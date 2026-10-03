@@ -1,0 +1,17 @@
+# Store and check out text files with LF line endings on every OS, so diffs are not polluted
+# by CRLF/LF churn between Windows and macOS/Linux contributors.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets are never normalised.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

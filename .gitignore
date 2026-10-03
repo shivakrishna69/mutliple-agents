@@ -1,0 +1,78 @@
+# =============================================================================
+# Secrets and environment configuration
+# Never commit real credentials. Only the documented templates (*.env.example) are tracked.
+# =============================================================================
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+
+# =============================================================================
+# Dependencies
+# Lockfiles (package-lock.json) ARE committed for reproducible installs.
+# =============================================================================
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/install-state.gz
+
+# =============================================================================
+# Build output and distribution artifacts
+# =============================================================================
+dist/
+build/
+out/
+*.tsbuildinfo
+.vite/
+
+# =============================================================================
+# Logs and debug output
+# =============================================================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+
+# =============================================================================
+# Test and coverage output
+# =============================================================================
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# =============================================================================
+# Python (ai-service)
+# =============================================================================
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# =============================================================================
+# Editors, operating systems, and local tool state
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+.claude/settings.local.json
