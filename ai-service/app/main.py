@@ -24,12 +24,14 @@ Request lifecycle for POST /ai/process
 
 Error mapping (body is always { "error": { message, requestId, details? } }):
     401 missing/invalid internal key        422 invalid body
-    503 GROQ_API_KEY not set, or Groq rate limited (with Retry-After when Groq provided one)
-    502 Groq unreachable / failed / rejected the key, or the model returned unusable output
+    503 GROQ_API_KEY not set
+    502 the graph finished without a reply message (should not happen; logged)
     504 the turn exceeded AI_PROCESS_TIMEOUT_SECONDS
     500 anything unexpected (logged with traceback; details hidden in production)
-The backend treats every non-2xx answer as "AI unavailable" and escalates the conversation to a
-human, so these codes are for observability; none of them loses a customer message.
+Model, tool, and parsing failures inside the graph do not produce errors: the supervisor and the
+workers handle them by handing off to a human, which returns 200 with next_worker = "human" and the
+reason in internal_logs. The backend treats every non-2xx answer as "AI unavailable" and escalates
+the conversation too, so no path loses a customer message.
 """
 
 from __future__ import annotations
@@ -54,7 +56,6 @@ from app.agent import (
     AgentTimeoutError,
     InvalidModelOutputError,
     LLMNotConfiguredError,
-    LLMUpstreamError,
 )
 from app.config import ConfigurationError, Settings
 from app.logging_config import configure_logging
@@ -300,6 +301,7 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
         turn_result = await agent_runtime.process_conversation(
             thread_id=thread_id,
             transcript_messages=convert_to_langchain_messages(conversation_input.messages),
+            customer_id=conversation_input.customer_id,
             request_id=request_id,
         )
     except LLMNotConfiguredError as not_configured_error:
@@ -308,15 +310,6 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
     except AgentTimeoutError as timeout_error:
         logger.error("AI turn timed out", extra={**log_context, "detail": timeout_error.detail})
         raise ServiceError(status.HTTP_504_GATEWAY_TIMEOUT, "AI processing timed out") from timeout_error
-    except LLMUpstreamError as upstream_error:
-        logger.error(
-            "AI turn failed: model provider error",
-            extra={**log_context, "failure_kind": upstream_error.failure_kind, "detail": upstream_error.detail},
-        )
-        if upstream_error.failure_kind == "rate_limited":
-            retry_headers = {"Retry-After": str(upstream_error.retry_after_seconds)} if upstream_error.retry_after_seconds else None
-            raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI model is rate limited", headers=retry_headers) from upstream_error
-        raise ServiceError(status.HTTP_502_BAD_GATEWAY, "AI model provider request failed") from upstream_error
     except InvalidModelOutputError as invalid_output_error:
         logger.error(
             "AI turn failed: unusable model output",

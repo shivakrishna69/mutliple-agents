@@ -86,6 +86,10 @@ class Settings:
     # AI_SERVICE_TIMEOUT_MS so the backend receives a clean 504 instead of timing out itself.
     process_timeout_seconds: float
 
+    # Worker tools backed by simulated data (app/nodes/workers.py). Never allowed in production,
+    # where customers would receive invented ledger and log data as fact.
+    simulated_tools_enabled: bool
+
     # Conversation memory bounds (see agent.ThreadRegistry).
     max_context_messages: int
     thread_idle_ttl_seconds: int
@@ -127,8 +131,19 @@ class Settings:
         if process_timeout_seconds <= llm_request_timeout_seconds:
             raise ConfigurationError("AI_PROCESS_TIMEOUT_SECONDS must be greater than LLM_REQUEST_TIMEOUT_SECONDS")
 
+        environment = os.getenv("APP_ENV", "development").strip()
+        simulated_tools_setting = os.getenv("SIMULATED_TOOLS_ENABLED", "").strip().lower()
+        if simulated_tools_setting not in {"", "true", "false"}:
+            raise ConfigurationError('SIMULATED_TOOLS_ENABLED must be "true" or "false"')
+        # Default: on everywhere except production.
+        simulated_tools_enabled = (
+            environment != "production" if simulated_tools_setting == "" else simulated_tools_setting == "true"
+        )
+        if environment == "production" and simulated_tools_enabled:
+            raise ConfigurationError("SIMULATED_TOOLS_ENABLED cannot be true in production: customers would receive simulated data")
+
         return cls(
-            environment=os.getenv("APP_ENV", "development").strip(),
+            environment=environment,
             log_level=log_level,
             internal_api_key=internal_api_key,
             groq_api_key=groq_api_key,
@@ -140,6 +155,7 @@ class Settings:
             llm_max_output_tokens=_read_int("LLM_MAX_OUTPUT_TOKENS", 2048, 64, 8192),
             llm_reasoning_effort=llm_reasoning_effort,
             process_timeout_seconds=process_timeout_seconds,
+            simulated_tools_enabled=simulated_tools_enabled,
             max_context_messages=_read_int("MAX_CONTEXT_MESSAGES", 30, 2, 100),
             thread_idle_ttl_seconds=_read_int("THREAD_IDLE_TTL_SECONDS", 7200, 60, 7 * 24 * 3600),
             max_tracked_threads=_read_int("MAX_TRACKED_THREADS", 1000, 1, 100_000),

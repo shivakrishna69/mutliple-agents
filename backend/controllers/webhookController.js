@@ -320,7 +320,7 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
     .select('_id senderType text createdAt')
     .lean();
 
-  const aiProcessRequest = buildConversationInput(conversationId.toString(), [
+  const aiProcessRequest = buildConversationInput(conversationId.toString(), customerId, [
     ...earlierMessagesNewestFirst.reverse(),
     customerMessage,
   ]);

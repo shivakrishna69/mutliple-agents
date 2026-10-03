@@ -74,6 +74,11 @@ class ConversationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     conversation_id: IdentifierString
+    customer_id: IdentifierString | None = Field(
+        default=None,
+        description="The authenticated customer who owns the conversation. Tools that read customer records are "
+        "scoped to this id; without it, those tools are unavailable and the worker hands off to a human.",
+    )
     thread_id: IdentifierString | None = Field(
         default=None,
         description="Checkpointer thread key. Defaults to conversation_id; set it to keep separate memory per channel.",

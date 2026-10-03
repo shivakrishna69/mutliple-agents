@@ -19,5 +19,10 @@ from langchain_core.language_models.chat_models import BaseChatModel
 class AgentContext:
     # Deterministic (temperature 0.0) model used only for routing decisions.
     supervisor_model: BaseChatModel
+    # Model that writes customer replies. Worker nodes bind their tools to it per call.
+    worker_model: BaseChatModel
     # How many recent transcript messages a node sends to its model.
     max_context_messages: int
+    # Whether workers may call the simulated tools (query_system_logs, check_invoice_status).
+    # Always False in production; see Settings.simulated_tools_enabled.
+    simulated_tools_enabled: bool

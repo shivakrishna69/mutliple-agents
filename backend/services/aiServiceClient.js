@@ -5,6 +5,8 @@
  * Request (ConversationInput), built by `buildConversationInput`:
  *   {
  *     "conversation_id": string,
+ *     "customer_id":     string,             // the conversation owner; ai-service tools that read customer
+ *                                         // records (billing ledger) are scoped to it server-side
  *     "thread_id":       string,             // = conversation_id: one checkpointer thread per conversation
  *     "messages": [ { "message_id": string, "role": "user" | "assistant", "content": string } ]
  *   }
@@ -83,11 +85,13 @@ const CHAT_ROLE_BY_SENDER_TYPE = Object.freeze({
  * message to answer). Messages with empty text (AI audit entries without a reply) are skipped,
  * because the ai-service requires non-empty content.
  * @param {string} conversationId
+ * @param {string} customerId  Owner of the conversation (Conversation.customerId).
  * @param {Array<{ _id: unknown, senderType: string, text: string }>} transcriptMessages
  */
-export function buildConversationInput(conversationId, transcriptMessages) {
+export function buildConversationInput(conversationId, customerId, transcriptMessages) {
   return {
     conversation_id: conversationId,
+    customer_id: customerId,
     thread_id: conversationId,
     messages: transcriptMessages
       .filter((transcriptMessage) => typeof transcriptMessage.text === 'string' && transcriptMessage.text.trim().length > 0)
