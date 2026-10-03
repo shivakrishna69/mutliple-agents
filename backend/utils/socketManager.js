@@ -17,6 +17,8 @@
  *
  *   session:<sessionId>               every socket opened with one login session; used to
  *                                     disconnect them all at once on logout.
+ *   user:<userId>                     every socket of one user; used to end them after a role or
+ *                                     password change.
  *   staff                             every admin/agent socket; receives every conversation's
  *                                     status changes so queue views stay current.
  *   conversation:<id>:staff           admins/agents viewing one conversation; full payloads.
@@ -149,6 +151,8 @@ export const SOCKET_ERROR_CODES = Object.freeze({
   ACCESS_REVOKED: 'access_revoked',
   SESSION_EXPIRED: 'session_expired',
   SESSION_LOGGED_OUT: 'session_logged_out',
+  ROLE_CHANGED: 'role_changed',
+  PASSWORD_CHANGED: 'password_changed',
   SERVER_ERROR: 'server_error',
   // Handshake authentication failures use SESSION_FAILURE_REASON codes from sessionAuthenticator.
 });
@@ -184,6 +188,7 @@ const CONVERSATION_ROOM_PREFIX = 'conversation:';
 const ROOM_NAMES = Object.freeze({
   staffLobby: () => 'staff',
   session: (sessionId) => `session:${sessionId}`,
+  user: (userId) => `user:${userId}`,
   conversationStaff: (conversationId) => `${CONVERSATION_ROOM_PREFIX}${conversationId}:staff`,
   conversationCustomer: (conversationId) => `${CONVERSATION_ROOM_PREFIX}${conversationId}:customer`,
 });
@@ -450,6 +455,7 @@ function handleSocketConnection(socket) {
   activeClientConnections.set(socket.id, connectionRecord);
 
   socket.join(ROOM_NAMES.session(session.sessionId));
+  socket.join(ROOM_NAMES.user(user.id));
   if (isStaffRole(user.role)) socket.join(ROOM_NAMES.staffLobby());
 
   logger.info('Socket connected', {
@@ -796,6 +802,30 @@ export function disconnectSessionSockets(sessionId) {
     socketIoInstance.in(sessionRoomName).disconnectSockets(true);
   } catch (disconnectError) {
     logger.error('Failed to disconnect session sockets', {
+      error: { name: disconnectError.name, message: disconnectError.message, stack: disconnectError.stack },
+    });
+  }
+}
+
+/**
+ * Ends every socket of one user, optionally except those opened with one session, after telling
+ * the clients why. Used when a role changes (the role cached on each socket is now stale) and on
+ * other devices when the password changes. Never throws.
+ * @param {string} userId
+ * @param {string} endReasonCode  One of SOCKET_ERROR_CODES (ROLE_CHANGED, PASSWORD_CHANGED).
+ * @param {{ exceptSessionId?: string }} [options]
+ */
+export function disconnectUserSockets(userId, endReasonCode, { exceptSessionId } = {}) {
+  if (!socketIoInstance) return;
+  try {
+    const userSockets = exceptSessionId
+      ? socketIoInstance.in(ROOM_NAMES.user(userId)).except(ROOM_NAMES.session(exceptSessionId))
+      : socketIoInstance.in(ROOM_NAMES.user(userId));
+    userSockets.emit(SOCKET_EVENTS.SESSION_ENDED, { code: endReasonCode, message: SOCKET_MESSAGES.SESSION_ENDED });
+    userSockets.disconnectSockets(true);
+  } catch (disconnectError) {
+    logger.error('Failed to disconnect user sockets', {
+      userId,
       error: { name: disconnectError.name, message: disconnectError.message, stack: disconnectError.stack },
     });
   }

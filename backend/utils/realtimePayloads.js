@@ -16,17 +16,38 @@ function toIsoTimestamp(dateValue) {
   return dateValue instanceof Date ? dateValue.toISOString() : dateValue ?? null;
 }
 
+/** Longest tool output text sent to clients; the full value stays in the database. */
+const MAX_TOOL_OUTPUT_CHARACTERS = 500;
+
+/** A tool step's output as bounded display text (it may be a string or structured data). */
+function summarizeToolOutput(toolOutput) {
+  if (toolOutput === null || toolOutput === undefined) return null;
+  let outputText;
+  if (typeof toolOutput === 'string') {
+    outputText = toolOutput;
+  } else {
+    try {
+      outputText = JSON.stringify(toolOutput);
+    } catch {
+      outputText = String(toolOutput);
+    }
+  }
+  return outputText.length > MAX_TOOL_OUTPUT_CHARACTERS ? `${outputText.slice(0, MAX_TOOL_OUTPUT_CHARACTERS)}…` : outputText;
+}
+
 /** Full message payload for staff rooms. Accepts a Message document or lean record. */
 export function toStaffMessagePayload(messageRecord) {
   return {
     messageId: messageRecord._id.toString(),
     conversationId: messageRecord.conversationId.toString(),
     senderType: messageRecord.senderType,
+    senderUserId: messageRecord.senderUserId ? messageRecord.senderUserId.toString() : null,
     text: messageRecord.text,
     toolExecutionLogs: (messageRecord.toolExecutionLogs ?? []).map((toolStep) => ({
       step: toolStep.step,
       node: toolStep.node,
       toolName: toolStep.toolName ?? null,
+      output: summarizeToolOutput(toolStep.output),
       status: toolStep.status,
       error: toolStep.error ?? null,
       startedAt: toIsoTimestamp(toolStep.startedAt),

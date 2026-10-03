@@ -55,7 +55,29 @@ class WorkerName(str, Enum):
     SUPERVISOR = "supervisor"
     BILLING_AGENT = "billing_agent"
     TECH_AGENT = "tech_agent"
+    ATTENDANCE_AGENT = "attendance_agent"
     HUMAN = "human"
+
+
+class EmployeeContext(BaseModel):
+    """
+    The signed-in user's employment record, loaded by the backend from MongoDB (EmployeeProfile,
+    its OfficeLocation, and User) for every request that may reach the attendance regularization
+    agent. Trusted input: it comes from the authenticated session, never from the conversation.
+    Absent when the user has no current employee profile with an assigned office.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    employee_id: IdentifierString = Field(description="EmployeeProfile id.")
+    display_name: Annotated[str, StringConstraints(min_length=1, max_length=100)]
+    time_zone: Annotated[str, StringConstraints(min_length=1, max_length=64)] = Field(description="The office's IANA time zone.")
+    shift_start_time: Annotated[str, StringConstraints(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")] = Field(description="Office shift start, HH:MM.")
+    shift_end_time: Annotated[str, StringConstraints(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")] = Field(description="Office shift end, HH:MM.")
+    manager_id: IdentifierString | None = Field(default=None, description="The reporting manager's EmployeeProfile id.")
+    allowed_geofence_radius: Annotated[int, Field(ge=0, le=100_000)] | None = Field(
+        default=None, description="Punch-in geofence radius in metres, recorded with manager reviews."
+    )
 
 
 class ConversationMessage(BaseModel):
@@ -82,6 +104,10 @@ class ConversationInput(BaseModel):
     thread_id: IdentifierString | None = Field(
         default=None,
         description="Checkpointer thread key. Defaults to conversation_id; set it to keep separate memory per channel.",
+    )
+    employee_context: EmployeeContext | None = Field(
+        default=None,
+        description="Set when the customer is also an employee; enables attendance regularization in this conversation.",
     )
     messages: Annotated[list[ConversationMessage], Field(min_length=1, max_length=MAX_MESSAGES_PER_REQUEST)]
 
@@ -123,3 +149,56 @@ class ErrorResponse(BaseModel):
     """Error body, identical in shape to the backend's: { "error": { message, requestId, details? } }."""
 
     error: ErrorDetail
+
+
+# =================================================================================================
+# POST /ai/attendance/regularize
+# =================================================================================================
+
+REGULARIZATION_MESSAGE_MAX_LENGTH = 2_000
+
+
+class RegularizationTurnInput(BaseModel):
+    """
+    One employee message for the attendance regularization agent, sent by the backend's
+    POST /api/attendance/regularize. If the thread is waiting for the employee's answer to a
+    question, the message is treated as that answer; otherwise it starts a new request.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    thread_id: IdentifierString = Field(description="One regularization conversation per employee, e.g. attendance:<employeeId>.")
+    message: Annotated[str, StringConstraints(min_length=1, max_length=REGULARIZATION_MESSAGE_MAX_LENGTH)]
+    employee_context: EmployeeContext
+    start_new: bool = Field(default=False, description="Discard any unanswered question and treat the message as a new request.")
+
+
+class RegularizationApprovalSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attendance_id: str
+    date: str
+    punch_in_time: str
+    calculation_status: str
+    newly_created: bool
+
+
+class RegularizationReviewSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    review_id: str | None
+    routing_reason: str
+    date: str | None
+    manager_id: str | None
+    submitted: bool
+
+
+class RegularizationTurnResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    thread_id: IdentifierString
+    outcome: Annotated[str, StringConstraints(pattern=r"^(approved|awaiting_employee_input|routed_to_manager|out_of_scope)$")]
+    reply: Annotated[str, StringConstraints(min_length=1, max_length=MESSAGE_CONTENT_MAX_LENGTH)]
+    approval: RegularizationApprovalSummary | None
+    manager_review: RegularizationReviewSummary | None
+    internal_logs: Annotated[list[str], Field(max_length=MAX_INTERNAL_LOG_ENTRIES)]

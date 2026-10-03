@@ -81,6 +81,14 @@ class Settings:
     # For reasoning models (gpt-oss, qwen3): how much hidden reasoning to do before answering.
     # None means the parameter is not sent, which non-reasoning models require.
     llm_reasoning_effort: str | None
+    # Model for the attendance regularization sub-agent (app/nodes/attendance_agent.py). Defaults to
+    # groq_model. When a different model is set, reasoning_effort is not sent to it, because
+    # non-reasoning models (e.g. Llama) reject the parameter.
+    regularization_groq_model: str
+    # Base URL of the Node backend's internal API, used by the regularization agent to write
+    # Attendance entries and file manager reviews (app/services/backend_client.py). None disables
+    # attendance regularization: requests are answered with "unavailable" instead.
+    backend_internal_url: str | None
 
     # Hard deadline for one /ai/process call. Must be shorter than the backend's
     # AI_SERVICE_TIMEOUT_MS so the backend receives a clean 504 instead of timing out itself.
@@ -142,12 +150,23 @@ class Settings:
         if environment == "production" and simulated_tools_enabled:
             raise ConfigurationError("SIMULATED_TOOLS_ENABLED cannot be true in production: customers would receive simulated data")
 
+        groq_model = os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
+
+        backend_internal_url = os.getenv("BACKEND_INTERNAL_URL", "").strip().rstrip("/") or None
+        if backend_internal_url is not None:
+            if not backend_internal_url.startswith(("http://", "https://")):
+                raise ConfigurationError("BACKEND_INTERNAL_URL must start with http:// or https://")
+            if environment == "production" and not backend_internal_url.startswith("https://"):
+                raise ConfigurationError("BACKEND_INTERNAL_URL must use https in production")
+
         return cls(
             environment=environment,
             log_level=log_level,
             internal_api_key=internal_api_key,
             groq_api_key=groq_api_key,
-            groq_model=os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL,
+            groq_model=groq_model,
+            regularization_groq_model=os.getenv("REGULARIZATION_GROQ_MODEL", "").strip() or groq_model,
+            backend_internal_url=backend_internal_url,
             groq_base_url=groq_base_url,
             llm_request_timeout_seconds=llm_request_timeout_seconds,
             llm_max_retries=_read_int("LLM_MAX_RETRIES", 1, 0, 5),

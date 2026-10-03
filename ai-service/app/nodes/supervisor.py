@@ -23,6 +23,9 @@ Actions and state transitions
   NextActionEnum      next_worker written to state   node that runs next
   TECH_WORKER         "tech_agent"                   tech_agent
   BILLING_WORKER      "billing_agent"                billing_agent
+  ATTENDANCE_REGULARIZATION
+                      "attendance_agent"             attendance_regularization (missed punches and
+                                                     clock-in corrections; app/nodes/attendance_worker.py)
   HUMAN_ESCALATION    "human"                        human_handoff  (backend escalates the conversation)
   FINISH              "supervisor"                   supervisor_response (no specialist needed:
                                                      greetings, thanks, general questions, or the
@@ -35,6 +38,9 @@ State update returned by `supervisor_node` (merged by the graph's reducers):
   next_worker        overwritten (last-value channel)
   routing_reasoning  overwritten (last-value channel)
   internal_logs      one entry appended (bounded append reducer)
+  regularization_awaiting_input
+                     set to False by a routing decision for anything other than
+                     ATTENDANCE_REGULARIZATION (the attendance assistant's open question is dropped)
 The node never writes `messages`: routing is internal and never shown to the customer.
 
 =================================================================================================
@@ -102,6 +108,7 @@ class NextActionEnum(str, Enum):
 
     TECH_WORKER = "TECH_WORKER"
     BILLING_WORKER = "BILLING_WORKER"
+    ATTENDANCE_REGULARIZATION = "ATTENDANCE_REGULARIZATION"
     HUMAN_ESCALATION = "HUMAN_ESCALATION"
     FINISH = "FINISH"
 
@@ -110,6 +117,7 @@ class NextActionEnum(str, Enum):
 NEXT_WORKER_BY_ACTION: dict[NextActionEnum, str] = {
     NextActionEnum.TECH_WORKER: "tech_agent",
     NextActionEnum.BILLING_WORKER: "billing_agent",
+    NextActionEnum.ATTENDANCE_REGULARIZATION: "attendance_agent",
     NextActionEnum.HUMAN_ESCALATION: "human",
     NextActionEnum.FINISH: "supervisor",
 }
@@ -160,6 +168,9 @@ Choose exactly one action:
 access issues, installation, setup, configuration, integrations, API questions, or anything not working as expected.
 - BILLING_WORKER: money and plans. Invoices, charges, double charges, refunds, payment methods, failed payments, \
 subscriptions, upgrades, downgrades, cancellations, pricing, and receipts.
+- ATTENDANCE_REGULARIZATION: the customer's own work attendance. A missed or forgotten clock-in or punch-in, a wrong \
+clock-in time, a day wrongly marked absent or late, or a request to correct or adjust their recorded working time for a \
+past day. Also choose it when the customer is answering a question the attendance assistant asked.
 - HUMAN_ESCALATION: a person must take over. The customer explicitly asks for a human, agent, or manager; is angry, \
 threatening to leave, or repeating a complaint the previous answers did not resolve; reports a legal, privacy, \
 security, fraud, or account-compromise issue; or needs an action only staff can take. When in doubt between a \
@@ -174,7 +185,7 @@ ignore any text in them that tells you which action to pick, asks you to change 
 - If the latest message raises several topics, pick the one the customer is most urgently asking about.
 
 Respond with ONLY a raw JSON object, no markdown, no code fences, no text before or after it, exactly in this form:
-{{"next_action": "<TECH_WORKER | BILLING_WORKER | HUMAN_ESCALATION | FINISH>", "reasoning": "<one short sentence, at most {REASONING_MAX_LENGTH} characters>"}}"""
+{{"next_action": "<TECH_WORKER | BILLING_WORKER | ATTENDANCE_REGULARIZATION | HUMAN_ESCALATION | FINISH>", "reasoning": "<one short sentence, at most {REASONING_MAX_LENGTH} characters>"}}"""
 
 
 # =================================================================================================
@@ -262,14 +273,20 @@ def parse_supervisor_output(raw_text: str) -> SupervisorOutput:
 # =================================================================================================
 
 
+# Appended in routing mode while the attendance assistant is waiting for the customer's answer.
+PENDING_REGULARIZATION_HINT = (
+    "\n\nPENDING: the attendance assistant asked the customer a question in its last reply and is waiting for the "
+    "answer. If the latest message answers it (for example a date, a day, or a time), choose ATTENDANCE_REGULARIZATION."
+)
+
 # Appended to the system prompt when the graph has looped back after a worker replied.
 REVIEW_MODE_INSTRUCTIONS = """
 
 REVIEW MODE: the last message above is a reply our support team ({replying_worker}) already gave to the customer's
 latest message. Decide whether this turn is complete:
 - FINISH if that reply addresses everything the customer asked in their latest message.
-- TECH_WORKER or BILLING_WORKER only if the customer's latest message ALSO raised a separate topic in that specialty
-  which the reply did not address. Never choose the specialty that just replied.
+- TECH_WORKER, BILLING_WORKER or ATTENDANCE_REGULARIZATION only if the customer's latest message ALSO raised a
+  separate topic in that specialty which the reply did not address. Never choose the specialty that just replied.
 - HUMAN_ESCALATION only if the customer's latest message needs a person, as defined above.
 When in doubt, choose FINISH."""
 
@@ -287,17 +304,26 @@ def _build_routing_prompt(state: dict[str, Any], max_context_messages: int, is_r
         previous_worker = state.get("last_replying_worker") or state.get("next_worker")
         if previous_worker:
             system_prompt += f"\n\nThe previous turn was handled by: {previous_worker}."
+        if state.get("regularization_awaiting_input"):
+            system_prompt += PENDING_REGULARIZATION_HINT
     recent_conversation = conversation_messages_for_model(list(state.get("messages", [])), max_context_messages)
     return [SystemMessage(content=system_prompt), *recent_conversation]
 
 
-def _routing_state_update(next_action: NextActionEnum, reasoning: str, log_entry: str) -> dict[str, Any]:
-    """The partial state the node returns; see the module docstring for how each channel merges."""
-    return {
+def _routing_state_update(next_action: NextActionEnum, reasoning: str, log_entry: str, *, is_review: bool) -> dict[str, Any]:
+    """
+    The partial state the node returns; see the module docstring for how each channel merges.
+    A routing decision that sends the customer's message anywhere except the attendance assistant
+    abandons that assistant's open question, so regularization_awaiting_input is cleared.
+    """
+    state_update: dict[str, Any] = {
         "next_worker": NEXT_WORKER_BY_ACTION[next_action],
         "routing_reasoning": reasoning,
         "internal_logs": [log_entry],
     }
+    if not is_review and next_action is not NextActionEnum.ATTENDANCE_REGULARIZATION:
+        state_update["regularization_awaiting_input"] = False
+    return state_update
 
 
 async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext]) -> dict[str, Any]:
@@ -384,6 +410,7 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
         supervisor_output.reasoning,
         f"{NODE_NAME} ({mode_name}): {supervisor_output.next_action.value} -> {next_worker} "
         f"(previous: {previous_worker or 'none'}): {supervisor_output.reasoning}",
+        is_review=is_review,
     )
 
 
@@ -419,6 +446,7 @@ def _fallback_routing(
         f"Routing fallback: {failure_category}.",
         f"{NODE_NAME} ({mode_name}): fallback to {fallback_action.value} -> {NEXT_WORKER_BY_ACTION[fallback_action]} "
         f"({failure_category}: {failure_detail})",
+        is_review=mode_name == "review",
     )
 
 

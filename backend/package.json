@@ -10,9 +10,13 @@
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch --env-file-if-exists=.env server.js"
+    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "set-role": "node scripts/setUserRole.js",
+    "send-test-message": "node scripts/sendTestMessage.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.20.0",
     "bcryptjs": "^3.0.2",
@@ -21,6 +25,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.0",
+    "multer": "^2.4.0",
     "redis": "^6.3.0",
     "socket.io": "^4.8.4"
   }

@@ -17,7 +17,7 @@
  *   unassigned          New conversation, no reply has been produced yet.
  *                       Worker: supervisor (it will route the first message).
  *   processing-ai       The LangGraph supervisor or one of its workers is handling the thread.
- *                       Worker: supervisor | billing_agent | tech_agent. Moving between AI workers
+ *                       Worker: supervisor | billing_agent | tech_agent | attendance_agent. Moving between AI workers
  *                       changes only `currentActiveWorker`; the status stays processing-ai.
  *   escalated-to-human  The AI decided it cannot resolve the issue and the thread is waiting in
  *                       the human queue. Worker: human. assignedAgentId is empty.
@@ -59,6 +59,8 @@ export const ACTIVE_WORKER = Object.freeze({
   SUPERVISOR: 'supervisor',
   BILLING_AGENT: 'billing_agent',
   TECH_AGENT: 'tech_agent',
+  // Attendance regularization sub-agent (ai-service app/nodes/attendance_worker.py).
+  ATTENDANCE_AGENT: 'attendance_agent',
   HUMAN: 'human',
 });
 
@@ -69,7 +71,7 @@ const W = ACTIVE_WORKER;
 export const HUMAN_OWNED_STATUSES = Object.freeze([S.ESCALATED_TO_HUMAN, S.ASSIGNED_AGENT]);
 
 /** AI workers that the ai-service may hand a conversation to while it stays in processing-ai. */
-export const AI_WORKERS = Object.freeze([W.SUPERVISOR, W.BILLING_AGENT, W.TECH_AGENT]);
+export const AI_WORKERS = Object.freeze([W.SUPERVISOR, W.BILLING_AGENT, W.TECH_AGENT, W.ATTENDANCE_AGENT]);
 
 /**
  * For each status, the statuses it may move to. A status that is absent from a list
@@ -85,7 +87,7 @@ export const ALLOWED_STATUS_TRANSITIONS = Object.freeze({
 /** For each status, the workers that may be active while the conversation is in it. */
 const WORKERS_ALLOWED_IN_STATUS = Object.freeze({
   [S.UNASSIGNED]: [W.SUPERVISOR],
-  [S.PROCESSING_AI]: [W.SUPERVISOR, W.BILLING_AGENT, W.TECH_AGENT],
+  [S.PROCESSING_AI]: [W.SUPERVISOR, W.BILLING_AGENT, W.TECH_AGENT, W.ATTENDANCE_AGENT],
   [S.ESCALATED_TO_HUMAN]: [W.HUMAN],
   [S.ASSIGNED_AGENT]: [W.HUMAN],
 });

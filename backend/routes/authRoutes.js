@@ -5,6 +5,7 @@
  *   POST /api/auth/login   -> login rate limits -> loginUser       (public)
  *   GET  /api/auth/me      -> protect           -> getCurrentUser  (session required)
  *   POST /api/auth/logout  -> protect           -> logoutUser      (session + CSRF token required)
+ *   POST /api/auth/password -> protect -> login IP rate limit -> changePassword (session + CSRF token)
  *
  * The login route applies two limits in order: per client IP first (cheap, stops one source
  * from trying many accounts), then per IP-and-email (stops guessing one account's password).
@@ -13,7 +14,7 @@
  */
 
 import { Router } from 'express';
-import { getCurrentUser, loginUser, logoutUser, registerUser } from '../controllers/authController.js';
+import { changePassword, getCurrentUser, loginUser, logoutUser, registerUser } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
   loginRateLimitByClientIp,
@@ -27,5 +28,7 @@ authRouter.post('/signup', signupRateLimitByClientIp, registerUser);
 authRouter.post('/login', loginRateLimitByClientIp, loginRateLimitByClientIpAndEmail, loginUser);
 authRouter.get('/me', protect, getCurrentUser);
 authRouter.post('/logout', protect, logoutUser);
+// Rate-limited like login: it checks a password, so it must not become a guessing oracle.
+authRouter.post('/password', protect, loginRateLimitByClientIp, changePassword);
 
 export default authRouter;

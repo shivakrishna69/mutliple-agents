@@ -95,9 +95,45 @@ export const loginRateLimitByClientIpAndEmail = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_LOGIN_ATTEMPTS,
 });
 
+/** Per signed-in user (runs after `protect`), so customers on one shared network do not share a budget. */
+export const supportMessageRateLimitByUser = createRateLimiter({
+  limiterName: 'support_messages_per_user',
+  ...RATE_LIMITS.SUPPORT_MESSAGES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_SUPPORT_MESSAGES,
+});
+
 export const signupRateLimitByClientIp = createRateLimiter({
   limiterName: 'signup_per_ip',
   ...RATE_LIMITS.SIGNUP_PER_CLIENT_IP,
   resolveClientKey: resolveClientIp,
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_SIGNUP_ATTEMPTS,
+});
+
+export const vaultUploadRateLimitByUser = createRateLimiter({
+  limiterName: 'vault_uploads_per_user',
+  ...RATE_LIMITS.VAULT_UPLOADS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_VAULT_UPLOADS,
+});
+
+export const vaultDownloadRateLimitByUser = createRateLimiter({
+  limiterName: 'vault_downloads_per_user',
+  ...RATE_LIMITS.VAULT_DOWNLOADS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_VAULT_DOWNLOADS,
+});
+
+export const attendancePunchRateLimitByUser = createRateLimiter({
+  limiterName: 'attendance_punches_per_user',
+  ...RATE_LIMITS.ATTENDANCE_PUNCHES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_PUNCH_ATTEMPTS,
+});
+
+export const regularizationRateLimitByUser = createRateLimiter({
+  limiterName: 'regularization_messages_per_user',
+  ...RATE_LIMITS.REGULARIZATION_MESSAGES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_REGULARIZATION_MESSAGES,
 });

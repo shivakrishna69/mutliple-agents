@@ -40,3 +40,23 @@ export function sendError(req, res, statusCode, message, errorDetails) {
     },
   });
 }
+
+/**
+ * Sends an expected-error response that also carries a stable machine-readable `code` (so clients
+ * branch on the code, not on message text) and optional structured `context`:
+ *   { "error": { "message", "code", "requestId", "context"?: object } }
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {number} statusCode
+ * @param {{ code: string, message: string, context?: object }} codedError
+ */
+export function sendCodedError(req, res, statusCode, { code, message, context }) {
+  return res.status(statusCode).json({
+    error: {
+      message,
+      code,
+      requestId: req.id,
+      ...(context && { context }),
+    },
+  });
+}

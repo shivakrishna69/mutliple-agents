@@ -40,6 +40,49 @@ function validateEmailField(rawEmail) {
 }
 
 /**
+ * A password being set (signup or change): required (whitespace-only counts as empty) ->
+ * minimum length -> 72-byte maximum -> strength rules. Same order as the backend's checkNewPassword.
+ */
+function validateNewPasswordField(candidatePassword) {
+  if (candidatePassword.trim().length === 0) return FORM_MESSAGES.PASSWORD_REQUIRED;
+  if (candidatePassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) return FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
+  if (measureUtf8ByteLength(candidatePassword) > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES) return FORM_MESSAGES.PASSWORD_TOO_LONG;
+  if (!evaluatePasswordRules(candidatePassword).every((ruleResult) => ruleResult.isSatisfied)) {
+    return FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
+  }
+  return null;
+}
+
+/**
+ * Validates the change-password form (Account page), mirroring backend validateChangePasswordInput:
+ *   currentPassword  required
+ *   newPassword      new-password rules -> must differ from the current password
+ *   confirmPassword  required -> identical to newPassword (frontend-only)
+ */
+export function validateChangePasswordForm(formValues) {
+  const fieldErrors = {};
+
+  if (formValues.currentPassword.trim().length === 0) {
+    fieldErrors.currentPassword = FORM_MESSAGES.CURRENT_PASSWORD_REQUIRED;
+  }
+
+  const newPasswordError = validateNewPasswordField(formValues.newPassword);
+  if (newPasswordError) {
+    fieldErrors.newPassword = newPasswordError;
+  } else if (!fieldErrors.currentPassword && formValues.newPassword === formValues.currentPassword) {
+    fieldErrors.newPassword = FORM_MESSAGES.NEW_PASSWORD_SAME_AS_CURRENT;
+  }
+
+  if (formValues.confirmPassword.length === 0) {
+    fieldErrors.confirmPassword = FORM_MESSAGES.CONFIRM_PASSWORD_REQUIRED;
+  } else if (formValues.confirmPassword !== formValues.newPassword) {
+    fieldErrors.confirmPassword = FORM_MESSAGES.PASSWORDS_DO_NOT_MATCH;
+  }
+
+  return fieldErrors;
+}
+
+/**
  * Validates every signup field. Order per field matches the backend:
  *   name      required (after trimming) -> 1..100 characters
  *   email     required -> length -> pattern
@@ -60,15 +103,8 @@ export function validateSignupForm(formValues) {
   const emailError = validateEmailField(formValues.email);
   if (emailError) fieldErrors.email = emailError;
 
-  if (formValues.password.trim().length === 0) {
-    fieldErrors.password = FORM_MESSAGES.PASSWORD_REQUIRED;
-  } else if (formValues.password.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) {
-    fieldErrors.password = FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
-  } else if (measureUtf8ByteLength(formValues.password) > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES) {
-    fieldErrors.password = FORM_MESSAGES.PASSWORD_TOO_LONG;
-  } else if (!evaluatePasswordRules(formValues.password).every((ruleResult) => ruleResult.isSatisfied)) {
-    fieldErrors.password = FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
-  }
+  const passwordError = validateNewPasswordField(formValues.password);
+  if (passwordError) fieldErrors.password = passwordError;
 
   if (formValues.confirmPassword.length === 0) {
     fieldErrors.confirmPassword = FORM_MESSAGES.CONFIRM_PASSWORD_REQUIRED;

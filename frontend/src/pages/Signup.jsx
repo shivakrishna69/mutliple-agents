@@ -40,6 +40,8 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import FormField from '../components/FormField.jsx';
+import PasswordChecklist from '../components/PasswordChecklist.jsx';
+import PasswordField from '../components/PasswordField.jsx';
 import SubmitButton from '../components/SubmitButton.jsx';
 import { API_MESSAGES, BANNER_TITLES, FORM_MESSAGES } from '../constants/messages.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
@@ -246,6 +248,7 @@ export default function Signup() {
           <FormField
             fieldId="name"
             label="Full name"
+            placeholder="Jane Cooper"
             fieldValue={formValues.name}
             errorMessage={resolveVisibleFieldError('name')}
             autoCompleteHint="name"
@@ -258,6 +261,7 @@ export default function Signup() {
             fieldId="email"
             label="Email address"
             inputType="email"
+            placeholder="you@company.com"
             fieldValue={formValues.email}
             errorMessage={resolveVisibleFieldError('email')}
             autoCompleteHint="email"
@@ -266,10 +270,10 @@ export default function Signup() {
             onFieldBlur={handleFieldBlur}
           />
 
-          <FormField
+          <PasswordField
             fieldId="password"
             label="Password"
-            inputType="password"
+            placeholder="Create a strong password"
             fieldValue={formValues.password}
             errorMessage={resolveVisibleFieldError('password')}
             autoCompleteHint="new-password"
@@ -278,39 +282,13 @@ export default function Signup() {
             onFieldChange={handleFieldChange}
             onFieldBlur={handleFieldBlur}
           >
-            <ul id={PASSWORD_REQUIREMENTS_LIST_ID} className="mt-3 space-y-1.5 text-sm">
-              {passwordRuleResults.map((ruleResult) => (
-                <li
-                  key={ruleResult.ruleId}
-                  className={`flex items-center gap-2 transition-colors ${
-                    ruleResult.isSatisfied ? 'text-emerald-700' : 'text-slate-500'
-                  }`}
-                >
-                  <svg
-                    className={`h-4 w-4 shrink-0 ${ruleResult.isSatisfied ? 'text-emerald-500' : 'text-slate-300'}`}
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>
-                    {ruleResult.description}
-                    <span className="sr-only">{ruleResult.isSatisfied ? ' (met)' : ' (not met)'}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </FormField>
+            <PasswordChecklist listId={PASSWORD_REQUIREMENTS_LIST_ID} ruleResults={passwordRuleResults} />
+          </PasswordField>
 
-          <FormField
+          <PasswordField
             fieldId="confirmPassword"
             label="Confirm password"
-            inputType="password"
+            placeholder="Re-enter your password"
             fieldValue={formValues.confirmPassword}
             errorMessage={resolveVisibleFieldError('confirmPassword')}
             autoCompleteHint="new-password"

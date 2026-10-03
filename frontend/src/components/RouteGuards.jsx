@@ -8,7 +8,7 @@
 
 import { Navigate, Outlet } from 'react-router';
 import { AUTH_STATUS, useAuth } from '../auth/AuthContext.jsx';
-import { ROUTE_PATHS } from '../constants/routes.js';
+import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES } from '../constants/routes.js';
 import { SESSION_MESSAGES } from '../constants/messages.js';
 
 function SessionCheckSpinner() {
@@ -28,6 +28,36 @@ export function ProtectedRoute() {
   const { authStatus } = useAuth();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  return <Outlet />;
+}
+
+/**
+ * Renders the child route only for signed-in staff (admin or agent). Customers are sent to the
+ * dashboard; signed-out users to login. The backend enforces the same rule on every staff route.
+ */
+export function StaffRoute() {
+  const { authStatus, currentUser } = useAuth();
+  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
+  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  if (!STAFF_ROLES.includes(currentUser?.role)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  return <Outlet />;
+}
+
+/** Renders the child route only for signed-in customers; staff are sent to the dashboard. */
+export function CustomerRoute() {
+  const { authStatus, currentUser } = useAuth();
+  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
+  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  if (currentUser?.role !== USER_ROLES.CUSTOMER) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  return <Outlet />;
+}
+
+/** Renders the child route only for signed-in admins; everyone else is sent to the dashboard. */
+export function AdminRoute() {
+  const { authStatus, currentUser } = useAuth();
+  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
+  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  if (currentUser?.role !== USER_ROLES.ADMIN) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
   return <Outlet />;
 }
 

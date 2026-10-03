@@ -69,11 +69,16 @@ import {
   buildConversationInput,
   requestAiProcessing,
 } from '../services/aiServiceClient.js';
+import { loadEmployeeAgentContext } from '../services/employeeContext.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { createKeyedSerialExecutor } from '../utils/keyedSerialExecutor.js';
 import { logger } from '../utils/logger.js';
-import { toStaffConversationStatusPayload, toStaffMessagePayload } from '../utils/realtimePayloads.js';
-import { emitConversationStatusUpdate, emitNewMessage } from '../utils/socketManager.js';
+import {
+  publishConversationState,
+  publishMessage,
+  touchConversation,
+  updateConversationWithRetry,
+} from '../services/conversationState.js';
 import { validateIncomingMessagePayload } from '../validators/webhookValidators.js';
 
 export const WEBHOOK_OUTCOME = Object.freeze({
@@ -92,9 +97,6 @@ const ACTIVE_CONVERSATION_STATUSES = Object.freeze(Object.values(CONVERSATION_ST
 
 /** Earlier messages sent to the AI as context. Bounds request size and LLM token usage. */
 const AI_HISTORY_MESSAGE_LIMIT = 50;
-
-/** Attempts for a conversation state update that loses an optimistic-concurrency race. */
-const MAX_STATE_UPDATE_ATTEMPTS = 3;
 
 const DUPLICATE_KEY_ERROR_CODE = 11000;
 
@@ -119,45 +121,8 @@ function toReplySummary(replyMessage) {
   return { messageId: replyMessage._id.toString(), senderType: replyMessage.senderType, text: replyMessage.text };
 }
 
-/**
- * Real-time publishing. Called only after the corresponding write has been committed, so a
- * subscriber never sees an event for data that is not in the database. Both emit helpers
- * never throw: a socket problem cannot fail the webhook. Status updates are awaited so that
- * consecutive changes to one conversation reach clients in the order they were written.
- */
-function publishMessage(messageRecord) {
-  emitNewMessage(messageRecord.conversationId, toStaffMessagePayload(messageRecord));
-}
-
-async function publishConversationState(conversationRecord) {
-  await emitConversationStatusUpdate(conversationRecord._id, toStaffConversationStatusPayload(conversationRecord));
-}
-
 function isDuplicateExternalMessageIdError(error) {
   return error?.code === DUPLICATE_KEY_ERROR_CODE && Boolean(error?.keyPattern?.externalMessageId);
-}
-
-/**
- * Loads a conversation, lets `applyChange` modify it, and saves it, reloading and retrying if
- * another writer saved first (VersionError from optimisticConcurrency). `applyChange` returns
- * false when the current state needs no change, in which case nothing is written.
- * Returns the conversation as stored after the update, or null if it no longer exists.
- */
-async function updateConversationWithRetry(conversationId, applyChange) {
-  for (let attemptNumber = 1; attemptNumber <= MAX_STATE_UPDATE_ATTEMPTS; attemptNumber += 1) {
-    const conversationRecord = await Conversation.findById(conversationId);
-    if (!conversationRecord) return null;
-    if (!applyChange(conversationRecord)) return conversationRecord;
-    try {
-      await conversationRecord.save();
-      await publishConversationState(conversationRecord);
-      return conversationRecord;
-    } catch (saveError) {
-      const isLastAttempt = attemptNumber === MAX_STATE_UPDATE_ATTEMPTS;
-      if (!(saveError instanceof mongoose.Error.VersionError) || isLastAttempt) throw saveError;
-    }
-  }
-  return null;
 }
 
 /** Returns the customer's active conversation, creating a new `unassigned` one if there is none. */
@@ -274,6 +239,8 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
     throw createError;
   }
   publishMessage(customerMessage);
+  // Record the activity on the conversation so activity-sorted consoles move it to the top.
+  await touchConversation(conversationId);
 
   const stageContext = {
     ...logContext,
@@ -320,15 +287,21 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
     .select('_id senderType text createdAt')
     .lean();
 
-  const aiProcessRequest = buildConversationInput(conversationId.toString(), customerId, [
-    ...earlierMessagesNewestFirst.reverse(),
-    customerMessage,
-  ]);
+  // Employees get their real employment context (EmployeeProfile + OfficeLocation), so an
+  // attendance correction can be routed to the regularization agent; everyone else gets null.
+  const employeeContextLookup = await loadEmployeeAgentContext(customerId);
+  const aiProcessRequest = buildConversationInput(
+    conversationId.toString(),
+    customerId,
+    [...earlierMessagesNewestFirst.reverse(), customerMessage],
+    employeeContextLookup.isAvailable ? employeeContextLookup.employeeContext : null,
+  );
 
   logger.info('Forwarded to AI service', {
     ...stageContext,
     stage: 'forwarded',
     transcriptMessageCount: aiProcessRequest.messages.length,
+    hasEmployeeContext: aiProcessRequest.employee_context !== null,
     activeWorker: aiReadyConversation.currentActiveWorker,
     timeoutMs: config.aiServiceTimeoutMs,
   });
@@ -418,6 +391,18 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
   };
 }
 
+/**
+ * Entry point to stages 2-4 for any channel that has already authenticated the customer and
+ * validated the text: the signed webhook below, and the web chat (controllers/supportController.js).
+ * Runs with the customer's lock held, so one customer's messages are processed in arrival order
+ * whatever channel they come from. `eventId` is the channel's idempotency key: a repeated id
+ * returns the original result without saving or calling the AI again.
+ * @returns {Promise<{ outcome: string, conversation: object|null, customerMessageId: string, reply: object|null }>}
+ */
+export function ingestCustomerMessage({ customerId, eventId, text, config, logContext }) {
+  return runExclusivelyPerCustomer(customerId, () => processCustomerMessage({ customerId, eventId, text, config, logContext }));
+}
+
 // ---------------------------------------------------------------------------
 // Route handler (stage 1)
 // ---------------------------------------------------------------------------
@@ -456,15 +441,13 @@ export async function receiveIncomingMessage(req, res, next) {
     }
     const customerId = customerRecord._id.toString();
 
-    const processingResult = await runExclusivelyPerCustomer(customerId, () =>
-      processCustomerMessage({
-        customerId,
-        eventId,
-        text,
-        config: req.app.locals.config,
-        logContext: { ...logContext, customerId },
-      }),
-    );
+    const processingResult = await ingestCustomerMessage({
+      customerId,
+      eventId,
+      text,
+      config: req.app.locals.config,
+      logContext: { ...logContext, customerId },
+    });
 
     const responseMessage =
       processingResult.outcome === WEBHOOK_OUTCOME.DUPLICATE ? WEBHOOK_MESSAGES.DUPLICATE_EVENT : WEBHOOK_MESSAGES.MESSAGE_PROCESSED;

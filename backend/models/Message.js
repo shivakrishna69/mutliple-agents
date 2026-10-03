@@ -86,6 +86,14 @@ const messageSchema = new mongoose.Schema(
       maxlength: [MESSAGE_FIELD_LIMITS.TEXT_MAX_LENGTH, 'Message text is too long'],
       immutable: true,
     },
+    // The staff member who wrote a human_agent message; required for that sender type and absent
+    // for all others, so every human reply in the audit trail names its author.
+    senderUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      immutable: true,
+      default: undefined,
+    },
     // The sending system's id for an inbound message (webhook `eventId`). Unique, so a webhook
     // delivered twice is stored once; absent for messages created inside this system.
     externalMessageId: {
@@ -145,6 +153,13 @@ messageSchema.pre('validate', async function requireContent() {
   }
   if (!isAi && hasSteps) {
     this.invalidate('toolExecutionLogs', `Messages from "${this.senderType}" cannot have toolExecutionLogs`);
+  }
+  const isHumanAgent = this.senderType === SENDER_TYPE.HUMAN_AGENT;
+  if (isHumanAgent && !this.senderUserId) {
+    this.invalidate('senderUserId', 'Human agent messages must record the agent who sent them');
+  }
+  if (!isHumanAgent && this.senderUserId) {
+    this.invalidate('senderUserId', `Messages from "${this.senderType}" cannot have a senderUserId`);
   }
 });
 

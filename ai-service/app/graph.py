@@ -27,6 +27,13 @@ reply, and every worker returns control to the supervisor until the turn is comp
   tech_agent            app/nodes/workers.py      replies; may call query_system_logs
   supervisor_response   app/nodes/workers.py      the supervisor's own reply (FINISH, no tools)
   human_handoff         this module                fixed handoff reply; escalates to a person
+  attendance_regularization
+                        app/nodes/attendance_worker.py
+                                                   runs the attendance regularization sub-agent
+                                                   (app/nodes/attendance_agent.py); returns to the
+                                                   supervisor for review like billing/tech. Not
+                                                   drawn above: it sits beside billing_agent and
+                                                   tech_agent and follows the same edges.
 
 =================================================================================================
 2. One turn = one customer message
@@ -73,6 +80,7 @@ reply, and every worker returns control to the supervisor until the turn is comp
 
     replies == 0   (first decision of the turn)
       billing_agent -> billing_agent      tech_agent -> tech_agent
+      attendance_agent -> attendance_regularization
       supervisor    -> supervisor_response (FINISH: the supervisor answers itself)
       human         -> human_handoff
     replies >= 1   (review after a worker replied)
@@ -87,7 +95,7 @@ reply, and every worker returns control to the supervisor until the turn is comp
       supervisor_response replied                               -> END (the supervisor already
                                                                   answered the turn as a whole)
       replies >= MAX_REPLIES_PER_TURN                           -> END (a review could only end it)
-      billing_agent / tech_agent replied                        -> supervisor (review)
+      billing_agent / tech_agent / attendance_agent replied     -> supervisor (review)
 
   Why the loop always terminates: every pass through a worker adds exactly one final reply or
   ends the turn; the review can only route to a specialist that has not replied this turn; and
@@ -113,6 +121,14 @@ reply, and every worker returns control to the supervisor until the turn is comp
                         unique marker so only that turn's entries are returned.
   customer_id           last value, set from the request each turn; read only by server-side tool
                         argument injection, never shown to a model.
+  employee_context      last value, set from the request each turn (None for non-employees); read
+                        only by the attendance node.
+  conversation_thread_id
+                        last value, set each turn; the attendance node's sub-agent thread is
+                        "support:<conversation_thread_id>".
+  regularization_awaiting_input
+                        last value: the attendance sub-agent is paused on a question. Set by the
+                        attendance node, cleared by the supervisor when it routes elsewhere.
 
   The graph is compiled with a checkpointer (MemorySaver in AgentRuntime). Runs use
   durability="exit": one checkpoint per completed turn; a failed or timed-out turn writes nothing.
@@ -132,6 +148,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 
+from app.nodes.attendance_worker import NODE_NAME as ATTENDANCE_NODE_NAME
+from app.nodes.attendance_worker import attendance_regularization_node
 from app.nodes.context import AgentContext
 from app.nodes.policies import HUMAN_HANDOFF_REPLY
 from app.nodes.supervisor import NODE_NAME as SUPERVISOR_NODE_NAME
@@ -158,11 +176,13 @@ NODE_BILLING_AGENT = BILLING_WORKER_NODE_NAME
 NODE_TECH_AGENT = TECH_WORKER_NODE_NAME
 NODE_SUPERVISOR_RESPONSE = SUPERVISOR_RESPONSE_NODE_NAME
 NODE_HUMAN_HANDOFF = "human_handoff"
+NODE_ATTENDANCE_REGULARIZATION = ATTENDANCE_NODE_NAME
 
 # The supervisor's decision string (state.next_worker) -> the node that carries it out.
 NODE_BY_ROUTING_DECISION: dict[str, str] = {
     WorkerName.BILLING_AGENT.value: NODE_BILLING_AGENT,
     WorkerName.TECH_AGENT.value: NODE_TECH_AGENT,
+    WorkerName.ATTENDANCE_AGENT.value: NODE_ATTENDANCE_REGULARIZATION,
     WorkerName.SUPERVISOR.value: NODE_SUPERVISOR_RESPONSE,
     WorkerName.HUMAN.value: NODE_HUMAN_HANDOFF,
 }
@@ -195,6 +215,15 @@ class AgentState(TypedDict, total=False):
     routing_reasoning: str
     internal_logs: Annotated[list[str], merge_internal_logs]
     customer_id: str
+    # Set from the request each turn: the customer's employment record (EmployeeContext as a dict)
+    # loaded by the backend from MongoDB, or None when they are not an employee with an office.
+    employee_context: dict[str, Any] | None
+    # The checkpointer thread of this conversation; the attendance node derives the sub-agent's
+    # thread from it.
+    conversation_thread_id: str
+    # True while the attendance regularization sub-agent is waiting for the customer's answer to a
+    # question; the supervisor routes the answer back to it (app/nodes/supervisor.py).
+    regularization_awaiting_input: bool
 
 
 # =================================================================================================
@@ -263,6 +292,7 @@ def build_support_graph(memory_checkpointer: BaseCheckpointSaver) -> CompiledSta
     graph_builder.add_node(NODE_TECH_AGENT, tech_worker_node)
     graph_builder.add_node(NODE_SUPERVISOR_RESPONSE, supervisor_response_node)
     graph_builder.add_node(NODE_HUMAN_HANDOFF, human_handoff_node)
+    graph_builder.add_node(NODE_ATTENDANCE_REGULARIZATION, attendance_regularization_node)
 
     graph_builder.add_edge(START, NODE_SUPERVISOR)
 
@@ -273,6 +303,7 @@ def build_support_graph(memory_checkpointer: BaseCheckpointSaver) -> CompiledSta
         {
             NODE_BILLING_AGENT: NODE_BILLING_AGENT,
             NODE_TECH_AGENT: NODE_TECH_AGENT,
+            NODE_ATTENDANCE_REGULARIZATION: NODE_ATTENDANCE_REGULARIZATION,
             NODE_SUPERVISOR_RESPONSE: NODE_SUPERVISOR_RESPONSE,
             NODE_HUMAN_HANDOFF: NODE_HUMAN_HANDOFF,
             END: END,
@@ -280,7 +311,7 @@ def build_support_graph(memory_checkpointer: BaseCheckpointSaver) -> CompiledSta
     )
 
     # Worker exits loop back to the supervisor, unless the worker ended the turn.
-    for worker_node_name in (NODE_BILLING_AGENT, NODE_TECH_AGENT, NODE_SUPERVISOR_RESPONSE):
+    for worker_node_name in (NODE_BILLING_AGENT, NODE_TECH_AGENT, NODE_ATTENDANCE_REGULARIZATION, NODE_SUPERVISOR_RESPONSE):
         graph_builder.add_conditional_edges(
             worker_node_name,
             route_after_worker,

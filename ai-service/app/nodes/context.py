@@ -11,8 +11,12 @@ for module-level globals.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from langchain_core.language_models.chat_models import BaseChatModel
+
+if TYPE_CHECKING:
+    from app.nodes.attendance_agent import RegularizationAgent
 
 
 @dataclass(frozen=True)
@@ -26,3 +30,6 @@ class AgentContext:
     # Whether workers may call the simulated tools (query_system_logs, check_invoice_status).
     # Always False in production; see Settings.simulated_tools_enabled.
     simulated_tools_enabled: bool
+    # The attendance regularization sub-agent, shared with POST /ai/attendance/regularize. None when
+    # BACKEND_INTERNAL_URL is not configured (the attendance node then says the feature is unavailable).
+    regularization_agent: "RegularizationAgent | None" = None

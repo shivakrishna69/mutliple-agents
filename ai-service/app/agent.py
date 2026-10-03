@@ -60,10 +60,20 @@ from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
 from app.config import Settings
 from app.graph import NODE_HUMAN_HANDOFF, RECURSION_LIMIT, build_support_graph
+from app.nodes.attendance_agent import (
+    BackendRegularizationSystems,
+    EmployeeProfileSnapshot,
+    RegularizationAgent,
+    RegularizationContext,
+    RegularizationTurnResult,
+    SimulatedActivityEvidenceSource,
+    create_regularization_model,
+)
 from app.nodes.context import AgentContext
 from app.nodes.supervisor import create_supervisor_model
 from app.nodes.transcript import replies_given_this_turn
-from app.schemas import MESSAGE_CONTENT_MAX_LENGTH
+from app.schemas import MESSAGE_CONTENT_MAX_LENGTH, EmployeeContext
+from app.services.backend_client import BackendInternalClient
 
 logger = logging.getLogger("ai_service.agent")
 
@@ -91,6 +101,10 @@ class InvalidModelOutputError(AgentError):
 
 class AgentTimeoutError(AgentError):
     """The whole turn exceeded AI_PROCESS_TIMEOUT_SECONDS."""
+
+
+class RegularizationUnavailableError(AgentError):
+    """BACKEND_INTERNAL_URL is not configured, so attendance cannot be read or written."""
 
 
 @dataclass(frozen=True)
@@ -213,8 +227,23 @@ class AgentRuntime:
 
         self._response_model: ChatGroq | None = None
         self._agent_context: AgentContext | None = None
+        self._backend_client: BackendInternalClient | None = None
+        self.regularization_agent: RegularizationAgent | None = None
         if settings.groq_api_key:
             self._response_model = self._create_chat_model(settings.llm_temperature)
+            # The attendance regularization sub-agent writes through the backend's internal API.
+            # Activity evidence comes from the simulated source only where simulated data is
+            # allowed (never in production); without a source every request goes to the manager.
+            if settings.backend_internal_url:
+                self._backend_client = BackendInternalClient(settings.backend_internal_url, settings.internal_api_key)
+                evidence_source = SimulatedActivityEvidenceSource() if settings.simulated_tools_enabled else None
+                self.regularization_agent = RegularizationAgent(
+                    RegularizationContext(
+                        extraction_model=create_regularization_model(settings),
+                        systems=BackendRegularizationSystems(self._backend_client, evidence_source),
+                    ),
+                    idle_ttl_seconds=settings.thread_idle_ttl_seconds,
+                )
             # Dependencies handed to nodes through LangGraph's runtime context on every run;
             # never written to the checkpointer.
             self._agent_context = AgentContext(
@@ -222,10 +251,20 @@ class AgentRuntime:
                 worker_model=self._response_model,
                 max_context_messages=settings.max_context_messages,
                 simulated_tools_enabled=settings.simulated_tools_enabled,
+                regularization_agent=self.regularization_agent,
             )
 
         # The cyclic support workflow (app/graph.py), persisted per thread by memory_checkpointer.
         self.compiled_graph = build_support_graph(self.memory_checkpointer)
+
+    async def aclose(self) -> None:
+        """Releases pooled connections (called on application shutdown)."""
+        if self._backend_client is not None:
+            await self._backend_client.aclose()
+
+    @property
+    def is_regularization_configured(self) -> bool:
+        return self.regularization_agent is not None
 
     @property
     def is_llm_configured(self) -> bool:
@@ -272,6 +311,7 @@ class AgentRuntime:
         transcript_messages: list[BaseMessage],
         customer_id: str | None,
         request_id: str | None,
+        employee_context: EmployeeContext | None = None,
     ) -> TurnResult:
         """
         Runs one turn for `thread_id` and returns the reply, the next worker, and this turn's logs.
@@ -280,6 +320,7 @@ class AgentRuntime:
           messages       [RemoveMessage(REMOVE_ALL_MESSAGES), *transcript_messages]  -> transcript replaced
           internal_logs  [turn marker]                                             -> appended
           customer_id    the authenticated customer from the request (empty if not sent) -> overwritten
+          employee_context / conversation_thread_id   from the request                -> overwritten
         `next_worker` and `routing_reasoning` are not in the input, so the stored values from the
         previous turn are visible to the supervisor.
         """
@@ -291,6 +332,8 @@ class AgentRuntime:
             "messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *transcript_messages],
             "internal_logs": [turn_marker],
             "customer_id": customer_id or "",
+            "employee_context": employee_context.model_dump(mode="json") if employee_context else None,
+            "conversation_thread_id": thread_id,
         }
         graph_config = {
             "configurable": {"thread_id": thread_id},
@@ -353,3 +396,33 @@ class AgentRuntime:
             logger.info("Thread history compacted", extra={"thread_id": thread_id})
         except Exception:  # noqa: BLE001 - compaction is best-effort by design (see docstring)
             logger.exception("Thread history compaction failed", extra={"thread_id": thread_id})
+
+    # ---------------------------------------------------------------------------------------------
+    # Attendance regularization (POST /ai/attendance/regularize)
+    # ---------------------------------------------------------------------------------------------
+
+    async def process_regularization(
+        self,
+        *,
+        thread_id: str,
+        message: str,
+        employee_context: EmployeeContext,
+        start_new: bool,
+    ) -> RegularizationTurnResult:
+        """
+        One employee message for the regularization sub-agent, outside the support conversation:
+        the answer to its pending question if it is waiting for one, otherwise a new request.
+        Bounded by AI_PROCESS_TIMEOUT_SECONDS. A timeout can interrupt the run after the backend
+        has written the entry; that is safe, because a retry finds the entry and reports it as
+        already recorded instead of writing a second one.
+        """
+        if not self.is_llm_configured:
+            raise LLMNotConfiguredError("llm_not_configured", "GROQ_API_KEY is not set")
+        if self.regularization_agent is None:
+            raise RegularizationUnavailableError("regularization_not_configured", "BACKEND_INTERNAL_URL is not set")
+        employee_profile = EmployeeProfileSnapshot.from_employee_context(employee_context)
+        try:
+            async with asyncio.timeout(self._settings.process_timeout_seconds):
+                return await self.regularization_agent.handle_message(thread_id, employee_profile, message, start_new=start_new)
+        except TimeoutError as timeout_error:
+            raise AgentTimeoutError("turn_timeout", f"regularization exceeded {self._settings.process_timeout_seconds} s") from timeout_error

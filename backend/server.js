@@ -4,10 +4,11 @@
  * Boot sequence (see `start()` at the bottom of this file):
  *   1. Load and validate environment variables  -> fail fast on misconfiguration.
  *   2. Connect to MongoDB through Mongoose      -> the server does not accept traffic without a database.
+ *      Then connect the cache (services/cacheStore.js): Redis when REDIS_URL is set, else in-memory.
  *   3. Build the Express app (`createApp`)      -> middleware, routes, 404 handler, error handler, in that order.
  *   4. Wrap it in a Node HTTP server and attach Socket.IO (utils/socketManager.js), so REST and
  *      real-time traffic share one port.
- *   5. Start listening and register shutdown    -> SIGINT/SIGTERM close sockets and HTTP first, then MongoDB.
+ *   5. Start listening and register shutdown    -> SIGINT/SIGTERM close sockets and HTTP first, then the cache and MongoDB.
  *
  * Error boundaries, from innermost to outermost:
  *   - `asyncHandler` wraps a route handler so a thrown error or rejected promise reaches `next(err)`.
@@ -29,6 +30,17 @@ import mongoose from 'mongoose';
 import { log, logger } from './utils/logger.js';
 import authRoutes from './routes/authRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import conversationRoutes from './routes/conversationRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import orgRoutes from './routes/orgRoutes.js';
+import vaultRoutes from './routes/vaultRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
+import internalRoutes from './routes/internalRoutes.js';
+import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
+import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
+import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
+import { EMAIL_PATTERN } from './constants/validation.js';
 import { closeSocketServer, initSocketServer } from './utils/socketManager.js';
 
 // ---------------------------------------------------------------------------
@@ -44,6 +56,65 @@ const MIN_SECRET_LENGTH = 32;
 
 /** Bounds for AI_SERVICE_TIMEOUT_MS: long enough for an LLM round trip, short enough not to hang webhooks. */
 const AI_SERVICE_TIMEOUT_BOUNDS_MS = Object.freeze({ MIN: 1_000, MAX: 120_000, DEFAULT: 20_000 });
+
+/**
+ * S3 bucket naming rules (3-63 characters, lowercase letters, digits, dots and hyphens, starting and
+ * ending with a letter or digit).
+ */
+const S3_BUCKET_NAME_PATTERN = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+// e.g. ap-south-1, us-east-1, us-gov-west-1
+const AWS_REGION_PATTERN = /^[a-z]{2}(?:-[a-z]+)+-\d+$/;
+
+/**
+ * Reads the document vault's storage settings (services/vaultStorage.js). Returns null when
+ * VAULT_S3_BUCKET is unset, which disables the vault: its routes then answer 503 and the rest of
+ * the backend runs normally. When a bucket is set, every related value is validated and a
+ * misconfiguration stops startup. AWS credentials are deliberately not read here; the SDK's
+ * default provider chain supplies them (IAM role in production).
+ */
+function loadVaultStorageConfig(env) {
+  const bucketName = process.env.VAULT_S3_BUCKET ? process.env.VAULT_S3_BUCKET.trim() : '';
+  if (!bucketName) return null;
+  if (!S3_BUCKET_NAME_PATTERN.test(bucketName) || bucketName.includes('..')) {
+    throw new Error('VAULT_S3_BUCKET is not a valid S3 bucket name');
+  }
+
+  const region = (process.env.AWS_REGION ?? '').trim();
+  if (!AWS_REGION_PATTERN.test(region)) {
+    throw new Error("AWS_REGION must be set to the vault bucket's region (e.g. ap-south-1) when VAULT_S3_BUCKET is set");
+  }
+
+  const serverSideEncryption = (process.env.VAULT_S3_SSE ?? 'aws:kms').trim();
+  if (!['aws:kms', 'AES256'].includes(serverSideEncryption)) {
+    throw new Error('VAULT_S3_SSE must be "aws:kms" or "AES256"');
+  }
+  const kmsKeyId = process.env.VAULT_S3_KMS_KEY_ID ? process.env.VAULT_S3_KMS_KEY_ID.trim() : null;
+  if (kmsKeyId && serverSideEncryption !== 'aws:kms') {
+    throw new Error('VAULT_S3_KMS_KEY_ID can only be used with VAULT_S3_SSE=aws:kms');
+  }
+
+  // Optional endpoint for S3-compatible stores. Production traffic must stay on TLS.
+  const rawEndpoint = process.env.VAULT_S3_ENDPOINT ? process.env.VAULT_S3_ENDPOINT.trim() : null;
+  let endpoint = null;
+  if (rawEndpoint) {
+    let parsedEndpoint;
+    try {
+      parsedEndpoint = new URL(rawEndpoint);
+    } catch {
+      throw new Error('VAULT_S3_ENDPOINT must be an absolute URL');
+    }
+    if (!['http:', 'https:'].includes(parsedEndpoint.protocol)) throw new Error('VAULT_S3_ENDPOINT must use http or https');
+    if (env === 'production' && parsedEndpoint.protocol !== 'https:') throw new Error('VAULT_S3_ENDPOINT must use https in production');
+    endpoint = parsedEndpoint.origin;
+  }
+
+  const forcePathStyleSetting = process.env.VAULT_S3_FORCE_PATH_STYLE;
+  if (forcePathStyleSetting !== undefined && forcePathStyleSetting !== '' && !['true', 'false'].includes(forcePathStyleSetting)) {
+    throw new Error('VAULT_S3_FORCE_PATH_STYLE must be "true" or "false"');
+  }
+
+  return { bucketName, region, serverSideEncryption, kmsKeyId, endpoint, forcePathStyle: forcePathStyleSetting === 'true' };
+}
 
 /**
  * Reads configuration from the environment and throws if a required value is missing.
@@ -109,6 +180,12 @@ function loadConfig() {
     throw new Error('TRUST_PROXY_HOPS must be a non-negative integer');
   }
 
+  // Optional. The account that becomes the first administrator (see services/bootstrapAdmin.js).
+  const bootstrapAdminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL ? process.env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase() : null;
+  if (bootstrapAdminEmail && !EMAIL_PATTERN.test(bootstrapAdminEmail)) {
+    throw new Error('BOOTSTRAP_ADMIN_EMAIL must be a valid email address');
+  }
+
   // Optional. When set, Socket.IO rooms are shared across instances through Redis.
   const redisUrl = process.env.REDIS_URL ? process.env.REDIS_URL.trim() : null;
   if (redisUrl) {
@@ -123,10 +200,15 @@ function loadConfig() {
     }
   }
 
+  // Optional. Employee document vault storage; null disables the vault.
+  const vaultStorage = loadVaultStorageConfig(env);
+
   return {
     env,
     cookieSecure,
     redisUrl,
+    vaultStorage,
+    bootstrapAdminEmail,
     trustProxyHops,
     port: Number(process.env.PORT ?? 5000),
     mongoUri: process.env.MONGO_URI,
@@ -338,6 +420,20 @@ export function createApp(config) {
   app.use('/api/auth', authRoutes);
   // POST /api/webhooks/incoming
   app.use('/api/webhooks', webhookRoutes);
+  // Conversation list, history, and staff actions (claim, release, reply)
+  app.use('/api/conversations', conversationRoutes);
+  // Customer web chat: send a message into the AI support pipeline
+  app.use('/api/support', supportRoutes);
+  // User administration (admins only)
+  app.use('/api/admin', adminRoutes);
+  // Organisation chart: full hierarchy and per-manager reports (staff only, Redis-cached)
+  app.use('/api/org', orgRoutes);
+  // Employee document vault: upload, list, 60-second pre-signed downloads, verification
+  app.use('/api/vault', vaultRoutes);
+  // Attendance: geofenced punch-in for the signed-in employee
+  app.use('/api/attendance', attendanceRoutes);
+  // Service-to-service API for the ai-service (X-Internal-Api-Key); not for browsers
+  app.use('/api/internal', internalRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -378,6 +474,9 @@ async function start() {
   try {
     config = loadConfig();
     await connectDatabase(config.mongoUri);
+    await ensureBootstrapAdmin(config.bootstrapAdminEmail);
+    await initCacheStore(config);
+    initVaultStorage(config.vaultStorage);
   } catch (err) {
     logger.error('Startup failed', { error: err.message, stack: err.stack });
     process.exit(1);
@@ -393,6 +492,7 @@ async function start() {
     await initSocketServer(httpServer, config);
   } catch (socketInitError) {
     logger.error('Startup failed', { error: socketInitError.message, stack: socketInitError.stack });
+    await closeCacheStore();
     await mongoose.connection.close();
     process.exit(1);
   }
@@ -407,7 +507,7 @@ async function start() {
 
   /**
    * Graceful shutdown: disconnect sockets and stop accepting connections (closeSocketServer
-   * also closes the HTTP server and waits for in-flight requests), then close MongoDB.
+   * also closes the HTTP server and waits for in-flight requests), then close the cache and MongoDB.
    * A 10-second timer forces exit if something hangs.
    */
   let isShuttingDown = false;
@@ -423,6 +523,8 @@ async function start() {
 
     try {
       await closeSocketServer();
+      await closeCacheStore();
+      closeVaultStorage();
       await mongoose.connection.close();
       logger.info('Shutdown complete');
       process.exit(0);

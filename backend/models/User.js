@@ -5,8 +5,10 @@
  *   - admin    : manages users and system settings; can view every conversation.
  *   - agent    : a human support agent; can claim escalated conversations
  *                (Conversation.assignedAgentId references a user with this role).
+ *   - hr       : HR staff; manages employee records and documents in the document vault
+ *                (DocumentVault.accessibleRoles). Has no access to the support console.
  *   - customer : opens conversations (Conversation.customerId references a user with this role).
- *   Public signup always creates customers; admin and agent accounts are created by an admin.
+ *   Public signup always creates customers; admins promote accounts to agent, hr or admin.
  *
  * Password handling:
  *   - `password` stores a bcrypt hash, never plaintext. The `pre('save')` hook is the single
@@ -24,11 +26,13 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { EMAIL_PATTERN, USER_FIELD_LIMITS } from '../constants/validation.js';
+import { invalidateOrgHierarchyCache } from '../services/orgHierarchyCache.js';
 
 /** Allowed values for `role`. Import this instead of repeating the strings in route code. */
 export const ROLES = Object.freeze({
   ADMIN: 'admin',
   AGENT: 'agent',
+  HR: 'hr',
   CUSTOMER: 'customer',
 });
 
@@ -65,6 +69,12 @@ const userSchema = new mongoose.Schema(
       // The 72-byte upper bound is enforced by the request validator, which can measure bytes.
       minlength: [USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH, 'Password is too short'],
       select: false,
+    },
+    // When the password was last changed. Sessions issued before this are rejected
+    // (services/sessionAuthenticator.loadSessionUser), which signs out other devices.
+    passwordChangedAt: {
+      type: Date,
+      default: null,
     },
     role: {
       type: String,
@@ -113,6 +123,42 @@ userSchema.methods.comparePassword = async function comparePassword(candidatePas
   }
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// ---------------------------------------------------------------------------
+// Org chart cache invalidation
+// ---------------------------------------------------------------------------
+
+/**
+ * The cached org hierarchy shows each employee's `name` from this collection, so renaming or
+ * deleting an account marks it stale. Other user changes (role, password) do not affect the chart
+ * and do not invalidate it. Hooks are awaited and never throw (services/orgHierarchyCache.js).
+ */
+const USER_UPDATE_QUERY_OPERATIONS = ['updateOne', 'updateMany', 'findOneAndUpdate'];
+const USER_REPLACE_OR_DELETE_OPERATIONS = ['replaceOne', 'findOneAndReplace', 'deleteOne', 'deleteMany', 'findOneAndDelete'];
+
+/** True when a query update writes `name` (top level or inside an operator such as $set). */
+function updateTouchesName(update) {
+  return Object.entries(update ?? {}).some(([updateKey, updateValue]) =>
+    updateKey === 'name' || (updateKey.startsWith('$') && updateValue !== null && typeof updateValue === 'object' && 'name' in updateValue),
+  );
+}
+
+userSchema.pre('save', function recordNameChange() {
+  // Captured before saving: after save() Mongoose resets the modified-paths tracking.
+  this.$locals.hasNameChanged = !this.isNew && this.isModified('name');
+});
+userSchema.post('save', async function invalidateOrgChartAfterRename() {
+  if (this.$locals.hasNameChanged) await invalidateOrgHierarchyCache('user renamed');
+});
+userSchema.post('deleteOne', { document: true, query: false }, async function invalidateOrgChartAfterDocumentDelete() {
+  await invalidateOrgHierarchyCache('user deleted');
+});
+userSchema.post(USER_UPDATE_QUERY_OPERATIONS, async function invalidateOrgChartAfterQueryRename() {
+  if (updateTouchesName(this.getUpdate())) await invalidateOrgHierarchyCache(`user ${this.op}`);
+});
+userSchema.post(USER_REPLACE_OR_DELETE_OPERATIONS, async function invalidateOrgChartAfterReplaceOrDelete() {
+  await invalidateOrgHierarchyCache(`user ${this.op}`);
+});
 
 const User = mongoose.model('User', userSchema);
 

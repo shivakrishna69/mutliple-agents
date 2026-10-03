@@ -9,6 +9,10 @@ Endpoints
                       Unauthenticated so orchestrators can probe it; exposes no conversation data.
     POST /ai/process  One conversation turn (see schemas.py for the contract). Requires the
                       X-Internal-Api-Key header to equal AI_SERVICE_API_KEY.
+    POST /ai/attendance/regularize
+                      One employee message for the attendance regularization sub-agent
+                      (RegularizationTurnInput -> RegularizationTurnResponse). Same key. 503 when
+                      the LLM or BACKEND_INTERNAL_URL is not configured, 504 on the turn deadline.
 
 Request lifecycle for POST /ai/process
     1. Middleware assigns/propagates X-Request-Id and logs the request when it completes.
@@ -56,10 +60,21 @@ from app.agent import (
     AgentTimeoutError,
     InvalidModelOutputError,
     LLMNotConfiguredError,
+    RegularizationUnavailableError,
 )
 from app.config import ConfigurationError, Settings
 from app.logging_config import configure_logging
-from app.schemas import AIProcessResponse, ChatRole, ConversationInput, ConversationMessage, ErrorResponse
+from app.schemas import (
+    AIProcessResponse,
+    ChatRole,
+    ConversationInput,
+    ConversationMessage,
+    ErrorResponse,
+    RegularizationApprovalSummary,
+    RegularizationReviewSummary,
+    RegularizationTurnInput,
+    RegularizationTurnResponse,
+)
 
 # ---------------------------------------------------------------------------------------------
 # Configuration and logging (fail fast on invalid configuration)
@@ -141,6 +156,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             await eviction_task
         except asyncio.CancelledError:
             pass
+        await agent_runtime.aclose()
         logger.info("ai-service stopped")
 
 
@@ -276,6 +292,7 @@ async def health(request: Request) -> JSONResponse:
             "status": "ok" if is_ready else "degraded",
             "service": "ai-service",
             "llm": "configured" if is_ready else "not_configured",
+            "attendanceRegularization": "configured" if agent_runtime.is_regularization_configured else "not_configured",
             "model": agent_runtime.model_name,
             "trackedThreads": agent_runtime.thread_registry.tracked_thread_count,
         },
@@ -303,6 +320,7 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
             transcript_messages=convert_to_langchain_messages(conversation_input.messages),
             customer_id=conversation_input.customer_id,
             request_id=request_id,
+            employee_context=conversation_input.employee_context,
         )
     except LLMNotConfiguredError as not_configured_error:
         logger.error("AI turn rejected: LLM not configured", extra=log_context)
@@ -333,4 +351,68 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
         response_content=turn_result.response_content,
         next_worker=turn_result.next_worker,
         internal_logs=turn_result.internal_logs,
+    )
+
+
+@app.post(
+    "/ai/attendance/regularize",
+    response_model=RegularizationTurnResponse,
+    responses=ERROR_RESPONSES,
+    dependencies=[Depends(require_internal_api_key)],
+    tags=["agent"],
+)
+async def regularize_attendance(turn_input: RegularizationTurnInput, request: Request) -> RegularizationTurnResponse:
+    """Runs one message of an employee's attendance regularization conversation."""
+    agent_runtime: AgentRuntime = request.app.state.agent_runtime
+    request_id = getattr(request.state, "request_id", None)
+    log_context = {"requestId": request_id, "thread_id": turn_input.thread_id}
+    started_at = time.perf_counter()
+
+    try:
+        turn_result = await agent_runtime.process_regularization(
+            thread_id=turn_input.thread_id,
+            message=turn_input.message,
+            employee_context=turn_input.employee_context,
+            start_new=turn_input.start_new,
+        )
+    except LLMNotConfiguredError as not_configured_error:
+        logger.error("Regularization rejected: LLM not configured", extra=log_context)
+        raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI model is not configured") from not_configured_error
+    except RegularizationUnavailableError as unavailable_error:
+        logger.error("Regularization rejected: backend internal URL not configured", extra=log_context)
+        raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "Attendance regularization is not configured") from unavailable_error
+    except AgentTimeoutError as timeout_error:
+        logger.error("Regularization timed out", extra={**log_context, "detail": timeout_error.detail})
+        raise ServiceError(status.HTTP_504_GATEWAY_TIMEOUT, "AI processing timed out") from timeout_error
+
+    approval_summary = None
+    if turn_result.approval is not None:
+        approval_summary = RegularizationApprovalSummary(
+            attendance_id=turn_result.approval.attendance_id,
+            date=turn_result.approval.target_date.isoformat(),
+            punch_in_time=turn_result.approval.punch_in_time.isoformat(),
+            calculation_status=turn_result.approval.calculation_status,
+            newly_created=turn_result.approval.newly_created,
+        )
+    review_summary = None
+    if turn_result.manager_review is not None:
+        review_summary = RegularizationReviewSummary(
+            review_id=turn_result.manager_review_id,
+            routing_reason=turn_result.manager_review.routing_reason.value,
+            date=turn_result.manager_review.target_date.isoformat() if turn_result.manager_review.target_date else None,
+            manager_id=turn_result.manager_review.reporting_manager_id,
+            submitted=turn_result.manager_review_id is not None,
+        )
+
+    logger.info(
+        "Regularization turn completed",
+        extra={**log_context, "outcome": turn_result.outcome.value, "duration_ms": round((time.perf_counter() - started_at) * 1000, 1)},
+    )
+    return RegularizationTurnResponse(
+        thread_id=turn_input.thread_id,
+        outcome=turn_result.outcome.value,
+        reply=turn_result.reply,
+        approval=approval_summary,
+        manager_review=review_summary,
+        internal_logs=turn_result.internal_logs[-200:],
     )

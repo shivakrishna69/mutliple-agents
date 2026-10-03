@@ -37,6 +37,53 @@ function normalizeEmail(rawEmail) {
 }
 
 /**
+ * Every rule a newly chosen password must meet (signup and password change): present, at least
+ * PASSWORD_MIN_LENGTH characters, at most PASSWORD_MAX_BYTES UTF-8 bytes, and each strength rule.
+ * Returns the first failure's message, or null. Not trimmed: spaces are part of the password.
+ */
+function checkNewPassword(rawPassword) {
+  const presenceError = checkRequiredString(rawPassword, VALIDATION_MESSAGES.PASSWORD_REQUIRED, VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING);
+  if (presenceError) return presenceError;
+  if (rawPassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) return VALIDATION_MESSAGES.PASSWORD_TOO_SHORT;
+  if (Buffer.byteLength(rawPassword, 'utf8') > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES) return VALIDATION_MESSAGES.PASSWORD_TOO_LONG;
+  // The first unmet strength rule; one message per field keeps the response shape uniform.
+  const firstUnmetRule = PASSWORD_STRENGTH_RULES.find((strengthRule) => !strengthRule.pattern.test(rawPassword));
+  return firstUnmetRule ? PASSWORD_RULE_MESSAGES[firstUnmetRule.ruleId] : null;
+}
+
+/**
+ * Validates POST /api/auth/password: { currentPassword, newPassword }. The current password is only
+ * checked for presence (the controller verifies it against the stored hash); the new one must meet
+ * every signup rule and differ from the current one.
+ */
+export function validateChangePasswordInput(requestBody) {
+  if (!isPlainObject(requestBody)) {
+    return {
+      isValid: false,
+      validationErrors: [{ field: 'body', message: VALIDATION_MESSAGES.REQUEST_BODY_MUST_BE_OBJECT }],
+      sanitizedInput: null,
+    };
+  }
+  const { currentPassword: rawCurrentPassword, newPassword: rawNewPassword } = requestBody;
+  const validationErrors = [];
+
+  const currentPasswordError = checkRequiredString(rawCurrentPassword, VALIDATION_MESSAGES.PASSWORD_REQUIRED, VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING);
+  if (currentPasswordError) validationErrors.push({ field: 'currentPassword', message: currentPasswordError });
+
+  const newPasswordError = checkNewPassword(rawNewPassword);
+  if (newPasswordError) {
+    validationErrors.push({ field: 'newPassword', message: newPasswordError });
+  } else if (!currentPasswordError && rawNewPassword === rawCurrentPassword) {
+    validationErrors.push({ field: 'newPassword', message: VALIDATION_MESSAGES.NEW_PASSWORD_SAME_AS_CURRENT });
+  }
+
+  if (validationErrors.length > 0) {
+    return { isValid: false, validationErrors, sanitizedInput: null };
+  }
+  return { isValid: true, validationErrors: [], sanitizedInput: { currentPassword: rawCurrentPassword, newPassword: rawNewPassword } };
+}
+
+/**
  * Validates POST /signup: name, email, and password, with the same limits as the User model,
  * plus the password strength rules (uppercase, lowercase, digit, special character).
  * The password is not trimmed: leading or trailing spaces are part of what the user typed.
@@ -82,25 +129,8 @@ export function validateRegistrationInput(requestBody) {
     }
   }
 
-  const passwordError = checkRequiredString(
-    rawPassword,
-    VALIDATION_MESSAGES.PASSWORD_REQUIRED,
-    VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING,
-  );
-  if (passwordError) {
-    validationErrors.push({ field: 'password', message: passwordError });
-  } else if (rawPassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) {
-    validationErrors.push({ field: 'password', message: VALIDATION_MESSAGES.PASSWORD_TOO_SHORT });
-  } else if (Buffer.byteLength(rawPassword, 'utf8') > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES) {
-    validationErrors.push({ field: 'password', message: VALIDATION_MESSAGES.PASSWORD_TOO_LONG });
-  } else {
-    // Report the first unmet strength rule; one message per field keeps the response shape
-    // the same as every other field's.
-    const firstUnmetRule = PASSWORD_STRENGTH_RULES.find((strengthRule) => !strengthRule.pattern.test(rawPassword));
-    if (firstUnmetRule) {
-      validationErrors.push({ field: 'password', message: PASSWORD_RULE_MESSAGES[firstUnmetRule.ruleId] });
-    }
-  }
+  const passwordError = checkNewPassword(rawPassword);
+  if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
 
   if (validationErrors.length > 0) {
     return { isValid: false, validationErrors, sanitizedInput: null };

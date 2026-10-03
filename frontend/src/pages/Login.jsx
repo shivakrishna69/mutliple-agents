@@ -38,6 +38,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import FormField from '../components/FormField.jsx';
+import PasswordField from '../components/PasswordField.jsx';
 import SubmitButton from '../components/SubmitButton.jsx';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
@@ -188,8 +189,8 @@ export default function Login() {
 
   return (
     <AuthLayout
-      heading="Sign in to your account"
-      subheading="Welcome back. Enter your details to continue."
+      heading="Welcome back"
+      subheading="Sign in to continue to your support workspace."
       footer={
         <>
           Don&apos;t have an account?{' '}
@@ -217,6 +218,7 @@ export default function Login() {
             fieldId="email"
             label="Email address"
             inputType="email"
+            placeholder="you@company.com"
             fieldValue={formValues.email}
             errorMessage={resolveVisibleFieldError('email')}
             autoCompleteHint="email"
@@ -225,10 +227,10 @@ export default function Login() {
             onFieldBlur={handleFieldBlur}
           />
 
-          <FormField
+          <PasswordField
             fieldId="password"
             label="Password"
-            inputType="password"
+            placeholder="Enter your password"
             fieldValue={formValues.password}
             errorMessage={resolveVisibleFieldError('password')}
             autoCompleteHint="current-password"

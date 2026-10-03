@@ -8,6 +8,10 @@
  *     "customer_id":     string,             // the conversation owner; ai-service tools that read customer
  *                                         // records (billing ledger) are scoped to it server-side
  *     "thread_id":       string,             // = conversation_id: one checkpointer thread per conversation
+ *     "employee_context": object | null,     // the customer's EmployeeProfile + OfficeLocation (services/
+ *                                         // employeeContext.js) when they are an employee, so the
+ *                                         // supervisor can route attendance corrections to the
+ *                                         // regularization agent with real data; null otherwise
  *     "messages": [ { "message_id": string, "role": "user" | "assistant", "content": string } ]
  *   }
  *   Oldest first; the last entry is the customer message being answered. Roles: customer -> user;
@@ -19,14 +23,15 @@
  *   {
  *     "conversation_id":  string,   // must equal the request's
  *     "response_content": string,   // 1–20,000 chars, the reply shown to the customer
- *     "next_worker":      "supervisor" | "billing_agent" | "tech_agent" | "human",
+ *     "next_worker":      "supervisor" | "billing_agent" | "tech_agent" | "attendance_agent" | "human",
  *     "internal_logs":    [ string ]   // this turn's audit trail, entries "<node>: <event>"
  *   }
  *
  * Translation into this backend's domain (returned by `requestAiProcessing`):
  *   next_worker "human"                -> nextState { action: escalate }
  *   any other next_worker              -> nextState { action: continue, activeWorker: next_worker }
- *   billing_agent / tech_agent replies -> senderType ai_worker; supervisor / human -> ai_supervisor
+ *   billing_agent / tech_agent / attendance_agent replies -> senderType ai_worker;
+ *   supervisor / human -> ai_supervisor
  *   internal_logs[i] "<node>: <event>" -> toolExecutionLogs[i] { step: i+1, node, output: event,
  *                                          status: success, startedAt: request start }
  *
@@ -45,6 +50,7 @@ import { SENDER_TYPE, TOOL_STEP_STATUS } from '../models/Message.js';
 import { MESSAGE_FIELD_LIMITS } from '../constants/validation.js';
 
 export const AI_PROCESS_PATH = '/ai/process';
+export const AI_REGULARIZE_PATH = '/ai/attendance/regularize';
 
 export const AI_FAILURE_KIND = Object.freeze({
   TIMEOUT: 'timeout',
@@ -66,10 +72,14 @@ const MAX_INTERNAL_LOG_ENTRY_LENGTH = 2_000;
 /** Worker value that means "hand the conversation to a human agent". */
 const HUMAN_WORKER = 'human';
 const RESPONSE_NEXT_WORKERS = Object.freeze([...AI_WORKERS, HUMAN_WORKER]);
-const WORKERS_REPLYING_AS_SPECIALIST = Object.freeze(['billing_agent', 'tech_agent']);
+const WORKERS_REPLYING_AS_SPECIALIST = Object.freeze(['billing_agent', 'tech_agent', 'attendance_agent']);
 
-/** "<node>: <event>" — node is a lowercase identifier such as supervisor or tech_agent. */
-const INTERNAL_LOG_ENTRY_PATTERN = /^([a-z_]{1,64}): ([\s\S]+)$/;
+/**
+ * "<node>: <event>" or "<node> (<mode>): <event>": node is a lowercase identifier such as
+ * supervisor or tech_agent; the optional mode (e.g. routing, review) is kept in the output text.
+ */
+// The node may carry a mode in parentheses, e.g. "supervisor (review): FINISH -> ...".
+const INTERNAL_LOG_ENTRY_PATTERN = /^([a-z_]{1,64})(?: \(([a-z_]{1,32})\))?: ([\s\S]+)$/;
 const UNATTRIBUTED_LOG_NODE = 'ai_service';
 
 /** Who the AI is answering on behalf of: the customer is "user", everyone else "assistant". */
@@ -87,12 +97,14 @@ const CHAT_ROLE_BY_SENDER_TYPE = Object.freeze({
  * @param {string} conversationId
  * @param {string} customerId  Owner of the conversation (Conversation.customerId).
  * @param {Array<{ _id: unknown, senderType: string, text: string }>} transcriptMessages
+ * @param {object|null} [employeeContext]  EmployeeContext from services/employeeContext.js, or null.
  */
-export function buildConversationInput(conversationId, customerId, transcriptMessages) {
+export function buildConversationInput(conversationId, customerId, transcriptMessages, employeeContext = null) {
   return {
     conversation_id: conversationId,
     customer_id: customerId,
     thread_id: conversationId,
+    employee_context: employeeContext,
     messages: transcriptMessages
       .filter((transcriptMessage) => typeof transcriptMessage.text === 'string' && transcriptMessage.text.trim().length > 0)
       .map((transcriptMessage) => ({
@@ -161,7 +173,7 @@ function parseAiServiceResponse(responseBody, expectedConversationId, requestSta
       step: entryIndex + 1,
       node: attributedEntry ? attributedEntry[1] : UNATTRIBUTED_LOG_NODE,
       toolName: null,
-      output: attributedEntry ? attributedEntry[2] : logEntry,
+      output: attributedEntry ? (attributedEntry[2] ? `[${attributedEntry[2]}] ${attributedEntry[3]}` : attributedEntry[3]) : logEntry,
       status: TOOL_STEP_STATUS.SUCCESS,
       startedAt: requestStartedAt,
       durationMs: null,
@@ -232,6 +244,101 @@ export async function requestAiProcessing(aiProcessRequest, { config, requestId 
       ...parseAiServiceResponse(aiServiceResponse.data, aiProcessRequest.conversation_id, new Date(startedAtMs)),
       durationMs,
     };
+  } catch (parseError) {
+    if (parseError instanceof AiServiceError) parseError.durationMs = durationMs;
+    throw parseError;
+  }
+}
+
+
+// =================================================================================================
+// POST /ai/attendance/regularize
+// =================================================================================================
+
+const REGULARIZATION_OUTCOMES = Object.freeze(['approved', 'awaiting_employee_input', 'routed_to_manager', 'out_of_scope']);
+
+/**
+ * Checks a RegularizationTurnResponse and maps it to the backend's camelCase shape. Throws
+ * AiServiceError(invalid_response) on any deviation from the contract.
+ */
+function parseRegularizationResponse(responseBody, expectedThreadId) {
+  const rejectResponse = (detail) => {
+    throw new AiServiceError(AI_FAILURE_KIND.INVALID_RESPONSE, detail);
+  };
+  if (!isPlainObject(responseBody)) rejectResponse('body is not a JSON object');
+  const { thread_id: threadId, outcome, reply, approval, manager_review: managerReview } = responseBody;
+  if (threadId !== expectedThreadId) rejectResponse('thread_id does not match the request');
+  if (!REGULARIZATION_OUTCOMES.includes(outcome)) rejectResponse('outcome is not a known outcome');
+  if (typeof reply !== 'string' || reply.trim().length === 0 || reply.length > MESSAGE_FIELD_LIMITS.TEXT_MAX_LENGTH) rejectResponse('reply is not a non-empty string');
+  if (approval !== null && !(isPlainObject(approval) && typeof approval.attendance_id === 'string' && typeof approval.date === 'string')) rejectResponse('approval is malformed');
+  if (managerReview !== null && !(isPlainObject(managerReview) && typeof managerReview.routing_reason === 'string' && typeof managerReview.submitted === 'boolean')) {
+    rejectResponse('manager_review is malformed');
+  }
+  return {
+    outcome,
+    reply: reply.trim(),
+    awaitingInput: outcome === 'awaiting_employee_input',
+    approval: approval
+      ? {
+          attendanceId: approval.attendance_id,
+          date: approval.date,
+          punchInTime: approval.punch_in_time,
+          calculationStatus: approval.calculation_status,
+          newlyCreated: approval.newly_created,
+        }
+      : null,
+    managerReview: managerReview
+      ? {
+          reviewId: managerReview.review_id,
+          routingReason: managerReview.routing_reason,
+          date: managerReview.date,
+          managerId: managerReview.manager_id,
+          submitted: managerReview.submitted,
+        }
+      : null,
+  };
+}
+
+/**
+ * Sends one employee message to the attendance regularization agent.
+ * @param {{ thread_id: string, message: string, employee_context: object, start_new: boolean }} regularizationRequest
+ * @param {{ config: object, requestId: string }} callContext
+ * @returns {Promise<ReturnType<typeof parseRegularizationResponse> & { durationMs: number }>}
+ * @throws {AiServiceError}
+ */
+export async function requestAttendanceRegularization(regularizationRequest, { config, requestId }) {
+  const startedAtMs = Date.now();
+  const deadlineSignal = AbortSignal.timeout(config.aiServiceTimeoutMs);
+  let aiServiceResponse;
+  try {
+    aiServiceResponse = await axios.post(`${config.aiServiceUrl}${AI_REGULARIZE_PATH}`, regularizationRequest, {
+      timeout: config.aiServiceTimeoutMs,
+      signal: deadlineSignal,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Internal-Api-Key': config.aiServiceApiKey,
+        'X-Request-Id': requestId,
+      },
+      responseType: 'json',
+      maxContentLength: MAX_AI_RESPONSE_BYTES,
+      maxBodyLength: MAX_AI_RESPONSE_BYTES,
+      maxRedirects: 0,
+      transitional: { clarifyTimeoutError: true },
+    });
+  } catch (requestError) {
+    const durationMs = Date.now() - startedAtMs;
+    if (deadlineSignal.aborted || requestError.code === 'ETIMEDOUT' || requestError.code === 'ECONNABORTED') {
+      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, { durationMs });
+    }
+    if (requestError.response) {
+      throw new AiServiceError(AI_FAILURE_KIND.ERROR_RESPONSE, `HTTP ${requestError.response.status}`, { httpStatus: requestError.response.status, durationMs });
+    }
+    throw new AiServiceError(AI_FAILURE_KIND.UNAVAILABLE, requestError.code ?? requestError.message, { durationMs });
+  }
+  const durationMs = Date.now() - startedAtMs;
+  try {
+    return { ...parseRegularizationResponse(aiServiceResponse.data, regularizationRequest.thread_id), durationMs };
   } catch (parseError) {
     if (parseError instanceof AiServiceError) parseError.durationMs = durationMs;
     throw parseError;

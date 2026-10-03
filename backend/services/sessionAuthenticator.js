@@ -82,32 +82,38 @@ export function verifySessionToken(accessToken, authConfig) {
     throw verificationError;
   }
 
-  const { sub: userId, jti: sessionId, csrf: csrfTokenHash, exp: expiresAtSeconds } = decodedTokenPayload;
+  const { sub: userId, jti: sessionId, csrf: csrfTokenHash, exp: expiresAtSeconds, iat: issuedAtSeconds } = decodedTokenPayload;
   const hasExpectedClaims =
     typeof userId === 'string' &&
     mongoose.isValidObjectId(userId) &&
     typeof sessionId === 'string' &&
     sessionId.length > 0 &&
     isWellFormedCsrfHash(csrfTokenHash) &&
-    typeof expiresAtSeconds === 'number';
+    typeof expiresAtSeconds === 'number' &&
+    typeof issuedAtSeconds === 'number';
   if (!hasExpectedClaims) {
     return sessionFailure(SESSION_FAILURE_REASON.MISSING_CLAIMS, SESSION_MESSAGES.SESSION_INVALID, true);
   }
 
   return {
     isValid: true,
-    sessionClaims: { userId, sessionId, csrfTokenHash, expiresAtMs: expiresAtSeconds * 1000 },
+    sessionClaims: { userId, sessionId, csrfTokenHash, issuedAtSeconds, expiresAtMs: expiresAtSeconds * 1000 },
   };
 }
 
 /**
  * Steps 5–6. Returns `{ isValid: true, user }` with the public profile, or a failure.
  * Database errors are thrown.
- * @param {{ userId: string, sessionId: string }} sessionClaims
+ *
+ * A session issued before the account's latest password change is treated as revoked, so
+ * changing the password signs out every other device. The comparison is at whole-second
+ * resolution (JWT `iat` is in seconds): the session issued in the same request as the change
+ * shares that second and stays valid.
+ * @param {{ userId: string, sessionId: string, issuedAtSeconds: number }} sessionClaims
  */
-export async function loadSessionUser({ userId, sessionId }) {
+export async function loadSessionUser({ userId, sessionId, issuedAtSeconds }) {
   const [userRecord, isSessionRevoked] = await Promise.all([
-    User.findById(userId).select(PUBLIC_USER_PROFILE_FIELDS).lean(),
+    User.findById(userId).select(`${PUBLIC_USER_PROFILE_FIELDS} passwordChangedAt`).lean(),
     RevokedSession.exists({ sessionId }),
   ]);
 
@@ -116,6 +122,10 @@ export async function loadSessionUser({ userId, sessionId }) {
   }
   if (!userRecord) {
     return sessionFailure(SESSION_FAILURE_REASON.ACCOUNT_NOT_FOUND, SESSION_MESSAGES.ACCOUNT_NOT_FOUND, true);
+  }
+  const passwordChangedAtSeconds = userRecord.passwordChangedAt ? Math.floor(userRecord.passwordChangedAt.getTime() / 1000) : null;
+  if (passwordChangedAtSeconds !== null && issuedAtSeconds < passwordChangedAtSeconds) {
+    return sessionFailure(SESSION_FAILURE_REASON.SESSION_REVOKED, SESSION_MESSAGES.SESSION_REVOKED, true);
   }
   return { isValid: true, user: toPublicUserProfile(userRecord) };
 }

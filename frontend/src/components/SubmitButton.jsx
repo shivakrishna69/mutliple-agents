@@ -11,7 +11,7 @@ export default function SubmitButton({ isSubmitting, idleLabel, loadingLabel }) 
       type="submit"
       disabled={isSubmitting}
       aria-busy={isSubmitting}
-      className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-indigo-400"
+      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:from-indigo-500 hover:to-violet-500 focus-visible:ring-4 focus-visible:ring-indigo-200 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
     >
       {isSubmitting && (
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">

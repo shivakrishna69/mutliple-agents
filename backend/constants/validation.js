@@ -61,3 +61,80 @@ export const WEBHOOK_EVENT_ID_PATTERN = /^[\x21-\x7E]+$/;
  * Full RFC 5322 validation is not attempted; deliverability is proven only by sending mail.
  */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Limits for the HR models (Department, EmployeeProfile), shared with their request validators. */
+export const ORGANIZATION_FIELD_LIMITS = Object.freeze({
+  DEPARTMENT_NAME_MAX_LENGTH: 120,
+  DESIGNATION_MAX_LENGTH: 120,
+  // Deepest reporting chain or department tree walked by the cycle check. Real organisations are
+  // far shallower (a 100,000-person company is rarely more than 12 levels deep); the cap bounds
+  // the cost of the check and of $graphLookup traversals.
+  HIERARCHY_MAX_DEPTH: 50,
+  // Geofence radius in metres. Below ~25 m, ordinary phone GPS error (5–20 m outdoors, worse
+  // indoors) would reject employees standing inside the office; above 10 km it stops being a
+  // meaningful site check.
+  GEOFENCE_RADIUS_MIN_METRES: 25,
+  GEOFENCE_RADIUS_MAX_METRES: 10_000,
+  SCORE_MIN: 0,
+  SCORE_MAX: 100,
+});
+
+/** Limits for the employee document vault (models/DocumentVault.js, controllers/vaultController.js). */
+export const VAULT_FIELD_LIMITS = Object.freeze({
+  // Largest accepted upload. Files are buffered in memory before going to S3, so this also bounds
+  // the memory one upload can hold.
+  MAX_FILE_BYTES: 10 * 1024 * 1024,
+  ORIGINAL_FILE_NAME_MAX_LENGTH: 255,
+  // Lifetime of a pre-signed download URL.
+  DOWNLOAD_URL_TTL_SECONDS: 60,
+  // Most documents returned by one listing call.
+  LIST_LIMIT: 100,
+});
+
+/** Limits for attendance punches (models/Attendance.js, controllers/attendanceController.js). */
+export const ATTENDANCE_FIELD_LIMITS = Object.freeze({
+  // A browser Geolocation reading less precise than this cannot place someone inside a typical
+  // office geofence, so the punch is refused and the user asked to retry (usually with GPS on).
+  MAX_LOCATION_ACCURACY_METRES: 100,
+  DEVICE_FINGERPRINT_MIN_LENGTH: 16,
+  DEVICE_FINGERPRINT_MAX_LENGTH: 256,
+  OFFICE_NAME_MAX_LENGTH: 120,
+  // Shift policy bounds, in minutes.
+  LATE_GRACE_MAX_MINUTES: 180,
+  HALF_DAY_AFTER_MAX_MINUTES: 720,
+  // How many days back the regularization agent may regularize on its own. Must equal
+  // MAX_REGULARIZATION_AGE_DAYS in ai-service app/nodes/attendance_agent.py; the backend enforces it
+  // regardless of what the agent sends.
+  SELF_SERVICE_REGULARIZATION_DAYS: 7,
+  // How many days back a manager may approve a reviewed regularization.
+  MANAGER_REGULARIZATION_DAYS: 31,
+  // Longest employee message forwarded to the regularization agent (matches the ai-service schema).
+  REGULARIZATION_MESSAGE_MAX_LENGTH: 2000,
+  REVIEW_NOTE_MAX_LENGTH: 500,
+});
+
+/** "HH:MM" on a 24-hour clock, 00:00–23:59. */
+export const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+/** Calendar date "YYYY-MM-DD" (shape only; real-date validity is checked separately). */
+export const CALENDAR_DATE_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
+
+/**
+ * Department code: 2–20 characters, uppercase letters and digits, optionally separated by "-"
+ * or "_", starting with a letter or digit. Examples: "ENG", "FIN-AP", "HR_OPS2".
+ * Values are uppercased before this check runs.
+ */
+export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,19}$/;
+
+/**
+ * Finance budget / cost-centre code: 1–40 characters of uppercase letters, digits and the
+ * separators "-", "_", "/", "." (covers SAP-style "CC-1001" and ledger-style "4100/ENG.01").
+ */
+export const BUDGET_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_./-]{0,39}$/;
+
+/**
+ * MAC-48 address in canonical form: six pairs of uppercase hex digits separated by colons,
+ * e.g. "3C:22:FB:7A:10:9E". Inputs written with "-" separators or lowercase are normalised to this
+ * form by the model's setter before the check runs.
+ */
+export const MAC_ADDRESS_PATTERN = /^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$/;

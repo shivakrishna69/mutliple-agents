@@ -16,6 +16,8 @@ export const FORM_MESSAGES = Object.freeze({
   PASSWORD_TOO_LONG: `Password is too long (maximum ${USER_FIELD_LIMITS.PASSWORD_MAX_BYTES} bytes; some characters count as more than one).`,
   CONFIRM_PASSWORD_REQUIRED: 'Re-enter your password.',
   PASSWORDS_DO_NOT_MATCH: 'Passwords do not match.',
+  CURRENT_PASSWORD_REQUIRED: 'Enter your current password.',
+  NEW_PASSWORD_SAME_AS_CURRENT: 'Choose a password different from your current one.',
 });
 
 export const API_MESSAGES = Object.freeze({
@@ -40,4 +42,11 @@ export const BANNER_TITLES = Object.freeze({
   SIGNUP_FAILED: 'We could not create your account',
   LOGIN_FAILED: 'Sign-in failed',
   SIGN_OUT_FAILED: 'We could not sign you out',
+  PASSWORD_CHANGE_FAILED: 'We could not change your password',
+  USERS_LOAD_FAILED: 'We could not load users',
+  ROLE_CHANGE_FAILED: 'We could not change that role',
+});
+
+export const SUCCESS_MESSAGES = Object.freeze({
+  PASSWORD_CHANGED: 'Password updated. Your other devices have been signed out.',
 });

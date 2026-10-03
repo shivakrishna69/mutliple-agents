@@ -22,15 +22,15 @@ import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import User, { BCRYPT_SALT_ROUNDS, ROLES } from '../models/User.js';
 import RevokedSession from '../models/RevokedSession.js';
-import { AUTH_MESSAGES, SESSION_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
+import { ACCOUNT_MESSAGES, AUTH_MESSAGES, SESSION_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { clearSessionCookies, readRequestCookie, resolveCsrfTokenCookieName, setSessionCookies } from '../utils/authCookies.js';
 import { isCsrfTokenValid, issueSessionTokens } from '../utils/authToken.js';
 import { toPublicUserProfile } from '../utils/userProfile.js';
-import { disconnectSessionSockets } from '../utils/socketManager.js';
+import { SOCKET_ERROR_CODES, disconnectSessionSockets, disconnectUserSockets } from '../utils/socketManager.js';
 import { logger } from '../utils/logger.js';
-import { validateLoginInput, validateRegistrationInput } from '../validators/authValidators.js';
+import { validateChangePasswordInput, validateLoginInput, validateRegistrationInput } from '../validators/authValidators.js';
 
 /** MongoDB's error code for a unique-index violation. */
 const DUPLICATE_KEY_ERROR_CODE = 11000;
@@ -97,7 +97,11 @@ export async function registerUser(req, res, next) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, AUTH_MESSAGES.EMAIL_ALREADY_REGISTERED);
     }
 
-    const newUserRecord = new User({ name, email, password, role: ROLES.CUSTOMER });
+    // Every self-registered account is a customer, except the deployment's configured first admin
+    // (BOOTSTRAP_ADMIN_EMAIL), so a fresh deployment can be administered without database access.
+    const bootstrapAdminEmail = req.app.locals.config.bootstrapAdminEmail;
+    const assignedRole = bootstrapAdminEmail && email === bootstrapAdminEmail ? ROLES.ADMIN : ROLES.CUSTOMER;
+    const newUserRecord = new User({ name, email, password, role: assignedRole });
     await newUserRecord.save();
 
     const csrfToken = startSession(res, req.app.locals.config, newUserRecord._id);
@@ -245,6 +249,67 @@ export async function logoutUser(req, res, next) {
     logger.info('User logged out', { requestId: req.id, userId: req.user.id });
 
     return sendSuccess(res, HTTP_STATUS.OK, AUTH_MESSAGES.LOGOUT_SUCCESSFUL, {});
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * POST /api/auth/password   (requires `protect`, including its CSRF check)
+ *
+ * Request body: { currentPassword: string, newPassword: string }
+ * Responses:
+ *   200 { message, data: { user, csrfToken } } + new session cookies   Password changed.
+ *   400 { error: { message, requestId, details } }  New password fails the signup rules or equals the
+ *                                                   current one, or the current password is wrong
+ *                                                   (details field "currentPassword").
+ *   401 { error }                                   No valid session.
+ *
+ * A wrong current password is a 400, not a 401: clients treat 401 as "session ended" and sign
+ * the user out, which would be the wrong reaction to a typo.
+ *
+ * Security decisions:
+ *   - The current password is required, so a hijacked session alone cannot lock the owner out.
+ *   - passwordChangedAt is set; every session issued before it is rejected from then on
+ *     (sessionAuthenticator.loadSessionUser), which signs out all other devices. Their open
+ *     sockets are closed immediately.
+ *   - This request's session is replaced with a fresh one issued after the change, so the person
+ *     who changed the password stays signed in. The old session id is also revoked explicitly.
+ */
+export async function changePassword(req, res, next) {
+  try {
+    const changeValidation = validateChangePasswordInput(req.body);
+    if (!changeValidation.isValid) {
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED, changeValidation.validationErrors);
+    }
+    const { currentPassword, newPassword } = changeValidation.sanitizedInput;
+
+    const userRecord = await User.findById(req.user.id).select('+password');
+    if (!userRecord) {
+      return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, SESSION_MESSAGES.ACCOUNT_NOT_FOUND);
+    }
+    if (!(await userRecord.comparePassword(currentPassword))) {
+      logger.warn('Password change refused: wrong current password', { requestId: req.id, userId: req.user.id });
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, ACCOUNT_MESSAGES.CURRENT_PASSWORD_INCORRECT, [
+        { field: 'currentPassword', message: ACCOUNT_MESSAGES.CURRENT_PASSWORD_INCORRECT },
+      ]);
+    }
+
+    userRecord.password = newPassword;
+    userRecord.passwordChangedAt = new Date();
+    await userRecord.save();
+
+    const { sessionId: previousSessionId, expiresAtMs: previousExpiresAtMs } = req.authSession;
+    try {
+      await RevokedSession.create({ sessionId: previousSessionId, userId: req.user.id, expiresAt: new Date(previousExpiresAtMs) });
+    } catch (revocationError) {
+      if (revocationError?.code !== DUPLICATE_KEY_ERROR_CODE) throw revocationError;
+    }
+    disconnectUserSockets(req.user.id, SOCKET_ERROR_CODES.PASSWORD_CHANGED);
+
+    const csrfToken = startSession(res, req.app.locals.config, userRecord._id);
+    logger.info('Password changed', { requestId: req.id, userId: req.user.id });
+    return sendSuccess(res, HTTP_STATUS.OK, ACCOUNT_MESSAGES.PASSWORD_CHANGED, { user: toPublicUserProfile(userRecord), csrfToken });
   } catch (error) {
     return next(error);
   }
