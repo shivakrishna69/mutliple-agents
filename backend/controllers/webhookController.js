@@ -61,7 +61,14 @@ import Conversation, { CONVERSATION_STATUS, ACTIVE_WORKER, HUMAN_OWNED_STATUSES 
 import Message, { SENDER_TYPE, TOOL_STEP_STATUS } from '../models/Message.js';
 import { CUSTOMER_FACING_MESSAGES, VALIDATION_MESSAGES, WEBHOOK_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { AI_FAILURE_KIND, AI_NEXT_ACTION, AI_PROCESS_PATH, AiServiceError, requestAiProcessing } from '../services/aiServiceClient.js';
+import {
+  AI_FAILURE_KIND,
+  AI_NEXT_ACTION,
+  AI_PROCESS_PATH,
+  AiServiceError,
+  buildConversationInput,
+  requestAiProcessing,
+} from '../services/aiServiceClient.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { createKeyedSerialExecutor } from '../utils/keyedSerialExecutor.js';
 import { logger } from '../utils/logger.js';
@@ -181,16 +188,6 @@ async function buildDuplicateResult(existingCustomerMessage, logContext) {
     conversation: conversationRecord ? toConversationSummary(conversationRecord) : null,
     customerMessageId: existingCustomerMessage._id.toString(),
     reply: null,
-  };
-}
-
-/** Maps stored messages to the ai-service request contract. */
-function toAiMessage(messageRecord) {
-  return {
-    messageId: messageRecord._id.toString(),
-    senderType: messageRecord.senderType,
-    text: messageRecord.text,
-    createdAt: messageRecord.createdAt.toISOString(),
   };
 }
 
@@ -323,17 +320,15 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
     .select('_id senderType text createdAt')
     .lean();
 
-  const aiProcessRequest = {
-    conversation: toConversationSummary(aiReadyConversation),
-    customer: { id: customerId },
-    history: earlierMessagesNewestFirst.reverse().map(toAiMessage),
-    newMessage: toAiMessage(customerMessage),
-  };
+  const aiProcessRequest = buildConversationInput(conversationId.toString(), [
+    ...earlierMessagesNewestFirst.reverse(),
+    customerMessage,
+  ]);
 
   logger.info('Forwarded to AI service', {
     ...stageContext,
     stage: 'forwarded',
-    historyMessageCount: aiProcessRequest.history.length,
+    transcriptMessageCount: aiProcessRequest.messages.length,
     activeWorker: aiReadyConversation.currentActiveWorker,
     timeoutMs: config.aiServiceTimeoutMs,
   });

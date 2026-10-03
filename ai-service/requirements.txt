@@ -1,18 +1,23 @@
 # Python 3.11 runtime dependencies for the ai-service.
 # Install with: python -m pip install -r requirements.txt
+# Run with:     uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # HTTP API framework and ASGI server ([standard] adds uvloop, httptools, and websockets).
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30,<1.0
 
-# Data validation; FastAPI 0.100+ requires Pydantic v2.
+# Request/response validation.
 pydantic>=2.7,<3.0
 
-# Agent orchestration graph.
-langgraph>=0.2,<2.0
+# Agent graph runtime, including the in-memory checkpointer (langgraph-checkpoint).
+langgraph>=1.0,<2.0
 
-# Groq LLM inference client.
-groq>=0.11,<1.0
+# LangChain message primitives and the Groq chat model integration.
+langchain-core>=1.0,<2.0
+langchain-groq>=1.0,<2.0
 
-# Async MongoDB driver.
-motor>=3.5,<4.0
+# Groq SDK: used by langchain-groq, and imported directly for its typed API errors.
+groq>=0.30,<1.0
+
+# Loads ai-service/.env in local development; real environment variables take precedence.
+python-dotenv>=1.0,<2.0

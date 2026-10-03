@@ -1,0 +1,11 @@
+# Allowlist: ignore everything, then admit only what the image needs.
+# This guarantees .env files, local virtualenvs, caches, and editor files never enter the build
+# context, even ones that do not exist yet.
+*
+!requirements.txt
+!app/
+!app/**
+
+# Never ship bytecode caches even if they exist inside app/.
+**/__pycache__
+**/*.py[cod]
