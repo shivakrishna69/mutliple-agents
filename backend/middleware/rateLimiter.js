@@ -137,3 +137,31 @@ export const regularizationRateLimitByUser = createRateLimiter({
   resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_REGULARIZATION_MESSAGES,
 });
+
+export const taxEstimateRateLimitByUser = createRateLimiter({
+  limiterName: 'tax_estimates_per_user',
+  ...RATE_LIMITS.TAX_ESTIMATES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_TAX_ESTIMATES,
+});
+
+export const payslipGenerationRateLimitByUser = createRateLimiter({
+  limiterName: 'payslip_generations_per_user',
+  ...RATE_LIMITS.PAYSLIP_GENERATIONS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_PAYSLIP_GENERATIONS,
+});
+
+export const payslipVerificationRateLimitByClientIp = createRateLimiter({
+  limiterName: 'payslip_verifications_per_ip',
+  ...RATE_LIMITS.PAYSLIP_VERIFICATIONS_PER_CLIENT_IP,
+  resolveClientKey: resolveClientIp,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_VERIFICATIONS,
+});
+
+export const okrWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'okr_writes_per_user',
+  ...RATE_LIMITS.OKR_WRITES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OKR_UPDATES,
+});

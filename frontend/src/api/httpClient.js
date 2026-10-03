@@ -38,13 +38,17 @@ export class ApiError extends Error {
    * @param {number} errorProperties.status        HTTP status, or 0 if no response arrived.
    * @param {string|null} [errorProperties.requestId]  Backend request id, shown for server faults.
    * @param {Record<string, string>} [errorProperties.fieldErrors]  Message per form field.
+   * @param {string|null} [errorProperties.code]     Backend machine-readable code (e.g. STALE_VERSION).
+   * @param {object|null} [errorProperties.context]  Backend details that go with the code.
    */
-  constructor({ message, status, requestId = null, fieldErrors = {} }) {
+  constructor({ message, status, requestId = null, fieldErrors = {}, code = null, context = null }) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.requestId = requestId;
     this.fieldErrors = fieldErrors;
+    this.code = code;
+    this.context = context;
   }
 }
 
@@ -71,11 +75,13 @@ function convertDetailsToFieldErrors(errorDetails) {
  * @param {object} requestDescription
  * @param {'GET'|'POST'|'PATCH'} requestDescription.method
  * @param {string} requestDescription.endpointPath
- * @param {object} [requestDescription.requestPayload]  JSON body, for POST.
+ * @param {object} [requestDescription.requestPayload]  JSON body, for POST/PATCH.
+ * @param {FormData} [requestDescription.formData]      Multipart body (file uploads); the browser sets
+ *                                                      the Content-Type with its boundary.
  * @param {string} [requestDescription.csrfToken]       Sent as X-CSRF-Token when provided.
  * @param {AbortSignal} [requestDescription.callerSignal]
  */
-export async function sendApiRequest({ method, endpointPath, requestPayload, csrfToken, callerSignal }) {
+export async function sendApiRequest({ method, endpointPath, requestPayload, formData, csrfToken, callerSignal }) {
   const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const requestSignal = callerSignal ? AbortSignal.any([callerSignal, timeoutSignal]) : timeoutSignal;
 
@@ -88,7 +94,7 @@ export async function sendApiRequest({ method, endpointPath, requestPayload, csr
     httpResponse = await fetch(`${API_BASE_URL}${endpointPath}`, {
       method,
       headers: requestHeaders,
-      body: requestPayload === undefined ? undefined : JSON.stringify(requestPayload),
+      body: formData ?? (requestPayload === undefined ? undefined : JSON.stringify(requestPayload)),
       credentials: 'include',
       signal: requestSignal,
     });
@@ -126,6 +132,8 @@ export async function sendApiRequest({ method, endpointPath, requestPayload, csr
       status: httpResponse.status,
       requestId,
       fieldErrors: convertDetailsToFieldErrors(backendError?.details),
+      code: typeof backendError?.code === 'string' ? backendError.code : null,
+      context: backendError?.context && typeof backendError.context === 'object' ? backendError.context : null,
     });
   }
 

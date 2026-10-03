@@ -123,3 +123,102 @@ export function KeyIcon(iconProps) {
     </OutlineIcon>
   );
 }
+
+export function MapPinIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+    </OutlineIcon>
+  );
+}
+
+export function CurrencyIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M15 8.25H9m6 3H9m3 6-3-3h1.5a3 3 0 1 0 0-6M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </OutlineIcon>
+  );
+}
+
+export function DocumentIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+    </OutlineIcon>
+  );
+}
+
+export function ChartIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+    </OutlineIcon>
+  );
+}
+
+export function TargetIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.5" />
+    </OutlineIcon>
+  );
+}
+
+export function TerminalIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
+    </OutlineIcon>
+  );
+}
+
+export function SitemapIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M12 3v4.5m0 0h-6v4.5m6-4.5h6v4.5M4.5 12h3v3h-3v-3Zm6 0h3v3h-3v-3Zm6 0h3v3h-3v-3ZM12 15v3m-6-3v3m12-3v3M10.5 18h3v3h-3v-3Zm-6 0h3v3h-3v-3Zm12 0h3v3h-3v-3Z" />
+    </OutlineIcon>
+  );
+}
+
+export function UploadIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+    </OutlineIcon>
+  );
+}
+
+export function DownloadIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </OutlineIcon>
+  );
+}
+
+export function CheckBadgeIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+    </OutlineIcon>
+  );
+}
+
+export function FlagIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
+    </OutlineIcon>
+  );
+}
+
+export function PlusIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="M12 4.5v15m7.5-7.5h-15" />
+    </OutlineIcon>
+  );
+}

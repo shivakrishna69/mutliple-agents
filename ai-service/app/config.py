@@ -89,6 +89,9 @@ class Settings:
     # Attendance entries and file manager reviews (app/services/backend_client.py). None disables
     # attendance regularization: requests are answered with "unavailable" instead.
     backend_internal_url: str | None
+    # Live agent telemetry to the backend (app/telemetry.py). Defaults to on whenever
+    # BACKEND_INTERNAL_URL is set; requires it when enabled explicitly.
+    agent_telemetry_enabled: bool
 
     # Hard deadline for one /ai/process call. Must be shorter than the backend's
     # AI_SERVICE_TIMEOUT_MS so the backend receives a clean 504 instead of timing out itself.
@@ -159,6 +162,13 @@ class Settings:
             if environment == "production" and not backend_internal_url.startswith("https://"):
                 raise ConfigurationError("BACKEND_INTERNAL_URL must use https in production")
 
+        agent_telemetry_setting = os.getenv("AGENT_TELEMETRY_ENABLED", "").strip().lower()
+        if agent_telemetry_setting not in {"", "true", "false"}:
+            raise ConfigurationError('AGENT_TELEMETRY_ENABLED must be "true" or "false"')
+        if agent_telemetry_setting == "true" and backend_internal_url is None:
+            raise ConfigurationError("AGENT_TELEMETRY_ENABLED requires BACKEND_INTERNAL_URL")
+        agent_telemetry_enabled = backend_internal_url is not None and agent_telemetry_setting != "false"
+
         return cls(
             environment=environment,
             log_level=log_level,
@@ -167,6 +177,7 @@ class Settings:
             groq_model=groq_model,
             regularization_groq_model=os.getenv("REGULARIZATION_GROQ_MODEL", "").strip() or groq_model,
             backend_internal_url=backend_internal_url,
+            agent_telemetry_enabled=agent_telemetry_enabled,
             groq_base_url=groq_base_url,
             llm_request_timeout_seconds=llm_request_timeout_seconds,
             llm_max_retries=_read_int("LLM_MAX_RETRIES", 1, 0, 5),

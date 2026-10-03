@@ -223,6 +223,11 @@ const employeeProfileSchema = new mongoose.Schema(
     advancedMetrics: {
       currentBurnoutScore: scoreField('Burnout score'),
       attritionRiskIndex: scoreField('Attrition risk index'),
+      // When the analytics job last wrote the scores, and which model produced them. null means the
+      // employee has never been scored: the 0 defaults above then carry no information and must
+      // not be read as "no risk" (services/workforceRiskService.js reports such employees as unscored).
+      computedAt: { type: Date, default: null, select: false },
+      modelVersion: { type: String, default: null, maxlength: 64, select: false },
     },
   },
   {

@@ -35,6 +35,10 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_VAULT_DOWNLOADS: 'Too many download requests. Please wait a moment and try again',
   TOO_MANY_PUNCH_ATTEMPTS: 'Too many punch attempts. Please wait a minute and try again',
   TOO_MANY_REGULARIZATION_MESSAGES: 'Too many attendance correction messages. Please wait a minute and try again',
+  TOO_MANY_TAX_ESTIMATES: 'Too many tax estimates. Please wait a minute and try again',
+  TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
+  TOO_MANY_VERIFICATIONS: 'Too many verification requests. Please wait a minute and try again',
+  TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
 });
 
 export const SUPPORT_MESSAGES = Object.freeze({
@@ -168,6 +172,48 @@ export const REGULARIZATION_MESSAGES = Object.freeze({
   INTERNAL_KEY_INVALID: 'Missing or invalid internal API key',
 });
 
+export const PAYROLL_MESSAGES = Object.freeze({
+  RULES_RETRIEVED: 'Payroll rules retrieved',
+  ESTIMATE_COMPUTED: 'Tax estimate computed',
+  BODY_MUST_BE_OBJECT: 'Request body must be a JSON object',
+  INPUT_INVALID: 'The salary or investment details are invalid',
+  PAYSLIP_ISSUED: 'Payslip issued',
+  PAYSLIPS_RETRIEVED: 'Payslips retrieved',
+  DOWNLOAD_ISSUED: 'Download link issued',
+  VERIFICATION_COMPLETED: 'Verification completed',
+  PAYSLIP_MANAGERS_ONLY: 'Only HR and administrators can issue payslips',
+  PAYSLIP_ACCESS_DENIED: 'You do not have access to these payslips',
+  PAYSLIP_NOT_FOUND: 'Payslip not found',
+  NO_EMPLOYEE_PROFILE: 'No employee profile is linked to your account',
+  VERIFICATION_ID_INVALID: 'Verification IDs look like PS-202610-1A2B-3C4D-5E6F-7A8B',
+  VERIFICATION_NOT_FOUND: 'No payslip has this verification ID',
+});
+
+export const OKR_MESSAGES = Object.freeze({
+  ALIGNMENT_RETRIEVED: 'OKR alignment retrieved',
+  OBJECTIVE_CREATED: 'Objective created',
+  OBJECTIVE_UPDATED: 'Objective updated',
+  KEY_RESULT_CREATED: 'Key result created',
+  PROGRESS_UPDATED: 'Progress updated',
+  MILESTONE_CREATED: 'Milestone added',
+  MILESTONE_UPDATED: 'Milestone updated',
+  INPUT_INVALID: 'The OKR details are invalid',
+  OKRS_EMPLOYEES_ONLY: 'OKRs are available to employees, HR and administrators',
+});
+
+export const AGENT_TELEMETRY_MESSAGES = Object.freeze({
+  EVENTS_ACCEPTED: 'Telemetry events processed',
+  BATCH_INVALID: 'The telemetry batch is invalid',
+});
+
+export const ANALYTICS_MESSAGES = Object.freeze({
+  RISK_REPORT_RETRIEVED: 'Workforce risk report retrieved',
+  SCORES_RECORDED: 'Scores recorded',
+  ANALYTICS_RESTRICTED: 'Workforce analytics are available to HR and administrators only',
+  QUERY_INVALID: 'The report filters are invalid',
+  SCORES_INVALID: 'The score batch is invalid',
+});
+
 export const WEBHOOK_MESSAGES = Object.freeze({
   MESSAGE_PROCESSED: 'Message processed',
   DUPLICATE_EVENT: 'Event already processed',
@@ -215,6 +261,7 @@ export const SOCKET_MESSAGES = Object.freeze({
   RATE_LIMITED: 'Too many requests on this connection; slow down',
   ACCESS_REVOKED: 'You no longer have access to this conversation',
   SESSION_ENDED: 'Your session has ended. Please sign in again',
+  TELEMETRY_FORBIDDEN: 'Agent telemetry is available to administrators only',
   SERVER_ERROR: 'Something went wrong. Please try again',
 });
 

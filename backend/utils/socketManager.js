@@ -23,6 +23,8 @@
  *                                     status changes so queue views stay current.
  *   conversation:<id>:staff           admins/agents viewing one conversation; full payloads.
  *   conversation:<id>:customer        the owning customer's sockets; customer-safe payloads.
+ *   agent-telemetry                   admin sockets that asked for live agent telemetry (see
+ *                                     "Agent telemetry channel" below).
  *
  * Splitting each conversation into a staff room and a customer room means one publish call can
  * send full payloads (AI tool logs, routing, agent ids) to staff and a reduced payload to the
@@ -54,6 +56,33 @@
  *                                              (e.g. another agent claimed it)
  *               SESSION_ENDED                  the session expired or was logged out; the socket
  *                                              is disconnected right after
+ *
+ * ============================================================================
+ * Agent telemetry channel
+ * ============================================================================
+ *
+ * A live, opt-in feed of how the AI agents are working (graph nodes, model call timings, tool
+ * runs, retrieval scores), for operations consoles. Contract and privacy rules are in
+ * services/agentTelemetry.js; the events carry metrics and identifiers, never conversation text.
+ *
+ *   Client ->   SUBSCRIBE_AGENT_TELEMETRY    (no payload), ack -> { ok: true, events: [names] } |
+ *   server                                   { ok: false, error: { code, message } }
+ *                  Admins only: any other role gets TELEMETRY_FORBIDDEN. The role is the one
+ *                  verified at handshake; a role change disconnects the user's sockets (see
+ *                  disconnectUserSockets), so a demoted admin cannot keep the feed.
+ *               UNSUBSCRIBE_AGENT_TELEMETRY  ack -> { ok: true }
+ *               Both count against the same per-socket event budget as conversation joins.
+ *   Server ->   AGENT_THINKING_EVENT         a turn, node, model call or retrieval started/finished
+ *   client      TOOL_EXECUTION_STARTED       a tool began running (pairs with COMPLETED by runId)
+ *               TOOL_EXECUTION_COMPLETED     the tool finished, with status and duration
+ *
+ * Events are sent with normal (buffered) delivery, not `volatile`: a turn emits its events in a
+ * burst, and a volatile emit is dropped whenever the transport is busy writing the previous
+ * frame, which loses most of a burst. A console that stops reading cannot grow its buffer for
+ * long: the heartbeat disconnects it within PING_INTERVAL_MS + PING_TIMEOUT_MS and Socket.IO
+ * frees the buffer. Delivery is still at-most-once (events sent while a client is disconnected
+ * are not replayed), so consoles should treat per-turn sequence gaps as possible. After
+ * reconnecting, a client must subscribe again, because rooms are not restored on a new connection.
  *
  * ============================================================================
  * Heartbeat and connection resiliency
@@ -115,6 +144,8 @@ import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
 import Conversation from '../models/Conversation.js';
+import { ROLES } from '../models/User.js';
+import { AGENT_TELEMETRY_EVENTS } from '../services/agentTelemetry.js';
 import { SOCKET_MESSAGES } from '../constants/messages.js';
 import { canUserAccessConversation, isStaffRole } from '../services/conversationAccess.js';
 import { loadSessionUser, verifySessionToken } from '../services/sessionAuthenticator.js';
@@ -136,9 +167,15 @@ export const SOCKET_EVENTS = Object.freeze({
   CONVERSATION_STATUS_UPDATED: 'CONVERSATION_STATUS_UPDATED',
   CONVERSATION_ACCESS_REVOKED: 'CONVERSATION_ACCESS_REVOKED',
   SESSION_ENDED: 'SESSION_ENDED',
+  // Server -> client, agent telemetry channel (names are AGENT_TELEMETRY_EVENTS)
+  AGENT_THINKING_EVENT: AGENT_TELEMETRY_EVENTS.AGENT_THINKING_EVENT,
+  TOOL_EXECUTION_STARTED: AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_STARTED,
+  TOOL_EXECUTION_COMPLETED: AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_COMPLETED,
   // Client -> server
   JOIN_CONVERSATION: 'JOIN_CONVERSATION',
   LEAVE_CONVERSATION: 'LEAVE_CONVERSATION',
+  SUBSCRIBE_AGENT_TELEMETRY: 'SUBSCRIBE_AGENT_TELEMETRY',
+  UNSUBSCRIBE_AGENT_TELEMETRY: 'UNSUBSCRIBE_AGENT_TELEMETRY',
 });
 
 /** Machine-readable codes in connect_error data, acknowledgements, and server events. */
@@ -149,6 +186,7 @@ export const SOCKET_ERROR_CODES = Object.freeze({
   TOO_MANY_ROOMS: 'too_many_rooms',
   RATE_LIMITED: 'rate_limited',
   ACCESS_REVOKED: 'access_revoked',
+  TELEMETRY_FORBIDDEN: 'telemetry_forbidden',
   SESSION_EXPIRED: 'session_expired',
   SESSION_LOGGED_OUT: 'session_logged_out',
   ROLE_CHANGED: 'role_changed',
@@ -191,6 +229,7 @@ const ROOM_NAMES = Object.freeze({
   user: (userId) => `user:${userId}`,
   conversationStaff: (conversationId) => `${CONVERSATION_ROOM_PREFIX}${conversationId}:staff`,
   conversationCustomer: (conversationId) => `${CONVERSATION_ROOM_PREFIX}${conversationId}:customer`,
+  agentTelemetry: () => 'agent-telemetry',
 });
 
 // ---------------------------------------------------------------------------
@@ -438,6 +477,54 @@ function registerConversationHandlers(socket, connectionRecord) {
   });
 }
 
+/** Registers SUBSCRIBE_AGENT_TELEMETRY and UNSUBSCRIBE_AGENT_TELEMETRY for one socket. */
+function registerAgentTelemetryHandlers(socket, connectionRecord) {
+  const { user } = socket.data;
+  const telemetryRoomName = ROOM_NAMES.agentTelemetry();
+
+  socket.on(SOCKET_EVENTS.SUBSCRIBE_AGENT_TELEMETRY, async (_eventPayload, acknowledge) => {
+    const respond = typeof acknowledge === 'function' ? acknowledge : () => {};
+    const eventContext = { socketId: socket.id, userId: user.id, role: user.role };
+
+    if (!consumeRoomEventBudget(connectionRecord)) {
+      logger.warn('Socket event rate limited', { ...eventContext, event: SOCKET_EVENTS.SUBSCRIBE_AGENT_TELEMETRY });
+      return respond(buildErrorAck(SOCKET_ERROR_CODES.RATE_LIMITED, SOCKET_MESSAGES.RATE_LIMITED));
+    }
+    if (user.role !== ROLES.ADMIN) {
+      logger.warn('Agent telemetry subscription denied', eventContext);
+      return respond(buildErrorAck(SOCKET_ERROR_CODES.TELEMETRY_FORBIDDEN, SOCKET_MESSAGES.TELEMETRY_FORBIDDEN));
+    }
+    try {
+      await socket.join(telemetryRoomName);
+      logger.info('Agent telemetry subscribed', eventContext);
+      return respond({ ok: true, events: Object.values(AGENT_TELEMETRY_EVENTS) });
+    } catch (subscribeError) {
+      logger.error('Agent telemetry subscription failed', {
+        ...eventContext,
+        error: { name: subscribeError.name, message: subscribeError.message, stack: subscribeError.stack },
+      });
+      return respond(buildErrorAck(SOCKET_ERROR_CODES.SERVER_ERROR, SOCKET_MESSAGES.SERVER_ERROR));
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.UNSUBSCRIBE_AGENT_TELEMETRY, async (_eventPayload, acknowledge) => {
+    const respond = typeof acknowledge === 'function' ? acknowledge : () => {};
+    if (!consumeRoomEventBudget(connectionRecord)) {
+      return respond(buildErrorAck(SOCKET_ERROR_CODES.RATE_LIMITED, SOCKET_MESSAGES.RATE_LIMITED));
+    }
+    try {
+      await socket.leave(telemetryRoomName);
+      return respond({ ok: true });
+    } catch (unsubscribeError) {
+      logger.error('Agent telemetry unsubscribe failed', {
+        socketId: socket.id,
+        error: { name: unsubscribeError.name, message: unsubscribeError.message },
+      });
+      return respond(buildErrorAck(SOCKET_ERROR_CODES.SERVER_ERROR, SOCKET_MESSAGES.SERVER_ERROR));
+    }
+  });
+}
+
 /** Connection handler: registers state, rooms, timers, handlers, and the disconnect cleanup. */
 function handleSocketConnection(socket) {
   const { user, session } = socket.data;
@@ -478,6 +565,7 @@ function handleSocketConnection(socket) {
 
   scheduleSessionExpiry(socket, connectionRecord, session.expiresAtMs);
   registerConversationHandlers(socket, connectionRecord);
+  registerAgentTelemetryHandlers(socket, connectionRecord);
 
   socket.on('error', (socketError) => {
     logger.error('Socket error', {
@@ -785,6 +873,30 @@ export async function emitConversationStatusUpdate(conversationId, statusPayload
       error: { name: publishError.name, message: publishError.message, stack: publishError.stack },
     });
     return false;
+  }
+}
+
+/**
+ * Publishes validated telemetry events (services/agentTelemetry.js normalizeTelemetryEvent) to
+ * the agent-telemetry room, each under its own event name, in the order given (delivery
+ * semantics: see "Agent telemetry channel"). Never throws; returns the number of events handed
+ * to Socket.IO.
+ * @param {Array<{ eventType: string }>} telemetryEvents
+ */
+export function emitAgentTelemetryEvents(telemetryEvents) {
+  if (!socketIoInstance || telemetryEvents.length === 0) return 0;
+  try {
+    const telemetryRoom = socketIoInstance.to(ROOM_NAMES.agentTelemetry());
+    for (const telemetryEvent of telemetryEvents) {
+      telemetryRoom.emit(telemetryEvent.eventType, telemetryEvent);
+    }
+    return telemetryEvents.length;
+  } catch (publishError) {
+    logger.error('Failed to publish agent telemetry', {
+      eventCount: telemetryEvents.length,
+      error: { name: publishError.name, message: publishError.message, stack: publishError.stack },
+    });
+    return 0;
   }
 }
 

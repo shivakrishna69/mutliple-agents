@@ -37,7 +37,11 @@ import orgRoutes from './routes/orgRoutes.js';
 import vaultRoutes from './routes/vaultRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import internalRoutes from './routes/internalRoutes.js';
+import payrollRoutes from './routes/payrollRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import okrRoutes from './routes/okrRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
+import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
 import { EMAIL_PATTERN } from './constants/validation.js';
@@ -66,54 +70,126 @@ const S3_BUCKET_NAME_PATTERN = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 const AWS_REGION_PATTERN = /^[a-z]{2}(?:-[a-z]+)+-\d+$/;
 
 /**
- * Reads the document vault's storage settings (services/vaultStorage.js). Returns null when
- * VAULT_S3_BUCKET is unset, which disables the vault: its routes then answer 503 and the rest of
- * the backend runs normally. When a bucket is set, every related value is validated and a
- * misconfiguration stops startup. AWS credentials are deliberately not read here; the SDK's
- * default provider chain supplies them (IAM role in production).
+ * Reads one S3 storage area's settings from `<envPrefix>_S3_*` variables (VAULT_ for the document
+ * vault, PAYSLIP_ for payslip PDFs). Returns null when `<envPrefix>_S3_BUCKET` is unset, which
+ * disables that feature (its routes answer 503; the rest of the backend runs normally). When a
+ * bucket is set, every related value is validated and a misconfiguration stops startup. AWS
+ * credentials are deliberately not read here; the SDK's default provider chain supplies them
+ * (IAM role in production). AWS_REGION is shared by all storage areas.
+ *
+ *   <P>_S3_BUCKET            bucket name
+ *   <P>_S3_SSE               aws:kms (default) | AES256
+ *   <P>_S3_KMS_KEY_ID        optional customer-managed key, aws:kms only
+ *   <P>_S3_ENDPOINT          optional S3-compatible endpoint (https in production)
+ *   <P>_S3_FORCE_PATH_STYLE  "true" for stores that need path-style URLs
  */
-function loadVaultStorageConfig(env) {
-  const bucketName = process.env.VAULT_S3_BUCKET ? process.env.VAULT_S3_BUCKET.trim() : '';
+function loadS3StorageConfig(env, envPrefix) {
+  const readSetting = (suffix) => process.env[`${envPrefix}_S3_${suffix}`];
+  const settingName = (suffix) => `${envPrefix}_S3_${suffix}`;
+
+  const bucketName = readSetting('BUCKET') ? readSetting('BUCKET').trim() : '';
   if (!bucketName) return null;
   if (!S3_BUCKET_NAME_PATTERN.test(bucketName) || bucketName.includes('..')) {
-    throw new Error('VAULT_S3_BUCKET is not a valid S3 bucket name');
+    throw new Error(`${settingName('BUCKET')} is not a valid S3 bucket name`);
   }
 
   const region = (process.env.AWS_REGION ?? '').trim();
   if (!AWS_REGION_PATTERN.test(region)) {
-    throw new Error("AWS_REGION must be set to the vault bucket's region (e.g. ap-south-1) when VAULT_S3_BUCKET is set");
+    throw new Error(`AWS_REGION must be set to the bucket's region (e.g. ap-south-1) when ${settingName('BUCKET')} is set`);
   }
 
-  const serverSideEncryption = (process.env.VAULT_S3_SSE ?? 'aws:kms').trim();
+  const serverSideEncryption = (readSetting('SSE') ?? 'aws:kms').trim();
   if (!['aws:kms', 'AES256'].includes(serverSideEncryption)) {
-    throw new Error('VAULT_S3_SSE must be "aws:kms" or "AES256"');
+    throw new Error(`${settingName('SSE')} must be "aws:kms" or "AES256"`);
   }
-  const kmsKeyId = process.env.VAULT_S3_KMS_KEY_ID ? process.env.VAULT_S3_KMS_KEY_ID.trim() : null;
+  const kmsKeyId = readSetting('KMS_KEY_ID') ? readSetting('KMS_KEY_ID').trim() : null;
   if (kmsKeyId && serverSideEncryption !== 'aws:kms') {
-    throw new Error('VAULT_S3_KMS_KEY_ID can only be used with VAULT_S3_SSE=aws:kms');
+    throw new Error(`${settingName('KMS_KEY_ID')} can only be used with ${settingName('SSE')}=aws:kms`);
   }
 
   // Optional endpoint for S3-compatible stores. Production traffic must stay on TLS.
-  const rawEndpoint = process.env.VAULT_S3_ENDPOINT ? process.env.VAULT_S3_ENDPOINT.trim() : null;
+  const rawEndpoint = readSetting('ENDPOINT') ? readSetting('ENDPOINT').trim() : null;
   let endpoint = null;
   if (rawEndpoint) {
     let parsedEndpoint;
     try {
       parsedEndpoint = new URL(rawEndpoint);
     } catch {
-      throw new Error('VAULT_S3_ENDPOINT must be an absolute URL');
+      throw new Error(`${settingName('ENDPOINT')} must be an absolute URL`);
     }
-    if (!['http:', 'https:'].includes(parsedEndpoint.protocol)) throw new Error('VAULT_S3_ENDPOINT must use http or https');
-    if (env === 'production' && parsedEndpoint.protocol !== 'https:') throw new Error('VAULT_S3_ENDPOINT must use https in production');
+    if (!['http:', 'https:'].includes(parsedEndpoint.protocol)) throw new Error(`${settingName('ENDPOINT')} must use http or https`);
+    if (env === 'production' && parsedEndpoint.protocol !== 'https:') throw new Error(`${settingName('ENDPOINT')} must use https in production`);
     endpoint = parsedEndpoint.origin;
   }
 
-  const forcePathStyleSetting = process.env.VAULT_S3_FORCE_PATH_STYLE;
+  const forcePathStyleSetting = readSetting('FORCE_PATH_STYLE');
   if (forcePathStyleSetting !== undefined && forcePathStyleSetting !== '' && !['true', 'false'].includes(forcePathStyleSetting)) {
-    throw new Error('VAULT_S3_FORCE_PATH_STYLE must be "true" or "false"');
+    throw new Error(`${settingName('FORCE_PATH_STYLE')} must be "true" or "false"`);
   }
 
   return { bucketName, region, serverSideEncryption, kmsKeyId, endpoint, forcePathStyle: forcePathStyleSetting === 'true' };
+}
+
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const PDF_BROWSER_CHANNELS = Object.freeze(['chrome', 'chrome-beta', 'msedge', 'msedge-beta', 'chromium']);
+
+/**
+ * Payslip generation settings (services/payslipService.js). Disabled (null) unless
+ * PAYSLIP_S3_BUCKET is set; when it is, everything a payslip needs must be configured:
+ *   COMPANY_LEGAL_NAME, COMPANY_REGISTERED_ADDRESS   printed in the payslip header
+ *   COMPANY_BRAND_COLOR                              optional "#RRGGBB" accent (default #4f46e5)
+ *   PAYSLIP_SIGNING_SECRET                           HMAC key for verification IDs (≥ 32 chars)
+ *   PAYSLIP_VERIFICATION_BASE_URL                    optional public URL printed next to the ID
+ *   PDF_BROWSER_EXECUTABLE_PATH | PDF_BROWSER_CHANNEL  the Chromium build that renders PDFs
+ */
+function loadPayslipConfig(env) {
+  const storage = loadS3StorageConfig(env, 'PAYSLIP');
+  if (!storage) return null;
+
+  const companyLegalName = (process.env.COMPANY_LEGAL_NAME ?? '').trim();
+  const companyRegisteredAddress = (process.env.COMPANY_REGISTERED_ADDRESS ?? '').trim();
+  if (companyLegalName.length < 2 || companyLegalName.length > 200) {
+    throw new Error('COMPANY_LEGAL_NAME (2-200 characters) is required when PAYSLIP_S3_BUCKET is set');
+  }
+  if (companyRegisteredAddress.length < 5 || companyRegisteredAddress.length > 400) {
+    throw new Error('COMPANY_REGISTERED_ADDRESS (5-400 characters) is required when PAYSLIP_S3_BUCKET is set');
+  }
+  const brandColor = (process.env.COMPANY_BRAND_COLOR ?? '#4f46e5').trim();
+  if (!HEX_COLOR_PATTERN.test(brandColor)) throw new Error('COMPANY_BRAND_COLOR must be a hex colour such as #4f46e5');
+
+  const signingSecret = process.env.PAYSLIP_SIGNING_SECRET ?? '';
+  if (signingSecret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`PAYSLIP_SIGNING_SECRET is required when PAYSLIP_S3_BUCKET is set and must be at least ${MIN_SECRET_LENGTH} characters`);
+  }
+  if (signingSecret === process.env.JWT_SECRET) throw new Error('PAYSLIP_SIGNING_SECRET must differ from JWT_SECRET');
+
+  let verificationBaseUrl = null;
+  if (process.env.PAYSLIP_VERIFICATION_BASE_URL) {
+    try {
+      const parsedUrl = new URL(process.env.PAYSLIP_VERIFICATION_BASE_URL.trim());
+      if (env === 'production' && parsedUrl.protocol !== 'https:') throw new Error('not https');
+      verificationBaseUrl = parsedUrl.toString().replace(/\/+$/, '');
+    } catch {
+      throw new Error('PAYSLIP_VERIFICATION_BASE_URL must be an absolute URL (https in production)');
+    }
+  }
+
+  const browserExecutablePath = (process.env.PDF_BROWSER_EXECUTABLE_PATH ?? '').trim() || null;
+  const browserChannel = (process.env.PDF_BROWSER_CHANNEL ?? '').trim() || null;
+  if (!browserExecutablePath && !browserChannel) {
+    throw new Error('PDF_BROWSER_EXECUTABLE_PATH or PDF_BROWSER_CHANNEL is required when PAYSLIP_S3_BUCKET is set');
+  }
+  if (browserChannel && !PDF_BROWSER_CHANNELS.includes(browserChannel)) {
+    throw new Error(`PDF_BROWSER_CHANNEL must be one of ${PDF_BROWSER_CHANNELS.join(', ')}`);
+  }
+
+  return {
+    storage,
+    signingSecret,
+    verificationBaseUrl,
+    company: { legalName: companyLegalName, registeredAddress: companyRegisteredAddress, brandColor },
+    pdfBrowser: { executablePath: browserExecutablePath, channel: browserExecutablePath ? null : browserChannel },
+  };
 }
 
 /**
@@ -201,13 +277,16 @@ function loadConfig() {
   }
 
   // Optional. Employee document vault storage; null disables the vault.
-  const vaultStorage = loadVaultStorageConfig(env);
+  const vaultStorage = loadS3StorageConfig(env, 'VAULT');
+  // Optional. Payslip PDF generation and storage; null disables it.
+  const payslips = loadPayslipConfig(env);
 
   return {
     env,
     cookieSecure,
     redisUrl,
     vaultStorage,
+    payslips,
     bootstrapAdminEmail,
     trustProxyHops,
     port: Number(process.env.PORT ?? 5000),
@@ -434,6 +513,12 @@ export function createApp(config) {
   app.use('/api/attendance', attendanceRoutes);
   // Service-to-service API for the ai-service (X-Internal-Api-Key); not for browsers
   app.use('/api/internal', internalRoutes);
+  // Payroll: income tax under both regimes, EPF, ESI, professional tax (FY 2026-27)
+  app.use('/api/payroll', payrollRoutes);
+  // Workforce analytics: attrition and burnout risk (HR and admins)
+  app.use('/api/analytics', analyticsRoutes);
+  // OKRs: company goals, team objectives, key results, milestones
+  app.use('/api/okrs', okrRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -477,6 +562,7 @@ async function start() {
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);
+    initPayslipServices(config.payslips);
   } catch (err) {
     logger.error('Startup failed', { error: err.message, stack: err.stack });
     process.exit(1);
@@ -525,6 +611,7 @@ async function start() {
       await closeSocketServer();
       await closeCacheStore();
       closeVaultStorage();
+      await closePayslipServices();
       await mongoose.connection.close();
       logger.info('Shutdown complete');
       process.exit(0);

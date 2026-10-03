@@ -188,11 +188,16 @@ export async function uploadDocument(req, res, next) {
  * The owner sees all their documents; admin/hr see the documents whose accessibleRoles include
  * their role; anyone else gets 403. The filter is applied in the query, so documents the caller
  * may not read are never loaded.
+ * `:employeeId` may be "me" for the caller's own documents (no need to know their profile id).
  * Responses: 200 { message, data: { documents: [summary], meta: { count, limit } } }, 400, 403, 404
  */
 export async function listEmployeeDocuments(req, res, next) {
   try {
-    const { employeeId } = req.params;
+    let { employeeId } = req.params;
+    if (employeeId === 'me') {
+      employeeId = await findOwnEmployeeProfileId(req.user.id);
+      if (!employeeId) return sendError(req, res, HTTP_STATUS.NOT_FOUND, VAULT_MESSAGES.EMPLOYEE_NOT_FOUND);
+    }
     if (!isValidObjectIdString(employeeId)) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_EMPLOYEE_ID, [{ field: 'employeeId', message: VAULT_MESSAGES.INVALID_EMPLOYEE_ID }]);
     }
@@ -214,7 +219,7 @@ export async function listEmployeeDocuments(req, res, next) {
     audit(req, AUDIT_ACTIONS.LIST, AUDIT_OUTCOMES.ALLOWED, { employeeId: normalizedEmployeeId, grantBasis: isOwner ? 'owner' : 'role', documentCount: documentRecords.length });
     return sendSuccess(res, HTTP_STATUS.OK, VAULT_MESSAGES.DOCUMENTS_RETRIEVED, {
       documents: documentRecords.map(toDocumentSummary),
-      meta: { count: documentRecords.length, limit: VAULT_FIELD_LIMITS.LIST_LIMIT },
+      meta: { employeeId: normalizedEmployeeId, count: documentRecords.length, limit: VAULT_FIELD_LIMITS.LIST_LIMIT },
     });
   } catch (error) {
     return next(error);

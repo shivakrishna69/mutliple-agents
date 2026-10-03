@@ -11,6 +11,16 @@ export const ROUTE_PATHS = Object.freeze({
   ACCOUNT: '/account',
   // User and role management, admins only.
   ADMIN_USERS: '/admin/users',
+  // Workforce: every signed-in user (features need an employee profile; the backend decides).
+  ATTENDANCE: '/attendance',
+  PAYROLL: '/payroll',
+  ANALYTICS: '/analytics',
+  // Organisation directory, staff only (the backend restricts /api/org to admins and agents).
+  ORGANISATION: '/organisation',
+  // Live agent telemetry console, admins only.
+  AGENT_TELEMETRY: '/admin/telemetry',
+  // Public payslip verification (no sign-in).
+  VERIFY_PAYSLIP: '/verify/payslip',
 });
 
 /** Account roles; mirrors backend constants ROLES. */

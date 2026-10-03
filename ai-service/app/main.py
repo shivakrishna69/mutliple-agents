@@ -141,6 +141,7 @@ async def run_thread_eviction_loop(agent_runtime: AgentRuntime) -> None:
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     agent_runtime = AgentRuntime(settings)
     application.state.agent_runtime = agent_runtime
+    agent_runtime.start()
     eviction_task = asyncio.create_task(run_thread_eviction_loop(agent_runtime), name="thread-eviction")
 
     if agent_runtime.is_llm_configured:
@@ -321,6 +322,7 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
             customer_id=conversation_input.customer_id,
             request_id=request_id,
             employee_context=conversation_input.employee_context,
+            conversation_id=conversation_input.conversation_id,
         )
     except LLMNotConfiguredError as not_configured_error:
         logger.error("AI turn rejected: LLM not configured", extra=log_context)

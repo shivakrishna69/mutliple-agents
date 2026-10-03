@@ -120,6 +120,31 @@ export const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 export const CALENDAR_DATE_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 
 /**
+ * Workforce risk bands for the 0-100 model scores (attritionRiskIndex, currentBurnoutScore).
+ *   safe       score < ELEVATED_FROM
+ *   elevated   ELEVATED_FROM ≤ score < CRITICAL_FROM   (monitor; a manager check-in is advised)
+ *   critical   score ≥ CRITICAL_FROM                    (action required)
+ * A policy choice, kept here so every consumer classifies identically.
+ */
+export const WORKFORCE_RISK_BANDS = Object.freeze({
+  ELEVATED_FROM: 40,
+  CRITICAL_FROM: 70,
+});
+
+/** Limits for OKRs (models/Objective.js, models/KeyResult.js). */
+export const OKR_FIELD_LIMITS = Object.freeze({
+  TITLE_MIN_LENGTH: 3,
+  TITLE_MAX_LENGTH: 200,
+  DESCRIPTION_MAX_LENGTH: 2000,
+  MAX_KEY_RESULTS_PER_OBJECTIVE: 10,
+  MAX_MILESTONES_PER_KEY_RESULT: 20,
+  // Check-ins (progress updates) kept per key result; older ones are dropped.
+  MAX_CHECK_INS_RETAINED: 50,
+  CHECK_IN_NOTE_MAX_LENGTH: 500,
+  MAX_WEIGHT: 10,
+});
+
+/**
  * Department code: 2–20 characters, uppercase letters and digits, optionally separated by "-"
  * or "_", starting with a letter or digit. Examples: "ENG", "FIN-AP", "HR_OPS2".
  * Values are uppercased before this check runs.

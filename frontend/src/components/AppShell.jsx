@@ -22,7 +22,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import RoleBadge from './RoleBadge.jsx';
-import { ChatIcon, CloseIcon, HomeIcon, InboxIcon, MenuIcon, SignOutIcon, UserCircleIcon, UsersIcon } from './Icons.jsx';
+import { ChartIcon, ChatIcon, CloseIcon, CurrencyIcon, HomeIcon, InboxIcon, MapPinIcon, MenuIcon, SignOutIcon, SitemapIcon, TerminalIcon, UserCircleIcon, UsersIcon } from './Icons.jsx';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES } from '../constants/routes.js';
 
@@ -37,8 +37,20 @@ const NAVIGATION_SECTIONS = Object.freeze([
     ],
   },
   {
+    sectionTitle: 'People',
+    items: [
+      { label: 'Attendance', path: ROUTE_PATHS.ATTENDANCE, Icon: MapPinIcon, isVisibleTo: () => true },
+      { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, isVisibleTo: () => true },
+      { label: 'Analytics hub', path: ROUTE_PATHS.ANALYTICS, Icon: ChartIcon, isVisibleTo: () => true },
+      { label: 'Organisation', path: ROUTE_PATHS.ORGANISATION, Icon: SitemapIcon, isVisibleTo: (role) => STAFF_ROLES.includes(role) },
+    ],
+  },
+  {
     sectionTitle: 'Administration',
-    items: [{ label: 'Users & roles', path: ROUTE_PATHS.ADMIN_USERS, Icon: UsersIcon, isVisibleTo: (role) => role === USER_ROLES.ADMIN }],
+    items: [
+      { label: 'Users & roles', path: ROUTE_PATHS.ADMIN_USERS, Icon: UsersIcon, isVisibleTo: (role) => role === USER_ROLES.ADMIN },
+      { label: 'Agent telemetry', path: ROUTE_PATHS.AGENT_TELEMETRY, Icon: TerminalIcon, isVisibleTo: (role) => role === USER_ROLES.ADMIN },
+    ],
   },
   {
     sectionTitle: 'Settings',

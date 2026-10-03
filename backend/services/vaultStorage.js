@@ -37,20 +37,14 @@
  *     request (and its 10 MB buffer) open indefinitely.
  */
 
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { VAULT_FIELD_LIMITS } from '../constants/validation.js';
 import { VAULT_SERVER_SIDE_ENCRYPTION } from '../models/DocumentVault.js';
 import { logger } from '../utils/logger.js';
+import { createS3Client } from '../utils/s3Client.js';
 
-const S3_CLIENT_SETTINGS = Object.freeze({
-  CONNECTION_TIMEOUT_MS: 3_000,
-  // A 10 MB upload over a slow link to S3 still finishes well inside this.
-  REQUEST_TIMEOUT_MS: 30_000,
-  MAX_ATTEMPTS: 3,
-});
-
-/** @type {{ s3Client: S3Client, bucketName: string, serverSideEncryption: string, kmsKeyId: string | null } | null} */
+/** @type {{ s3Client: import('@aws-sdk/client-s3').S3Client, bucketName: string, serverSideEncryption: string, kmsKeyId: string | null } | null} */
 let vaultStorage = null;
 
 /** Thrown when the vault is used without being configured; the controller maps it to 503. */
@@ -73,16 +67,7 @@ export function initVaultStorage(vaultConfig) {
     return;
   }
 
-  const s3Client = new S3Client({
-    region: vaultConfig.region,
-    ...(vaultConfig.endpoint && { endpoint: vaultConfig.endpoint }),
-    forcePathStyle: vaultConfig.forcePathStyle,
-    maxAttempts: S3_CLIENT_SETTINGS.MAX_ATTEMPTS,
-    requestHandler: {
-      connectionTimeout: S3_CLIENT_SETTINGS.CONNECTION_TIMEOUT_MS,
-      requestTimeout: S3_CLIENT_SETTINGS.REQUEST_TIMEOUT_MS,
-    },
-  });
+  const s3Client = createS3Client(vaultConfig);
 
   vaultStorage = {
     s3Client,

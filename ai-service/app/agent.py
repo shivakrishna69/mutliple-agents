@@ -74,6 +74,7 @@ from app.nodes.supervisor import create_supervisor_model
 from app.nodes.transcript import replies_given_this_turn
 from app.schemas import MESSAGE_CONTENT_MAX_LENGTH, EmployeeContext
 from app.services.backend_client import BackendInternalClient
+from app.telemetry import WORKFLOW_REGULARIZATION, WORKFLOW_SUPPORT, TelemetryPublisher, telemetry_turn
 
 logger = logging.getLogger("ai_service.agent")
 
@@ -227,15 +228,22 @@ class AgentRuntime:
 
         self._response_model: ChatGroq | None = None
         self._agent_context: AgentContext | None = None
-        self._backend_client: BackendInternalClient | None = None
         self.regularization_agent: RegularizationAgent | None = None
+        # One pooled client for the backend's internal API, shared by the regularization agent
+        # and telemetry delivery.
+        self._backend_client: BackendInternalClient | None = None
+        if settings.backend_internal_url:
+            self._backend_client = BackendInternalClient(settings.backend_internal_url, settings.internal_api_key)
+        # Live agent telemetry (app/telemetry.py); None when disabled.
+        self.telemetry_publisher: TelemetryPublisher | None = None
+        if settings.agent_telemetry_enabled and self._backend_client is not None:
+            self.telemetry_publisher = TelemetryPublisher(self._backend_client)
         if settings.groq_api_key:
             self._response_model = self._create_chat_model(settings.llm_temperature)
             # The attendance regularization sub-agent writes through the backend's internal API.
             # Activity evidence comes from the simulated source only where simulated data is
             # allowed (never in production); without a source every request goes to the manager.
-            if settings.backend_internal_url:
-                self._backend_client = BackendInternalClient(settings.backend_internal_url, settings.internal_api_key)
+            if self._backend_client is not None:
                 evidence_source = SimulatedActivityEvidenceSource() if settings.simulated_tools_enabled else None
                 self.regularization_agent = RegularizationAgent(
                     RegularizationContext(
@@ -257,8 +265,15 @@ class AgentRuntime:
         # The cyclic support workflow (app/graph.py), persisted per thread by memory_checkpointer.
         self.compiled_graph = build_support_graph(self.memory_checkpointer)
 
+    def start(self) -> None:
+        """Starts background work that needs the running event loop (called on application startup)."""
+        if self.telemetry_publisher is not None:
+            self.telemetry_publisher.start()
+
     async def aclose(self) -> None:
-        """Releases pooled connections (called on application shutdown)."""
+        """Flushes telemetry and releases pooled connections (called on application shutdown)."""
+        if self.telemetry_publisher is not None:
+            await self.telemetry_publisher.aclose()
         if self._backend_client is not None:
             await self._backend_client.aclose()
 
@@ -312,6 +327,7 @@ class AgentRuntime:
         customer_id: str | None,
         request_id: str | None,
         employee_context: EmployeeContext | None = None,
+        conversation_id: str | None = None,
     ) -> TurnResult:
         """
         Runs one turn for `thread_id` and returns the reply, the next worker, and this turn's logs.
@@ -323,9 +339,38 @@ class AgentRuntime:
           employee_context / conversation_thread_id   from the request                -> overwritten
         `next_worker` and `routing_reasoning` are not in the input, so the stored values from the
         previous turn are visible to the supervisor.
+
+        The whole turn is reported as live telemetry (app/telemetry.py), including failures.
         """
         if not self.is_llm_configured:
             raise LLMNotConfiguredError("llm_not_configured", "GROQ_API_KEY is not set")
+        async with telemetry_turn(
+            self.telemetry_publisher,
+            workflow=WORKFLOW_SUPPORT,
+            conversation_id=conversation_id,
+            transcript_messages=len(transcript_messages),
+        ) as turn_telemetry:
+            turn_result = await self._run_support_turn(
+                thread_id=thread_id,
+                transcript_messages=transcript_messages,
+                customer_id=customer_id,
+                request_id=request_id,
+                employee_context=employee_context,
+            )
+            if turn_telemetry is not None:
+                turn_telemetry.route_decision = turn_result.next_worker
+            return turn_result
+
+    async def _run_support_turn(
+        self,
+        *,
+        thread_id: str,
+        transcript_messages: list[BaseMessage],
+        customer_id: str | None,
+        request_id: str | None,
+        employee_context: EmployeeContext | None,
+    ) -> TurnResult:
+        """The body of process_conversation, run inside its telemetry scope."""
 
         turn_marker = f"gateway: turn {uuid.uuid4().hex} started with {len(transcript_messages)} transcript messages"
         graph_input = {
@@ -422,7 +467,11 @@ class AgentRuntime:
             raise RegularizationUnavailableError("regularization_not_configured", "BACKEND_INTERNAL_URL is not set")
         employee_profile = EmployeeProfileSnapshot.from_employee_context(employee_context)
         try:
-            async with asyncio.timeout(self._settings.process_timeout_seconds):
-                return await self.regularization_agent.handle_message(thread_id, employee_profile, message, start_new=start_new)
+            async with telemetry_turn(self.telemetry_publisher, workflow=WORKFLOW_REGULARIZATION) as turn_telemetry:
+                async with asyncio.timeout(self._settings.process_timeout_seconds):
+                    turn_result = await self.regularization_agent.handle_message(thread_id, employee_profile, message, start_new=start_new)
+                if turn_telemetry is not None:
+                    turn_telemetry.route_decision = turn_result.outcome.value
+                return turn_result
         except TimeoutError as timeout_error:
             raise AgentTimeoutError("turn_timeout", f"regularization exceeded {self._settings.process_timeout_seconds} s") from timeout_error

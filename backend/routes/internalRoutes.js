@@ -4,6 +4,8 @@
  *
  *   POST /attendance/regularizations         write a regularized Attendance entry (agent approval)
  *   POST /attendance/regularization-reviews  file a review for the employee's manager
+ *   POST /analytics/employee-scores          the scoring job writes attrition / burnout scores
+ *   POST /agent-telemetry/events             live agent telemetry, relayed to admin sockets
  *
  * In production these routes should also be unreachable from the public internet (expose them
  * only on the internal network, or block /api/internal at the load balancer); the key is the
@@ -11,6 +13,8 @@
  */
 
 import { Router } from 'express';
+import { ingestAgentTelemetry } from '../controllers/agentTelemetryController.js';
+import { ingestEmployeeScores } from '../controllers/analyticsController.js';
 import { createAgentRegularization, fileAgentReview } from '../controllers/internalAttendanceController.js';
 import { requireInternalApiKey } from '../middleware/requireInternalApiKey.js';
 
@@ -22,5 +26,7 @@ internalRouter.use(requireInternalApiKey, (req, res, next) => {
 });
 internalRouter.post('/attendance/regularizations', createAgentRegularization);
 internalRouter.post('/attendance/regularization-reviews', fileAgentReview);
+internalRouter.post('/analytics/employee-scores', ingestEmployeeScores);
+internalRouter.post('/agent-telemetry/events', ingestAgentTelemetry);
 
 export default internalRouter;

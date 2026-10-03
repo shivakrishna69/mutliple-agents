@@ -28,4 +28,12 @@ export const RATE_LIMITS = Object.freeze({
   ATTENDANCE_PUNCHES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
   // Attendance regularization: each message costs model calls; a person needs only a few per request.
   REGULARIZATION_MESSAGES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
+  // Tax estimates are cheap but carry no reason to be called in bulk.
+  TAX_ESTIMATES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
+  // Payslip generation renders a PDF in a browser; a month's run for a team stays within this.
+  PAYSLIP_GENERATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // Public verification: enough for a verifier, too few to scan the ID space.
+  PAYSLIP_VERIFICATIONS_PER_CLIENT_IP: Object.freeze({ windowMs: 60 * 1000, maxRequests: 20 }),
+  // OKR writes: progress sliders can fire often (clients should debounce); this stops runaway loops.
+  OKR_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 120 }),
 });
