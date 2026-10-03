@@ -26,8 +26,11 @@ Each reply is split into sentences, and each sentence is checked against PROHIBI
                               "The ticket was created": an account/request noun with a
                               completed or promised passive action.
   staff_commitment            "Our billing team will review the charge", "They'll get back to you",
-                              "The team has been notified": promises that staff will act, which
-                              implies something was handed over.
+                              "The team has been notified", "You'll receive a follow-up shortly":
+                              promises that staff will act or that the customer will hear back,
+                              which implies something was handed over.
+  (first_person_action_claim) also covers commitments through others: "I'll make sure they're
+                              aware", "I'll let the billing team know", "I'll keep you posted".
   fabricated_reference        "Ticket #48213", "Case number: ABC-1234": reference ids the AI could
                               only have invented.
 
@@ -162,6 +165,36 @@ PROHIBITED_PATTERNS: tuple[ProhibitedPattern, ...] = (
         re.compile(
             r"\b(?:team|department|specialists?|staff|engineers?)\s+(?:has|have)\s+(?:now\s+|already\s+)?been\s+"
             r"(?:notified|informed|alerted|contacted|made\s+aware|looped\s+in)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    ProhibitedPattern(
+        "first_person_commitment",
+        ViolationCategory.FIRST_PERSON_ACTION_CLAIM,
+        # Promises to make something happen through other people: "I'll make sure they're aware",
+        # "we will ensure the team sees this", "I'll let the billing team know", "I'll keep you posted".
+        re.compile(
+            rf"\b(?:I|we)(?:\s*{APOSTROPHE}(?:ll|m|re)|\s+(?:will|shall|am|are))\s+(?:going\s+to\s+|also\s+|personally\s+)?"
+            r"(?:make\s+sure|ensure|let\s+(?:them|the\s+(?:\w+\s+)?team|our\s+(?:\w+\s+)?team|(?:a|the|our)\s+\w+)\s+know|inform|notify|"
+            r"keep\s+you\s+(?:posted|updated|informed)|follow\s+up)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    ProhibitedPattern(
+        "promised_follow_up",
+        ViolationCategory.STAFF_COMMITMENT,
+        # Promises of something the customer will receive from the company: "You'll receive a
+        # follow-up from them shortly", "you will hear back within 24 hours", "you should get a refund".
+        # System emails ("you'll receive a confirmation email") are deliberately not matched.
+        # Follow-ups, refunds, credits, and callbacks only ever come from the company, so they are
+        # always promises. Generic replies (answer, response, reply, call) are promises only when
+        # the company is named as the source, so "your bank should give you an answer" stays allowed.
+        re.compile(
+            rf"\byou(?:\s*{APOSTROPHE}ll|\s+will|\s+should)\s+(?:(?:soon|shortly|then)\s+)?"
+            r"(?:(?:receive|get)\s+(?:a\s+|an\s+|your\s+)?(?:\w+\s+)?(?:follow[\s-]?up|callback|refund|credit)"
+            r"|(?:receive|get)\s+(?:a\s+|an\s+)?(?:\w+\s+)?(?:answer|response|reply|call)\s+from\s+"
+            r"(?:us|them|our\s+(?:\w+\s+)?team|the\s+(?:\w+\s+)?team|a\s+(?:specialist|colleague|team\s+member)|an\s+agent)"
+            r"|hear\s+(?:back|from\s+(?:us|them|the\s+(?:\w+\s+)?team|our\s+(?:\w+\s+)?team)))\b",
             re.IGNORECASE,
         ),
     ),

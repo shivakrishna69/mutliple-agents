@@ -42,10 +42,18 @@ Fallback
 =================================================================================================
 
 Any failure to obtain a valid decision (the model call raising, an empty or non-JSON reply,
-truncated JSON, an unknown action, a schema violation) is caught and converted into
-HUMAN_ESCALATION, with a warning log and an internal_logs entry naming the failure category.
-Escalating is the safe default: a human always resolves the conversation, the graph cannot loop,
-and the customer receives an immediate handoff message instead of an error. Only
+truncated JSON, an unknown action, a schema violation) is caught and converted into the mode's
+safe default, with a warning log and an internal_logs entry naming the failure category:
+
+  routing mode (no reply yet this turn)   HUMAN_ESCALATION: a human always resolves the
+                                          conversation, and the customer gets an immediate handoff
+                                          message instead of an error.
+  review mode (a worker already replied)  FINISH: the customer already has an answer, so the
+                                          turn ends normally rather than escalating a conversation
+                                          that may not need a person.
+
+Modes are detected from the transcript (app/nodes/transcript.replies_given_this_turn); see
+app/graph.py for how the cyclic graph uses them. Only
 `asyncio.CancelledError` (a BaseException, raised when the turn deadline cancels the run) is
 allowed to propagate, so timeouts still abort the turn cleanly.
 """
@@ -67,6 +75,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from app.config import Settings
 from app.nodes.context import AgentContext
+from app.nodes.transcript import conversation_messages_for_model, replies_given_this_turn
 
 logger = logging.getLogger("ai_service.supervisor")
 
@@ -253,14 +262,33 @@ def parse_supervisor_output(raw_text: str) -> SupervisorOutput:
 # =================================================================================================
 
 
-def _build_routing_prompt(state: dict[str, Any], max_context_messages: int) -> list[BaseMessage]:
-    """System prompt, plus who handled the previous turn (persisted state), plus recent transcript."""
+# Appended to the system prompt when the graph has looped back after a worker replied.
+REVIEW_MODE_INSTRUCTIONS = """
+
+REVIEW MODE: the last message above is a reply our support team ({replying_worker}) already gave to the customer's
+latest message. Decide whether this turn is complete:
+- FINISH if that reply addresses everything the customer asked in their latest message.
+- TECH_WORKER or BILLING_WORKER only if the customer's latest message ALSO raised a separate topic in that specialty
+  which the reply did not address. Never choose the specialty that just replied.
+- HUMAN_ESCALATION only if the customer's latest message needs a person, as defined above.
+When in doubt, choose FINISH."""
+
+
+def _build_routing_prompt(state: dict[str, Any], max_context_messages: int, is_review: bool) -> list[BaseMessage]:
+    """
+    System prompt plus the recent conversation (customer messages and final replies; other
+    workers' tool exchanges are excluded). Routing mode adds who handled the previous turn
+    (persisted state); review mode adds the review instructions instead.
+    """
     system_prompt = SUPERVISOR_SYSTEM_PROMPT
-    previous_worker = state.get("next_worker")
-    if previous_worker:
-        system_prompt += f"\n\nThe previous turn was handled by: {previous_worker}."
-    recent_transcript = list(state.get("messages", []))[-max_context_messages:]
-    return [SystemMessage(content=system_prompt), *recent_transcript]
+    if is_review:
+        system_prompt += REVIEW_MODE_INSTRUCTIONS.format(replying_worker=state.get("last_replying_worker") or "a specialist")
+    else:
+        previous_worker = state.get("last_replying_worker") or state.get("next_worker")
+        if previous_worker:
+            system_prompt += f"\n\nThe previous turn was handled by: {previous_worker}."
+    recent_conversation = conversation_messages_for_model(list(state.get("messages", [])), max_context_messages)
+    return [SystemMessage(content=system_prompt), *recent_conversation]
 
 
 def _routing_state_update(next_action: NextActionEnum, reasoning: str, log_entry: str) -> dict[str, Any]:
@@ -274,11 +302,20 @@ def _routing_state_update(next_action: NextActionEnum, reasoning: str, log_entry
 
 async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext]) -> dict[str, Any]:
     """
-    LangGraph node: routes the latest customer message. Never raises for model or parsing
-    problems; those become a HUMAN_ESCALATION decision (see "Fallback" above).
+    LangGraph node with two modes, chosen from the transcript:
+      routing  no reply yet this turn: pick who answers the customer's latest message.
+      review   the graph looped back after a worker replied: decide whether the turn is complete
+               (FINISH) or a second topic needs another specialist.
+    Never raises for model or parsing problems; those become the mode's safe default (see
+    "Fallback" above): HUMAN_ESCALATION when routing, FINISH when reviewing.
     """
-    previous_worker = state.get("next_worker")
-    routing_prompt = _build_routing_prompt(state, runtime.context.max_context_messages)
+    is_review = bool(replies_given_this_turn(list(state.get("messages", []))))
+    mode_name = "review" if is_review else "routing"
+    previous_worker = state.get("last_replying_worker") or state.get("next_worker")
+    # In review mode the customer already has an answer, so a failed review ends the turn rather
+    # than escalating a conversation that may not need a person.
+    fallback_action = NextActionEnum.FINISH if is_review else NextActionEnum.HUMAN_ESCALATION
+    routing_prompt = _build_routing_prompt(state, runtime.context.max_context_messages, is_review)
     started_at = time.perf_counter()
     raw_response_text = ""
 
@@ -287,13 +324,15 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
         raw_response_text = extract_response_text(model_reply)
         supervisor_output = parse_supervisor_output(raw_response_text)
     # ---------------------------------------------------------------------------------------------
-    # Fallback routing block. Each branch records why the decision failed, then defaults to
-    # HUMAN_ESCALATION. The returned update still sets next_worker = "human", so the conditional
-    # edge goes to human_handoff and the turn completes normally with a handoff reply.
+    # Fallback routing block. Each branch records why the decision failed, then returns the mode's
+    # safe default. The update still sets next_worker, so the graph's conditional edge routes
+    # normally: HUMAN_ESCALATION -> human_handoff, FINISH (in review) -> END.
     # ---------------------------------------------------------------------------------------------
     except json.JSONDecodeError as decode_error:
         # Empty reply, prose without a JSON object, or JSON cut off by the output token limit.
-        return _fallback_to_human_escalation(
+        return _fallback_routing(
+            fallback_action=fallback_action,
+            mode_name=mode_name,
             failure_category="malformed_json",
             failure_detail=f"{decode_error.msg} at position {decode_error.pos}",
             raw_response_text=raw_response_text,
@@ -303,7 +342,9 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
     except ValidationError as validation_error:
         # Well-formed JSON with a missing field, an unknown action, or a non-object value.
         failing_fields = sorted({".".join(str(location) for location in error["loc"]) or "<root>" for error in validation_error.errors()})
-        return _fallback_to_human_escalation(
+        return _fallback_routing(
+            fallback_action=fallback_action,
+            mode_name=mode_name,
             failure_category="schema_validation",
             failure_detail=f"invalid fields: {', '.join(failing_fields)}",
             raw_response_text=raw_response_text,
@@ -314,7 +355,9 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
         # Model call failures (rate limits, timeouts, connection or authentication errors) and
         # anything unforeseen. asyncio.CancelledError is a BaseException and is not caught here,
         # so the turn deadline still cancels the run.
-        return _fallback_to_human_escalation(
+        return _fallback_routing(
+            fallback_action=fallback_action,
+            mode_name=mode_name,
             failure_category="model_invocation_failed",
             failure_detail=f"{type(unexpected_error).__name__}: {str(unexpected_error)[:200]}",
             raw_response_text=raw_response_text,
@@ -322,12 +365,13 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
             started_at=started_at,
         )
 
-    # Successful decision: state transition to the chosen worker.
+    # Successful decision: state transition to the chosen worker (or, in review, to END via FINISH).
     next_worker = NEXT_WORKER_BY_ACTION[supervisor_output.next_action]
     logger.info(
         "Routing decision made",
         extra={
             "node": NODE_NAME,
+            "mode": mode_name,
             "next_action": supervisor_output.next_action.value,
             "next_worker": next_worker,
             "previous_worker": previous_worker,
@@ -338,13 +382,15 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
     return _routing_state_update(
         supervisor_output.next_action,
         supervisor_output.reasoning,
-        f"{NODE_NAME}: {supervisor_output.next_action.value} -> {next_worker} "
+        f"{NODE_NAME} ({mode_name}): {supervisor_output.next_action.value} -> {next_worker} "
         f"(previous: {previous_worker or 'none'}): {supervisor_output.reasoning}",
     )
 
 
-def _fallback_to_human_escalation(
+def _fallback_routing(
     *,
+    fallback_action: NextActionEnum,
+    mode_name: str,
     failure_category: str,
     failure_detail: str,
     raw_response_text: str,
@@ -352,13 +398,15 @@ def _fallback_to_human_escalation(
     started_at: float,
 ) -> dict[str, Any]:
     """
-    Logs why routing failed and returns the HUMAN_ESCALATION state update. The model's raw text is
-    not logged, because it may quote customer content; only its length is.
+    Logs why routing failed and returns the fallback decision. The model's raw text is not logged,
+    because it may quote customer content; only its length is.
     """
     logger.warning(
-        "Supervisor routing failed; defaulting to human escalation",
+        "Supervisor routing failed; applying fallback decision",
         extra={
             "node": NODE_NAME,
+            "mode": mode_name,
+            "fallback_action": fallback_action.value,
             "failure_category": failure_category,
             "failure_detail": failure_detail,
             "raw_response_length": len(raw_response_text),
@@ -366,11 +414,10 @@ def _fallback_to_human_escalation(
             "duration_ms": round((time.perf_counter() - started_at) * 1000, 1),
         },
     )
-    fallback_reasoning = f"Routing fallback: {failure_category}."
     return _routing_state_update(
-        NextActionEnum.HUMAN_ESCALATION,
-        fallback_reasoning,
-        f"{NODE_NAME}: fallback to {NextActionEnum.HUMAN_ESCALATION.value} -> human "
+        fallback_action,
+        f"Routing fallback: {failure_category}.",
+        f"{NODE_NAME} ({mode_name}): fallback to {fallback_action.value} -> {NEXT_WORKER_BY_ACTION[fallback_action]} "
         f"({failure_category}: {failure_detail})",
     )
 

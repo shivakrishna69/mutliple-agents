@@ -21,12 +21,17 @@ Tool execution pathway (run_worker_turn)
                            answer from the results. Up to MAX_TOOL_ROUNDS rounds; after that one
                            more call is made with tool_choice="none", so the model must answer.
   5. Control yielding      The final text passes through the output guard. The node returns
-                           messages [tool-call AIMessages, ToolMessages, final AIMessage] and its
-                           log entries. Every path then reaches END, and the next customer message
-                           starts again at START -> supervisor, so the supervisor re-routes every
-                           turn. `next_worker` keeps naming this worker on success (the backend
-                           records it as the conversation's active worker and attributes the reply
-                           to it); it is overwritten with "human" only when the node hands off.
+                           messages [tool-call AIMessages, ToolMessages, final AIMessage],
+                           `last_replying_worker` = this worker, and its log entries. The graph
+                           (app/graph.py) then returns control to the supervisor, which reviews the
+                           turn: FINISH ends it, or it routes a second topic to another specialist.
+                           On handoff the node sets next_worker and last_replying_worker to
+                           "human", and the graph ends the turn instead.
+
+  Inputs on a loop-back    When a colleague already replied this turn, the worker's system prompt
+                           gains COLLEAGUE_ALREADY_REPLIED_INSTRUCTION, and the model sees only the
+                           conversation (customer messages and final replies), never another
+                           worker's tool exchange.
 
 =================================================================================================
 Failure handling
@@ -74,6 +79,7 @@ from pydantic import ValidationError
 from app.guards.output_guard import GuardOutcome, validate_and_sanitize_output
 from app.nodes.context import AgentContext
 from app.nodes.policies import HUMAN_HANDOFF_REPLY, SHARED_POLICY_PROMPT
+from app.nodes.transcript import conversation_messages_for_model, replies_given_this_turn
 from app.schemas import MESSAGE_CONTENT_MAX_LENGTH
 
 logger = logging.getLogger("ai_service.workers")
@@ -287,10 +293,18 @@ def check_invoice_status(user_id: Annotated[str, InjectedToolArg]) -> str:
 # Prompts
 # =================================================================================================
 
+# Specialists answer only their own topic: when a message raises several, the supervisor routes the
+# remaining topic to the matching colleague in the same turn (app/graph.py, section 3).
+SPECIALIST_SCOPE_INSTRUCTION = (
+    "If the customer's message also raises a topic outside your specialty, do not address or ask about it; "
+    "a colleague will answer that part. "
+)
+
 TECH_WORKER_SYSTEM_PROMPT = (
     "You are the technical support specialist. Diagnose system errors, API failures, and integration bugs step by step. "
     "Ask for the exact error message or code, the device or client, and what the customer was doing when it happened, and "
     "give numbered troubleshooting steps the customer can follow. "
+    + SPECIALIST_SCOPE_INSTRUCTION
     + SHARED_POLICY_PROMPT
 )
 TECH_WORKER_TOOL_INSTRUCTIONS = (
@@ -304,6 +318,7 @@ BILLING_WORKER_SYSTEM_PROMPT = (
     "pricing clearly. Strict rule: you cannot change anything. Never promise or imply a refund, credit, cancellation, "
     "plan change, or any manual correction, and never say one is being or will be done; instead explain what the records "
     "show and that a member of the billing team can review requests to change anything. "
+    + SPECIALIST_SCOPE_INSTRUCTION
     + SHARED_POLICY_PROMPT
 )
 BILLING_WORKER_TOOL_INSTRUCTIONS = (
@@ -322,9 +337,11 @@ SUPERVISOR_RESPONSE_SYSTEM_PROMPT = (
 
 @dataclass(frozen=True)
 class WorkerProfile:
-    """Everything that distinguishes one worker: its node name, prompt, and tools."""
+    """Everything that distinguishes one worker: its node name, worker name, prompt, and tools."""
 
     node_name: str
+    # Value recorded in last_replying_worker / next_worker (the backend's worker names).
+    worker_name: str
     system_prompt: str
     tool_instructions: str
     tools: tuple[BaseTool, ...]
@@ -336,9 +353,16 @@ class WorkerProfile:
         return self.system_prompt + (self.tool_instructions if self.resolved_tools(simulated_tools_enabled) else "")
 
 
-TECH_WORKER_PROFILE = WorkerProfile(TECH_WORKER_NODE_NAME, TECH_WORKER_SYSTEM_PROMPT, TECH_WORKER_TOOL_INSTRUCTIONS, (query_system_logs,))
-BILLING_WORKER_PROFILE = WorkerProfile(BILLING_WORKER_NODE_NAME, BILLING_WORKER_SYSTEM_PROMPT, BILLING_WORKER_TOOL_INSTRUCTIONS, (check_invoice_status,))
-SUPERVISOR_RESPONSE_PROFILE = WorkerProfile(SUPERVISOR_RESPONSE_NODE_NAME, SUPERVISOR_RESPONSE_SYSTEM_PROMPT, "", ())
+TECH_WORKER_PROFILE = WorkerProfile(TECH_WORKER_NODE_NAME, "tech_agent", TECH_WORKER_SYSTEM_PROMPT, TECH_WORKER_TOOL_INSTRUCTIONS, (query_system_logs,))
+BILLING_WORKER_PROFILE = WorkerProfile(BILLING_WORKER_NODE_NAME, "billing_agent", BILLING_WORKER_SYSTEM_PROMPT, BILLING_WORKER_TOOL_INSTRUCTIONS, (check_invoice_status,))
+SUPERVISOR_RESPONSE_PROFILE = WorkerProfile(SUPERVISOR_RESPONSE_NODE_NAME, "supervisor", SUPERVISOR_RESPONSE_SYSTEM_PROMPT, "", ())
+
+# Added to a worker's system prompt when the graph looped back and a colleague already replied.
+COLLEAGUE_ALREADY_REPLIED_INSTRUCTION = (
+    " A colleague has already replied (shown last) to part of the customer's latest message. Address only the part "
+    "that falls within your specialty and was not yet answered. Do not greet the customer again and do not repeat "
+    "what your colleague said."
+)
 
 # Arguments the server always supplies itself, per tool, and the state key each one comes from.
 SERVER_INJECTED_TOOL_ARGUMENTS: dict[str, dict[str, str]] = {
@@ -441,9 +465,9 @@ async def execute_tool_call(
 
 def build_handoff_update(node_name: str, failure_category: str, failure_detail: str, log_entries: list[str]) -> dict[str, Any]:
     """
-    Fallback state update: hand the conversation to a human. Overwrites next_worker with "human",
-    which routes nothing further this turn (every worker edge goes to END) and tells the backend
-    to escalate.
+    Fallback state update: hand the conversation to a human. Sets next_worker and
+    last_replying_worker to "human"; the graph's route_after_worker then ends the turn, and the
+    backend escalates the conversation.
     """
     logger.warning(
         "Worker handed off to a human",
@@ -452,20 +476,23 @@ def build_handoff_update(node_name: str, failure_category: str, failure_detail: 
     return {
         "messages": [AIMessage(content=HUMAN_HANDOFF_REPLY, id=f"ai-{uuid.uuid4().hex}")],
         "next_worker": HUMAN_WORKER,
+        "last_replying_worker": HUMAN_WORKER,
         "internal_logs": [*log_entries, f"{node_name}: handed off to a human ({failure_category}: {failure_detail[:200]})"],
     }
 
 
 def build_guarded_reply_update(
-    node_name: str,
+    profile: WorkerProfile,
     generated_text: str,
     tool_exchange_messages: list[BaseMessage],
     log_entries: list[str],
 ) -> dict[str, Any]:
     """
     Step 5 of the pathway: applies the output guard to the final text and builds the state update.
-    PASSED / SANITIZED keep next_worker unchanged; ESCALATED hands off to a human.
+    PASSED / SANITIZED record this worker as last_replying_worker (the graph then returns control
+    to the supervisor); ESCALATED hands off to a human and ends the turn.
     """
+    node_name = profile.node_name
     guard_result = validate_and_sanitize_output(generated_text)
     guard_log_entry = f"{OUTPUT_GUARD_LOG_PREFIX}: {node_name} reply {guard_result.describe()}"
     if guard_result.outcome is not GuardOutcome.PASSED:
@@ -484,6 +511,7 @@ def build_guarded_reply_update(
         return {
             "messages": [*tool_exchange_messages, AIMessage(content=HUMAN_HANDOFF_REPLY, id=f"ai-{uuid.uuid4().hex}")],
             "next_worker": HUMAN_WORKER,
+            "last_replying_worker": HUMAN_WORKER,
             "internal_logs": [*log_entries, guard_log_entry],
         }
 
@@ -491,6 +519,7 @@ def build_guarded_reply_update(
     # A fresh AIMessage keeps only what the transcript needs; provider metadata is not checkpointed.
     return {
         "messages": [*tool_exchange_messages, AIMessage(content=reply_text, id=f"ai-{uuid.uuid4().hex}")],
+        "last_replying_worker": profile.worker_name,
         "internal_logs": [*log_entries, guard_log_entry],
     }
 
@@ -502,12 +531,22 @@ async def run_worker_turn(profile: WorkerProfile, state: dict[str, Any], runtime
     available_tools = profile.resolved_tools(agent_context.simulated_tools_enabled)
     tools_by_name = {available_tool.name: available_tool for available_tool in available_tools}
 
-    # Step 1: model input = worker prompt + recent transcript. The system prompt is built per call
-    # and never stored in state.
-    recent_transcript = list(state.get("messages", []))[-agent_context.max_context_messages :]
+    # Step 1: model input = worker prompt + recent conversation. The system prompt is built per call
+    # and never stored in state. Other workers' tool exchanges from earlier in this turn are left
+    # out (conversation_messages_for_model); this worker's own exchange is appended in the loop.
+    all_messages = list(state.get("messages", []))
+    system_prompt = profile.resolved_system_prompt(agent_context.simulated_tools_enabled)
+    routing_reasoning = str(state.get("routing_reasoning") or "").strip()
+    if profile.tools and routing_reasoning:
+        # Specialists get the supervisor's reason for routing to them as a concrete assignment,
+        # which keeps a multi-topic message from being answered in full by the first specialist.
+        system_prompt += f" The triage supervisor assigned you this part of the customer's latest message: {routing_reasoning}"
+    if replies_given_this_turn(all_messages):
+        # The graph looped back: a colleague already answered part of this customer message.
+        system_prompt += COLLEAGUE_ALREADY_REPLIED_INSTRUCTION
     model_input: list[BaseMessage] = [
-        SystemMessage(content=profile.resolved_system_prompt(agent_context.simulated_tools_enabled)),
-        *recent_transcript,
+        SystemMessage(content=system_prompt),
+        *conversation_messages_for_model(all_messages, agent_context.max_context_messages),
     ]
 
     # Step 2: dynamic tool binding. One binding offers the tools; the other forbids calling them,
@@ -576,7 +615,7 @@ async def run_worker_turn(profile: WorkerProfile, state: dict[str, Any], runtime
             "duration_ms": duration_ms,
         },
     )
-    return build_guarded_reply_update(profile.node_name, generated_text, tool_exchange_messages, log_entries)
+    return build_guarded_reply_update(profile, generated_text, tool_exchange_messages, log_entries)
 
 
 # =================================================================================================
