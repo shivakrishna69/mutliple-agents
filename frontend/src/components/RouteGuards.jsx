@@ -61,6 +61,15 @@ export function AdminRoute() {
   return <Outlet />;
 }
 
+/** Renders the child route only for signed-in HR users and admins. */
+export function PeopleManagerRoute() {
+  const { authStatus, currentUser } = useAuth();
+  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
+  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  if (![USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser?.role)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  return <Outlet />;
+}
+
 /** Renders the child route when signed out; a signed-in user is sent to /dashboard instead. */
 export function PublicOnlyRoute() {
   const { authStatus } = useAuth();

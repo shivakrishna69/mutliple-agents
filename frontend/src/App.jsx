@@ -16,9 +16,11 @@
  *   /analytics    -> AdvancedAnalyticsHub every role (risk tab for HR/admin, OKRs, vault)
  *   /organisation -> OrgDirectory     staff (admin or agent)
  *   /admin/telemetry -> AgentTelemetry admins
+ *   /people/onboarding -> PeopleOnboarding HR and admins (invite new joiners)
  *
  *   Public, signed in or not:
  *   /verify/payslip -> PayslipVerification
+ *   /invite/:token  -> AcceptInvitation (emailed link; sets a password, creates the account)
  *
  *   anything else -> redirects to /
  *
@@ -29,7 +31,7 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import AppShell from './components/AppShell.jsx';
-import { AdminRoute, CustomerRoute, ProtectedRoute, PublicOnlyRoute, StaffRoute } from './components/RouteGuards.jsx';
+import { AdminRoute, CustomerRoute, PeopleManagerRoute, ProtectedRoute, PublicOnlyRoute, StaffRoute } from './components/RouteGuards.jsx';
 import Account from './pages/Account.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 
@@ -48,6 +50,8 @@ const AttendanceCenter = lazy(() => import('./pages/AttendanceCenter.jsx'));
 const OrgDirectory = lazy(() => import('./pages/OrgDirectory.jsx'));
 const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
+const PeopleOnboarding = lazy(() => import('./pages/PeopleOnboarding.jsx'));
+const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
 
 export default function App() {
   return (
@@ -55,6 +59,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
       <Route path={ROUTE_PATHS.VERIFY_PAYSLIP} element={<PayslipVerification />} />
+      <Route path={ROUTE_PATHS.ACCEPT_INVITATION} element={<AcceptInvitation />} />
 
       <Route element={<PublicOnlyRoute />}>
         <Route path={ROUTE_PATHS.LOGIN} element={<Login />} />
@@ -76,6 +81,10 @@ export default function App() {
           <Route element={<StaffRoute />}>
             <Route path={ROUTE_PATHS.CONSOLE} element={<AgentConsole />} />
             <Route path={ROUTE_PATHS.ORGANISATION} element={<OrgDirectory />} />
+          </Route>
+
+          <Route element={<PeopleManagerRoute />}>
+            <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
           </Route>
 
           <Route element={<AdminRoute />}>

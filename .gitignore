@@ -76,3 +76,6 @@ env/
 Thumbs.db
 desktop.ini
 .claude/settings.local.json
+
+# Local demo-data seeding (placeholder data, not part of the product)
+backend/scripts/seedDemoData.js

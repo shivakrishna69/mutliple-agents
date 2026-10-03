@@ -38,6 +38,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_TAX_ESTIMATES: 'Too many tax estimates. Please wait a minute and try again',
   TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
   TOO_MANY_VERIFICATIONS: 'Too many verification requests. Please wait a minute and try again',
+  TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
+  TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
   TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
 });
 
@@ -199,6 +201,20 @@ export const OKR_MESSAGES = Object.freeze({
   MILESTONE_UPDATED: 'Milestone updated',
   INPUT_INVALID: 'The OKR details are invalid',
   OKRS_EMPLOYEES_ONLY: 'OKRs are available to employees, HR and administrators',
+});
+
+export const PEOPLE_MESSAGES = Object.freeze({
+  RESTRICTED: 'Employee onboarding is available to HR and administrators only',
+  OPTIONS_RETRIEVED: 'Invitation options retrieved',
+  INVITATIONS_RETRIEVED: 'Invitations retrieved',
+  INVITATION_CREATED: 'Invitation created',
+  INVITATION_RESENT: 'Invitation sent again',
+  INVITATION_REVOKED: 'Invitation revoked',
+  INVITATION_RETRIEVED: 'Invitation retrieved',
+  INVITATION_ACCEPTED: 'Welcome aboard! Your account is ready',
+  INVITATION_INVALID: 'The invitation details are invalid',
+  INVITATION_ID_INVALID: 'Invalid invitation id',
+  STATUS_INVALID: 'Status must be pending, expired, accepted or revoked',
 });
 
 export const AGENT_TELEMETRY_MESSAGES = Object.freeze({

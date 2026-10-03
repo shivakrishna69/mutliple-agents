@@ -38,10 +38,13 @@ import vaultRoutes from './routes/vaultRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import internalRoutes from './routes/internalRoutes.js';
 import payrollRoutes from './routes/payrollRoutes.js';
+import peopleRoutes from './routes/peopleRoutes.js';
+import invitationRoutes from './routes/invitationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import okrRoutes from './routes/okrRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
+import { closeMailService, initMailService } from './services/mailService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
 import { EMAIL_PATTERN } from './constants/validation.js';
@@ -198,6 +201,50 @@ function loadPayslipConfig(env) {
  * so the full set of settings the backend depends on is visible in one place.
  * `createApp` exposes it to request handlers as `req.app.locals.config`.
  */
+/**
+ * Optional outgoing email (employee invitations) and the public address used in emailed links.
+ *   SMTP_HOST                 enables email; without it invitation links are shown to HR instead
+ *   SMTP_PORT (587), SMTP_SECURE ("true" for implicit TLS on 465), SMTP_USER, SMTP_PASSWORD
+ *   SMTP_REQUIRE_TLS          default "true"; "false" only outside production, for local mail
+ *                             catchers (Mailpit, MailHog) that do not offer STARTTLS
+ *   MAIL_FROM                 required with SMTP_HOST, e.g. "Nova HR <hr@yourcompany.com>"
+ *   APP_PUBLIC_URL            where people open the app (default: the first CORS origin);
+ *                             must be https in production
+ *   COMPANY_NAME              shown in invitation emails (default: COMPANY_LEGAL_NAME, else "Nova Support")
+ */
+function loadMailAndPublicConfig(env, corsOrigins) {
+  const appPublicUrlSetting = (process.env.APP_PUBLIC_URL ?? corsOrigins[0] ?? '').trim().replace(/\/+$/, '');
+  let parsedPublicUrl;
+  try {
+    parsedPublicUrl = new URL(appPublicUrlSetting);
+  } catch {
+    throw new Error('APP_PUBLIC_URL must be an absolute URL (or set CORS_ORIGINS)');
+  }
+  if (!['http:', 'https:'].includes(parsedPublicUrl.protocol)) throw new Error('APP_PUBLIC_URL must use http or https');
+  if (env === 'production' && parsedPublicUrl.protocol !== 'https:') throw new Error('APP_PUBLIC_URL must use https in production');
+
+  const companyName = (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? 'Nova Support').trim().slice(0, 120) || 'Nova Support';
+
+  const smtpHost = (process.env.SMTP_HOST ?? '').trim();
+  if (!smtpHost) return { mail: null, appPublicUrl: parsedPublicUrl.origin, companyName };
+  const smtpPort = Number(process.env.SMTP_PORT ?? 587);
+  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) throw new Error('SMTP_PORT must be a port number');
+  const smtpSecureSetting = process.env.SMTP_SECURE;
+  if (smtpSecureSetting !== undefined && !['true', 'false'].includes(smtpSecureSetting)) throw new Error('SMTP_SECURE must be "true" or "false"');
+  const mailFrom = (process.env.MAIL_FROM ?? '').trim();
+  if (!mailFrom) throw new Error('MAIL_FROM is required when SMTP_HOST is set');
+  const requireTlsSetting = process.env.SMTP_REQUIRE_TLS;
+  if (requireTlsSetting !== undefined && !['true', 'false'].includes(requireTlsSetting)) throw new Error('SMTP_REQUIRE_TLS must be "true" or "false"');
+  if (env === 'production' && requireTlsSetting === 'false') throw new Error('SMTP_REQUIRE_TLS cannot be "false" in production');
+  const smtpUser = (process.env.SMTP_USER ?? '').trim() || null;
+  if (smtpUser && !process.env.SMTP_PASSWORD) throw new Error('SMTP_PASSWORD is required when SMTP_USER is set');
+  return {
+    mail: { host: smtpHost, port: smtpPort, secure: smtpSecureSetting === undefined ? smtpPort === 465 : smtpSecureSetting === 'true', user: smtpUser, password: smtpUser ? process.env.SMTP_PASSWORD : null, from: mailFrom, requireTls: requireTlsSetting !== 'false' },
+    appPublicUrl: parsedPublicUrl.origin,
+    companyName,
+  };
+}
+
 function loadConfig() {
   const required = ['MONGO_URI', 'JWT_SECRET', 'WEBHOOK_SIGNING_SECRET', 'AI_SERVICE_API_KEY'];
   const missing = required.filter((key) => !process.env[key]);
@@ -281,6 +328,13 @@ function loadConfig() {
   // Optional. Payslip PDF generation and storage; null disables it.
   const payslips = loadPayslipConfig(env);
 
+  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  // Optional. Invitation email (null mail = links shown to HR) and the public app address.
+  const { mail, appPublicUrl, companyName } = loadMailAndPublicConfig(env, corsOrigins);
+
   return {
     env,
     cookieSecure,
@@ -293,10 +347,10 @@ function loadConfig() {
     mongoUri: process.env.MONGO_URI,
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
-    corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
+    corsOrigins,
+    mail,
+    appPublicUrl,
+    companyName,
     aiServiceUrl: parsedAiServiceUrl.origin,
     aiServiceTimeoutMs,
     aiServiceApiKey: process.env.AI_SERVICE_API_KEY,
@@ -515,6 +569,8 @@ export function createApp(config) {
   app.use('/api/internal', internalRoutes);
   // Payroll: income tax under both regimes, EPF, ESI, professional tax (FY 2026-27)
   app.use('/api/payroll', payrollRoutes);
+  app.use('/api/people', peopleRoutes);
+  app.use('/api/invitations', invitationRoutes);
   // Workforce analytics: attrition and burnout risk (HR and admins)
   app.use('/api/analytics', analyticsRoutes);
   // OKRs: company goals, team objectives, key results, milestones
@@ -563,6 +619,7 @@ async function start() {
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);
     initPayslipServices(config.payslips);
+    initMailService(config.mail);
   } catch (err) {
     logger.error('Startup failed', { error: err.message, stack: err.stack });
     process.exit(1);
@@ -612,6 +669,7 @@ async function start() {
       await closeCacheStore();
       closeVaultStorage();
       await closePayslipServices();
+      closeMailService();
       await mongoose.connection.close();
       logger.info('Shutdown complete');
       process.exit(0);

@@ -21,6 +21,10 @@ export const ROUTE_PATHS = Object.freeze({
   AGENT_TELEMETRY: '/admin/telemetry',
   // Public payslip verification (no sign-in).
   VERIFY_PAYSLIP: '/verify/payslip',
+  // Employee onboarding by invitation, HR and admins.
+  ONBOARDING: '/people/onboarding',
+  // Public page behind the emailed invitation link.
+  ACCEPT_INVITATION: '/invite/:token',
 });
 
 /** Account roles; mirrors backend constants ROLES. */

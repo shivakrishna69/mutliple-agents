@@ -41,7 +41,7 @@ function normalizeEmail(rawEmail) {
  * PASSWORD_MIN_LENGTH characters, at most PASSWORD_MAX_BYTES UTF-8 bytes, and each strength rule.
  * Returns the first failure's message, or null. Not trimmed: spaces are part of the password.
  */
-function checkNewPassword(rawPassword) {
+export function checkNewPassword(rawPassword) {
   const presenceError = checkRequiredString(rawPassword, VALIDATION_MESSAGES.PASSWORD_REQUIRED, VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING);
   if (presenceError) return presenceError;
   if (rawPassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) return VALIDATION_MESSAGES.PASSWORD_TOO_SHORT;

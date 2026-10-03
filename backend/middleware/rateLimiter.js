@@ -165,3 +165,17 @@ export const okrWriteRateLimitByUser = createRateLimiter({
   resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OKR_UPDATES,
 });
+
+export const invitationSendRateLimitByUser = createRateLimiter({
+  limiterName: 'invitation_sends_per_user',
+  ...RATE_LIMITS.INVITATION_SENDS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_INVITATIONS,
+});
+
+export const invitationLookupRateLimitByClientIp = createRateLimiter({
+  limiterName: 'invitation_lookups_per_ip',
+  ...RATE_LIMITS.INVITATION_LOOKUPS_PER_CLIENT_IP,
+  resolveClientKey: resolveClientIp,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_INVITATION_ATTEMPTS,
+});
