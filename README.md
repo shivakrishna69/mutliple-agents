@@ -70,6 +70,29 @@ Optional services switch features on when configured: S3 (document vault, paysli
 vault and payslip endpoints answer "unavailable", HR gets invitation links to share by hand, and
 real-time runs in memory on one instance.
 
+## Run the whole stack with Docker Compose
+
+For a demo or a production-like check, one command builds and starts everything (MongoDB, Redis,
+backend, AI service, and the frontend served by nginx):
+
+```bash
+# backend/.env and ai-service/.env as in step 2 above
+docker compose up --build -d     # open http://localhost:8080
+docker compose logs -f backend   # follow a service's log
+docker compose down              # stop (data is kept in the mongo-data volume)
+```
+
+- Only port 8080 is published; nginx forwards `/api` and `/socket.io` to the backend, so the browser
+  sees a single origin. It runs alongside the development setup without port clashes.
+- The compose stack has its own database volume (`nova-support_mongo-data`), separate from the
+  `multiagent-mongo` development database.
+- It serves plain HTTP on localhost, so the backend runs in development mode. A real deployment needs
+  TLS in front, `NODE_ENV=production`, `COOKIE_SECURE=true` and https URLs (startup refuses insecure
+  production settings).
+- Payslip PDFs need Chromium in the backend image: build it with
+  `docker compose build --build-arg WITH_PDF_BROWSER=true backend` and set
+  `PDF_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium` (the image grows from about 430 MB to 1.4 GB).
+
 ## Roles
 
 `admin` (everything incl. user management) · `hr` (people, payroll, analytics, onboarding) ·
@@ -92,6 +115,7 @@ by the backend; the frontend only hides what a role cannot use.
 | AI-service tests | Done (`python -m pytest` in `ai-service/`) |
 | CI (GitHub Actions: lint, format, tests, builds) | Done |
 | Frontend browser tests (Playwright) | Done (`npm run test:e2e` in `frontend/`) |
+| Docker images and Compose stack | Done (`docker compose up --build`) |
 
 ## Contributing
 

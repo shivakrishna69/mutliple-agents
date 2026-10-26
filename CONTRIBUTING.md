@@ -38,8 +38,9 @@
    tested, and includes screenshots for UI changes.
 7. GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same checks on
    every pull request: backend and frontend on Node 22 and 24, the browser tests, the ai-service on
-   Python 3.11, and a build and start-up check of the ai-service Docker image. Merge only when
-   every check is green; then delete the branch.
+   Python 3.11, the full Docker Compose stack (built, started and checked through nginx), and a
+   hardened start-up check of the ai-service image. Merge only when every check is green; then
+   delete the branch.
 
 ## Code conventions
 
