@@ -81,7 +81,7 @@ class Settings:
     # For reasoning models (gpt-oss, qwen3): how much hidden reasoning to do before answering.
     # None means the parameter is not sent, which non-reasoning models require.
     llm_reasoning_effort: str | None
-    # Model for the attendance regularization sub-agent (app/nodes/attendance_agent.py). Defaults to
+    # Model for the attendance regularization sub-agent (app/nodes/attendance_agent/). Defaults to
     # groq_model. When a different model is set, reasoning_effort is not sent to it, because
     # non-reasoning models (e.g. Llama) reject the parameter.
     regularization_groq_model: str
@@ -97,7 +97,7 @@ class Settings:
     # AI_SERVICE_TIMEOUT_MS so the backend receives a clean 504 instead of timing out itself.
     process_timeout_seconds: float
 
-    # Worker tools backed by simulated data (app/nodes/workers.py). Never allowed in production,
+    # Worker tools backed by simulated data (app/nodes/worker_tools.py). Never allowed in production,
     # where customers would receive invented ledger and log data as fact.
     simulated_tools_enabled: bool
 

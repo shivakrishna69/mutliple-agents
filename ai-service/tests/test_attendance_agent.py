@@ -89,6 +89,24 @@ def test_only_actions_by_the_employee_inside_the_shift_count_as_proof():
     assert evaluate_activity_evidence(UNPROVEN_DAY, PROFILE, YESTERDAY).qualifying_event_count == 0
 
 
+def test_a_single_qualifying_event_is_not_enough_proof():
+    one_event_day = report(
+        activity(ActivityKind.MEETING_ATTENDED, at(YESTERDAY, 10, 15)),
+        activity(ActivityKind.MESSAGE_RECEIVED, at(YESTERDAY, 11, 0)),
+    )
+    evaluation = evaluate_activity_evidence(one_event_day, PROFILE, YESTERDAY)
+    assert evaluation.qualifying_event_count == 1
+    assert evaluation.is_activity_proven is False
+
+
+def test_events_exactly_at_the_shift_edges_follow_the_half_open_window():
+    edge_day = report(
+        activity(ActivityKind.MESSAGE_SENT, at(YESTERDAY, 9, 30)),  # shift start: inside
+        activity(ActivityKind.MESSAGE_SENT, at(YESTERDAY, 18, 30)),  # shift end: outside
+    )
+    assert evaluate_activity_evidence(edge_day, PROFILE, YESTERDAY).qualifying_event_count == 1
+
+
 @pytest.mark.parametrize(
     ("relative_day", "expected_date"),
     [

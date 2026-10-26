@@ -30,7 +30,7 @@ reply, and every worker returns control to the supervisor until the turn is comp
   attendance_regularization
                         app/nodes/attendance_worker.py
                                                    runs the attendance regularization sub-agent
-                                                   (app/nodes/attendance_agent.py); returns to the
+                                                   (app/nodes/attendance_agent/); returns to the
                                                    supervisor for review like billing/tech. Not
                                                    drawn above: it sits beside billing_agent and
                                                    tech_agent and follows the same edges.
