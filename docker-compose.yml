@@ -1,0 +1,92 @@
+# The whole stack on one machine: docker compose up --build, then open http://localhost:8080.
+#
+# Secrets and optional integrations (Groq, SMTP, S3...) come from backend/.env and ai-service/.env,
+# the same files used for local development (BACKEND_ENV_FILE / AI_SERVICE_ENV_FILE select other
+# files, as CI does); `environment:` below overrides only the addresses that differ inside the
+# compose network. Only the frontend is published (port 8080), so this runs next to the dev servers
+# and the standalone multiagent-mongo / multiagent-ai-service containers.
+#
+# This stack serves plain HTTP on localhost, so the backend runs with NODE_ENV=development (secure
+# cookies and https URLs are required in production). For a real deployment, put it behind TLS and
+# set NODE_ENV=production, COOKIE_SECURE=true and https URLs.
+
+name: nova-support
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - path: ${BACKEND_ENV_FILE:-backend/.env}
+        required: true
+    environment:
+      NODE_ENV: development
+      PORT: "5000"
+      MONGO_URI: mongodb://mongo:27017/nova
+      REDIS_URL: redis://redis:6379
+      AI_SERVICE_URL: http://ai-service:8000
+      CORS_ORIGINS: http://localhost:8080
+      APP_PUBLIC_URL: http://localhost:8080
+      COOKIE_SECURE: "false"
+      # nginx in the frontend container is the one proxy in front of the backend.
+      TRUST_PROXY_HOPS: "1"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    env_file:
+      - path: ${AI_SERVICE_ENV_FILE:-ai-service/.env}
+        required: true
+    environment:
+      # Development rules: the backend is reached over plain HTTP inside the compose network.
+      APP_ENV: development
+      BACKEND_INTERNAL_URL: http://backend:5000
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: backend:5000
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  mongo-data:

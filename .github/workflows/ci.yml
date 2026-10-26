@@ -140,6 +140,52 @@ jobs:
       - run: ruff format --check .
       - run: python -m pytest
 
+  compose-stack:
+    name: Docker Compose stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Outside the checkout, so throwaway secrets can never be committed or enter a build context.
+      BACKEND_ENV_FILE: /tmp/ci-backend.env
+      AI_SERVICE_ENV_FILE: /tmp/ci-ai-service.env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create throwaway configuration
+        run: |
+          {
+            echo "JWT_SECRET=$(openssl rand -hex 32)"
+            echo "WEBHOOK_SIGNING_SECRET=$(openssl rand -hex 32)"
+            echo "AI_SERVICE_API_KEY=$(openssl rand -hex 32)"
+          } > "$BACKEND_ENV_FILE"
+          touch "$AI_SERVICE_ENV_FILE"
+      - run: docker compose config --quiet
+      # The AI service is left out: without a Groq key it reports itself unhealthy by design, and
+      # nothing the web stack needs depends on it.
+      - name: Build and start the web stack
+        run: docker compose up --detach --build --wait frontend
+      - name: Smoke-test through nginx
+        run: |
+          set -euo pipefail
+          base=http://localhost:8080
+          origin="Origin: http://localhost:8080"
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/")" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/invite/any-client-route")" = 200
+          curl -sf "$base/api/health"
+          signup_status=$(curl -s -c cookies.txt -H "$origin" -H 'Content-Type: application/json' \
+            -d '{"name":"CI Check","email":"ci.check@example.com","password":"Valid#Pass2026"}' \
+            -o /dev/null -w '%{http_code}' "$base/api/auth/signup")
+          test "$signup_status" = 201
+          curl -sf -b cookies.txt -H "$origin" "$base/api/auth/me" > /dev/null
+          test "$(curl -s -b cookies.txt -H "$origin" -o /dev/null -w '%{http_code}' "$base/socket.io/?EIO=4&transport=polling")" = 200
+          test "$(curl -s -H 'Origin: https://evil.example' -o /dev/null -w '%{http_code}' "$base/socket.io/?EIO=4&transport=polling")" = 403
+          echo "stack answers correctly through nginx"
+      - name: Show logs when something failed
+        if: failure()
+        run: docker compose logs
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
   ai-service-image:
     name: AI service Docker image
     runs-on: ubuntu-latest
