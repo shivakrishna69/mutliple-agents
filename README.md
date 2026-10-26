@@ -1,5 +1,7 @@
 # Nova Support
 
+[![CI](https://github.com/shivakrishna69/mutliple-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/shivakrishna69/mutliple-agents/actions/workflows/ci.yml)
+
 An HR portal and AI-first support desk in one platform, built for Indian companies of roughly
 50–1,000 employees.
 
@@ -35,7 +37,7 @@ calls the backend's internal API instead. Details: [docs/architecture.md](docs/a
 
 ## Quick start (local development)
 
-**Prerequisites:** Node.js 20+ (24 recommended), Docker Desktop, a [Groq](https://console.groq.com) API key.
+**Prerequisites:** Node.js 22.12+ (24 recommended), Docker Desktop, a [Groq](https://console.groq.com) API key.
 
 ```bash
 # 1. Database
@@ -88,7 +90,8 @@ by the backend; the frontend only hides what a role cannot use.
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
 | AI-service tests | Done (`python -m pytest` in `ai-service/`) |
-| Frontend tests, CI | In progress (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| CI (GitHub Actions: lint, format, tests, builds) | Done |
+| Frontend tests | Planned |
 
 ## Contributing
 

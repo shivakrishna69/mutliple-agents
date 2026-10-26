@@ -27,11 +27,19 @@
    policy's maximum balance, so balances no longer need manual updates.
    ```
 4. Write or update tests in the same branch as the code they cover.
-5. Before pushing, run the checks for every service you changed (lint and tests) and make sure no
-   secrets are staged (`.env` files are git-ignored; only `*.env.example` templates are tracked).
+5. Before pushing, run the checks for every service you changed and make sure no secrets are staged
+   (`.env` files are git-ignored; only `*.env.example` templates are tracked):
+   ```bash
+   cd backend && npm run lint && npm run format:check && npm test
+   cd frontend && npm run lint && npm run format:check && npm run build
+   cd ai-service && ruff check . && ruff format --check . && python -m pytest
+   ```
 6. Push and open a pull request into `main`. The description says what changed, why, how it was
    tested, and includes screenshots for UI changes.
-7. Merge after review; delete the branch.
+7. GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same checks on
+   every pull request: backend and frontend on Node 22 and 24, the ai-service on Python 3.11, and a
+   build and start-up check of the ai-service Docker image. Merge only when every check is green;
+   then delete the branch.
 
 ## Code conventions
 
