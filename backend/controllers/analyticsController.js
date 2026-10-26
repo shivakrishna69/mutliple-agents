@@ -16,7 +16,6 @@
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ANALYTICS_MESSAGES } from '../constants/messages.js';
-import { ROLES } from '../models/User.js';
 import {
   RISK_BANDS,
   RISK_LIST_LIMITS,
@@ -26,16 +25,16 @@ import {
 } from '../services/workforceRiskService.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
+import { isWorkforceAdmin } from '../services/workforceAccess.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 
-const ANALYTICS_VIEWER_ROLES = Object.freeze([ROLES.ADMIN, ROLES.HR]);
 const MAX_SCORES_PER_BATCH = 1000;
 const MODEL_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 /** GET /api/analytics/workforce-risk */
 export async function getWorkforceRiskReport(req, res, next) {
   try {
-    if (!ANALYTICS_VIEWER_ROLES.includes(req.user.role)) {
+    if (!isWorkforceAdmin(req.user.role)) {
       recordAuditEvent(req, {
         category: 'analytics',
         action: 'view_workforce_risk',

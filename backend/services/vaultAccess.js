@@ -16,8 +16,8 @@
  * employeeId is an EmployeeProfile id, never a User id, so the two are never compared directly.
  */
 
-import EmployeeProfile from '../models/EmployeeProfile.js';
 import { VAULT_DOCUMENT_TYPES, VAULT_GRANTABLE_ROLES } from '../models/DocumentVault.js';
+import { isWorkforceAdmin } from './workforceAccess.js';
 
 /** Default readers of a new document when the uploader does not choose. */
 export const DEFAULT_ACCESSIBLE_ROLES = Object.freeze([...VAULT_GRANTABLE_ROLES]);
@@ -35,14 +35,9 @@ export const VAULT_DENIAL_REASONS = Object.freeze({
   ROLE_NOT_GRANTED: 'role_not_granted',
 });
 
+/** Who may manage other employees' documents: the organisation-wide HR roles. */
 export function isVaultManagerRole(role) {
-  return VAULT_GRANTABLE_ROLES.includes(role);
-}
-
-/** The signed-in user's EmployeeProfile id as a string, or null when they have no profile. */
-export async function findOwnEmployeeProfileId(userId) {
-  const ownProfile = await EmployeeProfile.findOne({ userId }).select('_id').lean();
-  return ownProfile ? ownProfile._id.toString() : null;
+  return isWorkforceAdmin(role);
 }
 
 /**

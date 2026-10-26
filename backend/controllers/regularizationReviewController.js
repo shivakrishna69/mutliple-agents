@@ -28,7 +28,7 @@ import { REGULARIZATION_METHODS } from '../models/Attendance.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import RegularizationReview, { REVIEW_STATUSES } from '../models/RegularizationReview.js';
-import User, { ROLES } from '../models/User.js';
+import User from '../models/User.js';
 import { zonedLocalTimeToInstant } from '../services/attendancePolicy.js';
 import {
   RegularizationRuleError,
@@ -37,21 +37,15 @@ import {
 } from '../services/attendanceRegularization.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
+import { findOwnEmployeeProfileId, isWorkforceAdmin } from '../services/workforceAccess.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 import { REVIEW_DECISIONS, validateReviewDecision } from '../validators/regularizationValidators.js';
 import { toReviewSummary } from './internalAttendanceController.js';
 
 const REVIEW_LIST_LIMIT = 100;
-/** Roles that may review any employee's request. */
-const ORGANISATION_WIDE_REVIEWER_ROLES = Object.freeze([ROLES.ADMIN, ROLES.HR]);
 
 function auditReview(req, action, outcome, details) {
   recordAuditEvent(req, { category: 'attendance', action, outcome, ...details });
-}
-
-async function findOwnProfileId(userId) {
-  const ownProfile = await EmployeeProfile.findOne({ userId }).select('_id').lean();
-  return ownProfile ? ownProfile._id.toString() : null;
 }
 
 /** GET /api/attendance/regularization-reviews */
@@ -64,8 +58,8 @@ export async function listRegularizationReviews(req, res, next) {
       ]);
     }
 
-    const isOrganisationWideReviewer = ORGANISATION_WIDE_REVIEWER_ROLES.includes(req.user.role);
-    const ownProfileId = await findOwnProfileId(req.user.id);
+    const isOrganisationWideReviewer = isWorkforceAdmin(req.user.role);
+    const ownProfileId = await findOwnEmployeeProfileId(req.user.id);
     if (!isOrganisationWideReviewer && !ownProfileId) {
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, REGULARIZATION_MESSAGES.REVIEWS_FORBIDDEN);
     }
@@ -143,7 +137,7 @@ export async function decideRegularizationReview(req, res, next) {
     if (!reviewRecord) return sendError(req, res, HTTP_STATUS.NOT_FOUND, REGULARIZATION_MESSAGES.REVIEW_NOT_FOUND);
 
     // ---- Authorisation ---------------------------------------------------------------------------
-    const ownProfileId = await findOwnProfileId(req.user.id);
+    const ownProfileId = await findOwnEmployeeProfileId(req.user.id);
     const auditContext = { reviewId, employeeId: reviewRecord.employeeId.toString(), decision };
     if (ownProfileId && reviewRecord.employeeId.toString() === ownProfileId) {
       auditReview(req, 'decide_review', AUDIT_OUTCOMES.DENIED, { ...auditContext, reason: 'own_request' });
@@ -152,7 +146,7 @@ export async function decideRegularizationReview(req, res, next) {
     const isReportingManager = Boolean(
       ownProfileId && reviewRecord.reportingManagerId && reviewRecord.reportingManagerId.toString() === ownProfileId,
     );
-    if (!isReportingManager && !ORGANISATION_WIDE_REVIEWER_ROLES.includes(req.user.role)) {
+    if (!isReportingManager && !isWorkforceAdmin(req.user.role)) {
       auditReview(req, 'decide_review', AUDIT_OUTCOMES.DENIED, { ...auditContext, reason: 'not_reviewer' });
       return sendError(
         req,

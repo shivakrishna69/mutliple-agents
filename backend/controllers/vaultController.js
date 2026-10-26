@@ -31,9 +31,9 @@ import {
   evaluateDocumentReadAccess,
   evaluateUploadAccess,
   evaluateVerifyAccess,
-  findOwnEmployeeProfileId,
   isVaultManagerRole,
 } from '../services/vaultAccess.js';
+import { findOwnEmployeeProfileId } from '../services/workforceAccess.js';
 import {
   createVaultDownloadUrl,
   deleteVaultObjectQuietly,

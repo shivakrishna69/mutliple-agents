@@ -16,7 +16,6 @@
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { PEOPLE_MESSAGES } from '../constants/messages.js';
-import { ROLES } from '../models/User.js';
 import {
   INVITATION_DISPLAY_STATUSES,
   InvitationError,
@@ -29,10 +28,9 @@ import {
 } from '../services/invitationService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
+import { isWorkforceAdmin } from '../services/workforceAccess.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 import { validateInvitationInput } from '../validators/peopleValidators.js';
-
-const PEOPLE_MANAGER_ROLES = [ROLES.ADMIN, ROLES.HR];
 
 function audit(req, action, outcome, details = {}) {
   recordAuditEvent(req, { category: 'people', action, outcome, ...details });
@@ -46,7 +44,7 @@ function appContextOf(req) {
 /** Wraps a handler with the HR/admin check and InvitationError mapping. */
 function peopleHandler(action, handler) {
   return async (req, res, next) => {
-    if (!PEOPLE_MANAGER_ROLES.includes(req.user.role)) {
+    if (!isWorkforceAdmin(req.user.role)) {
       audit(req, action, AUDIT_OUTCOMES.DENIED);
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PEOPLE_MESSAGES.RESTRICTED);
     }

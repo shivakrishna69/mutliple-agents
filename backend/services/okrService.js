@@ -25,10 +25,9 @@ import Department from '../models/Department.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
 import KeyResult, { MILESTONE_STATUSES, computeKeyResultProgress } from '../models/KeyResult.js';
 import Objective, { OBJECTIVE_LEVELS, OKR_STATUSES } from '../models/Objective.js';
-import User, { ROLES } from '../models/User.js';
+import User from '../models/User.js';
 import { OKR_FIELD_LIMITS } from '../constants/validation.js';
-
-const ORGANISATION_WIDE_ROLES = Object.freeze([ROLES.ADMIN, ROLES.HR]);
+import { findOwnEmployeeProfileId, isWorkforceAdmin } from './workforceAccess.js';
 
 /** An expected failure the controller returns as-is. */
 export class OkrError extends Error {
@@ -49,14 +48,13 @@ export class OkrError extends Error {
  * @returns {Promise<{ userId: string, isOrganisationWide: boolean, profileId: string|null, headedDepartmentIds: Set<string> }>}
  */
 export async function loadOkrViewer(user) {
-  const ownProfile = await EmployeeProfile.findOne({ userId: user.id }).select('_id').lean();
-  const profileId = ownProfile ? ownProfile._id.toString() : null;
+  const profileId = await findOwnEmployeeProfileId(user.id);
   const headedDepartments = profileId
     ? await Department.find({ departmentHeadId: profileId }).select('_id').lean()
     : [];
   return {
     userId: user.id,
-    isOrganisationWide: ORGANISATION_WIDE_ROLES.includes(user.role),
+    isOrganisationWide: isWorkforceAdmin(user.role),
     profileId,
     headedDepartmentIds: new Set(headedDepartments.map((department) => department._id.toString())),
   };

@@ -29,9 +29,7 @@ import {
   TAX_REGIMES,
   computeTaxLiability,
 } from '../utils/payrollCalculator.js';
-import EmployeeProfile from '../models/EmployeeProfile.js';
 import Payslip from '../models/Payslip.js';
-import { ROLES } from '../models/User.js';
 import {
   PayslipGenerationError,
   createPayslipDownload,
@@ -40,6 +38,7 @@ import {
 } from '../services/payslipService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
+import { findOwnEmployeeProfileId, isWorkforceAdmin } from '../services/workforceAccess.js';
 import { logger } from '../utils/logger.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 
@@ -101,8 +100,6 @@ export function createTaxEstimate(req, res, next) {
 // Payslips
 // =================================================================================================
 
-/** Roles that issue payslips and may read anyone's. */
-const PAYROLL_MANAGER_ROLES = Object.freeze([ROLES.ADMIN, ROLES.HR]);
 const VERIFICATION_ID_PATTERN = /^PS-\d{6}-[0-9A-F]{4}(?:-[0-9A-F]{4}){3}$/;
 const PAYSLIP_LIST_LIMIT = 60;
 
@@ -142,11 +139,6 @@ function toPayslipSummary(payslip) {
   };
 }
 
-async function findOwnEmployeeProfileId(userId) {
-  const ownProfile = await EmployeeProfile.findOne({ userId }).select('_id').lean();
-  return ownProfile ? ownProfile._id.toString() : null;
-}
-
 /**
  * POST /api/payroll/payslips   (admin, hr)
  * Body: { employeeId, year, month, salaryStructure, investmentsDeclared?, taxRegimeChoice,
@@ -157,7 +149,7 @@ async function findOwnEmployeeProfileId(userId) {
  */
 export async function createPayslip(req, res, next) {
   try {
-    if (!PAYROLL_MANAGER_ROLES.includes(req.user.role)) {
+    if (!isWorkforceAdmin(req.user.role)) {
       auditPayslip(req, 'generate_payslip', AUDIT_OUTCOMES.DENIED, { reason: 'role_not_allowed' });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PAYROLL_MESSAGES.PAYSLIP_MANAGERS_ONLY);
     }
@@ -243,7 +235,7 @@ export async function createPayslip(req, res, next) {
  */
 export async function listPayslips(req, res, next) {
   try {
-    const isPayrollManager = PAYROLL_MANAGER_ROLES.includes(req.user.role);
+    const isPayrollManager = isWorkforceAdmin(req.user.role);
     const ownProfileId = await findOwnEmployeeProfileId(req.user.id);
     const requestedEmployeeId =
       typeof req.query.employeeId === 'string' ? req.query.employeeId.toLowerCase() : ownProfileId;
@@ -301,7 +293,7 @@ export async function downloadPayslip(req, res, next) {
     const payslipOwner = await Payslip.findById(payslipId).select('employeeId').lean();
     if (!payslipOwner) return sendError(req, res, HTTP_STATUS.NOT_FOUND, PAYROLL_MESSAGES.PAYSLIP_NOT_FOUND);
     const isOwner = (await findOwnEmployeeProfileId(req.user.id)) === payslipOwner.employeeId.toString();
-    if (!isOwner && !PAYROLL_MANAGER_ROLES.includes(req.user.role)) {
+    if (!isOwner && !isWorkforceAdmin(req.user.role)) {
       auditPayslip(req, 'download_payslip', AUDIT_OUTCOMES.DENIED, { payslipId, reason: 'not_owner' });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PAYROLL_MESSAGES.PAYSLIP_ACCESS_DENIED);
     }
