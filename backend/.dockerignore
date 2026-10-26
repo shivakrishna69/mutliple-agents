@@ -1,0 +1,17 @@
+# Allowlist: ignore everything, then admit only what the image needs, so .env files, tests,
+# node_modules from the host and local-only scripts never enter the build context.
+*
+!package.json
+!package-lock.json
+!server.js
+!constants/
+!controllers/
+!middleware/
+!models/
+!routes/
+!services/
+!utils/
+!validators/
+!scripts/
+# Local demo data stays on developer machines (it is git-ignored too).
+scripts/seedDemoData.js
