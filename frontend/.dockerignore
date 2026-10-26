@@ -1,0 +1,10 @@
+# Allowlist: only what `vite build` needs. Keeps host node_modules, .env files, test output and
+# the browser tests out of the build context.
+*
+!package.json
+!package-lock.json
+!index.html
+!vite.config.js
+!src/
+!public/
+!nginx.conf
