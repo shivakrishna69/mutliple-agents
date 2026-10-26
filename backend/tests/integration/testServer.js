@@ -57,7 +57,7 @@ function findFreePort() {
   });
 }
 
-function buildServerEnvironment({ port, mongoUri }) {
+function buildServerEnvironment({ port, mongoUri, appOrigin }) {
   const inherited = Object.fromEntries(
     INHERITED_ENVIRONMENT_KEYS.filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]]),
   );
@@ -72,7 +72,7 @@ function buildServerEnvironment({ port, mongoUri }) {
     AI_SERVICE_API_KEY: randomBytes(32).toString('hex'),
     // Nothing listens here; tests never reach the AI service.
     AI_SERVICE_URL: 'http://127.0.0.1:9',
-    CORS_ORIGINS: TEST_APP_ORIGIN,
+    CORS_ORIGINS: appOrigin,
     BOOTSTRAP_ADMIN_EMAIL: TEST_ADMIN_EMAIL,
     COMPANY_NAME: 'Test Company',
   };
@@ -97,17 +97,20 @@ async function waitUntilHealthy(baseUrl, serverProcess, readOutput) {
 
 /**
  * Starts server.js on a fresh database.
+ * @param {{ port?: number, appOrigin?: string }} [options]  A fixed port and the browser origin to allow
+ *   (the frontend's browser tests need both to be known in advance); by default a free port and
+ *   TEST_APP_ORIGIN.
  * @returns {Promise<{ baseUrl: string, database: mongoose.Connection, createClient: () => TestClient, stop: () => Promise<void> }>}
  */
-export async function startTestServer() {
-  const port = await findFreePort();
+export async function startTestServer({ port: requestedPort, appOrigin = TEST_APP_ORIGIN } = {}) {
+  const port = requestedPort ?? (await findFreePort());
   const databaseName = `nova_test_${process.pid}_${randomBytes(4).toString('hex')}`;
   const mongoUri = `${MONGO_BASE_URL}/${databaseName}`;
   const workingDirectory = await mkdtemp(path.join(tmpdir(), 'nova-backend-test-'));
 
   const serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
     cwd: workingDirectory,
-    env: buildServerEnvironment({ port, mongoUri }),
+    env: buildServerEnvironment({ port, mongoUri, appOrigin }),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let capturedOutput = '';
