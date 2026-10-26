@@ -54,6 +54,13 @@
   with ids and outcomes only (never salaries, message text or tokens).
 - **Concurrency:** use optimistic versioning (409 on stale writes) and atomic conditional updates;
   don't assume MongoDB transactions.
+- **Reuse shared rules instead of re-creating them:** organisation-wide HR access and "my employee
+  profile" come from `backend/services/workforceAccess.js` (mirrored by `WORKFORCE_ADMIN_ROLES` in
+  `frontend/src/constants/routes.js`); every email uses `backend/services/emailLayout.js`; HTML is
+  escaped with `backend/utils/html.js`.
+- **No hardcoded business policy:** rules that differ between customer companies (leave quotas,
+  working days, holidays, limits a company would tune) are stored as configuration or data that HR
+  can change, not as constants in code.
 - **Frontend:** pages compose components; data access goes through `src/api/*` and
   `useApiResource`; UI is built from `src/components/ui.jsx`.
 - **Secrets** only in `.env` files, validated at startup; never in code, logs or commits.
