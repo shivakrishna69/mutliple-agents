@@ -99,14 +99,30 @@ describe('real-time channel', { skip: skipReason ?? false }, () => {
     await testServer?.stop();
   });
 
-  it('refuses a connection without a session', async () => {
-    const socket = openSocket(testServer, null);
+  async function connectionErrorFor(client) {
+    const socket = openSocket(testServer, client);
     openSockets.push(socket);
-    const connectionError = await connected(socket).then(
-      () => assert.fail('connected without a session'),
+    return connected(socket).then(
+      () => assert.fail('the connection should have been refused'),
       (error) => error,
     );
-    assert.equal(typeof connectionError.data?.code, 'string');
+  }
+
+  it('refuses a connection without a session', async () => {
+    assert.equal((await connectionErrorFor(null)).data?.code, 'not_authenticated');
+  });
+
+  it('refuses a connection whose session cookie was tampered with', async () => {
+    const tamperedClient = testServer.createClient();
+    for (const [cookieName, cookieValue] of customerClient.cookies) {
+      // The access token is a signed JWT; changing its signature must invalidate it.
+      tamperedClient.cookies.set(
+        cookieName,
+        cookieName.includes('access') ? `${cookieValue.slice(0, -4)}AAAA` : cookieValue,
+      );
+    }
+    assert.ok([...tamperedClient.cookies.keys()].some((cookieName) => cookieName.includes('access')));
+    assert.equal((await connectionErrorFor(tamperedClient)).data?.code, 'token_invalid');
   });
 
   it('refuses a connection from a site that is not allowed, even with a valid session', async () => {
