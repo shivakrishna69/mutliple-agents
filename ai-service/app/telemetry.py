@@ -264,7 +264,7 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
             }
             self._sequence += 1
             self._publisher.publish(telemetry_event)
-        except Exception:  # noqa: BLE001 - telemetry must never break a turn
+        except Exception:
             logger.debug("Telemetry event could not be built", exc_info=True)
 
     def emit_turn_started(self, transcript_messages: int | None) -> None:

@@ -107,7 +107,8 @@ import operator
 import re
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, time as clock_time, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
+from datetime import time as clock_time
 from enum import Enum
 from typing import Annotated, Any, Literal, Protocol, TypedDict
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -190,7 +191,7 @@ class EmployeeProfileSnapshot(BaseModel):
     allowed_geofence_radius: int | None = None
 
     @classmethod
-    def from_employee_context(cls, employee_context: EmployeeContext) -> "EmployeeProfileSnapshot":
+    def from_employee_context(cls, employee_context: EmployeeContext) -> EmployeeProfileSnapshot:
         """Maps the backend's EmployeeContext (MongoDB EmployeeProfile + OfficeLocation) to the agent's profile."""
         return cls(
             employee_id=employee_context.employee_id,
@@ -209,7 +210,7 @@ class EmployeeProfileSnapshot(BaseModel):
         return time_zone_name
 
     @model_validator(mode="after")
-    def validate_shift(self) -> "EmployeeProfileSnapshot":
+    def validate_shift(self) -> EmployeeProfileSnapshot:
         if self.shift_end <= self.shift_start:
             raise ValueError("shift_end must be later than shift_start (overnight shifts are not supported)")
         return self
@@ -729,7 +730,7 @@ async def extract_with_repair(model: BaseChatModel, prompt_messages: list[BaseMe
         try:
             model_reply = await model.ainvoke(working_messages)
             raw_text = extract_response_text(model_reply)
-        except Exception as invocation_error:  # noqa: BLE001 - a failed call is reported, never raised into the graph
+        except Exception as invocation_error:
             rejected_generation = _failed_generation_text(invocation_error)
             if rejected_generation is None:
                 raise ExtractionFailedError("model_invocation_failed", f"{type(invocation_error).__name__}: {str(invocation_error)[:200]}") from invocation_error
@@ -1153,7 +1154,7 @@ class RegularizationAgent:
         self._checkpointer = MemorySaver()
         self._graph = build_regularization_graph(self._checkpointer)
         self._idle_ttl_seconds = idle_ttl_seconds
-        self._now = now_provider or (lambda: datetime.now(timezone.utc))
+        self._now = now_provider or (lambda: datetime.now(UTC))
         self._thread_locks: dict[str, asyncio.Lock] = {}
         self._waiting_threads: dict[str, float] = {}
 

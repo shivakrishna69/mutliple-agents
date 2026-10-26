@@ -112,7 +112,7 @@ class ConversationInput(BaseModel):
     messages: Annotated[list[ConversationMessage], Field(min_length=1, max_length=MAX_MESSAGES_PER_REQUEST)]
 
     @model_validator(mode="after")
-    def validate_transcript(self) -> "ConversationInput":
+    def validate_transcript(self) -> ConversationInput:
         message_ids = [conversation_message.message_id for conversation_message in self.messages]
         if len(message_ids) != len(set(message_ids)):
             raise ValueError("message_id values must be unique within a request")

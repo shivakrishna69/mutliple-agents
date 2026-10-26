@@ -108,7 +108,7 @@ class Settings:
     compact_thread_after_turns: int
 
     @classmethod
-    def from_environment(cls) -> "Settings":
+    def from_environment(cls) -> Settings:
         internal_api_key = os.getenv("AI_SERVICE_API_KEY", "")
         if len(internal_api_key) < MIN_SECRET_LENGTH:
             raise ConfigurationError(

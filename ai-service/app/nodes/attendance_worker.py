@@ -90,7 +90,7 @@ async def attendance_regularization_node(state: dict[str, Any], runtime: Runtime
     try:
         employee_profile = EmployeeProfileSnapshot.from_employee_context(EmployeeContext.model_validate(raw_employee_context))
         turn_result = await regularization_agent.handle_message(sub_agent_thread_id, employee_profile, message_text)
-    except Exception as unexpected_error:  # noqa: BLE001 - never crash the support turn; a person takes over
+    except Exception as unexpected_error:
         logger.exception("Attendance regularization failed; handing off to a human", extra={"node": NODE_NAME})
         return _reply_update(
             HUMAN_HANDOFF_REPLY,

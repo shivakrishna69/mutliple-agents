@@ -133,7 +133,7 @@ async def run_thread_eviction_loop(agent_runtime: AgentRuntime) -> None:
                     "Idle threads evicted",
                     extra={"evicted_threads": evicted_thread_count, "tracked_threads": agent_runtime.thread_registry.tracked_thread_count},
                 )
-        except Exception:  # noqa: BLE001 - one failed sweep must not stop future sweeps
+        except Exception:
             logger.exception("Thread eviction sweep failed")
 
 

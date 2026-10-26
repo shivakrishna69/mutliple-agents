@@ -439,7 +439,7 @@ class AgentRuntime:
             await self.compiled_graph.aupdate_state(graph_config, retained_values, as_node=NODE_HUMAN_HANDOFF)
             thread_activity.turns_since_compaction = 0
             logger.info("Thread history compacted", extra={"thread_id": thread_id})
-        except Exception:  # noqa: BLE001 - compaction is best-effort by design (see docstring)
+        except Exception:
             logger.exception("Thread history compaction failed", extra={"thread_id": thread_id})
 
     # ---------------------------------------------------------------------------------------------
