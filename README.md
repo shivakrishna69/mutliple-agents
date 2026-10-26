@@ -91,7 +91,7 @@ by the backend; the frontend only hides what a role cannot use.
 | Backend tests | Done (`npm test` in `backend/`) |
 | AI-service tests | Done (`python -m pytest` in `ai-service/`) |
 | CI (GitHub Actions: lint, format, tests, builds) | Done |
-| Frontend tests | Planned |
+| Frontend browser tests (Playwright) | Done (`npm run test:e2e` in `frontend/`) |
 
 ## Contributing
 

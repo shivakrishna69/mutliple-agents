@@ -20,6 +20,32 @@ API.
 | `npm run dev` | development server with hot reload |
 | `npm run build` | production build into `dist/` |
 | `npm run preview` | serve the production build locally |
+| `npm run lint` / `npm run format:check` | ESLint and Prettier checks |
+| `npm run test:e2e` | browser tests (see below) |
+
+## Browser tests
+
+Playwright drives Chromium through the real app: the Vite dev server (port 5174) in front of the
+real backend (port 5065), which `e2e/globalSetup.js` starts on a throwaway MongoDB database with
+seeded admin, HR and customer accounts. Your `backend/.env` is never used.
+
+```bash
+cd backend && npm ci            # the tests start the backend, so it needs its dependencies
+cd ../frontend && npm ci
+npx playwright install chromium # once per machine
+npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (default mongodb://127.0.0.1:27017)
+```
+
+| File | Covers |
+|---|---|
+| `e2e/auth.spec.js` | Sign-up, sign-out (and the session ending on the server), wrong password, redirect to sign-in |
+| `e2e/roles.spec.js` | What admin, HR and customers see; admin-only addresses redirect customers |
+| `e2e/onboarding.spec.js` | HR invites a joiner, who activates the account from the link; the link works once |
+| `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
+| `e2e/pages.spec.js` | Every page of every role loads with no uncaught errors or 5xx responses; public payslip check |
+
+On failure, `playwright-report/` and `test-results/` hold screenshots and traces
+(`npx playwright show-trace <trace.zip>`); CI uploads them as an artifact.
 
 ## Structure
 
