@@ -54,6 +54,19 @@ async def test_billing_question_uses_the_tool_for_the_signed_in_customer_only():
     assert [message.content for message in tool_messages] == [check_invoice_status.invoke({"user_id": CUSTOMER_ID})]
 
 
+async def test_billing_facts_cited_from_the_records_reach_the_customer_unchanged():
+    records_reply = (
+        "Our records show your latest invoice was issued on 1 October and your refund was processed on 3 October."
+    )
+    supervisor = ScriptedChatModel(replies=[routing_reply("BILLING_WORKER"), routing_reply("FINISH")])
+    worker = ScriptedChatModel(replies=[text_reply(records_reply)])
+
+    final_state, replies = await run_turn(supervisor, worker, "What happened with my invoice and refund?")
+
+    assert replies == [records_reply]
+    assert final_state["last_replying_worker"] == "billing_agent"
+
+
 async def test_a_message_with_two_topics_gets_an_answer_from_each_specialist():
     supervisor = ScriptedChatModel(replies=[routing_reply("TECH_WORKER"), routing_reply("BILLING_WORKER")])
     worker = ScriptedChatModel(

@@ -36,7 +36,10 @@ Each reply is split into sentences, and each sentence is checked against PROHIBI
 
 Deliberately not matched, because they are honest: modal possibility ("a specialist can review
 it"), negation ("I can't process refunds"), the customer as subject ("you can update your card
-under Billing"), and needs rather than actions ("the team will need the invoice date").
+under Billing"), needs rather than actions ("the team will need the invoice date"), and past events
+cited from the records ("Our records show your invoice was issued on 1 October"), which is how the
+billing worker is told to report what check_invoice_status returned. That exemption covers only
+passive_completion_claim, only after the citation, and never a promise ("... will be updated").
 Apostrophes are matched in both straight (') and typographic (’) form, since models emit both.
 
 =================================================================================================
@@ -111,6 +114,19 @@ class ProhibitedPattern:
     pattern_id: str
     category: ViolationCategory
     expression: re.Pattern[str]
+    # True when a past event reported after a records citation is a fact, not a claimed action.
+    allows_cited_records: bool = False
+
+
+# "Our records show", "the billing records indicate", "according to our records": the reply is
+# reporting data a tool returned, not something the assistant did.
+_RECORDS_CITATION = re.compile(
+    r"\b(?:(?:our|the|your)\s+(?:billing\s+|account\s+|payment\s+)?records?\s+(?:shows?|indicates?|says?|lists?)"
+    r"|according\s+to\s+(?:our|the|your)\s+(?:billing\s+|account\s+|payment\s+)?records?)\b",
+    re.IGNORECASE,
+)
+# A promise is never a record, even after a citation.
+_FUTURE_TENSE = re.compile(r"\bwill\b", re.IGNORECASE)
 
 
 PROHIBITED_PATTERNS: tuple[ProhibitedPattern, ...] = (
@@ -148,6 +164,7 @@ PROHIBITED_PATTERNS: tuple[ProhibitedPattern, ...] = (
             rf"\s+(?:{_PASSIVE_PARTICIPLES})\b",
             re.IGNORECASE,
         ),
+        allows_cited_records=True,
     ),
     ProhibitedPattern(
         "staff_will_act",
@@ -262,11 +279,29 @@ class GuardResult:
         )
 
 
+def _is_cited_past_record(sentence: str, pattern_match: re.Match[str]) -> bool:
+    """True when the match reports a past event after a records citation earlier in the sentence."""
+    if _FUTURE_TENSE.search(pattern_match.group(0)):
+        return False
+    citation_match = _RECORDS_CITATION.search(sentence)
+    return citation_match is not None and citation_match.end() <= pattern_match.start()
+
+
 def find_violations(sentence: str) -> list[GuardViolation]:
     """Every prohibited pattern that matches the sentence, in PROHIBITED_PATTERNS order."""
     violations: list[GuardViolation] = []
     for prohibited_pattern in PROHIBITED_PATTERNS:
         pattern_match = prohibited_pattern.expression.search(sentence)
+        if pattern_match and prohibited_pattern.allows_cited_records:
+            # Check every occurrence: a citation may cover the first passive phrase but not a later promise.
+            pattern_match = next(
+                (
+                    candidate_match
+                    for candidate_match in prohibited_pattern.expression.finditer(sentence)
+                    if not _is_cited_past_record(sentence, candidate_match)
+                ),
+                None,
+            )
         if pattern_match:
             matched_phrase = " ".join(pattern_match.group(0).split())[:MAX_MATCHED_PHRASE_LENGTH]
             violations.append(
