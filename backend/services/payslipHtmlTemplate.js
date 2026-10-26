@@ -35,11 +35,7 @@
  *   └───────────────────────────────────────────────┘
  */
 
-const HTML_ESCAPES = Object.freeze({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' });
-
-export function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (character) => HTML_ESCAPES[character]);
-}
+import { escapeHtml } from '../utils/html.js';
 
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
