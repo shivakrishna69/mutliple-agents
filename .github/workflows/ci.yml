@@ -78,6 +78,46 @@ jobs:
       - run: npm run format:check
       - run: npm run build
 
+  browser-tests:
+    name: Browser tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Official image with Chromium and its system libraries preinstalled (Node 24). Its version must
+    # match @playwright/test in frontend/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    services:
+      mongo:
+        image: mongo:7
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CI: "true"
+      # Inside a job container, services are reached by their name.
+      TEST_MONGO_URL: mongodb://mongo:27017
+    steps:
+      - uses: actions/checkout@v4
+      # The browser tests start the real backend (e2e/globalSetup.js), so both packages are installed.
+      - run: npm ci
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run test:e2e
+        working-directory: frontend
+      - name: Keep the report and traces when a test fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
   ai-service:
     name: AI service
     runs-on: ubuntu-latest
