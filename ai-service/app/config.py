@@ -81,7 +81,7 @@ class Settings:
     # For reasoning models (gpt-oss, qwen3): how much hidden reasoning to do before answering.
     # None means the parameter is not sent, which non-reasoning models require.
     llm_reasoning_effort: str | None
-    # Model for the attendance regularization sub-agent (app/nodes/attendance_agent.py). Defaults to
+    # Model for the attendance regularization sub-agent (app/nodes/attendance_agent/). Defaults to
     # groq_model. When a different model is set, reasoning_effort is not sent to it, because
     # non-reasoning models (e.g. Llama) reject the parameter.
     regularization_groq_model: str

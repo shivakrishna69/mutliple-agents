@@ -1,6 +1,6 @@
 """
 The support graph's attendance_regularization node: hands a conversation turn to the attendance
-regularization sub-agent (app/nodes/attendance_agent.py) and turns its result into a reply.
+regularization sub-agent (app/nodes/attendance_agent/) and turns its result into a reply.
 
 Flow for one turn
 -----------------
