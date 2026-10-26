@@ -10,7 +10,7 @@ from app.graph import build_support_graph
 from app.nodes.context import AgentContext
 from app.nodes.policies import HUMAN_HANDOFF_REPLY
 from app.nodes.transcript import replies_given_this_turn
-from app.nodes.workers import check_invoice_status
+from app.nodes.worker_tools import check_invoice_status
 from tests.fakes import ScriptedChatModel, routing_reply, text_reply, tool_call_reply
 
 CUSTOMER_ID = "customer-a"

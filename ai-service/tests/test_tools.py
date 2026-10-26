@@ -4,12 +4,8 @@ import json
 
 import pytest
 
-from app.nodes.workers import (
-    ToolExecutionError,
-    check_invoice_status,
-    execute_tool_call,
-    query_system_logs,
-)
+from app.nodes.worker_tools import ToolExecutionError, check_invoice_status, query_system_logs
+from app.nodes.workers import execute_tool_call
 
 TOOLS_BY_NAME = {check_invoice_status.name: check_invoice_status, query_system_logs.name: query_system_logs}
 
