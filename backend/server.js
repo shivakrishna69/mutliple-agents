@@ -464,7 +464,6 @@ function notFoundHandler(req, res, next) {
  * `stack` is included only outside production.
  */
 function createErrorHandler(config) {
-  // eslint-disable-next-line no-unused-vars
   return function errorHandler(err, req, res, next) {
     const normalized = normalizeError(err);
     const isExpected = normalized instanceof HttpError;

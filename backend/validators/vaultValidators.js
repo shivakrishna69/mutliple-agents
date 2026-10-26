@@ -44,6 +44,8 @@ export function sanitizeOriginalFileName(rawFileName, detectedExtension) {
   const lastPathSegment = String(rawFileName ?? '').split(/[\\/]/).pop();
   let cleanedName = lastPathSegment
     .normalize('NFC')
+    // Strips ASCII and C1 control characters from uploaded file names on purpose.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001F\u007F-\u009F<>:"|?*]/g, '')
     .replace(/\s+/g, ' ')
     .replace(/^[.\s]+|[.\s]+$/g, '');

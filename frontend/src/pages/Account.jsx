@@ -63,10 +63,13 @@ function ChangePasswordForm() {
 
   const isSubmittingRef = useRef(false);
   const activeRequestControllerRef = useRef(null);
+  const currentPasswordInputRef = useRef(null);
+  const newPasswordInputRef = useRef(null);
+  const confirmPasswordInputRef = useRef(null);
   const inputRefsByField = {
-    currentPassword: useRef(null),
-    newPassword: useRef(null),
-    confirmPassword: useRef(null),
+    currentPassword: currentPasswordInputRef,
+    newPassword: newPasswordInputRef,
+    confirmPassword: confirmPasswordInputRef,
   };
 
   useEffect(() => () => activeRequestControllerRef.current?.abort(), []);
@@ -177,7 +180,7 @@ function ChangePasswordForm() {
           fieldValue={formValues.currentPassword}
           errorMessage={resolveVisibleFieldError('currentPassword')}
           autoCompleteHint="current-password"
-          inputRef={inputRefsByField.currentPassword}
+          inputRef={currentPasswordInputRef}
           onFieldChange={handleFieldChange}
           onFieldBlur={handleFieldBlur}
         />
@@ -188,7 +191,7 @@ function ChangePasswordForm() {
           fieldValue={formValues.newPassword}
           errorMessage={resolveVisibleFieldError('newPassword')}
           autoCompleteHint="new-password"
-          inputRef={inputRefsByField.newPassword}
+          inputRef={newPasswordInputRef}
           describedByIds={[NEW_PASSWORD_REQUIREMENTS_ID]}
           onFieldChange={handleFieldChange}
           onFieldBlur={handleFieldBlur}
@@ -202,7 +205,7 @@ function ChangePasswordForm() {
           fieldValue={formValues.confirmPassword}
           errorMessage={resolveVisibleFieldError('confirmPassword')}
           autoCompleteHint="new-password"
-          inputRef={inputRefsByField.confirmPassword}
+          inputRef={confirmPasswordInputRef}
           onFieldChange={handleFieldChange}
           onFieldBlur={handleFieldBlur}
         />
