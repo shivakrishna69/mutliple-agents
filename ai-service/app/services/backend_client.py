@@ -86,7 +86,10 @@ class BackendInternalClient:
                     if not isinstance(response_data, dict):
                         raise BackendUnavailableError("response has no data object")
                     return response_data
-            logger.warning("Backend internal call failed", extra={"path": path, "attempt": attempt_number, "error": str(last_failure)[:200]})
+            logger.warning(
+                "Backend internal call failed",
+                extra={"path": path, "attempt": attempt_number, "error": str(last_failure)[:200]},
+            )
             if attempt_number < MAX_ATTEMPTS:
                 await asyncio.sleep(RETRY_DELAY_SECONDS)
         raise last_failure  # type: ignore[misc]

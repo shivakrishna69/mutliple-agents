@@ -153,7 +153,9 @@ EXTRACTION_CONTEXT_MESSAGES = 8
 REASON_MAX_LENGTH = 300
 MAX_ACTIVITY_ENTRIES = 500
 
-TWELVE_HOUR_TIME_PATTERN = re.compile(r"^(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<meridiem>[ap])\.?\s*m\.?$", re.IGNORECASE)
+TWELVE_HOUR_TIME_PATTERN = re.compile(
+    r"^(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<meridiem>[ap])\.?\s*m\.?$", re.IGNORECASE
+)
 TWENTY_FOUR_HOUR_TIME_PATTERN = re.compile(r"^(?P<hour>\d{1,2}):(?P<minute>\d{2})(?::\d{2})?$")
 ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 NULL_LIKE_STRINGS = frozenset({"", "null", "none", "unknown", "n/a", "na", "not specified", "not provided"})
@@ -249,7 +251,15 @@ DAYS_BACK_BY_RELATIVE_DAY = {RelativeDay.TODAY: 0, RelativeDay.YESTERDAY: 1, Rel
 WEEKDAY_INDEX_BY_RELATIVE_DAY = {
     weekday_member: weekday_index
     for weekday_index, weekday_member in enumerate(
-        [RelativeDay.MONDAY, RelativeDay.TUESDAY, RelativeDay.WEDNESDAY, RelativeDay.THURSDAY, RelativeDay.FRIDAY, RelativeDay.SATURDAY, RelativeDay.SUNDAY]
+        [
+            RelativeDay.MONDAY,
+            RelativeDay.TUESDAY,
+            RelativeDay.WEDNESDAY,
+            RelativeDay.THURSDAY,
+            RelativeDay.FRIDAY,
+            RelativeDay.SATURDAY,
+            RelativeDay.SUNDAY,
+        ]
     )
 }
 
@@ -271,7 +281,7 @@ class RegularizationRequestExtraction(BaseModel):
     @field_validator("relative_day", mode="before")
     @classmethod
     def normalize_relative_day(cls, raw_relative_day: Any) -> Any:
-        """"Last Thursday" / "this-thursday" / "Day before yesterday" -> "thursday" / "day_before_yesterday"."""
+        """ "Last Thursday" / "this-thursday" / "Day before yesterday" -> "thursday" / "day_before_yesterday"."""
         normalized_day = _normalize_optional_text(raw_relative_day)
         if not isinstance(normalized_day, str):
             return normalized_day
@@ -471,16 +481,27 @@ class ApprovalRejectedError(Exception):
 class ActivityEvidenceSource(Protocol):
     """Where proof of work comes from (calendar and communications history)."""
 
-    async def fetch_calendar_and_comms_logs(self, employee_id: str, target_date: date, time_zone: str) -> ActivityLogReport: ...
+    async def fetch_calendar_and_comms_logs(
+        self, employee_id: str, target_date: date, time_zone: str
+    ) -> ActivityLogReport: ...
 
 
 class RegularizationSystems(Protocol):
     """The external operations the agent performs. Implementations must be safe to retry."""
 
-    async def fetch_calendar_and_comms_logs(self, employee_id: str, target_date: date, time_zone: str) -> ActivityLogReport: ...
+    async def fetch_calendar_and_comms_logs(
+        self, employee_id: str, target_date: date, time_zone: str
+    ) -> ActivityLogReport: ...
 
     async def approve_regularization_entry(
-        self, employee_id: str, target_date: date, punch_time: datetime, *, evidence_event_count: int, reason: str | None, thread_id: str
+        self,
+        employee_id: str,
+        target_date: date,
+        punch_time: datetime,
+        *,
+        evidence_event_count: int,
+        reason: str | None,
+        thread_id: str,
     ) -> ApprovalRecord: ...
 
     async def submit_manager_review(self, review: ManagerReviewRequest, *, idempotency_key: str) -> str: ...
@@ -497,7 +518,9 @@ class SimulatedActivityEvidenceSource:
     (meetings attended, messages sent) with non-qualifying ones (invitations, received messages).
     """
 
-    async def fetch_calendar_and_comms_logs(self, employee_id: str, target_date: date, time_zone: str) -> ActivityLogReport:
+    async def fetch_calendar_and_comms_logs(
+        self, employee_id: str, target_date: date, time_zone: str
+    ) -> ActivityLogReport:
         employee_zone = _resolve_time_zone(time_zone)
         seed_bytes = hashlib.sha256(f"{employee_id}|{target_date.isoformat()}".encode()).digest()
         has_no_activity = target_date.weekday() >= 5 or seed_bytes[0] % 4 == 0
@@ -515,10 +538,14 @@ class SimulatedActivityEvidenceSource:
             for entry_index in range(entry_count):
                 source, kind, summary = entry_templates[(seed_bytes[2] + entry_index) % len(entry_templates)]
                 minutes_after_nine = (seed_bytes[3 + entry_index] * 7 + entry_index * 61) % (9 * 60)
-                local_moment = datetime.combine(target_date, clock_time(9, 0), tzinfo=employee_zone) + timedelta(minutes=minutes_after_nine)
+                local_moment = datetime.combine(target_date, clock_time(9, 0), tzinfo=employee_zone) + timedelta(
+                    minutes=minutes_after_nine
+                )
                 entries.append(ActivityLogEntry(source=source, kind=kind, occurred_at=local_moment, summary=summary))
             entries.sort(key=lambda activity_entry: activity_entry.occurred_at)
-        return ActivityLogReport(employee_id=employee_id, target_date=target_date, entries=entries, data_source="simulated")
+        return ActivityLogReport(
+            employee_id=employee_id, target_date=target_date, entries=entries, data_source="simulated"
+        )
 
 
 REGULARIZATIONS_PATH = "/api/internal/attendance/regularizations"
@@ -537,13 +564,22 @@ class BackendRegularizationSystems:
         self._backend_client = backend_client
         self._evidence_source = evidence_source
 
-    async def fetch_calendar_and_comms_logs(self, employee_id: str, target_date: date, time_zone: str) -> ActivityLogReport:
+    async def fetch_calendar_and_comms_logs(
+        self, employee_id: str, target_date: date, time_zone: str
+    ) -> ActivityLogReport:
         if self._evidence_source is None:
             raise ActivitySystemUnavailableError("no calendar/communications evidence source is configured")
         return await self._evidence_source.fetch_calendar_and_comms_logs(employee_id, target_date, time_zone)
 
     async def approve_regularization_entry(
-        self, employee_id: str, target_date: date, punch_time: datetime, *, evidence_event_count: int, reason: str | None, thread_id: str
+        self,
+        employee_id: str,
+        target_date: date,
+        punch_time: datetime,
+        *,
+        evidence_event_count: int,
+        reason: str | None,
+        thread_id: str,
     ) -> ApprovalRecord:
         try:
             response_data = await self._backend_client.post_json(
@@ -575,7 +611,9 @@ class BackendRegularizationSystems:
             {
                 "employee_id": review.employee_id,
                 "date": review.target_date.isoformat() if review.target_date else None,
-                "claimed_punch_in_time": review.claimed_punch_in_time.strftime("%H:%M") if review.claimed_punch_in_time else None,
+                "claimed_punch_in_time": review.claimed_punch_in_time.strftime("%H:%M")
+                if review.claimed_punch_in_time
+                else None,
                 "reason": review.employee_reason,
                 "routing_reason": review.routing_reason.value,
                 "qualifying_event_count": review.qualifying_event_count,
@@ -710,15 +748,20 @@ def _failed_generation_text(invocation_error: Exception) -> str | None:
 
 def _describe_validation_problems(validation_error: ValidationError) -> str:
     return "; ".join(
-        f"{'.'.join(str(location) for location in error['loc']) or 'object'}: {error['msg']}" for error in validation_error.errors()
+        f"{'.'.join(str(location) for location in error['loc']) or 'object'}: {error['msg']}"
+        for error in validation_error.errors()
     )[:500]
 
 
 def _conversation_for_model(messages: list[BaseMessage]) -> list[BaseMessage]:
-    return [message for message in messages if isinstance(message, (HumanMessage, AIMessage))][-EXTRACTION_CONTEXT_MESSAGES:]
+    return [message for message in messages if isinstance(message, (HumanMessage, AIMessage))][
+        -EXTRACTION_CONTEXT_MESSAGES:
+    ]
 
 
-async def extract_with_repair(model: BaseChatModel, prompt_messages: list[BaseMessage]) -> RegularizationRequestExtraction:
+async def extract_with_repair(
+    model: BaseChatModel, prompt_messages: list[BaseMessage]
+) -> RegularizationRequestExtraction:
     """
     Calls the model, validates its JSON, and on an invalid reply runs EXTRACTION_REPAIR_ATTEMPTS
     repair rounds in which the model sees its own reply and the validation problems.
@@ -733,7 +776,9 @@ async def extract_with_repair(model: BaseChatModel, prompt_messages: list[BaseMe
         except Exception as invocation_error:
             rejected_generation = _failed_generation_text(invocation_error)
             if rejected_generation is None:
-                raise ExtractionFailedError("model_invocation_failed", f"{type(invocation_error).__name__}: {str(invocation_error)[:200]}") from invocation_error
+                raise ExtractionFailedError(
+                    "model_invocation_failed", f"{type(invocation_error).__name__}: {str(invocation_error)[:200]}"
+                ) from invocation_error
             raw_text = rejected_generation
         try:
             return parse_extraction(raw_text)
@@ -745,9 +790,19 @@ async def extract_with_repair(model: BaseChatModel, prompt_messages: list[BaseMe
             problems_for_model = last_problem[1]
         logger.warning(
             "Regularization extraction invalid",
-            extra={"node": "extract_request", "attempt": attempt_number + 1, "failure_category": last_problem[0], "failure_detail": last_problem[1], "raw_response_length": len(raw_text)},
+            extra={
+                "node": "extract_request",
+                "attempt": attempt_number + 1,
+                "failure_category": last_problem[0],
+                "failure_detail": last_problem[1],
+                "raw_response_length": len(raw_text),
+            },
         )
-        working_messages = [*working_messages, AIMessage(content=raw_text or "(empty reply)"), HumanMessage(content=REPAIR_INSTRUCTION.format(problems=problems_for_model))]
+        working_messages = [
+            *working_messages,
+            AIMessage(content=raw_text or "(empty reply)"),
+            HumanMessage(content=REPAIR_INSTRUCTION.format(problems=problems_for_model)),
+        ]
     raise ExtractionFailedError(*last_problem)
 
 
@@ -756,7 +811,9 @@ async def extract_with_repair(model: BaseChatModel, prompt_messages: list[BaseMe
 # =================================================================================================
 
 
-def evaluate_activity_evidence(report: ActivityLogReport, profile: EmployeeProfileSnapshot, target_date: date) -> EvidenceEvaluation:
+def evaluate_activity_evidence(
+    report: ActivityLogReport, profile: EmployeeProfileSnapshot, target_date: date
+) -> EvidenceEvaluation:
     """Section 3's rule. Pure function: same inputs, same decision."""
     employee_zone = profile.zone
     window_start = datetime.combine(target_date, profile.shift_start, tzinfo=employee_zone)
@@ -797,7 +854,9 @@ def _extracted_request(state: RegularizationState) -> RegularizationRequestExtra
 async def extract_request_node(state: RegularizationState, runtime: Runtime[RegularizationContext]) -> dict[str, Any]:
     profile = _profile(state)
     today = date.fromisoformat(state["today"])
-    system_prompt = EXTRACTION_SYSTEM_PROMPT.format(today_long=_format_day(today), today_iso=today.isoformat(), time_zone=profile.time_zone)
+    system_prompt = EXTRACTION_SYSTEM_PROMPT.format(
+        today_long=_format_day(today), today_iso=today.isoformat(), time_zone=profile.time_zone
+    )
     prompt_messages = [SystemMessage(content=system_prompt), *_conversation_for_model(list(state.get("messages", [])))]
     started_at = time.perf_counter()
     try:
@@ -805,7 +864,9 @@ async def extract_request_node(state: RegularizationState, runtime: Runtime[Regu
     except ExtractionFailedError as extraction_error:
         return {
             "extraction_failed": True,
-            "internal_logs": [f"extract_request: failed ({extraction_error.failure_category}: {extraction_error.detail})"],
+            "internal_logs": [
+                f"extract_request: failed ({extraction_error.failure_category}: {extraction_error.detail})"
+            ],
         }
     # The date the rest of the graph works with is computed here from what the model reported.
     extraction = extraction.model_copy(update={"target_date": resolve_requested_date(extraction, today)})
@@ -862,7 +923,7 @@ def _clarification_question(state: RegularizationState) -> str:
     if state.get("extraction_failed") or extraction is None:
         return (
             "Sorry, I couldn't quite follow that. Which day did you miss clocking in, and roughly what time did you start "
-            f"work? For example: \"{example_date}, started at 09:30\"."
+            f'work? For example: "{example_date}, started at 09:30".'
         )
     if extraction.target_date is not None and extraction.target_date > today:
         return f"{_format_day(extraction.target_date)} hasn't happened yet. Which past day do you need to regularize?"
@@ -880,23 +941,43 @@ async def ask_employee_node(state: RegularizationState) -> dict[str, Any]:
     return {
         "messages": [AIMessage(content=question), HumanMessage(content=answer_text)],
         "clarification_turns": state.get("clarification_turns", 0) + 1,
-        "internal_logs": [f"ask_employee: asked question {state.get('clarification_turns', 0) + 1} of {MAX_CLARIFICATION_TURNS} and received an answer"],
+        "internal_logs": [
+            f"ask_employee: asked question {state.get('clarification_turns', 0) + 1} of {MAX_CLARIFICATION_TURNS} and received an answer"
+        ],
     }
 
 
-async def fetch_activity_logs_node(state: RegularizationState, runtime: Runtime[RegularizationContext]) -> dict[str, Any]:
+async def fetch_activity_logs_node(
+    state: RegularizationState, runtime: Runtime[RegularizationContext]
+) -> dict[str, Any]:
     profile = _profile(state)
     extraction = _extracted_request(state)
     try:
-        report = await runtime.context.systems.fetch_calendar_and_comms_logs(profile.employee_id, extraction.target_date, profile.time_zone)
+        report = await runtime.context.systems.fetch_calendar_and_comms_logs(
+            profile.employee_id, extraction.target_date, profile.time_zone
+        )
         if report.employee_id != profile.employee_id or report.target_date != extraction.target_date:
             raise ActivitySystemUnavailableError("activity report does not match the requested employee/date")
     except Exception as fetch_error:  # noqa: BLE001 - an unavailable source routes to the manager
-        logger.warning("Activity log fetch failed", extra={"node": "fetch_activity_logs", "error_type": type(fetch_error).__name__, "error": str(fetch_error)[:200]})
-        return {"calendar_logs": None, "internal_logs": [f"fetch_activity_logs: unavailable ({type(fetch_error).__name__}: {str(fetch_error)[:120]})"]}
+        logger.warning(
+            "Activity log fetch failed",
+            extra={
+                "node": "fetch_activity_logs",
+                "error_type": type(fetch_error).__name__,
+                "error": str(fetch_error)[:200],
+            },
+        )
+        return {
+            "calendar_logs": None,
+            "internal_logs": [
+                f"fetch_activity_logs: unavailable ({type(fetch_error).__name__}: {str(fetch_error)[:120]})"
+            ],
+        }
     return {
         "calendar_logs": report.model_dump(mode="json"),
-        "internal_logs": [f"fetch_activity_logs: {len(report.entries)} entries for {report.target_date} (source: {report.data_source})"],
+        "internal_logs": [
+            f"fetch_activity_logs: {len(report.entries)} entries for {report.target_date} (source: {report.data_source})"
+        ],
     }
 
 
@@ -919,7 +1000,11 @@ async def evaluate_evidence_node(state: RegularizationState) -> dict[str, Any]:
 
 
 def route_after_evaluation(state: RegularizationState) -> str:
-    return "approve_entry" if EvidenceEvaluation.model_validate(state["evaluation"]).is_activity_proven else "route_to_manager"
+    return (
+        "approve_entry"
+        if EvidenceEvaluation.model_validate(state["evaluation"]).is_activity_proven
+        else "route_to_manager"
+    )
 
 
 async def approve_entry_node(state: RegularizationState, runtime: Runtime[RegularizationContext]) -> dict[str, Any]:
@@ -943,18 +1028,42 @@ async def approve_entry_node(state: RegularizationState, runtime: Runtime[Regula
             thread_id=state["thread_id"],
         )
     except ApprovalRejectedError as rejection:
-        logger.warning("Regularization refused by the attendance system", extra={"node": "approve_entry", "detail": str(rejection)[:200]})
-        return {"approval": None, "approval_failure": "rejected", "internal_logs": [f"approve_entry: refused by attendance system ({str(rejection)[:200]})"]}
+        logger.warning(
+            "Regularization refused by the attendance system",
+            extra={"node": "approve_entry", "detail": str(rejection)[:200]},
+        )
+        return {
+            "approval": None,
+            "approval_failure": "rejected",
+            "internal_logs": [f"approve_entry: refused by attendance system ({str(rejection)[:200]})"],
+        }
     except Exception as approval_error:  # noqa: BLE001 - an unreachable ledger routes to the manager
-        logger.error("Regularization approval failed", extra={"node": "approve_entry", "error_type": type(approval_error).__name__, "error": str(approval_error)[:200]})
-        return {"approval": None, "approval_failure": "unavailable", "internal_logs": [f"approve_entry: attendance system unavailable ({type(approval_error).__name__})"]}
+        logger.error(
+            "Regularization approval failed",
+            extra={
+                "node": "approve_entry",
+                "error_type": type(approval_error).__name__,
+                "error": str(approval_error)[:200],
+            },
+        )
+        return {
+            "approval": None,
+            "approval_failure": "unavailable",
+            "internal_logs": [f"approve_entry: attendance system unavailable ({type(approval_error).__name__})"],
+        }
 
     local_punch = approval.punch_in_time.astimezone(profile.zone)
     if approval.newly_created:
         claimed_note = ""
-        if extraction.claimed_punch_in_time and extraction.claimed_punch_in_time.strftime("%H:%M") != local_punch.strftime("%H:%M"):
+        if extraction.claimed_punch_in_time and extraction.claimed_punch_in_time.strftime(
+            "%H:%M"
+        ) != local_punch.strftime("%H:%M"):
             claimed_note = f" (you mentioned {extraction.claimed_punch_in_time:%H:%M}; I used the first time our systems recorded you working)"
-        status_note = "" if approval.calculation_status == "Normal" else f" Under your office's shift rules this counts as {approval.calculation_status.replace('_', ' ').lower()}."
+        status_note = (
+            ""
+            if approval.calculation_status == "Normal"
+            else f" Under your office's shift rules this counts as {approval.calculation_status.replace('_', ' ').lower()}."
+        )
         reply = (
             f"Done. I found {evaluation.qualifying_event_count} records of you working on {_format_day(extraction.target_date)} "
             f"(meetings attended and messages sent during your working hours), so I've regularized that day with a "
@@ -1005,7 +1114,9 @@ MANAGER_REPLY_BY_REASON: dict[ManagerRoutingReason, str] = {
         "{day} to approve this automatically, so I've sent your request to your manager for review."
     ),
     ManagerRoutingReason.OUTSIDE_REGULARIZATION_WINDOW: (
-        "{day} is more than " + str(MAX_REGULARIZATION_AGE_DAYS) + " days ago, which is outside the self-service window, "
+        "{day} is more than "
+        + str(MAX_REGULARIZATION_AGE_DAYS)
+        + " days ago, which is outside the self-service window, "
         "so I've sent your request to your manager for review."
     ),
     ManagerRoutingReason.CLARIFICATION_LIMIT_REACHED: "I still couldn't confirm which day you need, so I've passed your request to your manager, who will follow up with you.",
@@ -1047,10 +1158,21 @@ async def route_to_manager_node(state: RegularizationState, runtime: Runtime[Reg
     try:
         review_id = await runtime.context.systems.submit_manager_review(review_request, idempotency_key=idempotency_key)
     except Exception as submission_error:  # noqa: BLE001 - reported to the employee honestly below
-        logger.error("Manager review submission failed", extra={"node": "route_to_manager", "error_type": type(submission_error).__name__, "error": str(submission_error)[:200]})
+        logger.error(
+            "Manager review submission failed",
+            extra={
+                "node": "route_to_manager",
+                "error_type": type(submission_error).__name__,
+                "error": str(submission_error)[:200],
+            },
+        )
         review_id = None
 
-    reply = MANAGER_REPLY_BY_REASON[routing_reason].format(day=day_label) if review_id else MANAGER_REVIEW_NOT_SUBMITTED_REPLY.format(day=day_label)
+    reply = (
+        MANAGER_REPLY_BY_REASON[routing_reason].format(day=day_label)
+        if review_id
+        else MANAGER_REVIEW_NOT_SUBMITTED_REPLY.format(day=day_label)
+    )
     return {
         "manager_review": review_request.model_dump(mode="json"),
         "manager_review_id": review_id,
@@ -1066,7 +1188,7 @@ async def route_to_manager_node(state: RegularizationState, runtime: Runtime[Reg
 
 OUT_OF_SCOPE_REPLY = (
     "I can help you fix a missed or incorrect clock-in for a past working day. "
-    "Tell me which day it was and what happened, for example: \"I forgot to clock in yesterday because my laptop broke.\""
+    'Tell me which day it was and what happened, for example: "I forgot to clock in yesterday because my laptop broke."'
 )
 
 
@@ -1102,8 +1224,12 @@ def build_regularization_graph(checkpointer: MemorySaver) -> CompiledStateGraph:
         ["ask_employee", "route_to_manager", "reply_out_of_scope", "fetch_activity_logs"],
     )
     graph_builder.add_edge("ask_employee", "extract_request")
-    graph_builder.add_conditional_edges("fetch_activity_logs", route_after_fetch, ["evaluate_evidence", "route_to_manager"])
-    graph_builder.add_conditional_edges("evaluate_evidence", route_after_evaluation, ["approve_entry", "route_to_manager"])
+    graph_builder.add_conditional_edges(
+        "fetch_activity_logs", route_after_fetch, ["evaluate_evidence", "route_to_manager"]
+    )
+    graph_builder.add_conditional_edges(
+        "evaluate_evidence", route_after_evaluation, ["approve_entry", "route_to_manager"]
+    )
     graph_builder.add_conditional_edges("approve_entry", route_after_approval, [END, "route_to_manager"])
     graph_builder.add_edge("route_to_manager", END)
     graph_builder.add_edge("reply_out_of_scope", END)
@@ -1149,7 +1275,9 @@ class RegularizationAgent:
     question is forgotten (the next message then simply starts a new request).
     """
 
-    def __init__(self, context: RegularizationContext, *, idle_ttl_seconds: int = 3600, now_provider: Any = None) -> None:
+    def __init__(
+        self, context: RegularizationContext, *, idle_ttl_seconds: int = 3600, now_provider: Any = None
+    ) -> None:
         self._context = context
         self._checkpointer = MemorySaver()
         self._graph = build_regularization_graph(self._checkpointer)
@@ -1161,7 +1289,9 @@ class RegularizationAgent:
     def is_awaiting_input(self, thread_id: str) -> bool:
         return thread_id in self._waiting_threads
 
-    async def handle_message(self, thread_id: str, employee_profile: EmployeeProfileSnapshot, message_text: str, *, start_new: bool = False) -> RegularizationTurnResult:
+    async def handle_message(
+        self, thread_id: str, employee_profile: EmployeeProfileSnapshot, message_text: str, *, start_new: bool = False
+    ) -> RegularizationTurnResult:
         if not start_new and self.is_awaiting_input(thread_id):
             try:
                 return await self.respond(thread_id, message_text)
@@ -1169,7 +1299,9 @@ class RegularizationAgent:
                 pass  # expired between the check and the call: treat the message as a new request
         return await self.start(thread_id, employee_profile, message_text)
 
-    async def start(self, thread_id: str, employee_profile: EmployeeProfileSnapshot, message_text: str) -> RegularizationTurnResult:
+    async def start(
+        self, thread_id: str, employee_profile: EmployeeProfileSnapshot, message_text: str
+    ) -> RegularizationTurnResult:
         await self._evict_idle_threads()
         async with self._lock_for(thread_id):
             self._waiting_threads.pop(thread_id, None)
@@ -1201,16 +1333,27 @@ class RegularizationAgent:
         if pending_interrupts:
             self._waiting_threads[thread_id] = time.monotonic()
             question = pending_interrupts[0].value["question"]
-            return RegularizationTurnResult(thread_id, RegularizationOutcome.AWAITING_EMPLOYEE_INPUT, question, None, None, None, internal_logs)
+            return RegularizationTurnResult(
+                thread_id, RegularizationOutcome.AWAITING_EMPLOYEE_INPUT, question, None, None, None, internal_logs
+            )
 
         # Final outcome: the thread is complete, so its checkpoint is no longer needed.
         self._waiting_threads.pop(thread_id, None)
         await self._checkpointer.adelete_thread(thread_id)
         approval = ApprovalRecord.model_validate(final_state["approval"]) if final_state.get("approval") else None
-        manager_review = ManagerReviewRequest.model_validate(final_state["manager_review"]) if final_state.get("manager_review") else None
+        manager_review = (
+            ManagerReviewRequest.model_validate(final_state["manager_review"])
+            if final_state.get("manager_review")
+            else None
+        )
         logger.info(
             "Regularization finished",
-            extra={"agent": AGENT_NAME, "thread_id": thread_id, "outcome": final_state["outcome"], "clarification_turns": final_state.get("clarification_turns", 0)},
+            extra={
+                "agent": AGENT_NAME,
+                "thread_id": thread_id,
+                "outcome": final_state["outcome"],
+                "clarification_turns": final_state.get("clarification_turns", 0),
+            },
         )
         return RegularizationTurnResult(
             thread_id,
@@ -1227,10 +1370,15 @@ class RegularizationAgent:
 
     async def _evict_idle_threads(self) -> None:
         cutoff = time.monotonic() - self._idle_ttl_seconds
-        for idle_thread_id in [waiting_id for waiting_id, last_active in self._waiting_threads.items() if last_active < cutoff]:
+        for idle_thread_id in [
+            waiting_id for waiting_id, last_active in self._waiting_threads.items() if last_active < cutoff
+        ]:
             self._waiting_threads.pop(idle_thread_id, None)
             idle_lock = self._thread_locks.get(idle_thread_id)
             if idle_lock is None or not idle_lock.locked():
                 self._thread_locks.pop(idle_thread_id, None)
             await self._checkpointer.adelete_thread(idle_thread_id)
-            logger.info("Regularization thread evicted after inactivity", extra={"agent": AGENT_NAME, "thread_id": idle_thread_id})
+            logger.info(
+                "Regularization thread evicted after inactivity",
+                extra={"agent": AGENT_NAME, "thread_id": idle_thread_id},
+            )

@@ -151,7 +151,9 @@ class Settings:
             environment != "production" if simulated_tools_setting == "" else simulated_tools_setting == "true"
         )
         if environment == "production" and simulated_tools_enabled:
-            raise ConfigurationError("SIMULATED_TOOLS_ENABLED cannot be true in production: customers would receive simulated data")
+            raise ConfigurationError(
+                "SIMULATED_TOOLS_ENABLED cannot be true in production: customers would receive simulated data"
+            )
 
         groq_model = os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL).strip() or DEFAULT_GROQ_MODEL
 

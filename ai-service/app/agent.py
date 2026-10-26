@@ -199,7 +199,11 @@ class ThreadRegistry:
         """Deletes least recently used idle threads until within MAX_TRACKED_THREADS."""
         while len(self._activity_by_thread) > self._max_tracked_threads:
             least_recent_idle_thread = next(
-                (thread_id for thread_id, activity in self._activity_by_thread.items() if activity.pending_requests == 0),
+                (
+                    thread_id
+                    for thread_id, activity in self._activity_by_thread.items()
+                    if activity.pending_requests == 0
+                ),
                 None,
             )
             if least_recent_idle_thread is None:
@@ -405,7 +409,9 @@ class AgentRuntime:
         turn_replies = replies_given_this_turn(final_state.get("messages", []))
         if not turn_replies:
             raise InvalidModelOutputError("missing_reply", "the graph finished without producing a reply message")
-        response_content = "\n\n".join(str(turn_reply.content).strip() for turn_reply in turn_replies)[:MESSAGE_CONTENT_MAX_LENGTH]
+        response_content = "\n\n".join(str(turn_reply.content).strip() for turn_reply in turn_replies)[
+            :MESSAGE_CONTENT_MAX_LENGTH
+        ]
 
         stored_log_entries = final_state.get("internal_logs", [])
         turn_start_index = max(
@@ -432,7 +438,13 @@ class AgentRuntime:
             latest_snapshot = await self.compiled_graph.aget_state(graph_config)
             retained_values = {
                 channel_name: latest_snapshot.values[channel_name]
-                for channel_name in ("messages", "next_worker", "last_replying_worker", "routing_reasoning", "internal_logs")
+                for channel_name in (
+                    "messages",
+                    "next_worker",
+                    "last_replying_worker",
+                    "routing_reasoning",
+                    "internal_logs",
+                )
                 if channel_name in latest_snapshot.values
             }
             await self.memory_checkpointer.adelete_thread(thread_id)
@@ -469,9 +481,13 @@ class AgentRuntime:
         try:
             async with telemetry_turn(self.telemetry_publisher, workflow=WORKFLOW_REGULARIZATION) as turn_telemetry:
                 async with asyncio.timeout(self._settings.process_timeout_seconds):
-                    turn_result = await self.regularization_agent.handle_message(thread_id, employee_profile, message, start_new=start_new)
+                    turn_result = await self.regularization_agent.handle_message(
+                        thread_id, employee_profile, message, start_new=start_new
+                    )
                 if turn_telemetry is not None:
                     turn_telemetry.route_decision = turn_result.outcome.value
                 return turn_result
         except TimeoutError as timeout_error:
-            raise AgentTimeoutError("turn_timeout", f"regularization exceeded {self._settings.process_timeout_seconds} s") from timeout_error
+            raise AgentTimeoutError(
+                "turn_timeout", f"regularization exceeded {self._settings.process_timeout_seconds} s"
+            ) from timeout_error

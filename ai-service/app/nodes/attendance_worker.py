@@ -65,7 +65,9 @@ def _latest_customer_message_text(messages: list[Any]) -> str:
     return ""
 
 
-def _reply_update(reply_text: str, replying_worker: str, log_entries: list[str], *, awaiting_input: bool) -> dict[str, Any]:
+def _reply_update(
+    reply_text: str, replying_worker: str, log_entries: list[str], *, awaiting_input: bool
+) -> dict[str, Any]:
     return {
         "messages": [AIMessage(content=reply_text, id=f"ai-{uuid.uuid4().hex}")],
         "last_replying_worker": replying_worker,
@@ -79,16 +81,28 @@ async def attendance_regularization_node(state: dict[str, Any], runtime: Runtime
     attendance_worker = WorkerName.ATTENDANCE_AGENT.value
 
     if regularization_agent is None:
-        return _reply_update(REGULARIZATION_UNAVAILABLE_REPLY, attendance_worker, [f"{NODE_NAME}: regularization is not configured on this service"], awaiting_input=False)
+        return _reply_update(
+            REGULARIZATION_UNAVAILABLE_REPLY,
+            attendance_worker,
+            [f"{NODE_NAME}: regularization is not configured on this service"],
+            awaiting_input=False,
+        )
 
     raw_employee_context = state.get("employee_context")
     if not raw_employee_context:
-        return _reply_update(NOT_AN_EMPLOYEE_REPLY, attendance_worker, [f"{NODE_NAME}: customer has no employee profile with an office"], awaiting_input=False)
+        return _reply_update(
+            NOT_AN_EMPLOYEE_REPLY,
+            attendance_worker,
+            [f"{NODE_NAME}: customer has no employee profile with an office"],
+            awaiting_input=False,
+        )
 
     message_text = _latest_customer_message_text(state.get("messages", []))
     sub_agent_thread_id = f"support:{state.get('conversation_thread_id', '')}"
     try:
-        employee_profile = EmployeeProfileSnapshot.from_employee_context(EmployeeContext.model_validate(raw_employee_context))
+        employee_profile = EmployeeProfileSnapshot.from_employee_context(
+            EmployeeContext.model_validate(raw_employee_context)
+        )
         turn_result = await regularization_agent.handle_message(sub_agent_thread_id, employee_profile, message_text)
     except Exception as unexpected_error:
         logger.exception("Attendance regularization failed; handing off to a human", extra={"node": NODE_NAME})
@@ -100,7 +114,9 @@ async def attendance_regularization_node(state: dict[str, Any], runtime: Runtime
         )
 
     is_awaiting_input = turn_result.outcome is RegularizationOutcome.AWAITING_EMPLOYEE_INPUT
-    logger.info("Attendance regularization turn completed", extra={"node": NODE_NAME, "outcome": turn_result.outcome.value})
+    logger.info(
+        "Attendance regularization turn completed", extra={"node": NODE_NAME, "outcome": turn_result.outcome.value}
+    )
     return _reply_update(
         turn_result.reply,
         attendance_worker,
