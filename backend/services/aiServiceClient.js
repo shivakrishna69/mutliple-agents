@@ -106,7 +106,9 @@ export function buildConversationInput(conversationId, customerId, transcriptMes
     thread_id: conversationId,
     employee_context: employeeContext,
     messages: transcriptMessages
-      .filter((transcriptMessage) => typeof transcriptMessage.text === 'string' && transcriptMessage.text.trim().length > 0)
+      .filter(
+        (transcriptMessage) => typeof transcriptMessage.text === 'string' && transcriptMessage.text.trim().length > 0,
+      )
       .map((transcriptMessage) => ({
         message_id: transcriptMessage._id.toString(),
         role: CHAT_ROLE_BY_SENDER_TYPE[transcriptMessage.senderType],
@@ -163,7 +165,12 @@ function parseAiServiceResponse(responseBody, expectedConversationId, requestSta
 
   if (!Array.isArray(rawInternalLogs)) rejectResponse('internal_logs is not an array');
   if (rawInternalLogs.length > MAX_INTERNAL_LOG_ENTRIES) rejectResponse('internal_logs has too many entries');
-  if (!rawInternalLogs.every((logEntry) => typeof logEntry === 'string' && logEntry.length > 0 && logEntry.length <= MAX_INTERNAL_LOG_ENTRY_LENGTH)) {
+  if (
+    !rawInternalLogs.every(
+      (logEntry) =>
+        typeof logEntry === 'string' && logEntry.length > 0 && logEntry.length <= MAX_INTERNAL_LOG_ENTRY_LENGTH,
+    )
+  ) {
     rejectResponse('internal_logs contains an entry that is not a non-empty string of at most 2000 characters');
   }
 
@@ -173,7 +180,11 @@ function parseAiServiceResponse(responseBody, expectedConversationId, requestSta
       step: entryIndex + 1,
       node: attributedEntry ? attributedEntry[1] : UNATTRIBUTED_LOG_NODE,
       toolName: null,
-      output: attributedEntry ? (attributedEntry[2] ? `[${attributedEntry[2]}] ${attributedEntry[3]}` : attributedEntry[3]) : logEntry,
+      output: attributedEntry
+        ? attributedEntry[2]
+          ? `[${attributedEntry[2]}] ${attributedEntry[3]}`
+          : attributedEntry[3]
+        : logEntry,
       status: TOOL_STEP_STATUS.SUCCESS,
       startedAt: requestStartedAt,
       durationMs: null,
@@ -184,7 +195,9 @@ function parseAiServiceResponse(responseBody, expectedConversationId, requestSta
     nextWorker === HUMAN_WORKER
       ? { action: AI_NEXT_ACTION.ESCALATE }
       : { action: AI_NEXT_ACTION.CONTINUE, activeWorker: nextWorker };
-  const replySenderType = WORKERS_REPLYING_AS_SPECIALIST.includes(nextWorker) ? SENDER_TYPE.AI_WORKER : SENDER_TYPE.AI_SUPERVISOR;
+  const replySenderType = WORKERS_REPLYING_AS_SPECIALIST.includes(nextWorker)
+    ? SENDER_TYPE.AI_WORKER
+    : SENDER_TYPE.AI_SUPERVISOR;
 
   return { reply: { text: replyText, senderType: replySenderType }, nextState, toolExecutionLogs };
 }
@@ -227,7 +240,9 @@ export async function requestAiProcessing(aiProcessRequest, { config, requestId 
   } catch (requestError) {
     const durationMs = Date.now() - startedAtMs;
     if (deadlineSignal.aborted || requestError.code === 'ETIMEDOUT' || requestError.code === 'ECONNABORTED') {
-      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, { durationMs });
+      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, {
+        durationMs,
+      });
     }
     if (requestError.response) {
       throw new AiServiceError(AI_FAILURE_KIND.ERROR_RESPONSE, `HTTP ${requestError.response.status}`, {
@@ -250,12 +265,16 @@ export async function requestAiProcessing(aiProcessRequest, { config, requestId 
   }
 }
 
-
 // =================================================================================================
 // POST /ai/attendance/regularize
 // =================================================================================================
 
-const REGULARIZATION_OUTCOMES = Object.freeze(['approved', 'awaiting_employee_input', 'routed_to_manager', 'out_of_scope']);
+const REGULARIZATION_OUTCOMES = Object.freeze([
+  'approved',
+  'awaiting_employee_input',
+  'routed_to_manager',
+  'out_of_scope',
+]);
 
 /**
  * Checks a RegularizationTurnResponse and maps it to the backend's camelCase shape. Throws
@@ -269,9 +288,21 @@ function parseRegularizationResponse(responseBody, expectedThreadId) {
   const { thread_id: threadId, outcome, reply, approval, manager_review: managerReview } = responseBody;
   if (threadId !== expectedThreadId) rejectResponse('thread_id does not match the request');
   if (!REGULARIZATION_OUTCOMES.includes(outcome)) rejectResponse('outcome is not a known outcome');
-  if (typeof reply !== 'string' || reply.trim().length === 0 || reply.length > MESSAGE_FIELD_LIMITS.TEXT_MAX_LENGTH) rejectResponse('reply is not a non-empty string');
-  if (approval !== null && !(isPlainObject(approval) && typeof approval.attendance_id === 'string' && typeof approval.date === 'string')) rejectResponse('approval is malformed');
-  if (managerReview !== null && !(isPlainObject(managerReview) && typeof managerReview.routing_reason === 'string' && typeof managerReview.submitted === 'boolean')) {
+  if (typeof reply !== 'string' || reply.trim().length === 0 || reply.length > MESSAGE_FIELD_LIMITS.TEXT_MAX_LENGTH)
+    rejectResponse('reply is not a non-empty string');
+  if (
+    approval !== null &&
+    !(isPlainObject(approval) && typeof approval.attendance_id === 'string' && typeof approval.date === 'string')
+  )
+    rejectResponse('approval is malformed');
+  if (
+    managerReview !== null &&
+    !(
+      isPlainObject(managerReview) &&
+      typeof managerReview.routing_reason === 'string' &&
+      typeof managerReview.submitted === 'boolean'
+    )
+  ) {
     rejectResponse('manager_review is malformed');
   }
   return {
@@ -329,10 +360,15 @@ export async function requestAttendanceRegularization(regularizationRequest, { c
   } catch (requestError) {
     const durationMs = Date.now() - startedAtMs;
     if (deadlineSignal.aborted || requestError.code === 'ETIMEDOUT' || requestError.code === 'ECONNABORTED') {
-      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, { durationMs });
+      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, {
+        durationMs,
+      });
     }
     if (requestError.response) {
-      throw new AiServiceError(AI_FAILURE_KIND.ERROR_RESPONSE, `HTTP ${requestError.response.status}`, { httpStatus: requestError.response.status, durationMs });
+      throw new AiServiceError(AI_FAILURE_KIND.ERROR_RESPONSE, `HTTP ${requestError.response.status}`, {
+        httpStatus: requestError.response.status,
+        durationMs,
+      });
     }
     throw new AiServiceError(AI_FAILURE_KIND.UNAVAILABLE, requestError.code ?? requestError.message, { durationMs });
   }

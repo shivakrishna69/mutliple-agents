@@ -12,7 +12,15 @@
  */
 
 import { Router } from 'express';
-import { getAlignment, patchKeyResultProgress, patchMilestone, patchObjective, postKeyResult, postMilestone, postObjective } from '../controllers/okrController.js';
+import {
+  getAlignment,
+  patchKeyResultProgress,
+  patchMilestone,
+  patchObjective,
+  postKeyResult,
+  postMilestone,
+  postObjective,
+} from '../controllers/okrController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { okrWriteRateLimitByUser } from '../middleware/rateLimiter.js';
 

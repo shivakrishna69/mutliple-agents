@@ -198,8 +198,14 @@ const employeeProfileSchema = new mongoose.Schema(
       // Radius in metres around the assigned work site within which check-in is accepted.
       allowedGeofenceRadius: {
         type: Number,
-        min: [LIMITS.GEOFENCE_RADIUS_MIN_METRES, `Geofence radius must be at least ${LIMITS.GEOFENCE_RADIUS_MIN_METRES} m`],
-        max: [LIMITS.GEOFENCE_RADIUS_MAX_METRES, `Geofence radius cannot exceed ${LIMITS.GEOFENCE_RADIUS_MAX_METRES} m`],
+        min: [
+          LIMITS.GEOFENCE_RADIUS_MIN_METRES,
+          `Geofence radius must be at least ${LIMITS.GEOFENCE_RADIUS_MIN_METRES} m`,
+        ],
+        max: [
+          LIMITS.GEOFENCE_RADIUS_MAX_METRES,
+          `Geofence radius cannot exceed ${LIMITS.GEOFENCE_RADIUS_MAX_METRES} m`,
+        ],
         default: null,
         select: false,
       },
@@ -209,8 +215,14 @@ const employeeProfileSchema = new mongoose.Schema(
         default: null,
         select: false,
         validate: [
-          { validator: (macAddress) => macAddress === null || MAC_ADDRESS_PATTERN.test(macAddress), message: 'Device MAC address "{VALUE}" is not a valid MAC-48 address' },
-          { validator: (macAddress) => macAddress !== PLACEHOLDER_MAC_ADDRESS, message: 'This MAC address is a mobile OS placeholder, not a real device address' },
+          {
+            validator: (macAddress) => macAddress === null || MAC_ADDRESS_PATTERN.test(macAddress),
+            message: 'Device MAC address "{VALUE}" is not a valid MAC-48 address',
+          },
+          {
+            validator: (macAddress) => macAddress !== PLACEHOLDER_MAC_ADDRESS,
+            message: 'This MAC address is a mobile OS placeholder, not a real device address',
+          },
         ],
       },
     },
@@ -272,15 +284,27 @@ employeeProfileSchema.pre('validate', async function enforceReferences() {
   }
 
   if (this.isModified('organizationData.departmentId') && this.organizationData?.departmentId) {
-    await assertReferenceExists({ model: Department, referencedId: this.organizationData.departmentId, entityLabel: 'Department' });
+    await assertReferenceExists({
+      model: Department,
+      referencedId: this.organizationData.departmentId,
+      entityLabel: 'Department',
+    });
   }
 
   if (this.isModified('organizationData.officeLocationId') && this.organizationData?.officeLocationId) {
-    await assertReferenceExists({ model: OfficeLocation, referencedId: this.organizationData.officeLocationId, entityLabel: 'Office location' });
+    await assertReferenceExists({
+      model: OfficeLocation,
+      referencedId: this.organizationData.officeLocationId,
+      entityLabel: 'Office location',
+    });
   }
 
   const reportingManagerId = this.organizationData?.reportingManagerId;
-  if (this.isModified('organizationData.reportingManagerId') && reportingManagerId && !reportingManagerId.equals(this._id)) {
+  if (
+    this.isModified('organizationData.reportingManagerId') &&
+    reportingManagerId &&
+    !reportingManagerId.equals(this._id)
+  ) {
     await assertParentKeepsTreeAcyclic({
       model: this.constructor,
       documentId: this._id,
@@ -294,7 +318,12 @@ employeeProfileSchema.pre('validate', async function enforceReferences() {
 
 employeeProfileSchema.pre(
   QUERY_UPDATE_OPERATIONS,
-  createGuardedFieldUpdateBlocker('EmployeeProfile', ['userId', 'organizationData.departmentId', 'organizationData.reportingManagerId', 'organizationData.officeLocationId']),
+  createGuardedFieldUpdateBlocker('EmployeeProfile', [
+    'userId',
+    'organizationData.departmentId',
+    'organizationData.reportingManagerId',
+    'organizationData.officeLocationId',
+  ]),
 );
 
 // ---------------------------------------------------------------------------
@@ -312,9 +341,13 @@ const PROFILE_WRITE_QUERY_OPERATIONS = [...QUERY_UPDATE_OPERATIONS, 'deleteOne',
 employeeProfileSchema.post('save', async function invalidateOrgChartAfterSave() {
   await invalidateOrgHierarchyCache('employee profile saved');
 });
-employeeProfileSchema.post('deleteOne', { document: true, query: false }, async function invalidateOrgChartAfterDocumentDelete() {
-  await invalidateOrgHierarchyCache('employee profile deleted');
-});
+employeeProfileSchema.post(
+  'deleteOne',
+  { document: true, query: false },
+  async function invalidateOrgChartAfterDocumentDelete() {
+    await invalidateOrgHierarchyCache('employee profile deleted');
+  },
+);
 employeeProfileSchema.post(PROFILE_WRITE_QUERY_OPERATIONS, async function invalidateOrgChartAfterQueryWrite() {
   await invalidateOrgHierarchyCache(`employee profile ${this.op}`);
 });

@@ -45,8 +45,10 @@ function validateEmailField(rawEmail) {
  */
 function validateNewPasswordField(candidatePassword) {
   if (candidatePassword.trim().length === 0) return FORM_MESSAGES.PASSWORD_REQUIRED;
-  if (candidatePassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) return FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
-  if (measureUtf8ByteLength(candidatePassword) > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES) return FORM_MESSAGES.PASSWORD_TOO_LONG;
+  if (candidatePassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH)
+    return FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
+  if (measureUtf8ByteLength(candidatePassword) > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES)
+    return FORM_MESSAGES.PASSWORD_TOO_LONG;
   if (!evaluatePasswordRules(candidatePassword).every((ruleResult) => ruleResult.isSatisfied)) {
     return FORM_MESSAGES.PASSWORD_REQUIREMENTS_NOT_MET;
   }

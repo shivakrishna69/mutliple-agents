@@ -58,17 +58,16 @@ function buildVisibleConversationFilter(user) {
   if (user.role === ROLES.ADMIN) return {};
   if (user.role === ROLES.AGENT) {
     return {
-      $or: [
-        { assignedAgentId: user.id },
-        { status: CONVERSATION_STATUS.ESCALATED_TO_HUMAN, assignedAgentId: null },
-      ],
+      $or: [{ assignedAgentId: user.id }, { status: CONVERSATION_STATUS.ESCALATED_TO_HUMAN, assignedAgentId: null }],
     };
   }
   return { customerId: user.id };
 }
 
 function toCustomerSummary(customerRecord) {
-  return customerRecord ? { id: customerRecord._id.toString(), name: customerRecord.name, email: customerRecord.email } : null;
+  return customerRecord
+    ? { id: customerRecord._id.toString(), name: customerRecord.name, email: customerRecord.email }
+    : null;
 }
 
 /**
@@ -98,7 +97,10 @@ async function loadAccessibleConversation(req, res) {
 /** Status payload for the caller's role, with createdAt and the customer's public details. */
 function toConversationDetailsPayload(conversationRecord, customerRecord, viewerIsStaff) {
   const staffStatusPayload = toStaffConversationStatusPayload(conversationRecord);
-  const createdAt = conversationRecord.createdAt instanceof Date ? conversationRecord.createdAt.toISOString() : conversationRecord.createdAt;
+  const createdAt =
+    conversationRecord.createdAt instanceof Date
+      ? conversationRecord.createdAt.toISOString()
+      : conversationRecord.createdAt;
   if (!viewerIsStaff) {
     return { ...toCustomerConversationStatusPayload(staffStatusPayload), createdAt };
   }
@@ -131,8 +133,12 @@ export async function listConversations(req, res, next) {
         { $group: { _id: '$conversationId', text: { $first: '$text' }, senderType: { $first: '$senderType' } } },
       ]),
     ]);
-    const customerById = new Map(customerRecords.map((customerRecord) => [customerRecord._id.toString(), customerRecord]));
-    const latestMessageByConversationId = new Map(latestMessages.map((latestMessage) => [latestMessage._id.toString(), latestMessage]));
+    const customerById = new Map(
+      customerRecords.map((customerRecord) => [customerRecord._id.toString(), customerRecord]),
+    );
+    const latestMessageByConversationId = new Map(
+      latestMessages.map((latestMessage) => [latestMessage._id.toString(), latestMessage]),
+    );
 
     const conversations = conversationRecords.map((conversationRecord) => {
       const latestMessage = latestMessageByConversationId.get(conversationRecord._id.toString());
@@ -142,7 +148,10 @@ export async function listConversations(req, res, next) {
         : toCustomerConversationStatusPayload(toStaffConversationStatusPayload(conversationRecord));
       return {
         ...statusPayload,
-        ...(viewerIsStaff && { customerName: customerRecord?.name ?? null, customerEmail: customerRecord?.email ?? null }),
+        ...(viewerIsStaff && {
+          customerName: customerRecord?.name ?? null,
+          customerEmail: customerRecord?.email ?? null,
+        }),
         lastMessagePreview: latestMessage?.text ? latestMessage.text.slice(0, MESSAGE_PREVIEW_LENGTH) : null,
         lastMessageSenderType: latestMessage?.senderType ?? null,
       };
@@ -207,10 +216,13 @@ export async function claimConversation(req, res, next) {
     let claimOutcome = 'claimed';
     const claimedConversation = await updateConversationWithRetry(conversationRecord._id, (currentConversation) => {
       if (currentConversation.status === CONVERSATION_STATUS.ASSIGNED_AGENT) {
-        claimOutcome = String(currentConversation.assignedAgentId) === req.user.id ? 'already_yours' : 'claimed_by_other';
+        claimOutcome =
+          String(currentConversation.assignedAgentId) === req.user.id ? 'already_yours' : 'claimed_by_other';
         return false;
       }
-      if (![CONVERSATION_STATUS.ESCALATED_TO_HUMAN, CONVERSATION_STATUS.UNASSIGNED].includes(currentConversation.status)) {
+      if (
+        ![CONVERSATION_STATUS.ESCALATED_TO_HUMAN, CONVERSATION_STATUS.UNASSIGNED].includes(currentConversation.status)
+      ) {
         claimOutcome = 'not_claimable';
         return false;
       }
@@ -226,7 +238,11 @@ export async function claimConversation(req, res, next) {
       return sendError(req, res, HTTP_STATUS.CONFLICT, CONVERSATION_MESSAGES.NOT_CLAIMABLE);
     }
     if (claimOutcome === 'claimed') {
-      logger.info('Conversation claimed', { requestId: req.id, userId: req.user.id, conversationId: conversationRecord._id.toString() });
+      logger.info('Conversation claimed', {
+        requestId: req.id,
+        userId: req.user.id,
+        conversationId: conversationRecord._id.toString(),
+      });
     }
     const customerRecord = await User.findById(claimedConversation.customerId).select('_id name email').lean();
     return sendSuccess(res, HTTP_STATUS.OK, CONVERSATION_MESSAGES.CLAIMED, {
@@ -250,7 +266,8 @@ export async function releaseConversation(req, res, next) {
     const releasedConversation = await updateConversationWithRetry(conversationRecord._id, (currentConversation) => {
       const isAssignedToCaller = String(currentConversation.assignedAgentId) === req.user.id;
       isReleaseAllowed =
-        currentConversation.status === CONVERSATION_STATUS.ASSIGNED_AGENT && (isAssignedToCaller || req.user.role === ROLES.ADMIN);
+        currentConversation.status === CONVERSATION_STATUS.ASSIGNED_AGENT &&
+        (isAssignedToCaller || req.user.role === ROLES.ADMIN);
       if (!isReleaseAllowed) return false;
       currentConversation.transitionTo(CONVERSATION_STATUS.ESCALATED_TO_HUMAN);
       return true;
@@ -259,7 +276,11 @@ export async function releaseConversation(req, res, next) {
     if (!isReleaseAllowed) {
       return sendError(req, res, HTTP_STATUS.CONFLICT, CONVERSATION_MESSAGES.NOT_ASSIGNED_TO_YOU);
     }
-    logger.info('Conversation released to queue', { requestId: req.id, userId: req.user.id, conversationId: conversationRecord._id.toString() });
+    logger.info('Conversation released to queue', {
+      requestId: req.id,
+      userId: req.user.id,
+      conversationId: conversationRecord._id.toString(),
+    });
     const customerRecord = await User.findById(releasedConversation.customerId).select('_id name email').lean();
     return sendSuccess(res, HTTP_STATUS.OK, CONVERSATION_MESSAGES.RELEASED, {
       conversation: toConversationDetailsPayload(releasedConversation, customerRecord, true),
@@ -278,13 +299,20 @@ export async function sendAgentMessage(req, res, next) {
   try {
     const replyValidation = validateAgentReplyInput(req.body);
     if (!replyValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED, replyValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED,
+        replyValidation.validationErrors,
+      );
     }
 
     const conversationRecord = await loadAccessibleConversation(req, res);
     if (!conversationRecord) return undefined;
     const isAssignedToCaller =
-      conversationRecord.status === CONVERSATION_STATUS.ASSIGNED_AGENT && String(conversationRecord.assignedAgentId) === req.user.id;
+      conversationRecord.status === CONVERSATION_STATUS.ASSIGNED_AGENT &&
+      String(conversationRecord.assignedAgentId) === req.user.id;
     if (!isAssignedToCaller) {
       return sendError(req, res, HTTP_STATUS.CONFLICT, CONVERSATION_MESSAGES.NOT_ASSIGNED_TO_YOU);
     }
@@ -305,7 +333,9 @@ export async function sendAgentMessage(req, res, next) {
       messageId: agentMessage._id.toString(),
       textLength: agentMessage.text.length,
     });
-    return sendSuccess(res, HTTP_STATUS.CREATED, CONVERSATION_MESSAGES.REPLY_SENT, { message: toStaffMessagePayload(agentMessage) });
+    return sendSuccess(res, HTTP_STATUS.CREATED, CONVERSATION_MESSAGES.REPLY_SENT, {
+      message: toStaffMessagePayload(agentMessage),
+    });
   } catch (error) {
     return next(error);
   }

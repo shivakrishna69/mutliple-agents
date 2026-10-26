@@ -47,8 +47,10 @@ export default function PayslipVerification() {
       const { verification: verificationResult } = await requestPayslipVerification(normalizedId);
       setVerification(verificationResult);
     } catch (verificationError) {
-      if (verificationError.status === 404) setLookupError({ message: 'No payslip was issued with this ID. The document may be forged.' });
-      else if (verificationError.status === 503) setLookupError({ message: 'Payslip verification is temporarily unavailable. Please try again later.' });
+      if (verificationError.status === 404)
+        setLookupError({ message: 'No payslip was issued with this ID. The document may be forged.' });
+      else if (verificationError.status === 503)
+        setLookupError({ message: 'Payslip verification is temporarily unavailable. Please try again later.' });
       else setLookupError(toDisplayError(verificationError));
     } finally {
       setIsChecking(false);
@@ -77,7 +79,10 @@ export default function PayslipVerification() {
   const period = verification?.period;
   return (
     <main className="relative min-h-dvh overflow-hidden bg-slate-950 px-4 py-10 text-white sm:py-16">
-      <div className="pointer-events-none absolute -top-40 left-1/2 h-[30rem] w-[60rem] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-3xl" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute -top-40 left-1/2 h-[30rem] w-[60rem] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-3xl"
+        aria-hidden="true"
+      />
       <div className="relative mx-auto max-w-2xl">
         <div className="flex items-center justify-between">
           <BrandMark tone="light" />
@@ -123,10 +128,14 @@ export default function PayslipVerification() {
 
         {verification && (
           <section className="mt-8 overflow-hidden rounded-3xl bg-white text-slate-900 shadow-2xl shadow-black/40">
-            <div className={`flex items-center gap-3 px-6 py-5 ${verification.authentic ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-rose-500 to-pink-500'} text-white`}>
+            <div
+              className={`flex items-center gap-3 px-6 py-5 ${verification.authentic ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-rose-500 to-pink-500'} text-white`}
+            >
               <CheckBadgeIcon className="h-8 w-8" />
               <div>
-                <p className="text-lg font-bold">{verification.authentic ? 'Authentic payslip' : 'Integrity check failed'}</p>
+                <p className="text-lg font-bold">
+                  {verification.authentic ? 'Authentic payslip' : 'Integrity check failed'}
+                </p>
                 <p className="text-sm text-white/85">Issued by {verification.issuer}</p>
               </div>
             </div>
@@ -137,7 +146,9 @@ export default function PayslipVerification() {
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Pay period</dt>
-                <dd className="mt-1 font-semibold">{period ? `${MONTH_NAMES[period.month - 1]} ${period.year}` : '—'}</dd>
+                <dd className="mt-1 font-semibold">
+                  {period ? `${MONTH_NAMES[period.month - 1]} ${period.year}` : '—'}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Net pay</dt>
@@ -164,14 +175,23 @@ export default function PayslipVerification() {
             )}
             <div className="border-t border-slate-100 bg-slate-50 p-6">
               <p className="text-sm font-semibold">Check the PDF you received</p>
-              <p className="mt-1 text-xs text-slate-500">Its fingerprint is computed in your browser; the file is not uploaded.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Its fingerprint is computed in your browser; the file is not uploaded.
+              </p>
               <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-5 text-sm font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-600">
                 <UploadIcon className="h-5 w-5" /> Choose payslip PDF
                 <input type="file" accept="application/pdf" className="sr-only" onChange={handleFileChosen} />
               </label>
               {fileCheck && (
                 <div className="mt-3">
-                  <Notice tone={fileCheck.matches ? 'success' : 'error'} title={fileCheck.matches ? 'The file is the original, unmodified payslip' : 'The file does not match the issued payslip'}>
+                  <Notice
+                    tone={fileCheck.matches ? 'success' : 'error'}
+                    title={
+                      fileCheck.matches
+                        ? 'The file is the original, unmodified payslip'
+                        : 'The file does not match the issued payslip'
+                    }
+                  >
                     {fileCheck.fileName}
                   </Notice>
                 </div>

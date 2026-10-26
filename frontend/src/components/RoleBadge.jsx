@@ -12,7 +12,9 @@ export default function RoleBadge({ role, tone = 'light' }) {
     );
   }
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${roleDisplay?.badgeClassName ?? 'bg-slate-100 text-slate-700 ring-slate-500/20'}`}>
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${roleDisplay?.badgeClassName ?? 'bg-slate-100 text-slate-700 ring-slate-500/20'}`}
+    >
       {roleDisplay?.label ?? role}
     </span>
   );

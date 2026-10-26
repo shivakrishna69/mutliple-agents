@@ -13,7 +13,10 @@
 
 import { Router } from 'express';
 import { punchIn, regularizeAttendance } from '../controllers/attendanceController.js';
-import { decideRegularizationReview, listRegularizationReviews } from '../controllers/regularizationReviewController.js';
+import {
+  decideRegularizationReview,
+  listRegularizationReviews,
+} from '../controllers/regularizationReviewController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { attendancePunchRateLimitByUser, regularizationRateLimitByUser } from '../middleware/rateLimiter.js';
 

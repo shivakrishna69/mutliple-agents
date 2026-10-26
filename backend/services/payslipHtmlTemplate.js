@@ -41,10 +41,19 @@ export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => HTML_ESCAPES[character]);
 }
 
-const currencyFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 const formatMoney = (amount) => currencyFormatter.format(amount);
 
-const issueTimeFormatter = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
+const issueTimeFormatter = new Intl.DateTimeFormat('en-IN', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Kolkata',
+});
 const joiningDateFormatter = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 
 /** Inline brand mark (chat-bubble logo), tinted with the company accent colour. */
@@ -55,9 +64,12 @@ function brandMarkSvg(brandColor) {
 function statementRows(lineItems, { withReference }) {
   return lineItems
     .map(
-      (lineItem) => `<tr><td><span class="line-label">${escapeHtml(lineItem.label)}</span>${
-        withReference && lineItem.reference ? `<span class="line-reference">${escapeHtml(lineItem.reference)}</span>` : ''
-      }</td><td class="amount">${escapeHtml(formatMoney(lineItem.amount))}</td></tr>`,
+      (lineItem) =>
+        `<tr><td><span class="line-label">${escapeHtml(lineItem.label)}</span>${
+          withReference && lineItem.reference
+            ? `<span class="line-reference">${escapeHtml(lineItem.reference)}</span>`
+            : ''
+        }</td><td class="amount">${escapeHtml(formatMoney(lineItem.amount))}</td></tr>`,
     )
     .join('');
 }

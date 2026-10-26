@@ -43,7 +43,10 @@ export function validateIncomingMessagePayload(requestBody) {
     validationErrors.push({ field: 'eventId', message: WEBHOOK_MESSAGES.EVENT_ID_REQUIRED });
   } else if (typeof rawEventId !== 'string') {
     validationErrors.push({ field: 'eventId', message: WEBHOOK_MESSAGES.EVENT_ID_MUST_BE_STRING });
-  } else if (rawEventId.length > WEBHOOK_FIELD_LIMITS.EVENT_ID_MAX_LENGTH || !WEBHOOK_EVENT_ID_PATTERN.test(rawEventId)) {
+  } else if (
+    rawEventId.length > WEBHOOK_FIELD_LIMITS.EVENT_ID_MAX_LENGTH ||
+    !WEBHOOK_EVENT_ID_PATTERN.test(rawEventId)
+  ) {
     validationErrors.push({ field: 'eventId', message: WEBHOOK_MESSAGES.EVENT_ID_INVALID });
   }
 

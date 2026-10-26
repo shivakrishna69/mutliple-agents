@@ -25,7 +25,10 @@ export async function requestUserList({ search = '', role = '' } = {}, { signal 
     endpointPath: queryString ? `${ADMIN_USERS_PATH}?${queryString}` : ADMIN_USERS_PATH,
     callerSignal: signal,
   });
-  const hasExpectedShape = Array.isArray(responseData?.users) && typeof responseData?.countsByRole === 'object' && responseData.countsByRole !== null;
+  const hasExpectedShape =
+    Array.isArray(responseData?.users) &&
+    typeof responseData?.countsByRole === 'object' &&
+    responseData.countsByRole !== null;
   if (!hasExpectedShape) throw new ApiError({ message: API_MESSAGES.UNEXPECTED_RESPONSE, status: httpStatus });
   return { users: responseData.users, countsByRole: responseData.countsByRole };
 }

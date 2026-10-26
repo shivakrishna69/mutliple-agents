@@ -95,13 +95,24 @@ export function isRealCalendarDate(calendarDate) {
 /** A device-reported position. `_id: false`: it is a value, not an entity. */
 const coordinatesSchema = new mongoose.Schema(
   {
-    lat: { type: Number, required: true, validate: { validator: isValidLatitude, message: 'Latitude must be between -90 and 90' } },
-    lng: { type: Number, required: true, validate: { validator: isValidLongitude, message: 'Longitude must be between -180 and 180' } },
+    lat: {
+      type: Number,
+      required: true,
+      validate: { validator: isValidLatitude, message: 'Latitude must be between -90 and 90' },
+    },
+    lng: {
+      type: Number,
+      required: true,
+      validate: { validator: isValidLongitude, message: 'Longitude must be between -180 and 180' },
+    },
     accuracyMeters: {
       type: Number,
       required: true,
       min: [0, 'Accuracy cannot be negative'],
-      max: [ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES, `Accuracy must be within ${ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES} m`],
+      max: [
+        ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES,
+        `Accuracy must be within ${ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES} m`,
+      ],
     },
   },
   { _id: false },
@@ -184,14 +195,20 @@ const attendanceSchema = new mongoose.Schema(
       default: null,
       select: false,
       immutable: true,
-      validate: { validator: (fingerprintHash) => fingerprintHash === null || /^[0-9a-f]{64}$/.test(fingerprintHash), message: 'deviceFingerprint must be a SHA-256 hex digest' },
+      validate: {
+        validator: (fingerprintHash) => fingerprintHash === null || /^[0-9a-f]{64}$/.test(fingerprintHash),
+        message: 'deviceFingerprint must be a SHA-256 hex digest',
+      },
     },
     checkInMacAddress: {
       type: String,
       default: null,
       select: false,
       immutable: true,
-      validate: { validator: (macAddress) => macAddress === null || MAC_ADDRESS_PATTERN.test(macAddress), message: 'checkInMacAddress is not a valid MAC-48 address' },
+      validate: {
+        validator: (macAddress) => macAddress === null || MAC_ADDRESS_PATTERN.test(macAddress),
+        message: 'checkInMacAddress is not a valid MAC-48 address',
+      },
     },
     calculationStatus: {
       type: String,
@@ -233,7 +250,10 @@ attendanceSchema.pre('validate', function enforceEntrySourceConsistency() {
   }
   const { method, regularizedBySystem, approvedByUserId } = this.regularization;
   if (method === REGULARIZATION_METHODS.AUTOMATIC_EVIDENCE && (!regularizedBySystem || approvedByUserId)) {
-    this.invalidate('regularization.regularizedBySystem', 'An automatic regularization is made by the system, without an approving user');
+    this.invalidate(
+      'regularization.regularizedBySystem',
+      'An automatic regularization is made by the system, without an approving user',
+    );
   }
   if (method === REGULARIZATION_METHODS.MANAGER_APPROVED && (regularizedBySystem || !approvedByUserId)) {
     this.invalidate('regularization.approvedByUserId', 'A manager-approved regularization requires the approving user');

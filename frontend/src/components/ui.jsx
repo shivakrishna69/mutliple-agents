@@ -15,7 +15,16 @@ const BUTTON_VARIANTS = Object.freeze({
   success: 'bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500',
 });
 
-export function Button({ variant = 'primary', size = 'md', isBusy = false, className = '', children, disabled, type = 'button', ...buttonProps }) {
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  isBusy = false,
+  className = '',
+  children,
+  disabled,
+  type = 'button',
+  ...buttonProps
+}) {
   const sizeClassName = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2.5 text-sm';
   return (
     <button
@@ -86,7 +95,9 @@ export function StatTile({ label, value, hint, accent = 'indigo', Icon = null })
           {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
         </div>
         {Icon && (
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${STAT_ACCENTS[accent]}`}>
+          <span
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${STAT_ACCENTS[accent]}`}
+          >
             <Icon className="h-5 w-5" />
           </span>
         )}
@@ -106,13 +117,23 @@ const BADGE_TONES = Object.freeze({
 });
 
 export function Badge({ tone = 'slate', children, className = '' }) {
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${BADGE_TONES[tone]} ${className}`}>{children}</span>;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${BADGE_TONES[tone]} ${className}`}
+    >
+      {children}
+    </span>
+  );
 }
 
 /** Accessible tab bar. `tabs`: [{ id, label, Icon?, badge? }]. */
 export function Tabs({ tabs, activeTabId, onChange, label }) {
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100/80 p-1 ring-1 ring-slate-200/60 scroll-thin">
+    <div
+      role="tablist"
+      aria-label={label}
+      className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100/80 p-1 ring-1 ring-slate-200/60 scroll-thin"
+    >
       {tabs.map(({ id, label: tabLabel, Icon, badge }) => {
         const isActive = id === activeTabId;
         return (
@@ -123,12 +144,16 @@ export function Tabs({ tabs, activeTabId, onChange, label }) {
             aria-selected={isActive}
             onClick={() => onChange(id)}
             className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none ${
-              isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-800'
+              isActive
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             {Icon && <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-600' : ''}`} />}
             {tabLabel}
-            {badge !== undefined && badge !== null && <span className="rounded-full bg-indigo-600 px-1.5 text-[0.65rem] text-white">{badge}</span>}
+            {badge !== undefined && badge !== null && (
+              <span className="rounded-full bg-indigo-600 px-1.5 text-[0.65rem] text-white">{badge}</span>
+            )}
           </button>
         );
       })}
@@ -161,8 +186,18 @@ const PROGRESS_TONES = Object.freeze({
 export function ProgressBar({ value, tone = 'indigo', label }) {
   const clampedValue = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clampedValue)} aria-label={label}>
-      <div className={`h-full rounded-full bg-gradient-to-r ${PROGRESS_TONES[tone]} transition-[width] duration-500`} style={{ width: `${clampedValue}%` }} />
+    <div
+      className="h-2 w-full overflow-hidden rounded-full bg-slate-100"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(clampedValue)}
+      aria-label={label}
+    >
+      <div
+        className={`h-full rounded-full bg-gradient-to-r ${PROGRESS_TONES[tone]} transition-[width] duration-500`}
+        style={{ width: `${clampedValue}%` }}
+      />
     </div>
   );
 }
@@ -186,7 +221,11 @@ export function Field({ label, hint, error, children, className = '' }) {
         {label}
       </label>
       <div className="mt-1.5">{children(controlId, INPUT_CLASS_NAME + (error ? ' ring-rose-400' : ''))}</div>
-      {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      {error ? (
+        <p className="mt-1 text-xs text-rose-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -194,7 +233,9 @@ export function Field({ label, hint, error, children, className = '' }) {
 export function TextInput({ label, hint, error, className, ...inputProps }) {
   return (
     <Field label={label} hint={hint} error={error} className={className}>
-      {(controlId, inputClassName) => <input id={controlId} className={inputClassName} aria-invalid={Boolean(error) || undefined} {...inputProps} />}
+      {(controlId, inputClassName) => (
+        <input id={controlId} className={inputClassName} aria-invalid={Boolean(error) || undefined} {...inputProps} />
+      )}
     </Field>
   );
 }
@@ -222,8 +263,16 @@ export function Toggle({ label, description, checked, onChange }) {
         <span className="block text-sm font-medium text-slate-800">{label}</span>
         {description && <span className="block text-xs text-slate-500">{description}</span>}
       </span>
-      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(changeEvent) => onChange(changeEvent.target.checked)} />
-      <span className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" aria-hidden="true" />
+      <input
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        onChange={(changeEvent) => onChange(changeEvent.target.checked)}
+      />
+      <span
+        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
+        aria-hidden="true"
+      />
     </label>
   );
 }
@@ -237,13 +286,21 @@ export function Notice({ tone = 'info', title, children, onDismiss }) {
     error: 'bg-rose-50 text-rose-900 ring-rose-200',
   }[tone];
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ring-1 ${toneClassName}`}>
+    <div
+      role={tone === 'error' ? 'alert' : 'status'}
+      className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ring-1 ${toneClassName}`}
+    >
       <div className="flex-1">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={title ? 'mt-0.5' : ''}>{children}</div>}
       </div>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} className="-m-1 rounded-md p-1 opacity-60 hover:opacity-100" aria-label="Dismiss">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="-m-1 rounded-md p-1 opacity-60 hover:opacity-100"
+          aria-label="Dismiss"
+        >
           ✕
         </button>
       )}
@@ -254,7 +311,12 @@ export function Notice({ tone = 'info', title, children, onDismiss }) {
 // --- Formatting --------------------------------------------------------------------------------
 
 const INR_FORMATTER = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
-const INR_PRECISE_FORMATTER = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const INR_PRECISE_FORMATTER = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 export function formatInr(amount, { precise = false } = {}) {
   if (amount === null || amount === undefined || !Number.isFinite(Number(amount))) return '—';
@@ -269,7 +331,12 @@ export function formatDate(isoValue, options = { day: 'numeric', month: 'short',
 
 export function formatDateTime(isoValue) {
   if (!isoValue) return '—';
-  return new Date(isoValue).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(isoValue).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function formatBytes(byteCount) {
@@ -279,7 +346,20 @@ export function formatBytes(byteCount) {
   return `${(byteCount / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export const MONTH_NAMES = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);
+export const MONTH_NAMES = Object.freeze([
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]);
 
 /** Opens a short-lived signed URL in a new tab without giving that tab access to this window. */
 export function openSignedUrl(signedUrl) {

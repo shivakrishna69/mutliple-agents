@@ -27,7 +27,8 @@ export default function FormField({
   children,
 }) {
   const errorMessageId = `${fieldId}-error`;
-  const ariaDescribedBy = [errorMessage ? errorMessageId : null, ...describedByIds].filter(Boolean).join(' ') || undefined;
+  const ariaDescribedBy =
+    [errorMessage ? errorMessageId : null, ...describedByIds].filter(Boolean).join(' ') || undefined;
 
   return (
     <div>
@@ -57,7 +58,9 @@ export default function FormField({
               : 'border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-indigo-100',
           ].join(' ')}
         />
-        {trailingControl && <div className="absolute inset-y-0 right-0 flex items-center pr-1.5">{trailingControl}</div>}
+        {trailingControl && (
+          <div className="absolute inset-y-0 right-0 flex items-center pr-1.5">{trailingControl}</div>
+        )}
       </div>
       {errorMessage && (
         <p id={errorMessageId} className="mt-1.5 text-sm text-red-600">

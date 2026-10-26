@@ -140,7 +140,9 @@ export function groupMessagesBySender(messages) {
     const previousTime = parseTimestamp(previousMessage?.createdAt)?.getTime();
     const messageTime = parseTimestamp(message.createdAt)?.getTime();
     const isWithinWindow =
-      previousTime !== undefined && messageTime !== undefined && messageTime - previousTime <= MESSAGE_GROUPING_WINDOW_MS;
+      previousTime !== undefined &&
+      messageTime !== undefined &&
+      messageTime - previousTime <= MESSAGE_GROUPING_WINDOW_MS;
 
     if (currentGroup && currentGroup.senderType === message.senderType && isWithinWindow) {
       currentGroup.messages.push(message);
@@ -259,13 +261,19 @@ function ConversationListItem({ conversation, isSelected, onSelect }) {
 
 function ConversationListPane({ conversations, selectedConversationId, isLoading, onSelectConversation }) {
   return (
-    <section aria-label="Conversations" className="flex min-h-0 flex-col border-b border-slate-200 bg-white lg:border-r lg:border-b-0">
+    <section
+      aria-label="Conversations"
+      className="flex min-h-0 flex-col border-b border-slate-200 bg-white lg:border-r lg:border-b-0"
+    >
       <PaneHeader title="Conversations" subtitle={isLoading ? 'Loading…' : `${conversations.length} active`} />
       <div className="max-h-80 min-h-0 flex-1 overflow-y-auto lg:max-h-none">
         {isLoading ? (
           <LoadingRows label="Loading conversations" />
         ) : conversations.length === 0 ? (
-          <EmptyState title="No active conversations" description="New customer conversations appear here as they arrive." />
+          <EmptyState
+            title="No active conversations"
+            description="New customer conversations appear here as they arrive."
+          />
         ) : (
           <ul className="space-y-1 p-2">
             {conversations.map((conversation) => (
@@ -335,7 +343,9 @@ export function MessageComposer({ canSendMessage, sendDisabledReason, onSendMess
       await onSendMessage(trimmedDraft);
       setDraftText('');
     } catch (sendFailure) {
-      setSendErrorMessage(sendFailure instanceof Error && sendFailure.message ? sendFailure.message : 'The message could not be sent.');
+      setSendErrorMessage(
+        sendFailure instanceof Error && sendFailure.message ? sendFailure.message : 'The message could not be sent.',
+      );
     } finally {
       isSendingRef.current = false;
       setIsSending(false);
@@ -367,7 +377,9 @@ export function MessageComposer({ canSendMessage, sendDisabledReason, onSendMess
           onChange={(changeEvent) => setDraftText(changeEvent.target.value)}
           onKeyDown={handleComposerKeyDown}
           disabled={!canSendMessage || isSending}
-          placeholder={canSendMessage ? 'Write a reply… (Enter to send, Shift+Enter for a new line)' : 'Replies are disabled'}
+          placeholder={
+            canSendMessage ? 'Write a reply… (Enter to send, Shift+Enter for a new line)' : 'Replies are disabled'
+          }
           aria-invalid={isOverLimit ? 'true' : 'false'}
           aria-describedby="chat-composer-hint"
           className="block max-h-40 min-h-[2.75rem] flex-1 resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
@@ -382,11 +394,16 @@ export function MessageComposer({ canSendMessage, sendDisabledReason, onSendMess
         </button>
       </div>
       <div id="chat-composer-hint" className="mt-1 flex justify-between gap-2 px-1 text-xs">
-        <span className={sendErrorMessage ? 'text-red-600' : 'text-slate-400'} role={sendErrorMessage ? 'alert' : undefined}>
+        <span
+          className={sendErrorMessage ? 'text-red-600' : 'text-slate-400'}
+          role={sendErrorMessage ? 'alert' : undefined}
+        >
           {sendErrorMessage ?? (canSendMessage ? '' : sendDisabledReason)}
         </span>
         <span className={isOverLimit ? 'font-medium text-red-600' : 'text-slate-400'}>
-          {draftText.length > MESSAGE_TEXT_MAX_LENGTH * 0.9 ? `${draftText.length.toLocaleString()} / ${MESSAGE_TEXT_MAX_LENGTH.toLocaleString()}` : ''}
+          {draftText.length > MESSAGE_TEXT_MAX_LENGTH * 0.9
+            ? `${draftText.length.toLocaleString()} / ${MESSAGE_TEXT_MAX_LENGTH.toLocaleString()}`
+            : ''}
         </span>
       </div>
     </form>
@@ -429,7 +446,10 @@ function ChatPane({
   if (!conversationDetails) {
     return (
       <section aria-label="Chat" className="flex min-h-[24rem] flex-col bg-slate-50 lg:min-h-0">
-        <EmptyState title="No conversation selected" description="Choose a conversation from the list to read and reply." />
+        <EmptyState
+          title="No conversation selected"
+          description="Choose a conversation from the list to read and reply."
+        />
       </section>
     );
   }
@@ -518,7 +538,9 @@ function ConversationCard({ conversationDetails }) {
           <StatusChip status={conversationDetails.status} />
         </DetailRow>
         <DetailRow label="Handled by">
-          {ACTIVE_WORKER_LABELS[conversationDetails.currentActiveWorker] || conversationDetails.currentActiveWorker || '—'}
+          {ACTIVE_WORKER_LABELS[conversationDetails.currentActiveWorker] ||
+            conversationDetails.currentActiveWorker ||
+            '—'}
         </DetailRow>
         <DetailRow label="Assigned agent">
           <span className="font-mono text-xs">{conversationDetails.assignedAgentId || 'None'}</span>
@@ -546,7 +568,9 @@ function SystemLogList({ systemLogEntries }) {
               <li key={systemLogEntry.entryKey} className="rounded-lg bg-slate-50 p-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-mono text-xs font-medium text-slate-700">{systemLogEntry.node}</span>
-                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-semibold ring-1 ring-inset ${logStatusDisplay.className}`}>
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-semibold ring-1 ring-inset ${logStatusDisplay.className}`}
+                  >
                     {logStatusDisplay.label}
                   </span>
                 </div>
@@ -567,7 +591,10 @@ function SystemLogList({ systemLogEntries }) {
 
 function InspectorPane({ conversationDetails, messages }) {
   return (
-    <aside aria-label="Conversation details" className="min-h-0 border-t border-slate-200 bg-slate-50 lg:border-t-0 lg:border-l">
+    <aside
+      aria-label="Conversation details"
+      className="min-h-0 border-t border-slate-200 bg-slate-50 lg:border-t-0 lg:border-l"
+    >
       <div className="h-full space-y-4 overflow-y-auto p-4">
         {conversationDetails ? (
           <>
@@ -576,7 +603,10 @@ function InspectorPane({ conversationDetails, messages }) {
             <SystemLogList systemLogEntries={buildSystemLogEntries(messages)} />
           </>
         ) : (
-          <EmptyState title="Details" description="Customer details and system logs for the selected conversation appear here." />
+          <EmptyState
+            title="Details"
+            description="Customer details and system logs for the selected conversation appear here."
+          />
         )}
       </div>
     </aside>

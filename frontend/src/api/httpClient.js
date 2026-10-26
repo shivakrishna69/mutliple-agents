@@ -139,4 +139,3 @@ export async function sendApiRequest({ method, endpointPath, requestPayload, for
 
   return { responseData: responseBody?.data, httpStatus: httpResponse.status };
 }
-

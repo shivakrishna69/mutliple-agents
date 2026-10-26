@@ -126,12 +126,14 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   ACCURACY_INVALID: 'accuracyMeters must be a positive number of metres',
   FINGERPRINT_INVALID: 'deviceFingerprint must be 16-256 printable characters without spaces',
   MAC_ADDRESS_INVALID: 'macAddress must be a MAC-48 address such as 3C:22:FB:7A:10:9E',
-  MAC_ADDRESS_PLACEHOLDER: 'macAddress 02:00:00:00:00:00 is a placeholder reported by mobile systems, not a device address',
+  MAC_ADDRESS_PLACEHOLDER:
+    'macAddress 02:00:00:00:00:00 is a placeholder reported by mobile systems, not a device address',
   PROFILE_NOT_FOUND: 'No employee profile is linked to your account. Contact HR',
   EMPLOYMENT_ENDED: 'Your employment has ended, so attendance cannot be recorded',
   OFFICE_NOT_CONFIGURED: 'Your base office has not been set up yet. Contact HR before punching in',
   GEOFENCE_NOT_CONFIGURED: 'Your attendance geofence has not been set up yet. Contact HR before punching in',
-  LOCATION_TOO_IMPRECISE: 'Your location is not precise enough to confirm you are at the office. Turn on GPS / precise location and try again',
+  LOCATION_TOO_IMPRECISE:
+    'Your location is not precise enough to confirm you are at the office. Turn on GPS / precise location and try again',
   DEVICE_NOT_RECOGNISED: 'This device is not registered for your attendance. Use your registered device or contact HR',
   UNAUTHORIZED_SPATIAL_LOCATION: 'Unauthorized Spatial Location: you are outside the area allowed for punching in',
   ALREADY_PUNCHED_IN: 'You have already punched in today',

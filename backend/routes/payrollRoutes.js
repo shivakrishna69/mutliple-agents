@@ -16,9 +16,20 @@
  */
 
 import { Router } from 'express';
-import { createPayslip, createTaxEstimate, downloadPayslip, getPayrollRules, listPayslips, verifyPayslipById } from '../controllers/payrollController.js';
+import {
+  createPayslip,
+  createTaxEstimate,
+  downloadPayslip,
+  getPayrollRules,
+  listPayslips,
+  verifyPayslipById,
+} from '../controllers/payrollController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { payslipGenerationRateLimitByUser, payslipVerificationRateLimitByClientIp, taxEstimateRateLimitByUser } from '../middleware/rateLimiter.js';
+import {
+  payslipGenerationRateLimitByUser,
+  payslipVerificationRateLimitByClientIp,
+  taxEstimateRateLimitByUser,
+} from '../middleware/rateLimiter.js';
 
 const payrollRouter = Router();
 

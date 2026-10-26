@@ -25,12 +25,21 @@ import RevokedSession from '../models/RevokedSession.js';
 import { ACCOUNT_MESSAGES, AUTH_MESSAGES, SESSION_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
-import { clearSessionCookies, readRequestCookie, resolveCsrfTokenCookieName, setSessionCookies } from '../utils/authCookies.js';
+import {
+  clearSessionCookies,
+  readRequestCookie,
+  resolveCsrfTokenCookieName,
+  setSessionCookies,
+} from '../utils/authCookies.js';
 import { isCsrfTokenValid, issueSessionTokens } from '../utils/authToken.js';
 import { toPublicUserProfile } from '../utils/userProfile.js';
 import { SOCKET_ERROR_CODES, disconnectSessionSockets, disconnectUserSockets } from '../utils/socketManager.js';
 import { logger } from '../utils/logger.js';
-import { validateChangePasswordInput, validateLoginInput, validateRegistrationInput } from '../validators/authValidators.js';
+import {
+  validateChangePasswordInput,
+  validateLoginInput,
+  validateRegistrationInput,
+} from '../validators/authValidators.js';
 
 /** MongoDB's error code for a unique-index violation. */
 const DUPLICATE_KEY_ERROR_CODE = 11000;
@@ -280,7 +289,13 @@ export async function changePassword(req, res, next) {
   try {
     const changeValidation = validateChangePasswordInput(req.body);
     if (!changeValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED, changeValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED,
+        changeValidation.validationErrors,
+      );
     }
     const { currentPassword, newPassword } = changeValidation.sanitizedInput;
 
@@ -301,7 +316,11 @@ export async function changePassword(req, res, next) {
 
     const { sessionId: previousSessionId, expiresAtMs: previousExpiresAtMs } = req.authSession;
     try {
-      await RevokedSession.create({ sessionId: previousSessionId, userId: req.user.id, expiresAt: new Date(previousExpiresAtMs) });
+      await RevokedSession.create({
+        sessionId: previousSessionId,
+        userId: req.user.id,
+        expiresAt: new Date(previousExpiresAtMs),
+      });
     } catch (revocationError) {
       if (revocationError?.code !== DUPLICATE_KEY_ERROR_CODE) throw revocationError;
     }
@@ -309,7 +328,10 @@ export async function changePassword(req, res, next) {
 
     const csrfToken = startSession(res, req.app.locals.config, userRecord._id);
     logger.info('Password changed', { requestId: req.id, userId: req.user.id });
-    return sendSuccess(res, HTTP_STATUS.OK, ACCOUNT_MESSAGES.PASSWORD_CHANGED, { user: toPublicUserProfile(userRecord), csrfToken });
+    return sendSuccess(res, HTTP_STATUS.OK, ACCOUNT_MESSAGES.PASSWORD_CHANGED, {
+      user: toPublicUserProfile(userRecord),
+      csrfToken,
+    });
   } catch (error) {
     return next(error);
   }

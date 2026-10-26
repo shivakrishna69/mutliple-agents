@@ -84,22 +84,55 @@ export const getInvitations = peopleHandler('list_invitations', async (req, res)
 
 export const postInvitation = peopleHandler('create_invitation', async (req, res) => {
   const validation = validateInvitationInput(req.body);
-  if (!validation.isValid) return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PEOPLE_MESSAGES.INVITATION_INVALID, validation.validationErrors);
-  const { invitation, delivery } = await createInvitation({ inviter: { id: req.user.id, name: req.user.name, role: req.user.role }, input: validation.sanitizedInput, appContext: appContextOf(req) });
-  audit(req, 'create_invitation', AUDIT_OUTCOMES.ALLOWED, { invitationId: invitation._id.toString(), invitedRole: invitation.role, delivery: delivery.outcome });
-  return sendSuccess(res, HTTP_STATUS.CREATED, PEOPLE_MESSAGES.INVITATION_CREATED, { invitation: toInvitationSummary(invitation), delivery });
+  if (!validation.isValid)
+    return sendError(
+      req,
+      res,
+      HTTP_STATUS.BAD_REQUEST,
+      PEOPLE_MESSAGES.INVITATION_INVALID,
+      validation.validationErrors,
+    );
+  const { invitation, delivery } = await createInvitation({
+    inviter: { id: req.user.id, name: req.user.name, role: req.user.role },
+    input: validation.sanitizedInput,
+    appContext: appContextOf(req),
+  });
+  audit(req, 'create_invitation', AUDIT_OUTCOMES.ALLOWED, {
+    invitationId: invitation._id.toString(),
+    invitedRole: invitation.role,
+    delivery: delivery.outcome,
+  });
+  return sendSuccess(res, HTTP_STATUS.CREATED, PEOPLE_MESSAGES.INVITATION_CREATED, {
+    invitation: toInvitationSummary(invitation),
+    delivery,
+  });
 });
 
 export const postResendInvitation = peopleHandler('resend_invitation', async (req, res) => {
   if (!requireInvitationId(req, res)) return undefined;
-  const { invitation, delivery } = await resendInvitation({ invitationId: req.params.invitationId, inviter: { id: req.user.id, name: req.user.name, role: req.user.role }, appContext: appContextOf(req) });
-  audit(req, 'resend_invitation', AUDIT_OUTCOMES.ALLOWED, { invitationId: invitation._id.toString(), delivery: delivery.outcome });
-  return sendSuccess(res, HTTP_STATUS.OK, PEOPLE_MESSAGES.INVITATION_RESENT, { invitation: toInvitationSummary(invitation), delivery });
+  const { invitation, delivery } = await resendInvitation({
+    invitationId: req.params.invitationId,
+    inviter: { id: req.user.id, name: req.user.name, role: req.user.role },
+    appContext: appContextOf(req),
+  });
+  audit(req, 'resend_invitation', AUDIT_OUTCOMES.ALLOWED, {
+    invitationId: invitation._id.toString(),
+    delivery: delivery.outcome,
+  });
+  return sendSuccess(res, HTTP_STATUS.OK, PEOPLE_MESSAGES.INVITATION_RESENT, {
+    invitation: toInvitationSummary(invitation),
+    delivery,
+  });
 });
 
 export const postRevokeInvitation = peopleHandler('revoke_invitation', async (req, res) => {
   if (!requireInvitationId(req, res)) return undefined;
-  const invitation = await revokeInvitation({ invitationId: req.params.invitationId, inviter: { id: req.user.id, role: req.user.role } });
+  const invitation = await revokeInvitation({
+    invitationId: req.params.invitationId,
+    inviter: { id: req.user.id, role: req.user.role },
+  });
   audit(req, 'revoke_invitation', AUDIT_OUTCOMES.ALLOWED, { invitationId: invitation._id.toString() });
-  return sendSuccess(res, HTTP_STATUS.OK, PEOPLE_MESSAGES.INVITATION_REVOKED, { invitation: toInvitationSummary(invitation) });
+  return sendSuccess(res, HTTP_STATUS.OK, PEOPLE_MESSAGES.INVITATION_REVOKED, {
+    invitation: toInvitationSummary(invitation),
+  });
 });

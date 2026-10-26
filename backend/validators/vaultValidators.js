@@ -25,7 +25,10 @@ const FILE_SIGNATURES = Object.freeze([
 /** Returns `{ contentType, extension }` for an accepted file, or null for anything else. */
 export function detectVaultFileType(fileBuffer) {
   for (const { contentType, signatureBytes } of FILE_SIGNATURES) {
-    if (fileBuffer.length >= signatureBytes.length && signatureBytes.every((signatureByte, byteIndex) => fileBuffer[byteIndex] === signatureByte)) {
+    if (
+      fileBuffer.length >= signatureBytes.length &&
+      signatureBytes.every((signatureByte, byteIndex) => fileBuffer[byteIndex] === signatureByte)
+    ) {
       return { contentType, extension: VAULT_FILE_TYPES[contentType] };
     }
   }
@@ -41,7 +44,9 @@ export function detectVaultFileType(fileBuffer) {
  * The name is display data only; it never becomes part of the S3 key.
  */
 export function sanitizeOriginalFileName(rawFileName, detectedExtension) {
-  const lastPathSegment = String(rawFileName ?? '').split(/[\\/]/).pop();
+  const lastPathSegment = String(rawFileName ?? '')
+    .split(/[\\/]/)
+    .pop();
   let cleanedName = lastPathSegment
     .normalize('NFC')
     // Strips ASCII and C1 control characters from uploaded file names on purpose.
@@ -89,11 +94,18 @@ export function validateVaultUploadFields(requestBody) {
             .filter(Boolean)
         : null;
     const isValidRoleList =
-      roleList !== null && roleList.length > 0 && roleList.every((roleName) => VAULT_GRANTABLE_ROLES.includes(roleName)) && new Set(roleList).size === roleList.length;
+      roleList !== null &&
+      roleList.length > 0 &&
+      roleList.every((roleName) => VAULT_GRANTABLE_ROLES.includes(roleName)) &&
+      new Set(roleList).size === roleList.length;
     if (isValidRoleList) accessibleRoles = roleList;
     else validationErrors.push({ field: 'accessibleRoles', message: VAULT_MESSAGES.INVALID_ACCESSIBLE_ROLES });
   }
 
   if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
-  return { isValid: true, validationErrors: [], sanitizedInput: { employeeId: employeeId.toLowerCase(), documentType, accessibleRoles } };
+  return {
+    isValid: true,
+    validationErrors: [],
+    sanitizedInput: { employeeId: employeeId.toLowerCase(), documentType, accessibleRoles },
+  };
 }

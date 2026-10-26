@@ -17,7 +17,12 @@ import { logger } from '../utils/logger.js';
 /** Allows only admins. */
 export function requireAdmin(req, res, next) {
   if (req.user?.role !== ROLES.ADMIN) {
-    logger.warn('Admin-only route refused', { requestId: req.id, userId: req.user?.id, role: req.user?.role, path: req.originalUrl });
+    logger.warn('Admin-only route refused', {
+      requestId: req.id,
+      userId: req.user?.id,
+      role: req.user?.role,
+      path: req.originalUrl,
+    });
     return sendError(req, res, HTTP_STATUS.FORBIDDEN, ADMIN_MESSAGES.ADMINS_ONLY);
   }
   return next();
@@ -26,7 +31,12 @@ export function requireAdmin(req, res, next) {
 /** Allows only admins and agents. */
 export function requireStaff(req, res, next) {
   if (!req.user || !isStaffRole(req.user.role)) {
-    logger.warn('Staff-only route refused', { requestId: req.id, userId: req.user?.id, role: req.user?.role, path: req.originalUrl });
+    logger.warn('Staff-only route refused', {
+      requestId: req.id,
+      userId: req.user?.id,
+      role: req.user?.role,
+      path: req.originalUrl,
+    });
     return sendError(req, res, HTTP_STATUS.FORBIDDEN, CONVERSATION_MESSAGES.STAFF_ONLY);
   }
   return next();

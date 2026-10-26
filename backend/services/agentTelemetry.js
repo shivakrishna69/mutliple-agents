@@ -83,7 +83,8 @@ const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})
 const MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 const MAX_COUNT = 10_000_000;
 
-const isNonNegativeNumber = (maximum) => (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= maximum;
+const isNonNegativeNumber = (maximum) => (value) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= maximum;
 const isCount = (value) => Number.isInteger(value) && value >= 0 && value <= MAX_COUNT;
 const isUnitInterval = isNonNegativeNumber(1);
 
@@ -147,25 +148,59 @@ function normalizeMetrics(rawMetrics) {
  */
 export function normalizeTelemetryEvent(rawEvent, receivedAtMs = Date.now()) {
   try {
-    requireField(typeof rawEvent === 'object' && rawEvent !== null && !Array.isArray(rawEvent), 'event', 'must be an object');
+    requireField(
+      typeof rawEvent === 'object' && rawEvent !== null && !Array.isArray(rawEvent),
+      'event',
+      'must be an object',
+    );
     const eventType = rawEvent.event_type;
-    requireField(typeof eventType === 'string' && Object.hasOwn(AGENT_TELEMETRY_EVENTS, eventType),'event_type', 'is not a telemetry event type');
-    requireField(typeof rawEvent.event_id === 'string' && HEX_ID_PATTERN.test(rawEvent.event_id), 'event_id', 'must be 32 hex characters');
-    requireField(typeof rawEvent.turn_id === 'string' && HEX_ID_PATTERN.test(rawEvent.turn_id), 'turn_id', 'must be 32 hex characters');
-    requireField(TELEMETRY_WORKFLOWS.includes(rawEvent.workflow), 'workflow', `must be one of ${TELEMETRY_WORKFLOWS.join(', ')}`);
-    requireField(Number.isInteger(rawEvent.sequence) && rawEvent.sequence >= 0 && rawEvent.sequence <= MAX_COUNT, 'sequence', 'must be a non-negative integer');
+    requireField(
+      typeof eventType === 'string' && Object.hasOwn(AGENT_TELEMETRY_EVENTS, eventType),
+      'event_type',
+      'is not a telemetry event type',
+    );
+    requireField(
+      typeof rawEvent.event_id === 'string' && HEX_ID_PATTERN.test(rawEvent.event_id),
+      'event_id',
+      'must be 32 hex characters',
+    );
+    requireField(
+      typeof rawEvent.turn_id === 'string' && HEX_ID_PATTERN.test(rawEvent.turn_id),
+      'turn_id',
+      'must be 32 hex characters',
+    );
+    requireField(
+      TELEMETRY_WORKFLOWS.includes(rawEvent.workflow),
+      'workflow',
+      `must be one of ${TELEMETRY_WORKFLOWS.join(', ')}`,
+    );
+    requireField(
+      Number.isInteger(rawEvent.sequence) && rawEvent.sequence >= 0 && rawEvent.sequence <= MAX_COUNT,
+      'sequence',
+      'must be a non-negative integer',
+    );
 
     const occurredAt = rawEvent.occurred_at;
-    const occurredAtMs = typeof occurredAt === 'string' && ISO_TIMESTAMP_PATTERN.test(occurredAt) ? Date.parse(occurredAt) : Number.NaN;
+    const occurredAtMs =
+      typeof occurredAt === 'string' && ISO_TIMESTAMP_PATTERN.test(occurredAt) ? Date.parse(occurredAt) : Number.NaN;
     requireField(Number.isFinite(occurredAtMs), 'occurred_at', 'must be an ISO-8601 timestamp with a time zone');
-    requireField(Math.abs(receivedAtMs - occurredAtMs) <= TELEMETRY_LIMITS.MAX_CLOCK_SKEW_MS, 'occurred_at', 'is too far from the current time');
+    requireField(
+      Math.abs(receivedAtMs - occurredAtMs) <= TELEMETRY_LIMITS.MAX_CLOCK_SKEW_MS,
+      'occurred_at',
+      'is too far from the current time',
+    );
 
     const conversationId = rawEvent.conversation_id ?? null;
-    requireField(conversationId === null || isValidObjectIdString(conversationId), 'conversation_id', 'must be a conversation id or null');
+    requireField(
+      conversationId === null || isValidObjectIdString(conversationId),
+      'conversation_id',
+      'must be a conversation id or null',
+    );
 
     const isThinkingEvent = eventType === AGENT_TELEMETRY_EVENTS.AGENT_THINKING_EVENT;
     const phase = rawEvent.phase ?? null;
-    if (isThinkingEvent) requireField(THINKING_PHASES.includes(phase), 'phase', `must be one of ${THINKING_PHASES.join(', ')}`);
+    if (isThinkingEvent)
+      requireField(THINKING_PHASES.includes(phase), 'phase', `must be one of ${THINKING_PHASES.join(', ')}`);
     else requireField(phase === null, 'phase', 'is only allowed on AGENT_THINKING_EVENT');
 
     const toolName = optionalMatching(rawEvent.tool_name, IDENTIFIER_PATTERN, 'tool_name', 'must be a tool name');
@@ -175,8 +210,13 @@ export function normalizeTelemetryEvent(rawEvent, receivedAtMs = Date.now()) {
     if (!isThinkingEvent) requireField(runId !== null, 'run_id', 'is required on tool events');
 
     const status = rawEvent.status ?? null;
-    requireField(status === null || TELEMETRY_STATUSES.includes(status), 'status', `must be one of ${TELEMETRY_STATUSES.join(', ')}`);
-    if (eventType === AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_COMPLETED) requireField(status !== null, 'status', 'is required on TOOL_EXECUTION_COMPLETED');
+    requireField(
+      status === null || TELEMETRY_STATUSES.includes(status),
+      'status',
+      `must be one of ${TELEMETRY_STATUSES.join(', ')}`,
+    );
+    if (eventType === AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_COMPLETED)
+      requireField(status !== null, 'status', 'is required on TOOL_EXECUTION_COMPLETED');
 
     return {
       ok: true,
@@ -194,7 +234,12 @@ export function normalizeTelemetryEvent(rawEvent, receivedAtMs = Date.now()) {
         runId,
         toolName,
         status,
-        errorType: optionalMatching(rawEvent.error_type, IDENTIFIER_PATTERN, 'error_type', 'must be an exception class name'),
+        errorType: optionalMatching(
+          rawEvent.error_type,
+          IDENTIFIER_PATTERN,
+          'error_type',
+          'must be an exception class name',
+        ),
         metrics: normalizeMetrics(rawEvent.metrics),
       },
     };

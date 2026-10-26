@@ -24,13 +24,27 @@ import Department from '../models/Department.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import User from '../models/User.js';
 
-export const RISK_BANDS = Object.freeze({ UNSCORED: 'unscored', SAFE: 'safe', ELEVATED: 'elevated', CRITICAL: 'critical' });
-const BAND_SEVERITY = Object.freeze({ [RISK_BANDS.UNSCORED]: -1, [RISK_BANDS.SAFE]: 0, [RISK_BANDS.ELEVATED]: 1, [RISK_BANDS.CRITICAL]: 2 });
+export const RISK_BANDS = Object.freeze({
+  UNSCORED: 'unscored',
+  SAFE: 'safe',
+  ELEVATED: 'elevated',
+  CRITICAL: 'critical',
+});
+const BAND_SEVERITY = Object.freeze({
+  [RISK_BANDS.UNSCORED]: -1,
+  [RISK_BANDS.SAFE]: 0,
+  [RISK_BANDS.ELEVATED]: 1,
+  [RISK_BANDS.CRITICAL]: 2,
+});
 
 export const RISK_SORT_FIELDS = Object.freeze({ ATTRITION: 'attrition', BURNOUT: 'burnout' });
 export const RISK_LIST_LIMITS = Object.freeze({ DEFAULT: 100, MAX: 500, TOP_CRITICAL: 5 });
 
-const CURRENT_EMPLOYMENT_STATUSES = Object.freeze([EMPLOYMENT_STATUSES.PROBATION, EMPLOYMENT_STATUSES.ACTIVE, EMPLOYMENT_STATUSES.NOTICE]);
+const CURRENT_EMPLOYMENT_STATUSES = Object.freeze([
+  EMPLOYMENT_STATUSES.PROBATION,
+  EMPLOYMENT_STATUSES.ACTIVE,
+  EMPLOYMENT_STATUSES.NOTICE,
+]);
 
 /** The band of one 0-100 score. */
 export function classifyRiskScore(score, isScored) {
@@ -73,11 +87,18 @@ function toCountMap(groupedCounts) {
  *   band filters on the overall band
  * @returns {Promise<{ employees: object[], summary: object, thresholds: object }>}
  */
-export async function getWorkforceRisk({ departmentId = null, band = null, sortBy = RISK_SORT_FIELDS.ATTRITION, limit = RISK_LIST_LIMITS.DEFAULT }) {
+export async function getWorkforceRisk({
+  departmentId = null,
+  band = null,
+  sortBy = RISK_SORT_FIELDS.ATTRITION,
+  limit = RISK_LIST_LIMITS.DEFAULT,
+}) {
   const matchStage = { 'organizationData.employmentStatus': { $in: CURRENT_EMPLOYMENT_STATUSES } };
   if (departmentId) matchStage['organizationData.departmentId'] = new mongoose.Types.ObjectId(departmentId);
-  const primarySortField = sortBy === RISK_SORT_FIELDS.BURNOUT ? 'advancedMetrics.currentBurnoutScore' : 'advancedMetrics.attritionRiskIndex';
-  const secondarySortField = sortBy === RISK_SORT_FIELDS.BURNOUT ? 'advancedMetrics.attritionRiskIndex' : 'advancedMetrics.currentBurnoutScore';
+  const primarySortField =
+    sortBy === RISK_SORT_FIELDS.BURNOUT ? 'advancedMetrics.currentBurnoutScore' : 'advancedMetrics.attritionRiskIndex';
+  const secondarySortField =
+    sortBy === RISK_SORT_FIELDS.BURNOUT ? 'advancedMetrics.attritionRiskIndex' : 'advancedMetrics.currentBurnoutScore';
 
   const [result] = await EmployeeProfile.aggregate([
     { $match: matchStage },
@@ -94,8 +115,24 @@ export async function getWorkforceRisk({ departmentId = null, band = null, sortB
           $switch: {
             branches: [
               { case: { $eq: ['$attritionBand', RISK_BANDS.UNSCORED] }, then: RISK_BANDS.UNSCORED },
-              { case: { $or: [{ $eq: ['$attritionBand', RISK_BANDS.CRITICAL] }, { $eq: ['$burnoutBand', RISK_BANDS.CRITICAL] }] }, then: RISK_BANDS.CRITICAL },
-              { case: { $or: [{ $eq: ['$attritionBand', RISK_BANDS.ELEVATED] }, { $eq: ['$burnoutBand', RISK_BANDS.ELEVATED] }] }, then: RISK_BANDS.ELEVATED },
+              {
+                case: {
+                  $or: [
+                    { $eq: ['$attritionBand', RISK_BANDS.CRITICAL] },
+                    { $eq: ['$burnoutBand', RISK_BANDS.CRITICAL] },
+                  ],
+                },
+                then: RISK_BANDS.CRITICAL,
+              },
+              {
+                case: {
+                  $or: [
+                    { $eq: ['$attritionBand', RISK_BANDS.ELEVATED] },
+                    { $eq: ['$burnoutBand', RISK_BANDS.ELEVATED] },
+                  ],
+                },
+                then: RISK_BANDS.ELEVATED,
+              },
             ],
             default: RISK_BANDS.SAFE,
           },
@@ -110,8 +147,24 @@ export async function getWorkforceRisk({ departmentId = null, band = null, sortB
           ...(band ? [{ $match: { overallBand: band } }] : []),
           { $sort: { isScored: -1, [primarySortField]: -1, [secondarySortField]: -1, _id: 1 } },
           { $limit: limit },
-          { $lookup: { from: User.collection.collectionName, localField: 'userId', foreignField: '_id', pipeline: [{ $project: { _id: 0, name: 1 } }], as: 'account' } },
-          { $lookup: { from: Department.collection.collectionName, localField: 'organizationData.departmentId', foreignField: '_id', pipeline: [{ $project: { _id: 0, name: 1 } }], as: 'department' } },
+          {
+            $lookup: {
+              from: User.collection.collectionName,
+              localField: 'userId',
+              foreignField: '_id',
+              pipeline: [{ $project: { _id: 0, name: 1 } }],
+              as: 'account',
+            },
+          },
+          {
+            $lookup: {
+              from: Department.collection.collectionName,
+              localField: 'organizationData.departmentId',
+              foreignField: '_id',
+              pipeline: [{ $project: { _id: 0, name: 1 } }],
+              as: 'department',
+            },
+          },
           {
             $project: {
               _id: 0,
@@ -136,7 +189,14 @@ export async function getWorkforceRisk({ departmentId = null, band = null, sortB
         overallCounts: bandCounts('overallBand'),
         averages: [
           { $match: { isScored: 1 } },
-          { $group: { _id: null, attrition: { $avg: '$advancedMetrics.attritionRiskIndex' }, burnout: { $avg: '$advancedMetrics.currentBurnoutScore' }, lastScoredAt: { $max: '$advancedMetrics.computedAt' } } },
+          {
+            $group: {
+              _id: null,
+              attrition: { $avg: '$advancedMetrics.attritionRiskIndex' },
+              burnout: { $avg: '$advancedMetrics.currentBurnoutScore' },
+              lastScoredAt: { $max: '$advancedMetrics.computedAt' },
+            },
+          },
         ],
         total: [{ $count: 'count' }],
       },
@@ -149,7 +209,8 @@ export async function getWorkforceRisk({ departmentId = null, band = null, sortB
     // Unscored rows show null scores, not the meaningless stored zeros.
     attritionRiskIndex: row.attritionBand === RISK_BANDS.UNSCORED ? null : row.attritionRiskIndex,
     currentBurnoutScore: row.burnoutBand === RISK_BANDS.UNSCORED ? null : row.currentBurnoutScore,
-    overallBand: worseBand(row.attritionBand, row.burnoutBand) === RISK_BANDS.UNSCORED ? RISK_BANDS.UNSCORED : row.overallBand,
+    overallBand:
+      worseBand(row.attritionBand, row.burnoutBand) === RISK_BANDS.UNSCORED ? RISK_BANDS.UNSCORED : row.overallBand,
     scoredAt: row.scoredAt ? new Date(row.scoredAt).toISOString() : null,
   }));
   return {
@@ -164,7 +225,11 @@ export async function getWorkforceRisk({ departmentId = null, band = null, sortB
       lastScoredAt: averages?.lastScoredAt ? new Date(averages.lastScoredAt).toISOString() : null,
       criticalCount: toCountMap(result.overallCounts).critical,
     },
-    thresholds: { elevatedFrom: WORKFORCE_RISK_BANDS.ELEVATED_FROM, criticalFrom: WORKFORCE_RISK_BANDS.CRITICAL_FROM, scale: '0-100' },
+    thresholds: {
+      elevatedFrom: WORKFORCE_RISK_BANDS.ELEVATED_FROM,
+      criticalFrom: WORKFORCE_RISK_BANDS.CRITICAL_FROM,
+      scale: '0-100',
+    },
   };
 }
 
@@ -177,7 +242,9 @@ export async function getWorkforceRisk({ departmentId = null, band = null, sortB
  */
 export async function recordEmployeeScores({ modelVersion, computedAt, scores }) {
   const scoredEmployeeIds = scores.map((score) => new mongoose.Types.ObjectId(score.employeeId));
-  const existingProfiles = await EmployeeProfile.find({ _id: { $in: scoredEmployeeIds } }).select('_id').lean();
+  const existingProfiles = await EmployeeProfile.find({ _id: { $in: scoredEmployeeIds } })
+    .select('_id')
+    .lean();
   const existingIds = new Set(existingProfiles.map((profile) => profile._id.toString()));
   const knownScores = scores.filter((score) => existingIds.has(score.employeeId));
   if (knownScores.length > 0) {
@@ -198,5 +265,8 @@ export async function recordEmployeeScores({ modelVersion, computedAt, scores })
       { ordered: false },
     );
   }
-  return { updated: knownScores.length, unknownEmployeeIds: scores.filter((score) => !existingIds.has(score.employeeId)).map((score) => score.employeeId) };
+  return {
+    updated: knownScores.length,
+    unknownEmployeeIds: scores.filter((score) => !existingIds.has(score.employeeId)).map((score) => score.employeeId),
+  };
 }

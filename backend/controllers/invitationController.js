@@ -39,16 +39,28 @@ export async function getInvitationPreview(req, res, next) {
 export async function postAcceptInvitation(req, res, next) {
   try {
     const passwordError = checkNewPassword(req.body?.password);
-    if (passwordError) return sendError(req, res, HTTP_STATUS.BAD_REQUEST, passwordError, [{ field: 'password', message: passwordError }]);
+    if (passwordError)
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, passwordError, [
+        { field: 'password', message: passwordError },
+      ]);
 
     const newUser = await acceptInvitation(req.params.token, req.body.password);
     const authConfig = req.app.locals.config;
     const sessionTokens = issueSessionTokens(newUser._id, authConfig);
     setSessionCookies(res, authConfig, sessionTokens);
 
-    recordAuditEvent(req, { category: 'people', action: 'accept_invitation', outcome: AUDIT_OUTCOMES.ALLOWED, userId: newUser._id.toString(), role: newUser.role });
+    recordAuditEvent(req, {
+      category: 'people',
+      action: 'accept_invitation',
+      outcome: AUDIT_OUTCOMES.ALLOWED,
+      userId: newUser._id.toString(),
+      role: newUser.role,
+    });
     logger.info('Invitation accepted', { requestId: req.id, userId: newUser._id.toString() });
-    return sendSuccess(res, HTTP_STATUS.CREATED, PEOPLE_MESSAGES.INVITATION_ACCEPTED, { user: toPublicUserProfile(newUser), csrfToken: sessionTokens.csrfToken });
+    return sendSuccess(res, HTTP_STATUS.CREATED, PEOPLE_MESSAGES.INVITATION_ACCEPTED, {
+      user: toPublicUserProfile(newUser),
+      csrfToken: sessionTokens.csrfToken,
+    });
   } catch (error) {
     if (error instanceof InvitationError) return handleInvitationError(req, res, error, 'accept_invitation');
     return next(error);

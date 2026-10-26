@@ -20,11 +20,20 @@
  * (services/attendancePolicy.js classifyArrival), the same rule a device punch uses.
  */
 
-import Attendance, { ATTENDANCE_ENTRY_SOURCES, REGULARIZATION_METHODS, isRealCalendarDate } from '../models/Attendance.js';
+import Attendance, {
+  ATTENDANCE_ENTRY_SOURCES,
+  REGULARIZATION_METHODS,
+  isRealCalendarDate,
+} from '../models/Attendance.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { ATTENDANCE_FIELD_LIMITS } from '../constants/validation.js';
-import { classifyArrival, daysBetweenCalendarDates, localTimeToMinutes, readOfficeLocalClock } from './attendancePolicy.js';
+import {
+  classifyArrival,
+  daysBetweenCalendarDates,
+  localTimeToMinutes,
+  readOfficeLocalClock,
+} from './attendancePolicy.js';
 
 const DUPLICATE_KEY_ERROR_CODE = 11000;
 
@@ -70,7 +79,9 @@ export function toRegularizedAttendanceSummary(attendanceRecord) {
       ? {
           method: attendanceRecord.regularization.method,
           regularizedBySystem: attendanceRecord.regularization.regularizedBySystem,
-          approvedByUserId: attendanceRecord.regularization.approvedByUserId ? attendanceRecord.regularization.approvedByUserId.toString() : null,
+          approvedByUserId: attendanceRecord.regularization.approvedByUserId
+            ? attendanceRecord.regularization.approvedByUserId.toString()
+            : null,
         }
       : null,
   };
@@ -106,32 +117,66 @@ export async function recordRegularizedAttendance({
 }) {
   // ---- 1. Employee ----------------------------------------------------------------------------
   const employeeProfile = await EmployeeProfile.findById(employeeId).select('organizationData').lean();
-  if (!employeeProfile) throw new RegularizationRuleError(404, REGULARIZATION_RULE_CODES.EMPLOYEE_NOT_FOUND, 'Employee not found');
+  if (!employeeProfile)
+    throw new RegularizationRuleError(404, REGULARIZATION_RULE_CODES.EMPLOYEE_NOT_FOUND, 'Employee not found');
   if (employeeProfile.organizationData.employmentStatus === EMPLOYMENT_STATUSES.TERMINATED) {
-    throw new RegularizationRuleError(409, REGULARIZATION_RULE_CODES.EMPLOYMENT_ENDED, 'The employee is no longer employed');
+    throw new RegularizationRuleError(
+      409,
+      REGULARIZATION_RULE_CODES.EMPLOYMENT_ENDED,
+      'The employee is no longer employed',
+    );
   }
 
   // ---- 2. Office ------------------------------------------------------------------------------
-  const office = employeeProfile.organizationData.officeLocationId ? await OfficeLocation.findById(employeeProfile.organizationData.officeLocationId).lean() : null;
+  const office = employeeProfile.organizationData.officeLocationId
+    ? await OfficeLocation.findById(employeeProfile.organizationData.officeLocationId).lean()
+    : null;
   if (!office || !office.workday?.shiftEndLocalTime) {
-    throw new RegularizationRuleError(409, REGULARIZATION_RULE_CODES.OFFICE_NOT_CONFIGURED, 'The employee has no office with a shift configured');
+    throw new RegularizationRuleError(
+      409,
+      REGULARIZATION_RULE_CODES.OFFICE_NOT_CONFIGURED,
+      'The employee has no office with a shift configured',
+    );
   }
 
   // ---- 3. Date --------------------------------------------------------------------------------
-  if (!isRealCalendarDate(date)) throw new RegularizationRuleError(400, REGULARIZATION_RULE_CODES.INVALID_DATE, 'date must be a real calendar day as YYYY-MM-DD');
+  if (!isRealCalendarDate(date))
+    throw new RegularizationRuleError(
+      400,
+      REGULARIZATION_RULE_CODES.INVALID_DATE,
+      'date must be a real calendar day as YYYY-MM-DD',
+    );
   const officeToday = readOfficeLocalClock(now, office.timeZone).calendarDate;
   const daysAgo = daysBetweenCalendarDates(date, officeToday);
-  if (daysAgo < 0) throw new RegularizationRuleError(422, REGULARIZATION_RULE_CODES.DATE_IN_FUTURE, 'The date is in the future in the office time zone');
+  if (daysAgo < 0)
+    throw new RegularizationRuleError(
+      422,
+      REGULARIZATION_RULE_CODES.DATE_IN_FUTURE,
+      'The date is in the future in the office time zone',
+    );
   const windowDays = WINDOW_DAYS_BY_METHOD[method];
   if (daysAgo > windowDays) {
-    throw new RegularizationRuleError(422, REGULARIZATION_RULE_CODES.OUTSIDE_REGULARIZATION_WINDOW, `Only the last ${windowDays} days can be regularized this way`);
+    throw new RegularizationRuleError(
+      422,
+      REGULARIZATION_RULE_CODES.OUTSIDE_REGULARIZATION_WINDOW,
+      `Only the last ${windowDays} days can be regularized this way`,
+    );
   }
 
   // ---- 4. Punch time --------------------------------------------------------------------------
-  if (punchInTime.getTime() > now.getTime()) throw new RegularizationRuleError(422, REGULARIZATION_RULE_CODES.PUNCH_IN_FUTURE, 'The punch-in time is in the future');
+  if (punchInTime.getTime() > now.getTime())
+    throw new RegularizationRuleError(
+      422,
+      REGULARIZATION_RULE_CODES.PUNCH_IN_FUTURE,
+      'The punch-in time is in the future',
+    );
   const localPunch = readOfficeLocalClock(punchInTime, office.timeZone);
   if (localPunch.calendarDate !== date) {
-    throw new RegularizationRuleError(422, REGULARIZATION_RULE_CODES.PUNCH_NOT_ON_DATE, `The punch-in time does not fall on ${date} in ${office.timeZone}`);
+    throw new RegularizationRuleError(
+      422,
+      REGULARIZATION_RULE_CODES.PUNCH_NOT_ON_DATE,
+      `The punch-in time does not fall on ${date} in ${office.timeZone}`,
+    );
   }
   const shiftStartMinutes = localTimeToMinutes(office.workday.shiftStartLocalTime);
   const shiftEndMinutes = localTimeToMinutes(office.workday.shiftEndLocalTime);

@@ -47,7 +47,10 @@ export async function getOrgHierarchy(req, res, next) {
     const { roots, stats } = buildHierarchyForest(snapshot.nodes);
 
     if (stats.orphanedCount > 0) {
-      logger.warn('Org hierarchy has employees whose manager is not a current employee', { requestId: req.id, orphanedCount: stats.orphanedCount });
+      logger.warn('Org hierarchy has employees whose manager is not a current employee', {
+        requestId: req.id,
+        orphanedCount: stats.orphanedCount,
+      });
     }
 
     setOrgResponseHeaders(res, cacheStatus);
@@ -86,7 +89,9 @@ export async function getManagerReports(req, res, next) {
   try {
     const managerId = req.params.id;
     if (!isValidObjectIdString(managerId)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, ORG_MESSAGES.INVALID_EMPLOYEE_ID, [{ field: 'id', message: ORG_MESSAGES.INVALID_EMPLOYEE_ID }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, ORG_MESSAGES.INVALID_EMPLOYEE_ID, [
+        { field: 'id', message: ORG_MESSAGES.INVALID_EMPLOYEE_ID },
+      ]);
     }
     // Ids in the snapshot are lowercase hex strings; compare in the same form.
     const normalizedManagerId = managerId.toLowerCase();
@@ -105,7 +110,13 @@ export async function getManagerReports(req, res, next) {
 
     setOrgResponseHeaders(res, cacheStatus);
     return sendSuccess(res, HTTP_STATUS.OK, ORG_MESSAGES.REPORTS_RETRIEVED, {
-      manager: { id: managerRow.id, name: managerRow.name, designation: managerRow.designation, avatar: null, isCurrentEmployee },
+      manager: {
+        id: managerRow.id,
+        name: managerRow.name,
+        designation: managerRow.designation,
+        avatar: null,
+        isCurrentEmployee,
+      },
       tree,
       directReports,
       indirectReports,

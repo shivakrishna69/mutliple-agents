@@ -38,8 +38,32 @@ export const STAFF_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.AGENT]);
  * of users ("Agents", "HR"); `assignmentPhrase` completes "<name> is now …".
  */
 export const ROLE_DISPLAY = Object.freeze({
-  admin: { label: 'Admin', pluralLabel: 'Admins', assignmentPhrase: 'an admin', description: 'Full access, including user management', badgeClassName: 'bg-violet-50 text-violet-700 ring-violet-600/20' },
-  agent: { label: 'Agent', pluralLabel: 'Agents', assignmentPhrase: 'an agent', description: 'Handles escalated conversations in the console', badgeClassName: 'bg-sky-50 text-sky-700 ring-sky-600/20' },
-  hr: { label: 'HR', pluralLabel: 'HR', assignmentPhrase: 'an HR team member', description: 'Manages employee records and documents', badgeClassName: 'bg-amber-50 text-amber-800 ring-amber-600/20' },
-  customer: { label: 'Customer', pluralLabel: 'Customers', assignmentPhrase: 'a customer', description: 'Chats with support', badgeClassName: 'bg-slate-100 text-slate-700 ring-slate-500/20' },
+  admin: {
+    label: 'Admin',
+    pluralLabel: 'Admins',
+    assignmentPhrase: 'an admin',
+    description: 'Full access, including user management',
+    badgeClassName: 'bg-violet-50 text-violet-700 ring-violet-600/20',
+  },
+  agent: {
+    label: 'Agent',
+    pluralLabel: 'Agents',
+    assignmentPhrase: 'an agent',
+    description: 'Handles escalated conversations in the console',
+    badgeClassName: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+  },
+  hr: {
+    label: 'HR',
+    pluralLabel: 'HR',
+    assignmentPhrase: 'an HR team member',
+    description: 'Manages employee records and documents',
+    badgeClassName: 'bg-amber-50 text-amber-800 ring-amber-600/20',
+  },
+  customer: {
+    label: 'Customer',
+    pluralLabel: 'Customers',
+    assignmentPhrase: 'a customer',
+    description: 'Chats with support',
+    badgeClassName: 'bg-slate-100 text-slate-700 ring-slate-500/20',
+  },
 });

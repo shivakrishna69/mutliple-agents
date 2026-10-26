@@ -13,7 +13,7 @@
  */
 
 function toIsoTimestamp(dateValue) {
-  return dateValue instanceof Date ? dateValue.toISOString() : dateValue ?? null;
+  return dateValue instanceof Date ? dateValue.toISOString() : (dateValue ?? null);
 }
 
 /** Longest tool output text sent to clients; the full value stays in the database. */
@@ -32,7 +32,9 @@ function summarizeToolOutput(toolOutput) {
       outputText = String(toolOutput);
     }
   }
-  return outputText.length > MAX_TOOL_OUTPUT_CHARACTERS ? `${outputText.slice(0, MAX_TOOL_OUTPUT_CHARACTERS)}…` : outputText;
+  return outputText.length > MAX_TOOL_OUTPUT_CHARACTERS
+    ? `${outputText.slice(0, MAX_TOOL_OUTPUT_CHARACTERS)}…`
+    : outputText;
 }
 
 /** Full message payload for staff rooms. Accepts a Message document or lean record. */

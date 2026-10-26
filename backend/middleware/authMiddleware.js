@@ -95,7 +95,10 @@ export async function protect(req, res, next) {
   const { sessionClaims } = tokenVerification;
 
   // Step 3
-  if (!CSRF_EXEMPT_METHODS.has(req.method) && !isCsrfTokenValid(req.get(CSRF_HEADER_NAME), sessionClaims.csrfTokenHash)) {
+  if (
+    !CSRF_EXEMPT_METHODS.has(req.method) &&
+    !isCsrfTokenValid(req.get(CSRF_HEADER_NAME), sessionClaims.csrfTokenHash)
+  ) {
     logger.warn('CSRF check failed', { requestId: req.id, userId: sessionClaims.userId, path: req.originalUrl });
     return sendError(req, res, HTTP_STATUS.FORBIDDEN, SESSION_MESSAGES.CSRF_TOKEN_INVALID);
   }

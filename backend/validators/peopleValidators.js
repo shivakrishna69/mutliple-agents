@@ -34,26 +34,44 @@ export function validateInvitationInput(requestBody) {
 
   const name = readTrimmedString(body.name);
   if (name.length < INVITATION_LIMITS.NAME_MIN_LENGTH || name.length > INVITATION_LIMITS.NAME_MAX_LENGTH) {
-    validationErrors.push({ field: 'name', message: `must be ${INVITATION_LIMITS.NAME_MIN_LENGTH}-${INVITATION_LIMITS.NAME_MAX_LENGTH} characters` });
+    validationErrors.push({
+      field: 'name',
+      message: `must be ${INVITATION_LIMITS.NAME_MIN_LENGTH}-${INVITATION_LIMITS.NAME_MAX_LENGTH} characters`,
+    });
   }
   const email = readTrimmedString(body.email).toLowerCase();
-  if (!EMAIL_PATTERN.test(email) || email.length > 254) validationErrors.push({ field: 'email', message: 'must be a valid email address' });
-  if (!INVITABLE_ROLES.includes(body.role)) validationErrors.push({ field: 'role', message: `must be one of ${INVITABLE_ROLES.join(', ')}` });
+  if (!EMAIL_PATTERN.test(email) || email.length > 254)
+    validationErrors.push({ field: 'email', message: 'must be a valid email address' });
+  if (!INVITABLE_ROLES.includes(body.role))
+    validationErrors.push({ field: 'role', message: `must be one of ${INVITABLE_ROLES.join(', ')}` });
 
   const designation = readTrimmedString(body.designation);
   if (designation.length < 2 || designation.length > INVITATION_LIMITS.DESIGNATION_MAX_LENGTH) {
-    validationErrors.push({ field: 'designation', message: `must be 2-${INVITATION_LIMITS.DESIGNATION_MAX_LENGTH} characters` });
+    validationErrors.push({
+      field: 'designation',
+      message: `must be 2-${INVITATION_LIMITS.DESIGNATION_MAX_LENGTH} characters`,
+    });
   }
-  if (!isValidObjectIdString(body.departmentId)) validationErrors.push({ field: 'departmentId', message: 'choose a department' });
-  const hasManager = body.reportingManagerId !== undefined && body.reportingManagerId !== null && body.reportingManagerId !== '';
-  if (hasManager && !isValidObjectIdString(body.reportingManagerId)) validationErrors.push({ field: 'reportingManagerId', message: 'must be an employee' });
+  if (!isValidObjectIdString(body.departmentId))
+    validationErrors.push({ field: 'departmentId', message: 'choose a department' });
+  const hasManager =
+    body.reportingManagerId !== undefined && body.reportingManagerId !== null && body.reportingManagerId !== '';
+  if (hasManager && !isValidObjectIdString(body.reportingManagerId))
+    validationErrors.push({ field: 'reportingManagerId', message: 'must be an employee' });
   if (!Object.values(WORK_LOCATION_TYPES).includes(body.workLocationType)) {
-    validationErrors.push({ field: 'workLocationType', message: `must be one of ${Object.values(WORK_LOCATION_TYPES).join(', ')}` });
+    validationErrors.push({
+      field: 'workLocationType',
+      message: `must be one of ${Object.values(WORK_LOCATION_TYPES).join(', ')}`,
+    });
   }
   const dateOfJoining = parseJoiningDate(body.dateOfJoining);
-  if (!dateOfJoining) validationErrors.push({ field: 'dateOfJoining', message: 'must be a date within a year of today' });
+  if (!dateOfJoining)
+    validationErrors.push({ field: 'dateOfJoining', message: 'must be a date within a year of today' });
   if (!INVITABLE_EMPLOYMENT_STATUSES.includes(body.employmentStatus)) {
-    validationErrors.push({ field: 'employmentStatus', message: `must be ${INVITABLE_EMPLOYMENT_STATUSES.join(' or ')}` });
+    validationErrors.push({
+      field: 'employmentStatus',
+      message: `must be ${INVITABLE_EMPLOYMENT_STATUSES.join(' or ')}`,
+    });
   }
 
   if (validationErrors.length > 0) return { isValid: false, validationErrors };

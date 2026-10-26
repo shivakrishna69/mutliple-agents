@@ -19,10 +19,16 @@ async function postData(endpointPath, requestPayload, csrfToken) {
 }
 
 export const requestInvitationOptions = (callerSignal) => getData('/api/people/invitations/options', callerSignal);
-export const requestInvitations = (status, callerSignal) => getData(`/api/people/invitations${status ? `?status=${encode(status)}` : ''}`, callerSignal);
-export const requestInvitationCreation = (invitationInput, csrfToken) => postData('/api/people/invitations', invitationInput, csrfToken);
-export const requestInvitationResend = (invitationId, csrfToken) => postData(`/api/people/invitations/${encode(invitationId)}/resend`, {}, csrfToken);
-export const requestInvitationRevoke = (invitationId, csrfToken) => postData(`/api/people/invitations/${encode(invitationId)}/revoke`, {}, csrfToken);
+export const requestInvitations = (status, callerSignal) =>
+  getData(`/api/people/invitations${status ? `?status=${encode(status)}` : ''}`, callerSignal);
+export const requestInvitationCreation = (invitationInput, csrfToken) =>
+  postData('/api/people/invitations', invitationInput, csrfToken);
+export const requestInvitationResend = (invitationId, csrfToken) =>
+  postData(`/api/people/invitations/${encode(invitationId)}/resend`, {}, csrfToken);
+export const requestInvitationRevoke = (invitationId, csrfToken) =>
+  postData(`/api/people/invitations/${encode(invitationId)}/revoke`, {}, csrfToken);
 
-export const requestInvitationPreview = (token, callerSignal) => getData(`/api/invitations/${encode(token)}`, callerSignal);
-export const requestInvitationAcceptance = (token, password) => postData(`/api/invitations/${encode(token)}/accept`, { password });
+export const requestInvitationPreview = (token, callerSignal) =>
+  getData(`/api/invitations/${encode(token)}`, callerSignal);
+export const requestInvitationAcceptance = (token, password) =>
+  postData(`/api/invitations/${encode(token)}/accept`, { password });

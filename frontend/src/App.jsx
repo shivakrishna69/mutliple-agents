@@ -31,7 +31,14 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import AppShell from './components/AppShell.jsx';
-import { AdminRoute, CustomerRoute, PeopleManagerRoute, ProtectedRoute, PublicOnlyRoute, StaffRoute } from './components/RouteGuards.jsx';
+import {
+  AdminRoute,
+  CustomerRoute,
+  PeopleManagerRoute,
+  ProtectedRoute,
+  PublicOnlyRoute,
+  StaffRoute,
+} from './components/RouteGuards.jsx';
 import Account from './pages/Account.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 
@@ -56,46 +63,46 @@ const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
 export default function App() {
   return (
     <Suspense fallback={<LoadingBlock />}>
-    <Routes>
-      <Route path="/" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
-      <Route path={ROUTE_PATHS.VERIFY_PAYSLIP} element={<PayslipVerification />} />
-      <Route path={ROUTE_PATHS.ACCEPT_INVITATION} element={<AcceptInvitation />} />
+      <Routes>
+        <Route path="/" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
+        <Route path={ROUTE_PATHS.VERIFY_PAYSLIP} element={<PayslipVerification />} />
+        <Route path={ROUTE_PATHS.ACCEPT_INVITATION} element={<AcceptInvitation />} />
 
-      <Route element={<PublicOnlyRoute />}>
-        <Route path={ROUTE_PATHS.LOGIN} element={<Login />} />
-        <Route path={ROUTE_PATHS.SIGNUP} element={<Signup />} />
-      </Route>
+        <Route element={<PublicOnlyRoute />}>
+          <Route path={ROUTE_PATHS.LOGIN} element={<Login />} />
+          <Route path={ROUTE_PATHS.SIGNUP} element={<Signup />} />
+        </Route>
 
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppShell />}>
-          <Route path={ROUTE_PATHS.DASHBOARD} element={<Dashboard />} />
-          <Route path={ROUTE_PATHS.ACCOUNT} element={<Account />} />
-          <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
-          <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />
-          <Route path={ROUTE_PATHS.ANALYTICS} element={<AdvancedAnalyticsHub />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
+            <Route path={ROUTE_PATHS.DASHBOARD} element={<Dashboard />} />
+            <Route path={ROUTE_PATHS.ACCOUNT} element={<Account />} />
+            <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
+            <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />
+            <Route path={ROUTE_PATHS.ANALYTICS} element={<AdvancedAnalyticsHub />} />
 
-          <Route element={<CustomerRoute />}>
-            <Route path={ROUTE_PATHS.SUPPORT} element={<CustomerSupport />} />
-          </Route>
+            <Route element={<CustomerRoute />}>
+              <Route path={ROUTE_PATHS.SUPPORT} element={<CustomerSupport />} />
+            </Route>
 
-          <Route element={<StaffRoute />}>
-            <Route path={ROUTE_PATHS.CONSOLE} element={<AgentConsole />} />
-            <Route path={ROUTE_PATHS.ORGANISATION} element={<OrgDirectory />} />
-          </Route>
+            <Route element={<StaffRoute />}>
+              <Route path={ROUTE_PATHS.CONSOLE} element={<AgentConsole />} />
+              <Route path={ROUTE_PATHS.ORGANISATION} element={<OrgDirectory />} />
+            </Route>
 
-          <Route element={<PeopleManagerRoute />}>
-            <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
-          </Route>
+            <Route element={<PeopleManagerRoute />}>
+              <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
+            </Route>
 
-          <Route element={<AdminRoute />}>
-            <Route path={ROUTE_PATHS.ADMIN_USERS} element={<AdminUsers />} />
-            <Route path={ROUTE_PATHS.AGENT_TELEMETRY} element={<AgentTelemetry />} />
+            <Route element={<AdminRoute />}>
+              <Route path={ROUTE_PATHS.ADMIN_USERS} element={<AdminUsers />} />
+              <Route path={ROUTE_PATHS.AGENT_TELEMETRY} element={<AgentTelemetry />} />
+            </Route>
           </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Suspense>
   );
 }

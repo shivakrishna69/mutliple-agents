@@ -22,7 +22,22 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import RoleBadge from './RoleBadge.jsx';
-import { ChartIcon, ChatIcon, CloseIcon, CurrencyIcon, HomeIcon, InboxIcon, MapPinIcon, MenuIcon, SignOutIcon, SitemapIcon, TerminalIcon, UserPlusIcon, UserCircleIcon, UsersIcon } from './Icons.jsx';
+import {
+  ChartIcon,
+  ChatIcon,
+  CloseIcon,
+  CurrencyIcon,
+  HomeIcon,
+  InboxIcon,
+  MapPinIcon,
+  MenuIcon,
+  SignOutIcon,
+  SitemapIcon,
+  TerminalIcon,
+  UserPlusIcon,
+  UserCircleIcon,
+  UsersIcon,
+} from './Icons.jsx';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES } from '../constants/routes.js';
 
@@ -32,8 +47,18 @@ const NAVIGATION_SECTIONS = Object.freeze([
     sectionTitle: 'Workspace',
     items: [
       { label: 'Overview', path: ROUTE_PATHS.DASHBOARD, Icon: HomeIcon, isVisibleTo: () => true },
-      { label: 'Support chat', path: ROUTE_PATHS.SUPPORT, Icon: ChatIcon, isVisibleTo: (role) => role === USER_ROLES.CUSTOMER },
-      { label: 'Support console', path: ROUTE_PATHS.CONSOLE, Icon: InboxIcon, isVisibleTo: (role) => STAFF_ROLES.includes(role) },
+      {
+        label: 'Support chat',
+        path: ROUTE_PATHS.SUPPORT,
+        Icon: ChatIcon,
+        isVisibleTo: (role) => role === USER_ROLES.CUSTOMER,
+      },
+      {
+        label: 'Support console',
+        path: ROUTE_PATHS.CONSOLE,
+        Icon: InboxIcon,
+        isVisibleTo: (role) => STAFF_ROLES.includes(role),
+      },
     ],
   },
   {
@@ -42,15 +67,35 @@ const NAVIGATION_SECTIONS = Object.freeze([
       { label: 'Attendance', path: ROUTE_PATHS.ATTENDANCE, Icon: MapPinIcon, isVisibleTo: () => true },
       { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, isVisibleTo: () => true },
       { label: 'Analytics hub', path: ROUTE_PATHS.ANALYTICS, Icon: ChartIcon, isVisibleTo: () => true },
-      { label: 'Organisation', path: ROUTE_PATHS.ORGANISATION, Icon: SitemapIcon, isVisibleTo: (role) => STAFF_ROLES.includes(role) },
-      { label: 'Onboarding', path: ROUTE_PATHS.ONBOARDING, Icon: UserPlusIcon, isVisibleTo: (role) => role === USER_ROLES.ADMIN || role === USER_ROLES.HR },
+      {
+        label: 'Organisation',
+        path: ROUTE_PATHS.ORGANISATION,
+        Icon: SitemapIcon,
+        isVisibleTo: (role) => STAFF_ROLES.includes(role),
+      },
+      {
+        label: 'Onboarding',
+        path: ROUTE_PATHS.ONBOARDING,
+        Icon: UserPlusIcon,
+        isVisibleTo: (role) => role === USER_ROLES.ADMIN || role === USER_ROLES.HR,
+      },
     ],
   },
   {
     sectionTitle: 'Administration',
     items: [
-      { label: 'Users & roles', path: ROUTE_PATHS.ADMIN_USERS, Icon: UsersIcon, isVisibleTo: (role) => role === USER_ROLES.ADMIN },
-      { label: 'Agent telemetry', path: ROUTE_PATHS.AGENT_TELEMETRY, Icon: TerminalIcon, isVisibleTo: (role) => role === USER_ROLES.ADMIN },
+      {
+        label: 'Users & roles',
+        path: ROUTE_PATHS.ADMIN_USERS,
+        Icon: UsersIcon,
+        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+      },
+      {
+        label: 'Agent telemetry',
+        path: ROUTE_PATHS.AGENT_TELEMETRY,
+        Icon: TerminalIcon,
+        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+      },
     ],
   },
   {
@@ -62,7 +107,8 @@ const NAVIGATION_SECTIONS = Object.freeze([
 /** "Ada Lovelace" -> "AL"; a single word gives one letter. */
 function computeInitials(fullName) {
   const nameParts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
-  const initials = nameParts.length > 1 ? nameParts[0][0] + nameParts[nameParts.length - 1][0] : (nameParts[0]?.[0] ?? '?');
+  const initials =
+    nameParts.length > 1 ? nameParts[0][0] + nameParts[nameParts.length - 1][0] : (nameParts[0]?.[0] ?? '?');
   return initials.toUpperCase();
 }
 
@@ -74,7 +120,9 @@ function SidebarNavigation({ userRole, onNavigate }) {
         if (visibleItems.length === 0) return null;
         return (
           <div key={navigationSection.sectionTitle}>
-            <p className="px-3 text-[0.68rem] font-semibold tracking-wider text-slate-500 uppercase">{navigationSection.sectionTitle}</p>
+            <p className="px-3 text-[0.68rem] font-semibold tracking-wider text-slate-500 uppercase">
+              {navigationSection.sectionTitle}
+            </p>
             <ul className="mt-2 space-y-1">
               {visibleItems.map(({ label, path, Icon }) => (
                 <li key={path}>
@@ -93,7 +141,9 @@ function SidebarNavigation({ userRole, onNavigate }) {
                   >
                     {({ isActive }) => (
                       <>
-                        <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-indigo-300' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                        <Icon
+                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-indigo-300' : 'text-slate-500 group-hover:text-slate-300'}`}
+                        />
                         {label}
                       </>
                     )}
@@ -112,7 +162,10 @@ function UserCard({ currentUser, isSigningOut, onSignOut }) {
   return (
     <div className="border-t border-white/10 p-3">
       <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 text-sm font-bold text-white" aria-hidden="true">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 text-sm font-bold text-white"
+          aria-hidden="true"
+        >
           {computeInitials(currentUser.name)}
         </span>
         <div className="min-w-0 flex-1">
@@ -197,7 +250,12 @@ export default function AppShell() {
       {/* Mobile drawer */}
       {isMobileNavOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
-          <button type="button" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" aria-label="Close navigation" onClick={closeMobileNav} />
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            aria-label="Close navigation"
+            onClick={closeMobileNav}
+          />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
             <SidebarContents
               currentUser={currentUser}
@@ -237,7 +295,12 @@ export default function AppShell() {
 
         {signOutError && (
           <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
-            <ErrorBanner title={BANNER_TITLES.SIGN_OUT_FAILED} message={signOutError.message} requestId={signOutError.requestId} onDismiss={() => setSignOutError(null)} />
+            <ErrorBanner
+              title={BANNER_TITLES.SIGN_OUT_FAILED}
+              message={signOutError.message}
+              requestId={signOutError.requestId}
+              onDismiss={() => setSignOutError(null)}
+            />
           </div>
         )}
 

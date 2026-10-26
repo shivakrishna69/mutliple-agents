@@ -11,7 +11,15 @@ import { escapeHtml } from './payslipHtmlTemplate.js';
  *           departmentName: string|null, inviteUrl: string, expiresAt: Date }} details
  * @returns {{ subject: string, html: string, text: string }}
  */
-export function buildInvitationEmail({ inviteeName, inviterName, companyName, designation, departmentName, inviteUrl, expiresAt }) {
+export function buildInvitationEmail({
+  inviteeName,
+  inviterName,
+  companyName,
+  designation,
+  departmentName,
+  inviteUrl,
+  expiresAt,
+}) {
   const expiryText = expiresAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
   const roleLine = departmentName ? `${designation}, ${departmentName}` : designation;
   const subject = `${inviterName} invited you to join ${companyName}`;

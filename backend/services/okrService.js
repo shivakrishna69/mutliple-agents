@@ -51,7 +51,9 @@ export class OkrError extends Error {
 export async function loadOkrViewer(user) {
   const ownProfile = await EmployeeProfile.findOne({ userId: user.id }).select('_id').lean();
   const profileId = ownProfile ? ownProfile._id.toString() : null;
-  const headedDepartments = profileId ? await Department.find({ departmentHeadId: profileId }).select('_id').lean() : [];
+  const headedDepartments = profileId
+    ? await Department.find({ departmentHeadId: profileId }).select('_id').lean()
+    : [];
   return {
     userId: user.id,
     isOrganisationWide: ORGANISATION_WIDE_ROLES.includes(user.role),
@@ -76,7 +78,10 @@ export function canManageObjective(viewer, objective) {
 }
 
 export function canUpdateKeyResult(viewer, keyResult, objective) {
-  return canManageObjective(viewer, objective) || Boolean(viewer.profileId && keyResult.ownerEmployeeId.toString() === viewer.profileId);
+  return (
+    canManageObjective(viewer, objective) ||
+    Boolean(viewer.profileId && keyResult.ownerEmployeeId.toString() === viewer.profileId)
+  );
 }
 
 // =================================================================================================
@@ -86,12 +91,20 @@ export function canUpdateKeyResult(viewer, keyResult, objective) {
 function weightedMean(progressEntries) {
   const totalWeight = progressEntries.reduce((runningTotal, entry) => runningTotal + entry.weight, 0);
   if (totalWeight === 0) return null;
-  return Math.round((progressEntries.reduce((runningTotal, entry) => runningTotal + entry.progress * entry.weight, 0) / totalWeight) * 10) / 10;
+  return (
+    Math.round(
+      (progressEntries.reduce((runningTotal, entry) => runningTotal + entry.progress * entry.weight, 0) / totalWeight) *
+        10,
+    ) / 10
+  );
 }
 
 function plainMean(values) {
   const presentValues = values.filter((value) => value !== null);
-  return presentValues.length ? Math.round((presentValues.reduce((runningTotal, value) => runningTotal + value, 0) / presentValues.length) * 10) / 10 : null;
+  return presentValues.length
+    ? Math.round((presentValues.reduce((runningTotal, value) => runningTotal + value, 0) / presentValues.length) * 10) /
+        10
+    : null;
 }
 
 // =================================================================================================
@@ -103,21 +116,56 @@ function plainMean(values) {
  * objectives grouped by department, each node carrying progress and the viewer's edit rights.
  */
 export async function buildAlignmentTree(viewer, { year, quarter }) {
-  const objectives = await Objective.find({ 'period.year': year, 'period.quarter': quarter, status: OKR_STATUSES.ACTIVE }).sort({ createdAt: 1 }).lean();
+  const objectives = await Objective.find({
+    'period.year': year,
+    'period.quarter': quarter,
+    status: OKR_STATUSES.ACTIVE,
+  })
+    .sort({ createdAt: 1 })
+    .lean();
   const objectiveIds = objectives.map((objective) => objective._id);
-  const keyResults = objectiveIds.length ? await KeyResult.find({ objectiveId: { $in: objectiveIds }, status: OKR_STATUSES.ACTIVE }).sort({ createdAt: 1 }).lean() : [];
+  const keyResults = objectiveIds.length
+    ? await KeyResult.find({ objectiveId: { $in: objectiveIds }, status: OKR_STATUSES.ACTIVE })
+        .sort({ createdAt: 1 })
+        .lean()
+    : [];
 
-  const ownerProfileIds = [...new Set([...objectives.map((objective) => objective.ownerEmployeeId.toString()), ...keyResults.map((keyResult) => keyResult.ownerEmployeeId.toString())])];
+  const ownerProfileIds = [
+    ...new Set([
+      ...objectives.map((objective) => objective.ownerEmployeeId.toString()),
+      ...keyResults.map((keyResult) => keyResult.ownerEmployeeId.toString()),
+    ]),
+  ];
   const [ownerProfiles, departments] = await Promise.all([
-    EmployeeProfile.find({ _id: { $in: ownerProfileIds } }).select('userId organizationData.designation').lean(),
-    Department.find({ _id: { $in: objectives.filter((objective) => objective.departmentId).map((objective) => objective.departmentId) } }).select('name code').lean(),
+    EmployeeProfile.find({ _id: { $in: ownerProfileIds } })
+      .select('userId organizationData.designation')
+      .lean(),
+    Department.find({
+      _id: { $in: objectives.filter((objective) => objective.departmentId).map((objective) => objective.departmentId) },
+    })
+      .select('name code')
+      .lean(),
   ]);
-  const ownerAccounts = await User.find({ _id: { $in: ownerProfiles.map((profile) => profile.userId) } }).select('name').lean();
+  const ownerAccounts = await User.find({ _id: { $in: ownerProfiles.map((profile) => profile.userId) } })
+    .select('name')
+    .lean();
   const accountNameById = new Map(ownerAccounts.map((account) => [account._id.toString(), account.name]));
   const personById = new Map(
-    ownerProfiles.map((profile) => [profile._id.toString(), { employeeId: profile._id.toString(), name: accountNameById.get(profile.userId.toString()) ?? null, designation: profile.organizationData.designation }]),
+    ownerProfiles.map((profile) => [
+      profile._id.toString(),
+      {
+        employeeId: profile._id.toString(),
+        name: accountNameById.get(profile.userId.toString()) ?? null,
+        designation: profile.organizationData.designation,
+      },
+    ]),
   );
-  const departmentById = new Map(departments.map((department) => [department._id.toString(), { departmentId: department._id.toString(), name: department.name, code: department.code }]));
+  const departmentById = new Map(
+    departments.map((department) => [
+      department._id.toString(),
+      { departmentId: department._id.toString(), name: department.name, code: department.code },
+    ]),
+  );
 
   const keyResultsByObjectiveId = new Map();
   for (const keyResult of keyResults) {
@@ -144,20 +192,33 @@ export async function buildAlignmentTree(viewer, { year, quarter }) {
       status: milestone.status,
       completedAt: milestone.completedAt ? new Date(milestone.completedAt).toISOString() : null,
     })),
-    milestoneSummary: { done: keyResult.milestones.filter((milestone) => milestone.status === MILESTONE_STATUSES.DONE).length, total: keyResult.milestones.length },
-    lastCheckIn: keyResult.checkIns.length ? { value: keyResult.checkIns.at(-1).value, note: keyResult.checkIns.at(-1).note, at: new Date(keyResult.checkIns.at(-1).at).toISOString() } : null,
+    milestoneSummary: {
+      done: keyResult.milestones.filter((milestone) => milestone.status === MILESTONE_STATUSES.DONE).length,
+      total: keyResult.milestones.length,
+    },
+    lastCheckIn: keyResult.checkIns.length
+      ? {
+          value: keyResult.checkIns.at(-1).value,
+          note: keyResult.checkIns.at(-1).note,
+          at: new Date(keyResult.checkIns.at(-1).at).toISOString(),
+        }
+      : null,
     canUpdate: canUpdateKeyResult(viewer, keyResult, objective),
   });
 
   const toObjectiveNode = (objective) => {
-    const keyResultNodes = (keyResultsByObjectiveId.get(objective._id.toString()) ?? []).map((keyResult) => toKeyResultNode(keyResult, objective));
+    const keyResultNodes = (keyResultsByObjectiveId.get(objective._id.toString()) ?? []).map((keyResult) =>
+      toKeyResultNode(keyResult, objective),
+    );
     return {
       id: objective._id.toString(),
       title: objective.title,
       description: objective.description,
       level: objective.level,
       owner: personById.get(objective.ownerEmployeeId.toString()) ?? null,
-      progress: weightedMean(keyResultNodes.map((keyResultNode) => ({ progress: keyResultNode.progress, weight: keyResultNode.weight }))),
+      progress: weightedMean(
+        keyResultNodes.map((keyResultNode) => ({ progress: keyResultNode.progress, weight: keyResultNode.weight })),
+      ),
       keyResults: keyResultNodes,
       canManage: canManageObjective(viewer, objective),
       version: objective.__v,
@@ -179,14 +240,25 @@ export async function buildAlignmentTree(viewer, { year, quarter }) {
       for (const teamObjective of teamObjectivesByParentId.get(companyObjective._id.toString()) ?? []) {
         const departmentKey = teamObjective.departmentId.toString();
         if (!teamNodesByDepartment.has(departmentKey)) {
-          teamNodesByDepartment.set(departmentKey, { department: departmentById.get(departmentKey) ?? { departmentId: departmentKey, name: null, code: null }, objectives: [] });
+          teamNodesByDepartment.set(departmentKey, {
+            department: departmentById.get(departmentKey) ?? { departmentId: departmentKey, name: null, code: null },
+            objectives: [],
+          });
         }
         teamNodesByDepartment.get(departmentKey).objectives.push(toObjectiveNode(teamObjective));
       }
       const teams = [...teamNodesByDepartment.values()];
-      for (const team of teams) team.progress = plainMean(team.objectives.map((objectiveNode) => objectiveNode.progress));
-      const alignedProgress = plainMean(teams.flatMap((team) => team.objectives.map((objectiveNode) => objectiveNode.progress)));
-      return { ...companyNode, alignedProgress, rollupProgress: plainMean([companyNode.progress, alignedProgress]), teams };
+      for (const team of teams)
+        team.progress = plainMean(team.objectives.map((objectiveNode) => objectiveNode.progress));
+      const alignedProgress = plainMean(
+        teams.flatMap((team) => team.objectives.map((objectiveNode) => objectiveNode.progress)),
+      );
+      return {
+        ...companyNode,
+        alignedProgress,
+        rollupProgress: plainMean([companyNode.progress, alignedProgress]),
+        teams,
+      };
     });
 
   return {
@@ -208,22 +280,36 @@ export async function buildAlignmentTree(viewer, { year, quarter }) {
 // =================================================================================================
 
 async function requireOwnerProfile(ownerEmployeeId) {
-  if (!(await EmployeeProfile.exists({ _id: ownerEmployeeId }))) throw new OkrError(400, 'OWNER_NOT_FOUND', 'ownerEmployeeId does not match an employee');
+  if (!(await EmployeeProfile.exists({ _id: ownerEmployeeId })))
+    throw new OkrError(400, 'OWNER_NOT_FOUND', 'ownerEmployeeId does not match an employee');
 }
 
 export async function createObjective(viewer, input) {
   const departmentId = input.level === OBJECTIVE_LEVELS.TEAM ? input.departmentId : null;
   if (!canCreateObjective(viewer, input.level, departmentId)) {
-    throw new OkrError(403, 'OKR_FORBIDDEN', input.level === OBJECTIVE_LEVELS.COMPANY ? 'Only HR and administrators can create company objectives' : 'Only HR, administrators and the department head can create team objectives');
+    throw new OkrError(
+      403,
+      'OKR_FORBIDDEN',
+      input.level === OBJECTIVE_LEVELS.COMPANY
+        ? 'Only HR and administrators can create company objectives'
+        : 'Only HR, administrators and the department head can create team objectives',
+    );
   }
   await requireOwnerProfile(input.ownerEmployeeId);
   if (input.level === OBJECTIVE_LEVELS.TEAM) {
-    if (!(await Department.exists({ _id: departmentId }))) throw new OkrError(404, 'DEPARTMENT_NOT_FOUND', 'Department not found');
+    if (!(await Department.exists({ _id: departmentId })))
+      throw new OkrError(404, 'DEPARTMENT_NOT_FOUND', 'Department not found');
     const parentObjective = await Objective.findById(input.parentObjectiveId).lean();
-    if (!parentObjective || parentObjective.level !== OBJECTIVE_LEVELS.COMPANY) throw new OkrError(400, 'PARENT_INVALID', 'parentObjectiveId must be a company objective');
-    if (parentObjective.status !== OKR_STATUSES.ACTIVE) throw new OkrError(409, 'PARENT_ARCHIVED', 'The company objective is archived');
+    if (!parentObjective || parentObjective.level !== OBJECTIVE_LEVELS.COMPANY)
+      throw new OkrError(400, 'PARENT_INVALID', 'parentObjectiveId must be a company objective');
+    if (parentObjective.status !== OKR_STATUSES.ACTIVE)
+      throw new OkrError(409, 'PARENT_ARCHIVED', 'The company objective is archived');
     if (parentObjective.period.year !== input.period.year || parentObjective.period.quarter !== input.period.quarter) {
-      throw new OkrError(400, 'PERIOD_MISMATCH', 'A team objective must be in the same quarter as its company objective');
+      throw new OkrError(
+        400,
+        'PERIOD_MISMATCH',
+        'A team objective must be in the same quarter as its company objective',
+      );
     }
   }
   return Objective.create({
@@ -242,8 +328,10 @@ export async function createObjective(viewer, input) {
 async function loadManagedObjective(viewer, objectiveId, expectedVersion) {
   const objective = await Objective.findById(objectiveId);
   if (!objective) throw new OkrError(404, 'OBJECTIVE_NOT_FOUND', 'Objective not found');
-  if (!canManageObjective(viewer, objective)) throw new OkrError(403, 'OKR_FORBIDDEN', 'You cannot change this objective');
-  if (expectedVersion !== undefined && objective.__v !== expectedVersion) throw new OkrError(409, 'STALE_VERSION', 'This objective was changed by someone else. Reload and try again');
+  if (!canManageObjective(viewer, objective))
+    throw new OkrError(403, 'OKR_FORBIDDEN', 'You cannot change this objective');
+  if (expectedVersion !== undefined && objective.__v !== expectedVersion)
+    throw new OkrError(409, 'STALE_VERSION', 'This objective was changed by someone else. Reload and try again');
   return objective;
 }
 
@@ -258,10 +346,15 @@ export async function updateObjective(viewer, objectiveId, changes) {
 
 export async function addKeyResult(viewer, objectiveId, input) {
   const objective = await loadManagedObjective(viewer, objectiveId);
-  if (objective.status !== OKR_STATUSES.ACTIVE) throw new OkrError(409, 'OBJECTIVE_ARCHIVED', 'The objective is archived');
+  if (objective.status !== OKR_STATUSES.ACTIVE)
+    throw new OkrError(409, 'OBJECTIVE_ARCHIVED', 'The objective is archived');
   const activeCount = await KeyResult.countDocuments({ objectiveId, status: OKR_STATUSES.ACTIVE });
   if (activeCount >= OKR_FIELD_LIMITS.MAX_KEY_RESULTS_PER_OBJECTIVE) {
-    throw new OkrError(409, 'TOO_MANY_KEY_RESULTS', `An objective can have at most ${OKR_FIELD_LIMITS.MAX_KEY_RESULTS_PER_OBJECTIVE} key results`);
+    throw new OkrError(
+      409,
+      'TOO_MANY_KEY_RESULTS',
+      `An objective can have at most ${OKR_FIELD_LIMITS.MAX_KEY_RESULTS_PER_OBJECTIVE} key results`,
+    );
   }
   await requireOwnerProfile(input.ownerEmployeeId);
   return KeyResult.create({
@@ -273,7 +366,10 @@ export async function addKeyResult(viewer, objectiveId, input) {
     targetValue: input.targetValue,
     currentValue: input.startValue,
     weight: input.weight,
-    milestones: (input.milestones ?? []).map((milestone) => ({ title: milestone.title, dueDate: milestone.dueDate ?? null })),
+    milestones: (input.milestones ?? []).map((milestone) => ({
+      title: milestone.title,
+      dueDate: milestone.dueDate ?? null,
+    })),
   });
 }
 
@@ -282,9 +378,12 @@ async function loadUpdatableKeyResult(viewer, keyResultId, expectedVersion) {
   const keyResult = await KeyResult.findById(keyResultId);
   if (!keyResult) throw new OkrError(404, 'KEY_RESULT_NOT_FOUND', 'Key result not found');
   const objective = await Objective.findById(keyResult.objectiveId).lean();
-  if (!canUpdateKeyResult(viewer, keyResult, objective)) throw new OkrError(403, 'OKR_FORBIDDEN', 'You cannot update this key result');
-  if (keyResult.status !== OKR_STATUSES.ACTIVE || objective.status !== OKR_STATUSES.ACTIVE) throw new OkrError(409, 'KEY_RESULT_ARCHIVED', 'This key result is archived');
-  if (expectedVersion !== undefined && keyResult.__v !== expectedVersion) throw new OkrError(409, 'STALE_VERSION', 'This key result was updated by someone else. Reload and try again');
+  if (!canUpdateKeyResult(viewer, keyResult, objective))
+    throw new OkrError(403, 'OKR_FORBIDDEN', 'You cannot update this key result');
+  if (keyResult.status !== OKR_STATUSES.ACTIVE || objective.status !== OKR_STATUSES.ACTIVE)
+    throw new OkrError(409, 'KEY_RESULT_ARCHIVED', 'This key result is archived');
+  if (expectedVersion !== undefined && keyResult.__v !== expectedVersion)
+    throw new OkrError(409, 'STALE_VERSION', 'This key result was updated by someone else. Reload and try again');
   return keyResult;
 }
 
@@ -293,7 +392,8 @@ async function saveVersioned(document) {
   try {
     return await document.save();
   } catch (saveError) {
-    if (saveError instanceof mongoose.Error.VersionError) throw new OkrError(409, 'STALE_VERSION', 'This item was changed by someone else. Reload and try again');
+    if (saveError instanceof mongoose.Error.VersionError)
+      throw new OkrError(409, 'STALE_VERSION', 'This item was changed by someone else. Reload and try again');
     throw saveError;
   }
 }
@@ -305,7 +405,12 @@ async function saveVersioned(document) {
  */
 export async function updateKeyResultProgress(viewer, keyResultId, { currentValue, progressPercent, note, version }) {
   const keyResult = await loadUpdatableKeyResult(viewer, keyResultId, version);
-  const nextValue = currentValue !== undefined ? currentValue : Math.round((keyResult.startValue + ((keyResult.targetValue - keyResult.startValue) * progressPercent) / 100) * 100) / 100;
+  const nextValue =
+    currentValue !== undefined
+      ? currentValue
+      : Math.round(
+          (keyResult.startValue + ((keyResult.targetValue - keyResult.startValue) * progressPercent) / 100) * 100,
+        ) / 100;
   keyResult.currentValue = nextValue;
   keyResult.checkIns.push({ value: nextValue, note: note ?? null, byUserId: viewer.userId, at: new Date() });
   return saveVersioned(keyResult);
@@ -314,7 +419,11 @@ export async function updateKeyResultProgress(viewer, keyResultId, { currentValu
 export async function addMilestone(viewer, keyResultId, { title, dueDate, version }) {
   const keyResult = await loadUpdatableKeyResult(viewer, keyResultId, version);
   if (keyResult.milestones.length >= OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT) {
-    throw new OkrError(409, 'TOO_MANY_MILESTONES', `A key result can have at most ${OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT} milestones`);
+    throw new OkrError(
+      409,
+      'TOO_MANY_MILESTONES',
+      `A key result can have at most ${OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT} milestones`,
+    );
   }
   keyResult.milestones.push({ title, dueDate: dueDate ?? null });
   return saveVersioned(keyResult);

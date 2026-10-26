@@ -25,6 +25,12 @@ export default function MessageText({ text }) {
   }
 
   return textSegments.map((textSegment, segmentIndex) =>
-    textSegment.isBold ? <strong key={segmentIndex} className="font-semibold">{textSegment.value}</strong> : textSegment.value,
+    textSegment.isBold ? (
+      <strong key={segmentIndex} className="font-semibold">
+        {textSegment.value}
+      </strong>
+    ) : (
+      textSegment.value
+    ),
   );
 }

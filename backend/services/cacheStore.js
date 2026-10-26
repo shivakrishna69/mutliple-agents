@@ -120,8 +120,12 @@ export async function initCacheStore({ redisUrl }) {
     },
   });
   // node-redis reports connection failures as 'error' events; an unhandled one would crash the process.
-  redisClient.on('error', (redisError) => logger.error('Redis cache connection error', { redisUrl: redactedRedisUrl, error: redisError.message }));
-  redisClient.on('reconnecting', () => logger.warn('Redis cache connection reconnecting', { redisUrl: redactedRedisUrl }));
+  redisClient.on('error', (redisError) =>
+    logger.error('Redis cache connection error', { redisUrl: redactedRedisUrl, error: redisError.message }),
+  );
+  redisClient.on('reconnecting', () =>
+    logger.warn('Redis cache connection reconnecting', { redisUrl: redactedRedisUrl }),
+  );
 
   try {
     await redisClient.connect();
@@ -166,7 +170,9 @@ export async function getCachedJson(cacheKey) {
   if (!activeBackend) return null;
   try {
     const serializedValue =
-      activeBackend.kind === 'redis' ? await withTimeout('get', activeBackend.client.get(cacheKey)) : readMemoryEntry(cacheKey);
+      activeBackend.kind === 'redis'
+        ? await withTimeout('get', activeBackend.client.get(cacheKey))
+        : readMemoryEntry(cacheKey);
     return serializedValue === null ? null : JSON.parse(serializedValue);
   } catch (readError) {
     logger.warn('Cache read failed; falling back to the source', { cacheKey, error: readError.message });
@@ -180,7 +186,10 @@ export async function setCachedJson(cacheKey, cacheValue, ttlSeconds) {
   try {
     const serializedValue = JSON.stringify(cacheValue);
     if (activeBackend.kind === 'redis') {
-      await withTimeout('set', activeBackend.client.set(cacheKey, serializedValue, { expiration: { type: 'EX', value: ttlSeconds } }));
+      await withTimeout(
+        'set',
+        activeBackend.client.set(cacheKey, serializedValue, { expiration: { type: 'EX', value: ttlSeconds } }),
+      );
     } else {
       writeMemoryEntry(cacheKey, serializedValue, ttlSeconds);
     }
@@ -199,7 +208,9 @@ export async function getCounter(counterKey) {
   if (!activeBackend) return null;
   try {
     const counterValue =
-      activeBackend.kind === 'redis' ? await withTimeout('get', activeBackend.client.get(counterKey)) : String(activeBackend.counters.get(counterKey) ?? 0);
+      activeBackend.kind === 'redis'
+        ? await withTimeout('get', activeBackend.client.get(counterKey))
+        : String(activeBackend.counters.get(counterKey) ?? 0);
     const parsedCounter = counterValue === null ? 0 : Number.parseInt(counterValue, 10);
     return Number.isSafeInteger(parsedCounter) ? parsedCounter : 0;
   } catch (readError) {

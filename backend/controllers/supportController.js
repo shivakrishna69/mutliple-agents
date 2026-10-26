@@ -39,16 +39,29 @@ export async function sendCustomerMessage(req, res, next) {
     const textValidation = validateAgentReplyInput(req.body);
     const rawClientMessageId = req.body?.clientMessageId;
     const validationErrors = [...textValidation.validationErrors];
-    if (rawClientMessageId !== undefined && !(typeof rawClientMessageId === 'string' && CLIENT_MESSAGE_ID_PATTERN.test(rawClientMessageId))) {
+    if (
+      rawClientMessageId !== undefined &&
+      !(typeof rawClientMessageId === 'string' && CLIENT_MESSAGE_ID_PATTERN.test(rawClientMessageId))
+    ) {
       validationErrors.push({ field: 'clientMessageId', message: SUPPORT_MESSAGES.CLIENT_MESSAGE_ID_INVALID });
     }
     if (validationErrors.length > 0) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED, validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED,
+        validationErrors,
+      );
     }
 
     const eventId = `web:${req.user.id}:${rawClientMessageId ?? randomUUID()}`;
     const logContext = { requestId: req.id, eventId, customerId: req.user.id };
-    logger.info('Web chat message received', { ...logContext, stage: 'ingested', textLength: textValidation.sanitizedInput.text.length });
+    logger.info('Web chat message received', {
+      ...logContext,
+      stage: 'ingested',
+      textLength: textValidation.sanitizedInput.text.length,
+    });
 
     const processingResult = await ingestCustomerMessage({
       customerId: req.user.id,

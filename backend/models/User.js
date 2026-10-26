@@ -134,12 +134,20 @@ userSchema.methods.comparePassword = async function comparePassword(candidatePas
  * and do not invalidate it. Hooks are awaited and never throw (services/orgHierarchyCache.js).
  */
 const USER_UPDATE_QUERY_OPERATIONS = ['updateOne', 'updateMany', 'findOneAndUpdate'];
-const USER_REPLACE_OR_DELETE_OPERATIONS = ['replaceOne', 'findOneAndReplace', 'deleteOne', 'deleteMany', 'findOneAndDelete'];
+const USER_REPLACE_OR_DELETE_OPERATIONS = [
+  'replaceOne',
+  'findOneAndReplace',
+  'deleteOne',
+  'deleteMany',
+  'findOneAndDelete',
+];
 
 /** True when a query update writes `name` (top level or inside an operator such as $set). */
 function updateTouchesName(update) {
-  return Object.entries(update ?? {}).some(([updateKey, updateValue]) =>
-    updateKey === 'name' || (updateKey.startsWith('$') && updateValue !== null && typeof updateValue === 'object' && 'name' in updateValue),
+  return Object.entries(update ?? {}).some(
+    ([updateKey, updateValue]) =>
+      updateKey === 'name' ||
+      (updateKey.startsWith('$') && updateValue !== null && typeof updateValue === 'object' && 'name' in updateValue),
   );
 }
 

@@ -31,7 +31,20 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { USER_ROLES } from '../../constants/routes.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { FlagIcon, PlusIcon, TargetIcon } from '../Icons.jsx';
-import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, ProgressBar, SelectInput, TextInput, formatDate, formatInr, progressTone } from '../ui.jsx';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  LoadingBlock,
+  Notice,
+  ProgressBar,
+  SelectInput,
+  TextInput,
+  formatDate,
+  formatInr,
+  progressTone,
+} from '../ui.jsx';
 
 /** Keyboard slider changes are saved this long after the last key press, as one update. */
 const KEYBOARD_COMMIT_DELAY_MS = 600;
@@ -61,11 +74,19 @@ function ProgressRing({ value, size = 56, onDark = false }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const safeValue = Math.max(0, Math.min(100, value ?? 0));
-  const strokeClassName = { emerald: 'stroke-emerald-500', amber: 'stroke-amber-500', rose: 'stroke-rose-500' }[progressTone(safeValue)];
+  const strokeClassName = { emerald: 'stroke-emerald-500', amber: 'stroke-amber-500', rose: 'stroke-rose-500' }[
+    progressTone(safeValue)
+  ];
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={radius} className={`fill-none ${onDark ? "stroke-white/15" : "stroke-slate-100"}`} strokeWidth={strokeWidth} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          className={`fill-none ${onDark ? 'stroke-white/15' : 'stroke-slate-100'}`}
+          strokeWidth={strokeWidth}
+        />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -77,7 +98,11 @@ function ProgressRing({ value, size = 56, onDark = false }) {
           strokeDashoffset={circumference * (1 - safeValue / 100)}
         />
       </svg>
-      <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${onDark ? "text-white" : "text-slate-800"}`}>{Math.round(safeValue)}%</span>
+      <span
+        className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${onDark ? 'text-white' : 'text-slate-800'}`}
+      >
+        {Math.round(safeValue)}%
+      </span>
     </div>
   );
 }
@@ -100,7 +125,12 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
     setOptimisticStatusById((previousStatuses) => ({ ...previousStatuses, [milestone.id]: nextStatus }));
     setBusyMilestoneId(milestone.id);
     try {
-      await requestMilestoneUpdate(keyResult.id, milestone.id, { status: nextStatus, version: keyResult.version }, csrfToken);
+      await requestMilestoneUpdate(
+        keyResult.id,
+        milestone.id,
+        { status: nextStatus, version: keyResult.version },
+        csrfToken,
+      );
       onChanged();
     } catch (milestoneError) {
       setOptimisticStatusById((previousStatuses) => {
@@ -118,7 +148,11 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
     if (!newTitle.trim()) return;
     setBusyMilestoneId('new');
     try {
-      await requestMilestoneCreation(keyResult.id, { title: newTitle.trim(), ...(newDueDate && { dueDate: newDueDate }), version: keyResult.version }, csrfToken);
+      await requestMilestoneCreation(
+        keyResult.id,
+        { title: newTitle.trim(), ...(newDueDate && { dueDate: newDueDate }), version: keyResult.version },
+        csrfToken,
+      );
       setNewTitle('');
       setNewDueDate('');
       onChanged();
@@ -132,7 +166,10 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
   return (
     <div className="mt-3 space-y-1.5">
       {keyResult.milestones.map((milestone) => (
-        <label key={milestone.id} className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm ${keyResult.canUpdate ? 'cursor-pointer hover:bg-slate-50' : ''}`}>
+        <label
+          key={milestone.id}
+          className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm ${keyResult.canUpdate ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+        >
           <input
             type="checkbox"
             checked={statusOf(milestone) === 'done'}
@@ -140,8 +177,14 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
             onChange={() => toggleMilestone(milestone)}
             className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
           />
-          <span className={statusOf(milestone) === 'done' ? 'text-slate-400 line-through' : 'text-slate-700'}>{milestone.title}</span>
-          {milestone.dueDate && <span className="ml-auto text-xs text-slate-400">{formatDate(milestone.dueDate, { day: 'numeric', month: 'short' })}</span>}
+          <span className={statusOf(milestone) === 'done' ? 'text-slate-400 line-through' : 'text-slate-700'}>
+            {milestone.title}
+          </span>
+          {milestone.dueDate && (
+            <span className="ml-auto text-xs text-slate-400">
+              {formatDate(milestone.dueDate, { day: 'numeric', month: 'short' })}
+            </span>
+          )}
         </label>
       ))}
       {keyResult.canUpdate && (
@@ -154,8 +197,20 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
             aria-label="New milestone title"
             className="min-w-0 flex-1 rounded-lg border-0 bg-slate-50 px-3 py-1.5 text-xs ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
-          <input type="date" value={newDueDate} onChange={(changeEvent) => setNewDueDate(changeEvent.target.value)} aria-label="Due date" className="rounded-lg border-0 bg-slate-50 px-2 py-1.5 text-xs ring-1 ring-slate-200 ring-inset" />
-          <Button size="sm" variant="secondary" type="submit" isBusy={busyMilestoneId === 'new'} disabled={!newTitle.trim()}>
+          <input
+            type="date"
+            value={newDueDate}
+            onChange={(changeEvent) => setNewDueDate(changeEvent.target.value)}
+            aria-label="Due date"
+            className="rounded-lg border-0 bg-slate-50 px-2 py-1.5 text-xs ring-1 ring-slate-200 ring-inset"
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            type="submit"
+            isBusy={busyMilestoneId === 'new'}
+            disabled={!newTitle.trim()}
+          >
             Add
           </Button>
         </form>
@@ -197,7 +252,11 @@ function KeyResultRow({ keyResult, onChanged, reportError }) {
     isCommittingRef.current = true;
     setIsSaving(true);
     try {
-      await requestKeyResultProgress(keyResult.id, { progressPercent: percentToSave, version: keyResult.version }, csrfToken);
+      await requestKeyResultProgress(
+        keyResult.id,
+        { progressPercent: percentToSave, version: keyResult.version },
+        csrfToken,
+      );
       onChanged();
     } catch (progressError) {
       reportError(progressError);
@@ -214,12 +273,15 @@ function KeyResultRow({ keyResult, onChanged, reportError }) {
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-900">{keyResult.title}</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            {formatUnitValue(keyResult.currentValue, keyResult.unit)} of {formatUnitValue(keyResult.targetValue, keyResult.unit)}
+            {formatUnitValue(keyResult.currentValue, keyResult.unit)} of{' '}
+            {formatUnitValue(keyResult.targetValue, keyResult.unit)}
             {keyResult.owner?.name && ` · ${keyResult.owner.name}`}
             {keyResult.weight > 1 && ` · weight ${keyResult.weight}`}
           </p>
         </div>
-        <span className={`shrink-0 text-sm font-bold tabular-nums ${{ emerald: 'text-emerald-600', amber: 'text-amber-600', rose: 'text-rose-600' }[progressTone(displayedPercent)]}`}>
+        <span
+          className={`shrink-0 text-sm font-bold tabular-nums ${{ emerald: 'text-emerald-600', amber: 'text-amber-600', rose: 'text-rose-600' }[progressTone(displayedPercent)]}`}
+        >
           {isSaving ? '…' : `${Math.round(displayedPercent)}%`}
         </span>
       </div>
@@ -234,19 +296,36 @@ function KeyResultRow({ keyResult, onChanged, reportError }) {
             disabled={isSaving}
             onChange={(changeEvent) => updateDraft(Number(changeEvent.target.value))}
             onPointerUp={commitProgress}
-            onKeyUp={(keyEvent) => ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(keyEvent.key) && scheduleKeyboardCommit()}
+            onKeyUp={(keyEvent) =>
+              ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(
+                keyEvent.key,
+              ) && scheduleKeyboardCommit()
+            }
             onBlur={commitProgress}
             aria-label={`Progress for ${keyResult.title}`}
             className="h-2 w-full cursor-pointer accent-indigo-600"
           />
         ) : (
-          <ProgressBar value={keyResult.progress} tone={progressTone(keyResult.progress)} label={`Progress for ${keyResult.title}`} />
+          <ProgressBar
+            value={keyResult.progress}
+            tone={progressTone(keyResult.progress)}
+            label={`Progress for ${keyResult.title}`}
+          />
         )}
       </div>
-      <button type="button" onClick={() => setIsExpanded((wasExpanded) => !wasExpanded)} className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-500" aria-expanded={isExpanded}>
+      <button
+        type="button"
+        onClick={() => setIsExpanded((wasExpanded) => !wasExpanded)}
+        className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-500"
+        aria-expanded={isExpanded}
+      >
         Milestones {keyResult.milestoneSummary.done}/{keyResult.milestoneSummary.total} {isExpanded ? '▴' : '▾'}
       </button>
-      {keyResult.lastCheckIn?.note && isExpanded && <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600">Last check-in: “{keyResult.lastCheckIn.note}”</p>}
+      {keyResult.lastCheckIn?.note && isExpanded && (
+        <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-600">
+          Last check-in: “{keyResult.lastCheckIn.note}”
+        </p>
+      )}
       {isExpanded && <MilestoneList keyResult={keyResult} onChanged={onChanged} reportError={reportError} />}
     </div>
   );
@@ -254,7 +333,14 @@ function KeyResultRow({ keyResult, onChanged, reportError }) {
 
 function AddKeyResultForm({ objective, ownerOptions, defaultOwnerId, onCreated, onCancel }) {
   const { csrfToken } = useAuth();
-  const [form, setForm] = useState({ title: '', unit: 'percent', startValue: '0', targetValue: '100', weight: '1', ownerEmployeeId: defaultOwnerId ?? ownerOptions[0]?.value ?? '' });
+  const [form, setForm] = useState({
+    title: '',
+    unit: 'percent',
+    startValue: '0',
+    targetValue: '100',
+    weight: '1',
+    ownerEmployeeId: defaultOwnerId ?? ownerOptions[0]?.value ?? '',
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const update = (fieldName) => (changeEvent) => setForm({ ...form, [fieldName]: changeEvent.target.value });
@@ -266,7 +352,14 @@ function AddKeyResultForm({ objective, ownerOptions, defaultOwnerId, onCreated, 
     try {
       await requestKeyResultCreation(
         objective.id,
-        { title: form.title.trim(), unit: form.unit, startValue: Number(form.startValue), targetValue: Number(form.targetValue), weight: Number(form.weight), ownerEmployeeId: form.ownerEmployeeId },
+        {
+          title: form.title.trim(),
+          unit: form.unit,
+          startValue: Number(form.startValue),
+          targetValue: Number(form.targetValue),
+          weight: Number(form.weight),
+          ownerEmployeeId: form.ownerEmployeeId,
+        },
         csrfToken,
       );
       onCreated();
@@ -279,14 +372,42 @@ function AddKeyResultForm({ objective, ownerOptions, defaultOwnerId, onCreated, 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 rounded-xl bg-indigo-50/60 p-4 ring-1 ring-indigo-100">
-      <TextInput label="Key result" value={form.title} onChange={update('title')} placeholder="e.g. Raise CSAT from 78% to 90%" error={formError?.fieldErrors?.title} required />
+      <TextInput
+        label="Key result"
+        value={form.title}
+        onChange={update('title')}
+        placeholder="e.g. Raise CSAT from 78% to 90%"
+        error={formError?.fieldErrors?.title}
+        required
+      />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SelectInput label="Unit" value={form.unit} onChange={update('unit')} options={KEY_RESULT_UNITS} />
-        <TextInput label="Start" type="number" step="any" value={form.startValue} onChange={update('startValue')} error={formError?.fieldErrors?.startValue} />
-        <TextInput label="Target" type="number" step="any" value={form.targetValue} onChange={update('targetValue')} error={formError?.fieldErrors?.targetValue} />
+        <TextInput
+          label="Start"
+          type="number"
+          step="any"
+          value={form.startValue}
+          onChange={update('startValue')}
+          error={formError?.fieldErrors?.startValue}
+        />
+        <TextInput
+          label="Target"
+          type="number"
+          step="any"
+          value={form.targetValue}
+          onChange={update('targetValue')}
+          error={formError?.fieldErrors?.targetValue}
+        />
         <TextInput label="Weight" type="number" min="1" max="10" value={form.weight} onChange={update('weight')} />
       </div>
-      {ownerOptions.length > 0 && <SelectInput label="Owner" value={form.ownerEmployeeId} onChange={update('ownerEmployeeId')} options={ownerOptions} />}
+      {ownerOptions.length > 0 && (
+        <SelectInput
+          label="Owner"
+          value={form.ownerEmployeeId}
+          onChange={update('ownerEmployeeId')}
+          options={ownerOptions}
+        />
+      )}
       {formError && <Notice tone="error" title={formError.message} />}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>
@@ -324,12 +445,23 @@ function ObjectiveBody({ objective, ownerOptions, defaultOwnerId, onChanged, rep
 
   return (
     <div className="space-y-2.5">
-      {objective.keyResults.length === 0 && !isAddingKeyResult && <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">No key results yet.</p>}
+      {objective.keyResults.length === 0 && !isAddingKeyResult && (
+        <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">No key results yet.</p>
+      )}
       {objective.keyResults.map((keyResult) => (
         <KeyResultRow key={keyResult.id} keyResult={keyResult} onChanged={onChanged} reportError={reportError} />
       ))}
       {isAddingKeyResult && (
-        <AddKeyResultForm objective={objective} ownerOptions={ownerOptions} defaultOwnerId={defaultOwnerId} onCreated={() => { setIsAddingKeyResult(false); onChanged(); }} onCancel={() => setIsAddingKeyResult(false)} />
+        <AddKeyResultForm
+          objective={objective}
+          ownerOptions={ownerOptions}
+          defaultOwnerId={defaultOwnerId}
+          onCreated={() => {
+            setIsAddingKeyResult(false);
+            onChanged();
+          }}
+          onCancel={() => setIsAddingKeyResult(false)}
+        />
       )}
       {objective.canManage && !isAddingKeyResult && (
         <div className="flex gap-2 pt-1">
@@ -345,7 +477,15 @@ function ObjectiveBody({ objective, ownerOptions, defaultOwnerId, onChanged, rep
   );
 }
 
-function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChanged, reportError, onAddTeamObjective, canAddTeamObjective }) {
+function CompanyObjectiveNode({
+  objective,
+  ownerOptions,
+  defaultOwnerId,
+  onChanged,
+  reportError,
+  onAddTeamObjective,
+  canAddTeamObjective,
+}) {
   return (
     <article className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70">
       <header className="relative bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 px-6 py-5 text-white">
@@ -356,7 +496,11 @@ function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChang
             <h3 className="mt-2 text-lg font-bold">{objective.title}</h3>
             {objective.description && <p className="mt-1 text-sm text-slate-300">{objective.description}</p>}
             <p className="mt-2 text-xs text-slate-400">
-              Owner {objective.owner?.name ?? '—'} · own key results {Math.round(objective.progress ?? 0)}% · aligned teams {objective.alignedProgress === null || objective.alignedProgress === undefined ? '—' : `${Math.round(objective.alignedProgress)}%`}
+              Owner {objective.owner?.name ?? '—'} · own key results {Math.round(objective.progress ?? 0)}% · aligned
+              teams{' '}
+              {objective.alignedProgress === null || objective.alignedProgress === undefined
+                ? '—'
+                : `${Math.round(objective.alignedProgress)}%`}
             </p>
           </div>
         </div>
@@ -364,7 +508,13 @@ function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChang
       <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <div>
           <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Company key results</p>
-          <ObjectiveBody objective={objective} ownerOptions={ownerOptions} defaultOwnerId={defaultOwnerId} onChanged={onChanged} reportError={reportError} />
+          <ObjectiveBody
+            objective={objective}
+            ownerOptions={ownerOptions}
+            defaultOwnerId={defaultOwnerId}
+            onChanged={onChanged}
+            reportError={reportError}
+          />
         </div>
         <div>
           <div className="mb-2 flex items-center justify-between">
@@ -376,7 +526,11 @@ function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChang
             )}
           </div>
           {objective.teams.length === 0 ? (
-            <EmptyState Icon={FlagIcon} title="No team has aligned yet" description="Team objectives that support this goal appear here." />
+            <EmptyState
+              Icon={FlagIcon}
+              title="No team has aligned yet"
+              description="Team objectives that support this goal appear here."
+            />
           ) : (
             // Connector: a rail on the left with a tick per team node.
             <div className="relative space-y-4 border-l-2 border-dashed border-indigo-200 pl-5">
@@ -386,9 +540,14 @@ function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChang
                   <div className="rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/70">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-semibold text-slate-900">
-                        {team.department.name ?? 'Team'} {team.department.code && <span className="text-xs font-normal text-slate-400">· {team.department.code}</span>}
+                        {team.department.name ?? 'Team'}{' '}
+                        {team.department.code && (
+                          <span className="text-xs font-normal text-slate-400">· {team.department.code}</span>
+                        )}
                       </p>
-                      <span className="text-sm font-bold text-slate-700 tabular-nums">{Math.round(team.progress ?? 0)}%</span>
+                      <span className="text-sm font-bold text-slate-700 tabular-nums">
+                        {Math.round(team.progress ?? 0)}%
+                      </span>
                     </div>
                     <div className="mt-3 space-y-4">
                       {team.objectives.map((teamObjective) => (
@@ -400,7 +559,13 @@ function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChang
                               <p className="text-xs text-slate-500">Owner {teamObjective.owner?.name ?? '—'}</p>
                             </div>
                           </div>
-                          <ObjectiveBody objective={teamObjective} ownerOptions={ownerOptions} defaultOwnerId={defaultOwnerId} onChanged={onChanged} reportError={reportError} />
+                          <ObjectiveBody
+                            objective={teamObjective}
+                            ownerOptions={ownerOptions}
+                            defaultOwnerId={defaultOwnerId}
+                            onChanged={onChanged}
+                            reportError={reportError}
+                          />
                         </div>
                       ))}
                     </div>
@@ -415,9 +580,23 @@ function CompanyObjectiveNode({ objective, ownerOptions, defaultOwnerId, onChang
   );
 }
 
-function ObjectiveComposer({ level, parentObjective, period, departmentOptions, ownerOptions, defaultOwnerId, onCreated, onCancel }) {
+function ObjectiveComposer({
+  level,
+  parentObjective,
+  period,
+  departmentOptions,
+  ownerOptions,
+  defaultOwnerId,
+  onCreated,
+  onCancel,
+}) {
   const { csrfToken } = useAuth();
-  const [form, setForm] = useState({ title: '', description: '', departmentId: departmentOptions[0]?.value ?? '', ownerEmployeeId: defaultOwnerId ?? ownerOptions[0]?.value ?? '' });
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    departmentId: departmentOptions[0]?.value ?? '',
+    ownerEmployeeId: defaultOwnerId ?? ownerOptions[0]?.value ?? '',
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const update = (fieldName) => (changeEvent) => setForm({ ...form, [fieldName]: changeEvent.target.value });
@@ -447,20 +626,53 @@ function ObjectiveComposer({ level, parentObjective, period, departmentOptions, 
   }
 
   return (
-    <Card title={level === 'company' ? 'New company objective' : `New team objective under “${parentObjective.title}”`} subtitle={`Q${period.quarter} ${period.year}`}>
+    <Card
+      title={level === 'company' ? 'New company objective' : `New team objective under “${parentObjective.title}”`}
+      subtitle={`Q${period.quarter} ${period.year}`}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <TextInput label="Objective" value={form.title} onChange={update('title')} placeholder="An ambitious, qualitative goal" error={formError?.fieldErrors?.title} required />
-        <TextInput label="Description (optional)" value={form.description} onChange={update('description')} maxLength={2000} />
+        <TextInput
+          label="Objective"
+          value={form.title}
+          onChange={update('title')}
+          placeholder="An ambitious, qualitative goal"
+          error={formError?.fieldErrors?.title}
+          required
+        />
+        <TextInput
+          label="Description (optional)"
+          value={form.description}
+          onChange={update('description')}
+          maxLength={2000}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
-          {level === 'team' && <SelectInput label="Team" value={form.departmentId} onChange={update('departmentId')} options={departmentOptions} />}
-          {ownerOptions.length > 0 && <SelectInput label="Owner" value={form.ownerEmployeeId} onChange={update('ownerEmployeeId')} options={ownerOptions} />}
+          {level === 'team' && (
+            <SelectInput
+              label="Team"
+              value={form.departmentId}
+              onChange={update('departmentId')}
+              options={departmentOptions}
+            />
+          )}
+          {ownerOptions.length > 0 && (
+            <SelectInput
+              label="Owner"
+              value={form.ownerEmployeeId}
+              onChange={update('ownerEmployeeId')}
+              options={ownerOptions}
+            />
+          )}
         </div>
         {formError && <Notice tone="error" title={formError.message} />}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" isBusy={isSaving} disabled={!form.title.trim() || !form.ownerEmployeeId || (level === 'team' && !form.departmentId)}>
+          <Button
+            type="submit"
+            isBusy={isSaving}
+            disabled={!form.title.trim() || !form.ownerEmployeeId || (level === 'team' && !form.departmentId)}
+          >
             Create objective
           </Button>
         </div>
@@ -479,29 +691,51 @@ export default function OkrAlignmentCanvas() {
   const [period, setPeriod] = useState(currentQuarter);
   const [composer, setComposer] = useState(null); // { level, parentObjective? }
   const [actionError, setActionError] = useState(null);
-  const { data, error, isLoading, reload } = useApiResource((signal) => requestOkrAlignment(period, signal), [period.year, period.quarter]);
-  const rosterResource = useApiResource((signal) => requestWorkforceRisk({ limit: 500 }, signal), [], { enabled: isOrganisationWide });
+  const { data, error, isLoading, reload } = useApiResource(
+    (signal) => requestOkrAlignment(period, signal),
+    [period.year, period.quarter],
+  );
+  const rosterResource = useApiResource((signal) => requestWorkforceRisk({ limit: 500 }, signal), [], {
+    enabled: isOrganisationWide,
+  });
 
   const viewerEmployeeId = data?.meta?.viewerEmployeeId ?? null;
   const ownerOptions = useMemo(() => {
     const rosterOptions = [...(rosterResource.data?.employees ?? [])]
       .sort((first, second) => (first.name ?? '').localeCompare(second.name ?? ''))
-      .map((employee) => ({ value: employee.employeeId, label: `${employee.name ?? 'Unnamed'}${employee.employeeId === viewerEmployeeId ? ' (you)' : ''}` }));
+      .map((employee) => ({
+        value: employee.employeeId,
+        label: `${employee.name ?? 'Unnamed'}${employee.employeeId === viewerEmployeeId ? ' (you)' : ''}`,
+      }));
     if (rosterOptions.length > 0) return rosterOptions;
     return viewerEmployeeId ? [{ value: viewerEmployeeId, label: 'Me' }] : [];
   }, [rosterResource.data, viewerEmployeeId]);
 
   const departmentOptions = useMemo(() => {
     const departmentNames = new Map();
-    for (const employee of rosterResource.data?.employees ?? []) if (employee.departmentId) departmentNames.set(employee.departmentId, employee.departmentName);
-    for (const companyObjective of data?.companyObjectives ?? []) for (const team of companyObjective.teams) departmentNames.set(team.department.departmentId, team.department.name);
+    for (const employee of rosterResource.data?.employees ?? [])
+      if (employee.departmentId) departmentNames.set(employee.departmentId, employee.departmentName);
+    for (const companyObjective of data?.companyObjectives ?? [])
+      for (const team of companyObjective.teams)
+        departmentNames.set(team.department.departmentId, team.department.name);
     const allowedIds = isOrganisationWide ? [...departmentNames.keys()] : (data?.meta?.headedDepartmentIds ?? []);
-    return allowedIds.map((departmentId) => ({ value: departmentId, label: departmentNames.get(departmentId) ?? 'Your department' }));
+    return allowedIds.map((departmentId) => ({
+      value: departmentId,
+      label: departmentNames.get(departmentId) ?? 'Your department',
+    }));
   }, [rosterResource.data, data, isOrganisationWide]);
 
   function reportError(caughtError) {
     const displayError = toDisplayError(caughtError);
-    setActionError(caughtError?.code === 'STALE_VERSION' ? { ...displayError, message: 'Someone updated this just before you. The latest values are shown now; please re-apply your change.' } : displayError);
+    setActionError(
+      caughtError?.code === 'STALE_VERSION'
+        ? {
+            ...displayError,
+            message:
+              'Someone updated this just before you. The latest values are shown now; please re-apply your change.',
+          }
+        : displayError,
+    );
     reload();
   }
 
@@ -510,15 +744,33 @@ export default function OkrAlignmentCanvas() {
     reload();
   };
 
-  const yearOptions = [period.year - 1, period.year, period.year + 1].map((yearValue) => ({ value: String(yearValue), label: String(yearValue) }));
+  const yearOptions = [period.year - 1, period.year, period.year + 1].map((yearValue) => ({
+    value: String(yearValue),
+    label: String(yearValue),
+  }));
   const canAddTeamObjective = isOrganisationWide || (data?.meta?.headedDepartmentIds?.length ?? 0) > 0;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex gap-3">
-          <SelectInput label="Year" value={String(period.year)} onChange={(changeEvent) => setPeriod({ ...period, year: Number(changeEvent.target.value) })} options={yearOptions} className="w-28" />
-          <SelectInput label="Quarter" value={String(period.quarter)} onChange={(changeEvent) => setPeriod({ ...period, quarter: Number(changeEvent.target.value) })} options={[1, 2, 3, 4].map((quarterNumber) => ({ value: String(quarterNumber), label: `Q${quarterNumber}` }))} className="w-28" />
+          <SelectInput
+            label="Year"
+            value={String(period.year)}
+            onChange={(changeEvent) => setPeriod({ ...period, year: Number(changeEvent.target.value) })}
+            options={yearOptions}
+            className="w-28"
+          />
+          <SelectInput
+            label="Quarter"
+            value={String(period.quarter)}
+            onChange={(changeEvent) => setPeriod({ ...period, quarter: Number(changeEvent.target.value) })}
+            options={[1, 2, 3, 4].map((quarterNumber) => ({
+              value: String(quarterNumber),
+              label: `Q${quarterNumber}`,
+            }))}
+            className="w-28"
+          />
         </div>
         {data && (
           <div className="flex items-center gap-4">
@@ -538,7 +790,13 @@ export default function OkrAlignmentCanvas() {
         )}
       </div>
 
-      {actionError && <Notice tone={actionError.status === 409 ? 'warning' : 'error'} title={actionError.message} onDismiss={() => setActionError(null)} />}
+      {actionError && (
+        <Notice
+          tone={actionError.status === 409 ? 'warning' : 'error'}
+          title={actionError.message}
+          onDismiss={() => setActionError(null)}
+        />
+      )}
       {composer && (
         <ObjectiveComposer
           level={composer.level}
@@ -547,19 +805,35 @@ export default function OkrAlignmentCanvas() {
           departmentOptions={departmentOptions}
           ownerOptions={ownerOptions}
           defaultOwnerId={viewerEmployeeId}
-          onCreated={() => { setComposer(null); handleChanged(); }}
+          onCreated={() => {
+            setComposer(null);
+            handleChanged();
+          }}
           onCancel={() => setComposer(null)}
         />
       )}
 
       {isLoading && !data && <LoadingBlock label="Loading the alignment canvas…" />}
-      {error && <Notice tone={error.status === 403 ? 'info' : 'error'} title={error.status === 403 ? 'OKRs are available to employees with a profile, HR and administrators.' : error.message} />}
+      {error && (
+        <Notice
+          tone={error.status === 403 ? 'info' : 'error'}
+          title={
+            error.status === 403
+              ? 'OKRs are available to employees with a profile, HR and administrators.'
+              : error.message
+          }
+        />
+      )}
       {data && data.companyObjectives.length === 0 && (
         <EmptyState
           Icon={TargetIcon}
           title={`No objectives for Q${period.quarter} ${period.year}`}
           description="Company objectives anchor the canvas; team objectives align beneath them."
-          action={data.meta.canCreateCompanyObjective && <Button onClick={() => setComposer({ level: 'company' })}>Create the first objective</Button>}
+          action={
+            data.meta.canCreateCompanyObjective && (
+              <Button onClick={() => setComposer({ level: 'company' })}>Create the first objective</Button>
+            )
+          }
         />
       )}
       <div className="space-y-6">

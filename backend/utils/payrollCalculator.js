@@ -120,9 +120,23 @@ const NEW_REGIME_SLABS = Object.freeze([
 ]);
 
 const OLD_REGIME_SLABS_BY_AGE = Object.freeze({
-  [AGE_CATEGORIES.BELOW_60]: Object.freeze([[250_000, 0], [500_000, 500], [1_000_000, 2_000], [null, 3_000]]),
-  [AGE_CATEGORIES.SENIOR]: Object.freeze([[300_000, 0], [500_000, 500], [1_000_000, 2_000], [null, 3_000]]),
-  [AGE_CATEGORIES.SUPER_SENIOR]: Object.freeze([[500_000, 0], [1_000_000, 2_000], [null, 3_000]]),
+  [AGE_CATEGORIES.BELOW_60]: Object.freeze([
+    [250_000, 0],
+    [500_000, 500],
+    [1_000_000, 2_000],
+    [null, 3_000],
+  ]),
+  [AGE_CATEGORIES.SENIOR]: Object.freeze([
+    [300_000, 0],
+    [500_000, 500],
+    [1_000_000, 2_000],
+    [null, 3_000],
+  ]),
+  [AGE_CATEGORIES.SUPER_SENIOR]: Object.freeze([
+    [500_000, 0],
+    [1_000_000, 2_000],
+    [null, 3_000],
+  ]),
 });
 
 const REGIME_RULES = Object.freeze({
@@ -133,7 +147,11 @@ const REGIME_RULES = Object.freeze({
     rebateHasMarginalRelief: true,
     employerNpsCapBasisPoints: 1_400, // 14% of salary (basic + DA)
     // [incomeAbove, surchargeBasisPoints]; capped at 25% under the new regime.
-    surchargeBands: Object.freeze([[5_000_000, 1_000], [10_000_000, 1_500], [20_000_000, 2_500]]),
+    surchargeBands: Object.freeze([
+      [5_000_000, 1_000],
+      [10_000_000, 1_500],
+      [20_000_000, 2_500],
+    ]),
   }),
   [TAX_REGIMES.OLD]: Object.freeze({
     standardDeduction: 50_000,
@@ -141,7 +159,12 @@ const REGIME_RULES = Object.freeze({
     maximumRebate: 12_500,
     rebateHasMarginalRelief: false,
     employerNpsCapBasisPoints: 1_000, // 10% of salary (basic + DA), non-government employer
-    surchargeBands: Object.freeze([[5_000_000, 1_000], [10_000_000, 1_500], [20_000_000, 2_500], [50_000_000, 3_700]]),
+    surchargeBands: Object.freeze([
+      [5_000_000, 1_000],
+      [10_000_000, 1_500],
+      [20_000_000, 2_500],
+      [50_000_000, 3_700],
+    ]),
   }),
 });
 
@@ -159,8 +182,23 @@ const OLD_REGIME_DEDUCTION_LIMITS = Object.freeze({
 });
 
 /** HRA: 50% of salary in these cities from FY 2026-27 (Income-tax Rules, 2026), 40% elsewhere. */
-export const HRA_FIFTY_PERCENT_CITIES = Object.freeze(['mumbai', 'delhi', 'kolkata', 'chennai', 'bengaluru', 'hyderabad', 'pune', 'ahmedabad']);
-const HRA_CITY_ALIASES = Object.freeze({ bangalore: 'bengaluru', bombay: 'mumbai', calcutta: 'kolkata', madras: 'chennai', 'new delhi': 'delhi' });
+export const HRA_FIFTY_PERCENT_CITIES = Object.freeze([
+  'mumbai',
+  'delhi',
+  'kolkata',
+  'chennai',
+  'bengaluru',
+  'hyderabad',
+  'pune',
+  'ahmedabad',
+]);
+const HRA_CITY_ALIASES = Object.freeze({
+  bangalore: 'bengaluru',
+  bombay: 'mumbai',
+  calcutta: 'kolkata',
+  madras: 'chennai',
+  'new delhi': 'delhi',
+});
 
 /** EPF statutory wage ceiling over time (monthly wages, basic + DA). */
 const EPF_WAGE_CEILING_SCHEDULE = Object.freeze([
@@ -182,9 +220,26 @@ const PROFESSIONAL_TAX_ANNUAL_CAP = 2_500;
 /** The months of FY 2026-27, in payroll order. */
 const FINANCIAL_YEAR_MONTHS = Object.freeze(
   [
-    [2026, 4], [2026, 5], [2026, 6], [2026, 7], [2026, 8], [2026, 9],
-    [2026, 10], [2026, 11], [2026, 12], [2027, 1], [2027, 2], [2027, 3],
-  ].map(([year, month]) => Object.freeze({ year, month, label: `${year}-${String(month).padStart(2, '0')}`, daysInMonth: new Date(Date.UTC(year, month, 0)).getUTCDate() })),
+    [2026, 4],
+    [2026, 5],
+    [2026, 6],
+    [2026, 7],
+    [2026, 8],
+    [2026, 9],
+    [2026, 10],
+    [2026, 11],
+    [2026, 12],
+    [2027, 1],
+    [2027, 2],
+    [2027, 3],
+  ].map(([year, month]) =>
+    Object.freeze({
+      year,
+      month,
+      label: `${year}-${String(month).padStart(2, '0')}`,
+      daysInMonth: new Date(Date.UTC(year, month, 0)).getUTCDate(),
+    }),
+  ),
 );
 
 // =================================================================================================
@@ -239,7 +294,9 @@ function computeSlabTax(taxableIncome, slabs) {
 /** Thrown for invalid input; `fieldErrors` lists every problem found. */
 export class PayrollInputError extends Error {
   constructor(fieldErrors) {
-    super(`Invalid payroll input: ${fieldErrors.map((fieldError) => `${fieldError.field}: ${fieldError.message}`).join('; ')}`);
+    super(
+      `Invalid payroll input: ${fieldErrors.map((fieldError) => `${fieldError.field}: ${fieldError.message}`).join('; ')}`,
+    );
     this.name = 'PayrollInputError';
     this.fieldErrors = fieldErrors;
   }
@@ -254,9 +311,16 @@ function readAmount(source, key, fieldPath, fieldErrors, { required = false } = 
     return 0;
   }
   const isValidAmount =
-    typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0 && rawValue <= MAXIMUM_ANNUAL_AMOUNT && Math.abs(Math.round(rawValue * 100) - rawValue * 100) < 1e-6;
+    typeof rawValue === 'number' &&
+    Number.isFinite(rawValue) &&
+    rawValue >= 0 &&
+    rawValue <= MAXIMUM_ANNUAL_AMOUNT &&
+    Math.abs(Math.round(rawValue * 100) - rawValue * 100) < 1e-6;
   if (!isValidAmount) {
-    fieldErrors.push({ field: fieldPath, message: 'must be a non-negative amount in rupees with at most 2 decimal places' });
+    fieldErrors.push({
+      field: fieldPath,
+      message: 'must be a non-negative amount in rupees with at most 2 decimal places',
+    });
     return 0;
   }
   return rawValue;
@@ -271,7 +335,8 @@ function readBoolean(source, key, fieldPath, fieldErrors) {
 
 function normalizeInputs(salaryStructure, investmentsDeclared, taxRegimeChoice, employmentDetails) {
   const fieldErrors = [];
-  const isObject = (candidateValue) => typeof candidateValue === 'object' && candidateValue !== null && !Array.isArray(candidateValue);
+  const isObject = (candidateValue) =>
+    typeof candidateValue === 'object' && candidateValue !== null && !Array.isArray(candidateValue);
   if (!isObject(salaryStructure)) fieldErrors.push({ field: 'salaryStructure', message: 'must be an object' });
   if (investmentsDeclared !== undefined && investmentsDeclared !== null && !isObject(investmentsDeclared)) {
     fieldErrors.push({ field: 'investmentsDeclared', message: 'must be an object' });
@@ -281,30 +346,91 @@ function normalizeInputs(salaryStructure, investmentsDeclared, taxRegimeChoice, 
 
   const investments = investmentsDeclared ?? {};
   const salary = {
-    annualGross: readAmount(salaryStructure, 'annualGross', 'salaryStructure.annualGross', fieldErrors, { required: true }),
-    annualBasic: readAmount(salaryStructure, 'annualBasic', 'salaryStructure.annualBasic', fieldErrors, { required: true }),
-    annualDearnessAllowance: readAmount(salaryStructure, 'annualDearnessAllowance', 'salaryStructure.annualDearnessAllowance', fieldErrors),
-    annualHraReceived: readAmount(salaryStructure, 'annualHraReceived', 'salaryStructure.annualHraReceived', fieldErrors),
-    annualEmployerNpsContribution: readAmount(salaryStructure, 'annualEmployerNpsContribution', 'salaryStructure.annualEmployerNpsContribution', fieldErrors),
+    annualGross: readAmount(salaryStructure, 'annualGross', 'salaryStructure.annualGross', fieldErrors, {
+      required: true,
+    }),
+    annualBasic: readAmount(salaryStructure, 'annualBasic', 'salaryStructure.annualBasic', fieldErrors, {
+      required: true,
+    }),
+    annualDearnessAllowance: readAmount(
+      salaryStructure,
+      'annualDearnessAllowance',
+      'salaryStructure.annualDearnessAllowance',
+      fieldErrors,
+    ),
+    annualHraReceived: readAmount(
+      salaryStructure,
+      'annualHraReceived',
+      'salaryStructure.annualHraReceived',
+      fieldErrors,
+    ),
+    annualEmployerNpsContribution: readAmount(
+      salaryStructure,
+      'annualEmployerNpsContribution',
+      'salaryStructure.annualEmployerNpsContribution',
+      fieldErrors,
+    ),
   };
   if (salary.annualBasic + salary.annualDearnessAllowance + salary.annualHraReceived > salary.annualGross) {
-    fieldErrors.push({ field: 'salaryStructure', message: 'basic + DA + HRA cannot exceed annualGross (gross must include every salary component)' });
+    fieldErrors.push({
+      field: 'salaryStructure',
+      message: 'basic + DA + HRA cannot exceed annualGross (gross must include every salary component)',
+    });
   }
 
   const declared = {
-    section123Investments: readAmount(investments, 'section123Investments', 'investmentsDeclared.section123Investments', fieldErrors),
-    employeeNpsContribution: readAmount(investments, 'employeeNpsContribution', 'investmentsDeclared.employeeNpsContribution', fieldErrors),
-    healthInsuranceSelfFamily: readAmount(investments, 'healthInsuranceSelfFamily', 'investmentsDeclared.healthInsuranceSelfFamily', fieldErrors),
-    selfOrSpouseIsSenior: readBoolean(investments, 'selfOrSpouseIsSenior', 'investmentsDeclared.selfOrSpouseIsSenior', fieldErrors),
-    healthInsuranceParents: readAmount(investments, 'healthInsuranceParents', 'investmentsDeclared.healthInsuranceParents', fieldErrors),
+    section123Investments: readAmount(
+      investments,
+      'section123Investments',
+      'investmentsDeclared.section123Investments',
+      fieldErrors,
+    ),
+    employeeNpsContribution: readAmount(
+      investments,
+      'employeeNpsContribution',
+      'investmentsDeclared.employeeNpsContribution',
+      fieldErrors,
+    ),
+    healthInsuranceSelfFamily: readAmount(
+      investments,
+      'healthInsuranceSelfFamily',
+      'investmentsDeclared.healthInsuranceSelfFamily',
+      fieldErrors,
+    ),
+    selfOrSpouseIsSenior: readBoolean(
+      investments,
+      'selfOrSpouseIsSenior',
+      'investmentsDeclared.selfOrSpouseIsSenior',
+      fieldErrors,
+    ),
+    healthInsuranceParents: readAmount(
+      investments,
+      'healthInsuranceParents',
+      'investmentsDeclared.healthInsuranceParents',
+      fieldErrors,
+    ),
     parentIsSenior: readBoolean(investments, 'parentIsSenior', 'investmentsDeclared.parentIsSenior', fieldErrors),
-    educationLoanInterest: readAmount(investments, 'educationLoanInterest', 'investmentsDeclared.educationLoanInterest', fieldErrors),
-    selfOccupiedHomeLoanInterest: readAmount(investments, 'selfOccupiedHomeLoanInterest', 'investmentsDeclared.selfOccupiedHomeLoanInterest', fieldErrors),
+    educationLoanInterest: readAmount(
+      investments,
+      'educationLoanInterest',
+      'investmentsDeclared.educationLoanInterest',
+      fieldErrors,
+    ),
+    selfOccupiedHomeLoanInterest: readAmount(
+      investments,
+      'selfOccupiedHomeLoanInterest',
+      'investmentsDeclared.selfOccupiedHomeLoanInterest',
+      fieldErrors,
+    ),
     annualRentPaid: readAmount(investments, 'annualRentPaid', 'investmentsDeclared.annualRentPaid', fieldErrors),
     rentedCity: null,
   };
   if (investments.rentedCity !== undefined && investments.rentedCity !== null) {
-    if (typeof investments.rentedCity !== 'string' || investments.rentedCity.trim().length === 0 || investments.rentedCity.length > 100) {
+    if (
+      typeof investments.rentedCity !== 'string' ||
+      investments.rentedCity.trim().length === 0 ||
+      investments.rentedCity.length > 100
+    ) {
       fieldErrors.push({ field: 'investmentsDeclared.rentedCity', message: 'must be a city name' });
     } else {
       const cityKey = investments.rentedCity.trim().toLowerCase();
@@ -317,7 +443,10 @@ function normalizeInputs(salaryStructure, investmentsDeclared, taxRegimeChoice, 
 
   const regimeChoice = typeof taxRegimeChoice === 'string' ? taxRegimeChoice.trim().toLowerCase() : taxRegimeChoice;
   if (![TAX_REGIMES.OLD, TAX_REGIMES.NEW].includes(regimeChoice)) {
-    fieldErrors.push({ field: 'taxRegimeChoice', message: 'must be "old" or "new" (both are always computed; this marks the regime the employee has opted for)' });
+    fieldErrors.push({
+      field: 'taxRegimeChoice',
+      message: 'must be "old" or "new" (both are always computed; this marks the regime the employee has opted for)',
+    });
   }
 
   const employment = {
@@ -325,21 +454,49 @@ function normalizeInputs(salaryStructure, investmentsDeclared, taxRegimeChoice, 
     ageCategory: employmentDetails.ageCategory ?? AGE_CATEGORIES.BELOW_60,
     professionalTaxState: employmentDetails.professionalTaxState,
     gender: employmentDetails.gender,
-    isPersonWithDisability: readBoolean(employmentDetails, 'isPersonWithDisability', 'employmentDetails.isPersonWithDisability', fieldErrors),
-    epfContributionOnFullBasic: readBoolean(employmentDetails, 'epfContributionOnFullBasic', 'employmentDetails.epfContributionOnFullBasic', fieldErrors),
-    isEpfMember: employmentDetails.isEpfMember === undefined ? true : readBoolean(employmentDetails, 'isEpfMember', 'employmentDetails.isEpfMember', fieldErrors),
+    isPersonWithDisability: readBoolean(
+      employmentDetails,
+      'isPersonWithDisability',
+      'employmentDetails.isPersonWithDisability',
+      fieldErrors,
+    ),
+    epfContributionOnFullBasic: readBoolean(
+      employmentDetails,
+      'epfContributionOnFullBasic',
+      'employmentDetails.epfContributionOnFullBasic',
+      fieldErrors,
+    ),
+    isEpfMember:
+      employmentDetails.isEpfMember === undefined
+        ? true
+        : readBoolean(employmentDetails, 'isEpfMember', 'employmentDetails.isEpfMember', fieldErrors),
   };
   if (employment.financialYear !== SUPPORTED_FINANCIAL_YEAR) {
-    fieldErrors.push({ field: 'employmentDetails.financialYear', message: `only ${SUPPORTED_FINANCIAL_YEAR} is supported; other years have different rates` });
+    fieldErrors.push({
+      field: 'employmentDetails.financialYear',
+      message: `only ${SUPPORTED_FINANCIAL_YEAR} is supported; other years have different rates`,
+    });
   }
   if (!Object.values(AGE_CATEGORIES).includes(employment.ageCategory)) {
-    fieldErrors.push({ field: 'employmentDetails.ageCategory', message: 'must be below60, senior (60-79) or superSenior (80+)' });
+    fieldErrors.push({
+      field: 'employmentDetails.ageCategory',
+      message: 'must be below60, senior (60-79) or superSenior (80+)',
+    });
   }
   if (!Object.values(PROFESSIONAL_TAX_STATES).includes(employment.professionalTaxState)) {
-    fieldErrors.push({ field: 'employmentDetails.professionalTaxState', message: 'must be KA, MH, or NONE (state with no professional tax); other states are not modelled' });
+    fieldErrors.push({
+      field: 'employmentDetails.professionalTaxState',
+      message: 'must be KA, MH, or NONE (state with no professional tax); other states are not modelled',
+    });
   }
-  if (employment.professionalTaxState === PROFESSIONAL_TAX_STATES.MAHARASHTRA && !['male', 'female', 'other'].includes(employment.gender)) {
-    fieldErrors.push({ field: 'employmentDetails.gender', message: 'is required for Maharashtra professional tax (male, female or other)' });
+  if (
+    employment.professionalTaxState === PROFESSIONAL_TAX_STATES.MAHARASHTRA &&
+    !['male', 'female', 'other'].includes(employment.gender)
+  ) {
+    fieldErrors.push({
+      field: 'employmentDetails.gender',
+      message: 'is required for Maharashtra professional tax (male, female or other)',
+    });
   }
 
   if (fieldErrors.length > 0) throw new PayrollInputError(fieldErrors);
@@ -385,7 +542,10 @@ function computeMonthlyEpf(monthlyEpfWages, payrollMonth, contributeOnFullBasic)
   }
   return {
     month: payrollMonth.label,
-    ceilingSegments: ceilingSegments.map((ceilingSegment) => ({ monthlyCeiling: ceilingSegment.monthlyCeiling, days: ceilingSegment.days })),
+    ceilingSegments: ceilingSegments.map((ceilingSegment) => ({
+      monthlyCeiling: ceilingSegment.monthlyCeiling,
+      days: ceilingSegment.days,
+    })),
     contributoryWages: roundToPaisa(contributoryWages),
     employeeContribution: roundToNearestRupee(applyRate(contributoryWages, EPF_EMPLOYEE_RATE_BASIS_POINTS)),
   };
@@ -415,14 +575,21 @@ function computeStatutoryDeductions({ salary, employment }) {
 
   // ---- EPF -------------------------------------------------------------------------------------
   const epfMonths = employment.isEpfMember
-    ? FINANCIAL_YEAR_MONTHS.map((payrollMonth) => computeMonthlyEpf(monthlyEpfWages, payrollMonth, employment.epfContributionOnFullBasic))
+    ? FINANCIAL_YEAR_MONTHS.map((payrollMonth) =>
+        computeMonthlyEpf(monthlyEpfWages, payrollMonth, employment.epfContributionOnFullBasic),
+      )
     : [];
   const annualEpf = epfMonths.reduce((runningTotal, epfMonth) => runningTotal + epfMonth.employeeContribution, 0);
 
   // ---- Professional tax ------------------------------------------------------------------------
   const professionalTaxMonths = FINANCIAL_YEAR_MONTHS.map((payrollMonth) => ({
     month: payrollMonth.label,
-    amount: computeMonthlyProfessionalTax(employment.professionalTaxState, employment.gender, monthlyGross, payrollMonth),
+    amount: computeMonthlyProfessionalTax(
+      employment.professionalTaxState,
+      employment.gender,
+      monthlyGross,
+      payrollMonth,
+    ),
   }));
   const annualProfessionalTax = Math.min(
     professionalTaxMonths.reduce((runningTotal, professionalTaxMonth) => runningTotal + professionalTaxMonth.amount, 0),
@@ -430,7 +597,9 @@ function computeStatutoryDeductions({ salary, employment }) {
   );
 
   // ---- ESI -------------------------------------------------------------------------------------
-  const esiWageCeiling = employment.isPersonWithDisability ? ESI_RULES.monthlyWageCeilingForPersonsWithDisability : ESI_RULES.monthlyWageCeiling;
+  const esiWageCeiling = employment.isPersonWithDisability
+    ? ESI_RULES.monthlyWageCeilingForPersonsWithDisability
+    : ESI_RULES.monthlyWageCeiling;
   const isEsiCovered = monthlyGross <= esiWageCeiling;
   // The ₹176 average daily wage is measured over the six-month contribution period (wages ÷ days in
   // the period), the same unit as coverage; a per-month measure would wrongly make February (28
@@ -438,12 +607,17 @@ function computeStatutoryDeductions({ salary, employment }) {
   const contributionPeriods = [FINANCIAL_YEAR_MONTHS.slice(0, 6), FINANCIAL_YEAR_MONTHS.slice(6, 12)];
   const esiMonths = isEsiCovered
     ? contributionPeriods.flatMap((periodMonths) => {
-        const daysInPeriod = periodMonths.reduce((runningTotal, payrollMonth) => runningTotal + payrollMonth.daysInMonth, 0);
+        const daysInPeriod = periodMonths.reduce(
+          (runningTotal, payrollMonth) => runningTotal + payrollMonth.daysInMonth,
+          0,
+        );
         const averageDailyWage = (monthlyGross * periodMonths.length) / daysInPeriod;
         const isEmployeeShareExempt = averageDailyWage <= ESI_RULES.exemptAverageDailyWage;
         return periodMonths.map((payrollMonth) => ({
           month: payrollMonth.label,
-          employeeContribution: isEmployeeShareExempt ? 0 : roundUpToRupee(applyRate(monthlyGross, ESI_RULES.employeeRateBasisPoints)),
+          employeeContribution: isEmployeeShareExempt
+            ? 0
+            : roundUpToRupee(applyRate(monthlyGross, ESI_RULES.employeeRateBasisPoints)),
           employeeShareExempt: isEmployeeShareExempt,
         }));
       })
@@ -459,7 +633,11 @@ function computeStatutoryDeductions({ salary, employment }) {
       annualEmployeeContribution: annualEpf,
       months: epfMonths,
     },
-    professionalTax: { state: employment.professionalTaxState, annualAmount: annualProfessionalTax, months: professionalTaxMonths },
+    professionalTax: {
+      state: employment.professionalTaxState,
+      annualAmount: annualProfessionalTax,
+      months: professionalTaxMonths,
+    },
     esi: {
       isCovered: isEsiCovered,
       monthlyWageCeiling: esiWageCeiling,
@@ -484,10 +662,17 @@ function computeHraExemption({ salary, declared }) {
   const isFiftyPercentCity = HRA_FIFTY_PERCENT_CITIES.includes(declared.rentedCity);
   const limits = {
     actualHraReceived: salary.annualHraReceived,
-    rentPaidMinusTenPercentOfSalary: Math.max(0, roundToPaisa(declared.annualRentPaid - applyRate(salaryForHra, 1_000))),
+    rentPaidMinusTenPercentOfSalary: Math.max(
+      0,
+      roundToPaisa(declared.annualRentPaid - applyRate(salaryForHra, 1_000)),
+    ),
     percentOfSalary: applyRate(salaryForHra, isFiftyPercentCity ? 5_000 : 4_000),
   };
-  return { exemption: Math.min(limits.actualHraReceived, limits.rentPaidMinusTenPercentOfSalary, limits.percentOfSalary), limits, isFiftyPercentCity };
+  return {
+    exemption: Math.min(limits.actualHraReceived, limits.rentPaidMinusTenPercentOfSalary, limits.percentOfSalary),
+    limits,
+    isFiftyPercentCity,
+  };
 }
 
 /** Old-regime deductions with each claim capped by its statutory limit. */
@@ -503,18 +688,57 @@ function computeOldRegimeDeductions({ salary, declared }, annualEpf) {
   const section123Claimed = annualEpf + declared.section123Investments + npsWithinAggregate;
   const section123Allowed = Math.min(section123Claimed, limits.section123Aggregate);
 
-  const healthSelfFamilyLimit = declared.selfOrSpouseIsSenior ? limits.healthInsuranceSelfFamilySenior : limits.healthInsuranceSelfFamily;
-  const healthParentsLimit = declared.parentIsSenior ? limits.healthInsuranceParentsSenior : limits.healthInsuranceParents;
+  const healthSelfFamilyLimit = declared.selfOrSpouseIsSenior
+    ? limits.healthInsuranceSelfFamilySenior
+    : limits.healthInsuranceSelfFamily;
+  const healthParentsLimit = declared.parentIsSenior
+    ? limits.healthInsuranceParentsSenior
+    : limits.healthInsuranceParents;
   const employerNpsLimit = applyRate(salaryForCaps, REGIME_RULES[TAX_REGIMES.OLD].employerNpsCapBasisPoints);
 
   const deductionLines = [
-    { section: 's.123 (80C/80CCC/80CCD(1))', claimed: roundToPaisa(section123Claimed), allowed: roundToPaisa(section123Allowed), note: `includes employee EPF ₹${annualEpf}; aggregate cap ₹1,50,000` },
-    { section: 's.124 (80CCD(1B)) additional NPS', claimed: additionalNps, allowed: additionalNps, note: 'cap ₹50,000' },
-    { section: 's.124 (80CCD(2)) employer NPS', claimed: salary.annualEmployerNpsContribution, allowed: Math.min(salary.annualEmployerNpsContribution, employerNpsLimit), note: '10% of basic + DA' },
-    { section: 's.126 (80D) health insurance, self/family', claimed: declared.healthInsuranceSelfFamily, allowed: Math.min(declared.healthInsuranceSelfFamily, healthSelfFamilyLimit), note: `cap ₹${healthSelfFamilyLimit}` },
-    { section: 's.126 (80D) health insurance, parents', claimed: declared.healthInsuranceParents, allowed: Math.min(declared.healthInsuranceParents, healthParentsLimit), note: `cap ₹${healthParentsLimit}` },
-    { section: 's.129 (80E) education-loan interest', claimed: declared.educationLoanInterest, allowed: declared.educationLoanInterest, note: 'no cap' },
-    { section: 's.22 (24(b)) self-occupied home-loan interest', claimed: declared.selfOccupiedHomeLoanInterest, allowed: Math.min(declared.selfOccupiedHomeLoanInterest, limits.selfOccupiedHomeLoanInterest), note: 'cap ₹2,00,000' },
+    {
+      section: 's.123 (80C/80CCC/80CCD(1))',
+      claimed: roundToPaisa(section123Claimed),
+      allowed: roundToPaisa(section123Allowed),
+      note: `includes employee EPF ₹${annualEpf}; aggregate cap ₹1,50,000`,
+    },
+    {
+      section: 's.124 (80CCD(1B)) additional NPS',
+      claimed: additionalNps,
+      allowed: additionalNps,
+      note: 'cap ₹50,000',
+    },
+    {
+      section: 's.124 (80CCD(2)) employer NPS',
+      claimed: salary.annualEmployerNpsContribution,
+      allowed: Math.min(salary.annualEmployerNpsContribution, employerNpsLimit),
+      note: '10% of basic + DA',
+    },
+    {
+      section: 's.126 (80D) health insurance, self/family',
+      claimed: declared.healthInsuranceSelfFamily,
+      allowed: Math.min(declared.healthInsuranceSelfFamily, healthSelfFamilyLimit),
+      note: `cap ₹${healthSelfFamilyLimit}`,
+    },
+    {
+      section: 's.126 (80D) health insurance, parents',
+      claimed: declared.healthInsuranceParents,
+      allowed: Math.min(declared.healthInsuranceParents, healthParentsLimit),
+      note: `cap ₹${healthParentsLimit}`,
+    },
+    {
+      section: 's.129 (80E) education-loan interest',
+      claimed: declared.educationLoanInterest,
+      allowed: declared.educationLoanInterest,
+      note: 'no cap',
+    },
+    {
+      section: 's.22 (24(b)) self-occupied home-loan interest',
+      claimed: declared.selfOccupiedHomeLoanInterest,
+      allowed: Math.min(declared.selfOccupiedHomeLoanInterest, limits.selfOccupiedHomeLoanInterest),
+      note: 'cap ₹2,00,000',
+    },
   ];
   return deductionLines;
 }
@@ -535,7 +759,11 @@ function applySurcharge(taxableIncome, taxAfterRebate, slabs, surchargeBands) {
   const liabilityAtThreshold = roundToPaisa(taxAtThreshold + (lowerBand ? applyRate(taxAtThreshold, lowerBand[1]) : 0));
   const liabilityCap = roundToPaisa(liabilityAtThreshold + (taxableIncome - thresholdIncome));
   const marginalRelief = Math.max(0, roundToPaisa(taxAfterRebate + grossSurcharge - liabilityCap));
-  return { surchargeRatePercent: rateBasisPoints / 100, surcharge: roundToPaisa(grossSurcharge - marginalRelief), marginalRelief };
+  return {
+    surchargeRatePercent: rateBasisPoints / 100,
+    surcharge: roundToPaisa(grossSurcharge - marginalRelief),
+    marginalRelief,
+  };
 }
 
 function computeRegimeTax(regime, normalizedInputs, statutoryDeductions) {
@@ -546,11 +774,17 @@ function computeRegimeTax(regime, normalizedInputs, statutoryDeductions) {
   // ---- Salary income ---------------------------------------------------------------------------
   // The employer's NPS contribution is part of salary income and then deducted (up to the cap).
   const grossSalaryIncome = salary.annualGross + salary.annualEmployerNpsContribution;
-  const hra = regime === TAX_REGIMES.OLD ? computeHraExemption(normalizedInputs) : { exemption: 0, limits: null, isFiftyPercentCity: null };
+  const hra =
+    regime === TAX_REGIMES.OLD
+      ? computeHraExemption(normalizedInputs)
+      : { exemption: 0, limits: null, isFiftyPercentCity: null };
   const salaryAfterExemptions = roundToPaisa(grossSalaryIncome - hra.exemption);
   const standardDeduction = Math.min(rules.standardDeduction, salaryAfterExemptions);
   const professionalTaxDeduction = regime === TAX_REGIMES.OLD ? statutoryDeductions.professionalTax.annualAmount : 0;
-  const incomeFromSalary = Math.max(0, roundToPaisa(salaryAfterExemptions - standardDeduction - professionalTaxDeduction));
+  const incomeFromSalary = Math.max(
+    0,
+    roundToPaisa(salaryAfterExemptions - standardDeduction - professionalTaxDeduction),
+  );
 
   // ---- Deductions ------------------------------------------------------------------------------
   const deductionLines =
@@ -560,13 +794,18 @@ function computeRegimeTax(regime, normalizedInputs, statutoryDeductions) {
           {
             section: 's.124 (80CCD(2)) employer NPS',
             claimed: salary.annualEmployerNpsContribution,
-            allowed: Math.min(salary.annualEmployerNpsContribution, applyRate(salaryForCaps, rules.employerNpsCapBasisPoints)),
+            allowed: Math.min(
+              salary.annualEmployerNpsContribution,
+              applyRate(salaryForCaps, rules.employerNpsCapBasisPoints),
+            ),
             note: '14% of basic + DA; the only deduction from salary income allowed under the new regime',
           },
         ];
   // Home-loan interest is a loss under "house property" set off against salary; the other lines are
   // deductions from gross total income. Both reduce total income and are capped by it.
-  const totalDeductionsAllowed = roundToPaisa(deductionLines.reduce((runningTotal, deductionLine) => runningTotal + deductionLine.allowed, 0));
+  const totalDeductionsAllowed = roundToPaisa(
+    deductionLines.reduce((runningTotal, deductionLine) => runningTotal + deductionLine.allowed, 0),
+  );
   const taxableIncome = roundToNearestTen(Math.max(0, incomeFromSalary - totalDeductionsAllowed));
 
   // ---- Tax ---------------------------------------------------------------------------------------

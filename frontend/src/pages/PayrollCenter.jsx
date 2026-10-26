@@ -14,11 +14,35 @@
 
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { requestPayrollRules, requestPayslipDownload, requestPayslipGeneration, requestPayslipList, requestTaxEstimate, requestWorkforceRisk } from '../api/workforceApi.js';
+import {
+  requestPayrollRules,
+  requestPayslipDownload,
+  requestPayslipGeneration,
+  requestPayslipList,
+  requestTaxEstimate,
+  requestWorkforceRisk,
+} from '../api/workforceApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { CheckBadgeIcon, CurrencyIcon, DocumentIcon, DownloadIcon, SparklesIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import { Badge, Button, Card, EmptyState, LoadingBlock, MONTH_NAMES, Notice, SelectInput, StatTile, Tabs, TextInput, Toggle, formatBytes, formatDate, formatInr, openSignedUrl } from '../components/ui.jsx';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  LoadingBlock,
+  MONTH_NAMES,
+  Notice,
+  SelectInput,
+  StatTile,
+  Tabs,
+  TextInput,
+  Toggle,
+  formatBytes,
+  formatDate,
+  formatInr,
+  openSignedUrl,
+} from '../components/ui.jsx';
 import { ROUTE_PATHS, USER_ROLES } from '../constants/routes.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 
@@ -88,17 +112,36 @@ function buildCompensationPayload(compensation, financialYear) {
 
 /** Field errors from the backend use dotted paths ("salaryStructure.annualBasic"); match by the last segment. */
 function fieldErrorFor(fieldErrors, fieldName) {
-  const matchingPath = Object.keys(fieldErrors ?? {}).find((fieldPath) => fieldPath === fieldName || fieldPath.endsWith(`.${fieldName}`));
+  const matchingPath = Object.keys(fieldErrors ?? {}).find(
+    (fieldPath) => fieldPath === fieldName || fieldPath.endsWith(`.${fieldName}`),
+  );
   return matchingPath ? fieldErrors[matchingPath] : undefined;
 }
 
 function CompensationForm({ compensation, onChange, rules, fieldErrors }) {
   const update = (fieldName) => (changeEvent) => onChange({ ...compensation, [fieldName]: changeEvent.target.value });
   const amountField = (fieldName, label, hint) => (
-    <TextInput key={fieldName} label={label} hint={hint} type="number" min="0" step="1" inputMode="numeric" value={compensation[fieldName]} onChange={update(fieldName)} error={fieldErrorFor(fieldErrors, fieldName)} />
+    <TextInput
+      key={fieldName}
+      label={label}
+      hint={hint}
+      type="number"
+      min="0"
+      step="1"
+      inputMode="numeric"
+      value={compensation[fieldName]}
+      onChange={update(fieldName)}
+      error={fieldErrorFor(fieldErrors, fieldName)}
+    />
   );
   const toggleField = (fieldName, label, description) => (
-    <Toggle key={fieldName} label={label} description={description} checked={compensation[fieldName]} onChange={(checked) => onChange({ ...compensation, [fieldName]: checked })} />
+    <Toggle
+      key={fieldName}
+      label={label}
+      description={description}
+      checked={compensation[fieldName]}
+      onChange={(checked) => onChange({ ...compensation, [fieldName]: checked })}
+    />
   );
 
   return (
@@ -123,7 +166,13 @@ function CompensationForm({ compensation, onChange, rules, fieldErrors }) {
           {amountField('educationLoanInterest', 'Education loan interest')}
           {amountField('selfOccupiedHomeLoanInterest', 'Home loan interest')}
           {amountField('annualRentPaid', 'Rent paid')}
-          <TextInput label="Rented city" value={compensation.rentedCity} onChange={update('rentedCity')} error={fieldErrorFor(fieldErrors, 'rentedCity')} hint={rules ? `50% HRA cities: ${rules.hraFiftyPercentCities.join(', ')}` : undefined} />
+          <TextInput
+            label="Rented city"
+            value={compensation.rentedCity}
+            onChange={update('rentedCity')}
+            error={fieldErrorFor(fieldErrors, 'rentedCity')}
+            hint={rules ? `50% HRA cities: ${rules.hraFiftyPercentCities.join(', ')}` : undefined}
+          />
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {toggleField('selfOrSpouseIsSenior', 'Self or spouse is a senior citizen')}
@@ -133,11 +182,46 @@ function CompensationForm({ compensation, onChange, rules, fieldErrors }) {
       <fieldset>
         <legend className="text-sm font-semibold text-slate-900">Employment</legend>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SelectInput label="Opted regime" value={compensation.taxRegimeChoice} onChange={update('taxRegimeChoice')} options={[{ value: 'new', label: 'New regime' }, { value: 'old', label: 'Old regime' }]} />
-          <SelectInput label="Professional tax state" value={compensation.professionalTaxState} onChange={update('professionalTaxState')} options={[{ value: 'KA', label: 'Karnataka' }, { value: 'MH', label: 'Maharashtra' }, { value: 'NONE', label: 'No professional tax' }]} />
-          <SelectInput label="Age" value={compensation.ageCategory} onChange={update('ageCategory')} options={[{ value: 'below60', label: 'Below 60' }, { value: 'senior', label: '60 – 79' }, { value: 'superSenior', label: '80 and above' }]} />
+          <SelectInput
+            label="Opted regime"
+            value={compensation.taxRegimeChoice}
+            onChange={update('taxRegimeChoice')}
+            options={[
+              { value: 'new', label: 'New regime' },
+              { value: 'old', label: 'Old regime' },
+            ]}
+          />
+          <SelectInput
+            label="Professional tax state"
+            value={compensation.professionalTaxState}
+            onChange={update('professionalTaxState')}
+            options={[
+              { value: 'KA', label: 'Karnataka' },
+              { value: 'MH', label: 'Maharashtra' },
+              { value: 'NONE', label: 'No professional tax' },
+            ]}
+          />
+          <SelectInput
+            label="Age"
+            value={compensation.ageCategory}
+            onChange={update('ageCategory')}
+            options={[
+              { value: 'below60', label: 'Below 60' },
+              { value: 'senior', label: '60 – 79' },
+              { value: 'superSenior', label: '80 and above' },
+            ]}
+          />
           {compensation.professionalTaxState === 'MH' && (
-            <SelectInput label="Gender" value={compensation.gender} onChange={update('gender')} options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]} />
+            <SelectInput
+              label="Gender"
+              value={compensation.gender}
+              onChange={update('gender')}
+              options={[
+                { value: 'male', label: 'Male' },
+                { value: 'female', label: 'Female' },
+                { value: 'other', label: 'Other' },
+              ]}
+            />
           )}
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -156,7 +240,9 @@ function CompensationForm({ compensation, onChange, rules, fieldErrors }) {
 
 function RegimeColumn({ regimeResult, isRecommended, isChosen }) {
   return (
-    <div className={`relative rounded-2xl p-5 ring-1 ${isRecommended ? 'bg-gradient-to-br from-indigo-50 to-violet-50 ring-indigo-300' : 'bg-white ring-slate-200'}`}>
+    <div
+      className={`relative rounded-2xl p-5 ring-1 ${isRecommended ? 'bg-gradient-to-br from-indigo-50 to-violet-50 ring-indigo-300' : 'bg-white ring-slate-200'}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold tracking-wide text-slate-900 uppercase">{regimeResult.regime} regime</h3>
         <div className="flex gap-1.5">
@@ -200,7 +286,9 @@ function RegimeColumn({ regimeResult, isRecommended, isChosen }) {
                     {formatInr(slabLine.from)} – {formatInr(slabLine.to)}
                   </td>
                   <td className="py-1.5 text-right text-slate-500">{slabLine.ratePercent}%</td>
-                  <td className="py-1.5 text-right font-medium text-slate-800 tabular-nums">{formatInr(slabLine.tax)}</td>
+                  <td className="py-1.5 text-right font-medium text-slate-800 tabular-nums">
+                    {formatInr(slabLine.tax)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -223,7 +311,10 @@ function TaxPlanner({ rules }) {
     setIsCalculating(true);
     setEstimateError(null);
     try {
-      const { estimate: calculatedEstimate } = await requestTaxEstimate(buildCompensationPayload(compensation, rules.financialYear), csrfToken);
+      const { estimate: calculatedEstimate } = await requestTaxEstimate(
+        buildCompensationPayload(compensation, rules.financialYear),
+        csrfToken,
+      );
       setEstimate(calculatedEstimate);
     } catch (calculationError) {
       setEstimateError(toDisplayError(calculationError));
@@ -235,10 +326,21 @@ function TaxPlanner({ rules }) {
   const recommendedRegime = estimate?.recommendation.recommendedRegime;
   return (
     <div className="grid gap-6 xl:grid-cols-5">
-      <Card title={`Your compensation · FY ${rules.financialYear}`} subtitle="Figures stay in your browser and the calculation request; nothing is saved." className="xl:col-span-3">
+      <Card
+        title={`Your compensation · FY ${rules.financialYear}`}
+        subtitle="Figures stay in your browser and the calculation request; nothing is saved."
+        className="xl:col-span-3"
+      >
         <form onSubmit={handleCalculate} className="space-y-6">
-          <CompensationForm compensation={compensation} onChange={setCompensation} rules={rules} fieldErrors={estimateError?.fieldErrors} />
-          {estimateError && <Notice tone="error" title={estimateError.message} onDismiss={() => setEstimateError(null)} />}
+          <CompensationForm
+            compensation={compensation}
+            onChange={setCompensation}
+            rules={rules}
+            fieldErrors={estimateError?.fieldErrors}
+          />
+          {estimateError && (
+            <Notice tone="error" title={estimateError.message} onDismiss={() => setEstimateError(null)} />
+          )}
           <div className="flex justify-end">
             <Button type="submit" isBusy={isCalculating}>
               <SparklesIcon className="h-4 w-4" /> Compare regimes
@@ -247,32 +349,65 @@ function TaxPlanner({ rules }) {
         </form>
       </Card>
       <div className="space-y-4 xl:col-span-2">
-        {!estimate && <EmptyState Icon={CurrencyIcon} title="Compare both regimes" description="Enter your salary and declarations, and see which regime leaves you with more." />}
+        {!estimate && (
+          <EmptyState
+            Icon={CurrencyIcon}
+            title="Compare both regimes"
+            description="Enter your salary and declarations, and see which regime leaves you with more."
+          />
+        )}
         {estimate && (
           <>
             <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 p-5 text-white shadow-lg shadow-indigo-600/20">
               <p className="text-xs font-semibold tracking-wide text-indigo-100 uppercase">Recommendation</p>
-              <p className="mt-2 text-xl font-bold">{recommendedRegime === 'new' ? 'New' : 'Old'} regime saves {formatInr(estimate.recommendation.annualSavingVersusOtherRegime)}</p>
+              <p className="mt-2 text-xl font-bold">
+                {recommendedRegime === 'new' ? 'New' : 'Old'} regime saves{' '}
+                {formatInr(estimate.recommendation.annualSavingVersusOtherRegime)}
+              </p>
               <p className="mt-1 text-sm text-indigo-100">{estimate.recommendation.reason}</p>
               {!estimate.chosenRegime.isMostTaxEfficient && (
-                <p className="mt-3 rounded-lg bg-white/15 px-3 py-2 text-sm">Your opted regime costs {formatInr(estimate.chosenRegime.additionalTaxVersusRecommended)} more this year.</p>
+                <p className="mt-3 rounded-lg bg-white/15 px-3 py-2 text-sm">
+                  Your opted regime costs {formatInr(estimate.chosenRegime.additionalTaxVersusRecommended)} more this
+                  year.
+                </p>
               )}
             </div>
-            <RegimeColumn regimeResult={estimate.regimes.new} isRecommended={recommendedRegime === 'new'} isChosen={estimate.chosenRegime.regime === 'new'} />
-            <RegimeColumn regimeResult={estimate.regimes.old} isRecommended={recommendedRegime === 'old'} isChosen={estimate.chosenRegime.regime === 'old'} />
+            <RegimeColumn
+              regimeResult={estimate.regimes.new}
+              isRecommended={recommendedRegime === 'new'}
+              isChosen={estimate.chosenRegime.regime === 'new'}
+            />
+            <RegimeColumn
+              regimeResult={estimate.regimes.old}
+              isRecommended={recommendedRegime === 'old'}
+              isChosen={estimate.chosenRegime.regime === 'old'}
+            />
             <Card title="Statutory deductions (annual)">
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-slate-500">EPF (employee {estimate.statutoryDeductions.epf.ratePercent}%)</dt>
-                  <dd className="font-medium tabular-nums">{formatInr(estimate.statutoryDeductions.epf.annualEmployeeContribution)}</dd>
+                  <dd className="font-medium tabular-nums">
+                    {formatInr(estimate.statutoryDeductions.epf.annualEmployeeContribution)}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500">ESI {estimate.statutoryDeductions.esi.isCovered ? `(${estimate.statutoryDeductions.esi.ratePercent}%)` : '(not covered)'}</dt>
-                  <dd className="font-medium tabular-nums">{formatInr(estimate.statutoryDeductions.esi.annualEmployeeContribution)}</dd>
+                  <dt className="text-slate-500">
+                    ESI{' '}
+                    {estimate.statutoryDeductions.esi.isCovered
+                      ? `(${estimate.statutoryDeductions.esi.ratePercent}%)`
+                      : '(not covered)'}
+                  </dt>
+                  <dd className="font-medium tabular-nums">
+                    {formatInr(estimate.statutoryDeductions.esi.annualEmployeeContribution)}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500">Professional tax ({estimate.statutoryDeductions.professionalTax.state})</dt>
-                  <dd className="font-medium tabular-nums">{formatInr(estimate.statutoryDeductions.professionalTax.annualAmount)}</dd>
+                  <dt className="text-slate-500">
+                    Professional tax ({estimate.statutoryDeductions.professionalTax.state})
+                  </dt>
+                  <dd className="font-medium tabular-nums">
+                    {formatInr(estimate.statutoryDeductions.professionalTax.annualAmount)}
+                  </dd>
                 </div>
                 <div className="flex justify-between border-t border-slate-100 pt-2 font-semibold">
                   <dt>Total</dt>
@@ -323,13 +458,17 @@ function PayslipRow({ payslip }) {
     <li className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
       <div className="flex flex-wrap items-center gap-4 p-4 sm:p-5">
         <span className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
-          <span className="text-[0.65rem] font-semibold uppercase">{MONTH_NAMES[payslip.period.month - 1].slice(0, 3)}</span>
+          <span className="text-[0.65rem] font-semibold uppercase">
+            {MONTH_NAMES[payslip.period.month - 1].slice(0, 3)}
+          </span>
           <span className="text-sm font-bold">{payslip.period.year}</span>
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-slate-900">
             {MONTH_NAMES[payslip.period.month - 1]} {payslip.period.year}
-            {payslip.revision > 1 && <span className="ml-2 text-xs font-normal text-slate-500">revision {payslip.revision}</span>}
+            {payslip.revision > 1 && (
+              <span className="ml-2 text-xs font-normal text-slate-500">revision {payslip.revision}</span>
+            )}
           </p>
           <p className="truncate text-xs text-slate-500">
             {payslip.employee?.name} · {payslip.verificationId}
@@ -341,7 +480,12 @@ function PayslipRow({ payslip }) {
         </div>
         <Badge tone={payslip.status === 'Issued' ? 'emerald' : 'slate'}>{payslip.status}</Badge>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setIsExpanded((wasExpanded) => !wasExpanded)} aria-expanded={isExpanded}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded((wasExpanded) => !wasExpanded)}
+            aria-expanded={isExpanded}
+          >
             Details
           </Button>
           <Button variant="secondary" size="sm" isBusy={isOpening} onClick={handleDownload}>
@@ -379,7 +523,8 @@ function PayslipRow({ payslip }) {
             </div>
           ))}
           <p className="text-xs text-slate-500 sm:col-span-2">
-            {payslip.netPayInWords} · {payslip.taxSummary.regime} regime · issued {formatDate(payslip.issuedAt)} · PDF {formatBytes(payslip.document.sizeBytes)}
+            {payslip.netPayInWords} · {payslip.taxSummary.regime} regime · issued {formatDate(payslip.issuedAt)} · PDF{' '}
+            {formatBytes(payslip.document.sizeBytes)}
           </p>
         </div>
       )}
@@ -390,21 +535,45 @@ function PayslipRow({ payslip }) {
 function PayslipLibrary({ isPayrollAdmin, employeeOptions }) {
   const [employeeId, setEmployeeId] = useState('');
   const [includeSuperseded, setIncludeSuperseded] = useState(false);
-  const { data, error, isLoading } = useApiResource((signal) => requestPayslipList({ employeeId: employeeId || undefined, includeSuperseded: includeSuperseded || undefined }, signal), [employeeId, includeSuperseded]);
+  const { data, error, isLoading } = useApiResource(
+    (signal) =>
+      requestPayslipList(
+        { employeeId: employeeId || undefined, includeSuperseded: includeSuperseded || undefined },
+        signal,
+      ),
+    [employeeId, includeSuperseded],
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
         {isPayrollAdmin && employeeOptions.length > 0 && (
-          <SelectInput label="Employee" value={employeeId} onChange={(changeEvent) => setEmployeeId(changeEvent.target.value)} options={[{ value: '', label: 'My payslips' }, ...employeeOptions]} className="w-72" />
+          <SelectInput
+            label="Employee"
+            value={employeeId}
+            onChange={(changeEvent) => setEmployeeId(changeEvent.target.value)}
+            options={[{ value: '', label: 'My payslips' }, ...employeeOptions]}
+            className="w-72"
+          />
         )}
         <div className="w-72">
           <Toggle label="Show superseded revisions" checked={includeSuperseded} onChange={setIncludeSuperseded} />
         </div>
       </div>
       {isLoading && !data && <LoadingBlock label="Loading payslips…" />}
-      {error && <Notice tone={error.status === 404 ? 'info' : 'error'} title={error.status === 404 ? 'No employee profile is linked to your account.' : error.message} />}
-      {data && (data.payslips ?? []).length === 0 && <EmptyState Icon={DocumentIcon} title="No payslips yet" description="Payslips appear here as soon as payroll issues them." />}
+      {error && (
+        <Notice
+          tone={error.status === 404 ? 'info' : 'error'}
+          title={error.status === 404 ? 'No employee profile is linked to your account.' : error.message}
+        />
+      )}
+      {data && (data.payslips ?? []).length === 0 && (
+        <EmptyState
+          Icon={DocumentIcon}
+          title="No payslips yet"
+          description="Payslips appear here as soon as payroll issues them."
+        />
+      )}
       <ul className="space-y-3">
         {(data?.payslips ?? []).map((payslip) => (
           <PayslipRow key={payslip.id} payslip={payslip} />
@@ -436,7 +605,13 @@ function IssuePayslip({ rules, employeeOptions }) {
     setIssuedPayslip(null);
     try {
       const { payslip } = await requestPayslipGeneration(
-        { employeeId, year: Number(period.year), month: Number(period.month), reissue, ...buildCompensationPayload(compensation, rules.financialYear) },
+        {
+          employeeId,
+          year: Number(period.year),
+          month: Number(period.month),
+          reissue,
+          ...buildCompensationPayload(compensation, rules.financialYear),
+        },
         csrfToken,
       );
       setIssuedPayslip(payslip);
@@ -448,23 +623,60 @@ function IssuePayslip({ rules, employeeOptions }) {
   }
 
   if (employeeOptions.length === 0) {
-    return <EmptyState Icon={DocumentIcon} title="No employees found" description="Employee profiles appear here once HR creates them." />;
+    return (
+      <EmptyState
+        Icon={DocumentIcon}
+        title="No employees found"
+        description="Employee profiles appear here once HR creates them."
+      />
+    );
   }
   return (
-    <Card title="Issue a payslip" subtitle="Renders a signed PDF, stores it encrypted and makes it available to the employee.">
+    <Card
+      title="Issue a payslip"
+      subtitle="Renders a signed PDF, stores it encrypted and makes it available to the employee."
+    >
       <form onSubmit={handleIssue} className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-3">
-          <SelectInput label="Employee" value={employeeId} onChange={(changeEvent) => setEmployeeId(changeEvent.target.value)} options={employeeOptions} />
-          <SelectInput label="Month" value={period.month} onChange={(changeEvent) => setPeriod({ ...period, month: changeEvent.target.value })} options={MONTH_NAMES.map((monthName, monthIndex) => ({ value: String(monthIndex + 1), label: monthName }))} />
-          <TextInput label="Year" type="number" value={period.year} onChange={(changeEvent) => setPeriod({ ...period, year: changeEvent.target.value })} />
+          <SelectInput
+            label="Employee"
+            value={employeeId}
+            onChange={(changeEvent) => setEmployeeId(changeEvent.target.value)}
+            options={employeeOptions}
+          />
+          <SelectInput
+            label="Month"
+            value={period.month}
+            onChange={(changeEvent) => setPeriod({ ...period, month: changeEvent.target.value })}
+            options={MONTH_NAMES.map((monthName, monthIndex) => ({ value: String(monthIndex + 1), label: monthName }))}
+          />
+          <TextInput
+            label="Year"
+            type="number"
+            value={period.year}
+            onChange={(changeEvent) => setPeriod({ ...period, year: changeEvent.target.value })}
+          />
         </div>
-        <CompensationForm compensation={compensation} onChange={setCompensation} rules={rules} fieldErrors={issueError?.fieldErrors} />
-        <Toggle label="Reissue" description="Replace an already issued payslip for this month with a new revision" checked={reissue} onChange={setReissue} />
+        <CompensationForm
+          compensation={compensation}
+          onChange={setCompensation}
+          rules={rules}
+          fieldErrors={issueError?.fieldErrors}
+        />
+        <Toggle
+          label="Reissue"
+          description="Replace an already issued payslip for this month with a new revision"
+          checked={reissue}
+          onChange={setReissue}
+        />
         {issueError && <Notice tone="error" title={issueError.message} onDismiss={() => setIssueError(null)} />}
         {issuedPayslip && (
           <Notice tone="success" title={`Payslip issued: net pay ${formatInr(issuedPayslip.netPay)}`}>
             Verification ID <span className="font-mono">{issuedPayslip.verificationId}</span> ·{' '}
-            <Link className="font-semibold underline" to={`${ROUTE_PATHS.VERIFY_PAYSLIP}?id=${encodeURIComponent(issuedPayslip.verificationId)}`}>
+            <Link
+              className="font-semibold underline"
+              to={`${ROUTE_PATHS.VERIFY_PAYSLIP}?id=${encodeURIComponent(issuedPayslip.verificationId)}`}
+            >
               verify
             </Link>
           </Notice>
@@ -489,9 +701,17 @@ export default function PayrollCenter() {
   const [activeTabId, setActiveTabId] = useState('planner');
   const rulesResource = useApiResource((signal) => requestPayrollRules(signal), []);
   // HR and admins pick employees from the workforce roster (the risk report lists every current employee).
-  const rosterResource = useApiResource((signal) => requestWorkforceRisk({ limit: 500 }, signal), [], { enabled: isPayrollAdmin });
+  const rosterResource = useApiResource((signal) => requestWorkforceRisk({ limit: 500 }, signal), [], {
+    enabled: isPayrollAdmin,
+  });
   const employeeOptions = useMemo(
-    () => [...(rosterResource.data?.employees ?? [])].sort((first, second) => (first.name ?? '').localeCompare(second.name ?? '')).map((employee) => ({ value: employee.employeeId, label: `${employee.name ?? 'Unnamed'} · ${employee.designation ?? ''}` })),
+    () =>
+      [...(rosterResource.data?.employees ?? [])]
+        .sort((first, second) => (first.name ?? '').localeCompare(second.name ?? ''))
+        .map((employee) => ({
+          value: employee.employeeId,
+          label: `${employee.name ?? 'Unnamed'} · ${employee.designation ?? ''}`,
+        })),
     [rosterResource.data],
   );
 
@@ -514,17 +734,44 @@ export default function PayrollCenter() {
       />
       {rulesResource.data && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatTile label="Financial year" value={rulesResource.data.financialYear} hint="Income-tax Act 2025 rates" Icon={CurrencyIcon} accent="indigo" />
-          <StatTile label="Regimes compared" value="Old vs New" hint="Recommendation on every estimate" Icon={SparklesIcon} accent="emerald" />
-          <StatTile label="Payslips" value="Signed PDFs" hint="Tamper-evident verification ID" Icon={CheckBadgeIcon} accent="amber" />
+          <StatTile
+            label="Financial year"
+            value={rulesResource.data.financialYear}
+            hint="Income-tax Act 2025 rates"
+            Icon={CurrencyIcon}
+            accent="indigo"
+          />
+          <StatTile
+            label="Regimes compared"
+            value="Old vs New"
+            hint="Recommendation on every estimate"
+            Icon={SparklesIcon}
+            accent="emerald"
+          />
+          <StatTile
+            label="Payslips"
+            value="Signed PDFs"
+            hint="Tamper-evident verification ID"
+            Icon={CheckBadgeIcon}
+            accent="amber"
+          />
         </div>
       )}
       <Tabs tabs={tabs} activeTabId={activeTabId} onChange={setActiveTabId} label="Payroll tools" />
       {rulesResource.isLoading && <LoadingBlock label="Loading payroll rules…" />}
       {rulesResource.error && <Notice tone="error" title={rulesResource.error.message} />}
       {rulesResource.data && activeTabId === 'planner' && <TaxPlanner rules={rulesResource.data} />}
-      {activeTabId === 'payslips' && <PayslipLibrary isPayrollAdmin={isPayrollAdmin} employeeOptions={employeeOptions} />}
-      {rulesResource.data && activeTabId === 'issue' && isPayrollAdmin && (rosterResource.isLoading ? <LoadingBlock /> : <IssuePayslip rules={rulesResource.data} employeeOptions={employeeOptions} />)}
+      {activeTabId === 'payslips' && (
+        <PayslipLibrary isPayrollAdmin={isPayrollAdmin} employeeOptions={employeeOptions} />
+      )}
+      {rulesResource.data &&
+        activeTabId === 'issue' &&
+        isPayrollAdmin &&
+        (rosterResource.isLoading ? (
+          <LoadingBlock />
+        ) : (
+          <IssuePayslip rules={rulesResource.data} employeeOptions={employeeOptions} />
+        ))}
     </div>
   );
 }

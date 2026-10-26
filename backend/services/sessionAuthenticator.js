@@ -82,7 +82,13 @@ export function verifySessionToken(accessToken, authConfig) {
     throw verificationError;
   }
 
-  const { sub: userId, jti: sessionId, csrf: csrfTokenHash, exp: expiresAtSeconds, iat: issuedAtSeconds } = decodedTokenPayload;
+  const {
+    sub: userId,
+    jti: sessionId,
+    csrf: csrfTokenHash,
+    exp: expiresAtSeconds,
+    iat: issuedAtSeconds,
+  } = decodedTokenPayload;
   const hasExpectedClaims =
     typeof userId === 'string' &&
     mongoose.isValidObjectId(userId) &&
@@ -123,7 +129,9 @@ export async function loadSessionUser({ userId, sessionId, issuedAtSeconds }) {
   if (!userRecord) {
     return sessionFailure(SESSION_FAILURE_REASON.ACCOUNT_NOT_FOUND, SESSION_MESSAGES.ACCOUNT_NOT_FOUND, true);
   }
-  const passwordChangedAtSeconds = userRecord.passwordChangedAt ? Math.floor(userRecord.passwordChangedAt.getTime() / 1000) : null;
+  const passwordChangedAtSeconds = userRecord.passwordChangedAt
+    ? Math.floor(userRecord.passwordChangedAt.getTime() / 1000)
+    : null;
   if (passwordChangedAtSeconds !== null && issuedAtSeconds < passwordChangedAtSeconds) {
     return sessionFailure(SESSION_FAILURE_REASON.SESSION_REVOKED, SESSION_MESSAGES.SESSION_REVOKED, true);
   }

@@ -37,7 +37,13 @@ import { logger } from '../utils/logger.js';
 import { buildPayslipFigures } from './payslipDataBuilder.js';
 import { compilePayslipHtml } from './payslipHtmlTemplate.js';
 import { buildVerificationId, computePayslipContentHmac, isPayslipContentAuthentic } from './payslipVerification.js';
-import { PdfRenderError, closePdfRenderer, initPdfRenderer, isPdfRendererConfigured, renderHtmlToPdfStream } from './pdfGenerationService.js';
+import {
+  PdfRenderError,
+  closePdfRenderer,
+  initPdfRenderer,
+  isPdfRendererConfigured,
+  renderHtmlToPdfStream,
+} from './pdfGenerationService.js';
 import {
   PayslipStorageError,
   buildPayslipObjectKey,
@@ -78,7 +84,13 @@ let payslipSettings = null;
 export function initPayslipServices(payslipConfig) {
   initPayslipStorage(payslipConfig?.storage ?? null);
   initPdfRenderer(payslipConfig?.pdfBrowser ?? null);
-  payslipSettings = payslipConfig ? { signingSecret: payslipConfig.signingSecret, verificationBaseUrl: payslipConfig.verificationBaseUrl, company: payslipConfig.company } : null;
+  payslipSettings = payslipConfig
+    ? {
+        signingSecret: payslipConfig.signingSecret,
+        verificationBaseUrl: payslipConfig.verificationBaseUrl,
+        company: payslipConfig.company,
+      }
+    : null;
   if (!payslipConfig) logger.info('Payslip generation disabled', { reason: 'PAYSLIP_S3_BUCKET is not set' });
 }
 
@@ -93,7 +105,11 @@ export async function closePayslipServices() {
 
 function requireConfigured() {
   if (!isPayslipGenerationConfigured()) {
-    throw new PayslipGenerationError(503, PAYSLIP_ERROR_CODES.NOT_CONFIGURED, 'Payslip generation is not configured on this server');
+    throw new PayslipGenerationError(
+      503,
+      PAYSLIP_ERROR_CODES.NOT_CONFIGURED,
+      'Payslip generation is not configured on this server',
+    );
   }
 }
 
@@ -132,7 +148,17 @@ async function loadEmployeeForPayslip(employeeId) {
  * @returns {Promise<object>} the stored Payslip (lean, without storage key or HMAC)
  * @throws {PayslipGenerationError | import('../utils/payrollCalculator.js').PayrollInputError}
  */
-export async function generatePayslip({ employeeId, period, salaryStructure, investmentsDeclared, taxRegimeChoice, employmentDetails, reissue, generatedByUserId, requestId }) {
+export async function generatePayslip({
+  employeeId,
+  period,
+  salaryStructure,
+  investmentsDeclared,
+  taxRegimeChoice,
+  employmentDetails,
+  reissue,
+  generatedByUserId,
+  requestId,
+}) {
   requireConfigured();
 
   // ---- Stage 1: data calculation ---------------------------------------------------------------
@@ -140,33 +166,67 @@ export async function generatePayslip({ employeeId, period, salaryStructure, inv
   if (!employee) throw new PayslipGenerationError(404, PAYSLIP_ERROR_CODES.EMPLOYEE_NOT_FOUND, 'Employee not found');
 
   const periodFilter = { employeeId, 'period.year': period.year, 'period.month': period.month };
-  const issuedPayslip = await Payslip.findOne({ ...periodFilter, status: PAYSLIP_STATUSES.ISSUED }).select('_id revision').lean();
+  const issuedPayslip = await Payslip.findOne({ ...periodFilter, status: PAYSLIP_STATUSES.ISSUED })
+    .select('_id revision')
+    .lean();
   if (issuedPayslip && !reissue) {
-    throw new PayslipGenerationError(409, PAYSLIP_ERROR_CODES.PAYSLIP_EXISTS, `A payslip for this month already exists (${issuedPayslip._id}); send reissue: true to replace it`);
+    throw new PayslipGenerationError(
+      409,
+      PAYSLIP_ERROR_CODES.PAYSLIP_EXISTS,
+      `A payslip for this month already exists (${issuedPayslip._id}); send reissue: true to replace it`,
+    );
   }
   const latestRevision = await Payslip.findOne(periodFilter).sort({ revision: -1 }).select('revision').lean();
   const revision = (latestRevision?.revision ?? 0) + 1;
 
-  const figures = buildPayslipFigures({ employee, period, salaryStructure, investmentsDeclared, taxRegimeChoice, employmentDetails });
+  const figures = buildPayslipFigures({
+    employee,
+    period,
+    salaryStructure,
+    investmentsDeclared,
+    taxRegimeChoice,
+    employmentDetails,
+  });
 
   // ---- Stage 2: identity, verification and HTML compilation ------------------------------------
   const payslipId = new mongoose.Types.ObjectId();
   const issuedAt = new Date();
   const contentHmac = computePayslipContentHmac(
-    { payslipId: payslipId.toString(), employeeId, period, revision, earnings: figures.earnings, deductions: figures.deductions, grossEarnings: figures.grossEarnings, totalDeductions: figures.totalDeductions, netPay: figures.netPay, issuedAt },
+    {
+      payslipId: payslipId.toString(),
+      employeeId,
+      period,
+      revision,
+      earnings: figures.earnings,
+      deductions: figures.deductions,
+      grossEarnings: figures.grossEarnings,
+      totalDeductions: figures.totalDeductions,
+      netPay: figures.netPay,
+      issuedAt,
+    },
     payslipSettings.signingSecret,
   );
   const verificationId = buildVerificationId(contentHmac, period);
   const html = compilePayslipHtml({
     figures,
     company: payslipSettings.company,
-    verification: { verificationId, verificationUrl: payslipSettings.verificationBaseUrl ? `${payslipSettings.verificationBaseUrl}/${verificationId}` : null },
+    verification: {
+      verificationId,
+      verificationUrl: payslipSettings.verificationBaseUrl
+        ? `${payslipSettings.verificationBaseUrl}/${verificationId}`
+        : null,
+    },
     issuedAt,
     revision,
   });
 
   // ---- Stage 3: render and upload --------------------------------------------------------------
-  const objectKey = buildPayslipObjectKey({ year: period.year, month: period.month, employeeId, payslipId: payslipId.toString() });
+  const objectKey = buildPayslipObjectKey({
+    year: period.year,
+    month: period.month,
+    employeeId,
+    payslipId: payslipId.toString(),
+  });
   let storedObject;
   try {
     const pdfStream = await renderHtmlToPdfStream(html);
@@ -174,12 +234,20 @@ export async function generatePayslip({ employeeId, period, salaryStructure, inv
   } catch (pipelineError) {
     if (pipelineError instanceof PdfRenderError) {
       logger.error('Payslip PDF rendering failed', { requestId, employeeId, error: pipelineError.message });
-      throw new PayslipGenerationError(503, PAYSLIP_ERROR_CODES.RENDERER_UNAVAILABLE, 'The PDF renderer is unavailable. Please try again shortly');
+      throw new PayslipGenerationError(
+        503,
+        PAYSLIP_ERROR_CODES.RENDERER_UNAVAILABLE,
+        'The PDF renderer is unavailable. Please try again shortly',
+      );
     }
     if (pipelineError instanceof PayslipStorageError) {
       logger.error('Payslip upload failed', { requestId, employeeId, error: pipelineError.message });
       await deletePayslipObjectQuietly(objectKey, requestId);
-      throw new PayslipGenerationError(503, PAYSLIP_ERROR_CODES.STORAGE_UNAVAILABLE, 'Payslip storage is temporarily unavailable. Please try again shortly');
+      throw new PayslipGenerationError(
+        503,
+        PAYSLIP_ERROR_CODES.STORAGE_UNAVAILABLE,
+        'Payslip storage is temporarily unavailable. Please try again shortly',
+      );
     }
     throw pipelineError;
   }
@@ -192,7 +260,11 @@ export async function generatePayslip({ employeeId, period, salaryStructure, inv
     );
     if (!supersededPayslip) {
       await deletePayslipObjectQuietly(objectKey, requestId);
-      throw new PayslipGenerationError(409, PAYSLIP_ERROR_CODES.CONCURRENT_UPDATE, 'This payslip was changed by another request. Reload and try again');
+      throw new PayslipGenerationError(
+        409,
+        PAYSLIP_ERROR_CODES.CONCURRENT_UPDATE,
+        'This payslip was changed by another request. Reload and try again',
+      );
     }
   }
 
@@ -224,21 +296,45 @@ export async function generatePayslip({ employeeId, period, salaryStructure, inv
         monthlyTds: figures.taxSummary.monthlyTds,
       },
       verification: { verificationId, contentHmac },
-      storage: { s3Key: objectKey, sizeBytes: storedObject.sizeBytes, sha256: storedObject.sha256, contentType: 'application/pdf', serverSideEncryption: getPayslipServerSideEncryption() },
+      storage: {
+        s3Key: objectKey,
+        sizeBytes: storedObject.sizeBytes,
+        sha256: storedObject.sha256,
+        contentType: 'application/pdf',
+        serverSideEncryption: getPayslipServerSideEncryption(),
+      },
       generatedByUserId,
       issuedAt,
     });
-    logger.info('Payslip issued', { requestId, payslipId: payslipId.toString(), employeeId, period: `${period.year}-${period.month}`, revision, sizeBytes: storedObject.sizeBytes });
+    logger.info('Payslip issued', {
+      requestId,
+      payslipId: payslipId.toString(),
+      employeeId,
+      period: `${period.year}-${period.month}`,
+      revision,
+      sizeBytes: storedObject.sizeBytes,
+    });
     return storedPayslip.toJSON();
   } catch (writeError) {
     if (issuedPayslip) {
-      await Payslip.updateOne({ _id: issuedPayslip._id }, { $set: { status: PAYSLIP_STATUSES.ISSUED, supersededAt: null, supersededByPayslipId: null } }).catch((restoreError) =>
-        logger.error('Could not restore the previous payslip after a failed reissue', { requestId, payslipId: issuedPayslip._id.toString(), error: restoreError.message }),
+      await Payslip.updateOne(
+        { _id: issuedPayslip._id },
+        { $set: { status: PAYSLIP_STATUSES.ISSUED, supersededAt: null, supersededByPayslipId: null } },
+      ).catch((restoreError) =>
+        logger.error('Could not restore the previous payslip after a failed reissue', {
+          requestId,
+          payslipId: issuedPayslip._id.toString(),
+          error: restoreError.message,
+        }),
       );
     }
     await deletePayslipObjectQuietly(objectKey, requestId);
     if (writeError?.code === DUPLICATE_KEY_ERROR_CODE) {
-      throw new PayslipGenerationError(409, PAYSLIP_ERROR_CODES.PAYSLIP_EXISTS, 'A payslip for this month was issued by another request at the same time');
+      throw new PayslipGenerationError(
+        409,
+        PAYSLIP_ERROR_CODES.PAYSLIP_EXISTS,
+        'A payslip for this month was issued by another request at the same time',
+      );
     }
     throw writeError;
   }
@@ -257,7 +353,11 @@ export async function createPayslipDownload(payslipId) {
     const { downloadUrl, expiresAt } = await createPayslipDownloadUrl(payslip.storage.s3Key, fileName);
     return { payslip, download: { url: downloadUrl, expiresAt, expiresInSeconds: 60, fileName } };
   } catch (signingError) {
-    throw new PayslipGenerationError(503, PAYSLIP_ERROR_CODES.STORAGE_UNAVAILABLE, `Payslip storage is temporarily unavailable (${signingError.message})`);
+    throw new PayslipGenerationError(
+      503,
+      PAYSLIP_ERROR_CODES.STORAGE_UNAVAILABLE,
+      `Payslip storage is temporarily unavailable (${signingError.message})`,
+    );
   }
 }
 
@@ -274,7 +374,9 @@ function maskName(fullName) {
  */
 export async function verifyPayslip(verificationId) {
   requireConfigured();
-  const payslip = await Payslip.findOne({ 'verification.verificationId': verificationId }).select('+verification.contentHmac').lean();
+  const payslip = await Payslip.findOne({ 'verification.verificationId': verificationId })
+    .select('+verification.contentHmac')
+    .lean();
   if (!payslip) return { found: false };
   const authentic = isPayslipContentAuthentic(
     {
@@ -292,7 +394,10 @@ export async function verifyPayslip(verificationId) {
     payslip.verification.contentHmac,
     payslipSettings.signingSecret,
   );
-  if (!authentic) logger.error('Payslip verification failed: stored figures do not match their HMAC', { payslipId: payslip._id.toString() });
+  if (!authentic)
+    logger.error('Payslip verification failed: stored figures do not match their HMAC', {
+      payslipId: payslip._id.toString(),
+    });
   return {
     found: true,
     authentic,

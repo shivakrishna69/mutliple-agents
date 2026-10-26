@@ -63,7 +63,10 @@ const waitingRenders = [];
 export function initPdfRenderer(pdfBrowserConfig) {
   rendererConfig = pdfBrowserConfig;
   if (pdfBrowserConfig) {
-    logger.info('PDF renderer configured', { channel: pdfBrowserConfig.channel, customExecutable: Boolean(pdfBrowserConfig.executablePath) });
+    logger.info('PDF renderer configured', {
+      channel: pdfBrowserConfig.channel,
+      customExecutable: Boolean(pdfBrowserConfig.executablePath),
+    });
   }
 }
 
@@ -78,7 +81,9 @@ async function getBrowser() {
       .launch({
         headless: true,
         timeout: PDF_RENDER_SETTINGS.BROWSER_LAUNCH_TIMEOUT_MS,
-        ...(rendererConfig.executablePath ? { executablePath: rendererConfig.executablePath } : { channel: rendererConfig.channel }),
+        ...(rendererConfig.executablePath
+          ? { executablePath: rendererConfig.executablePath }
+          : { channel: rendererConfig.channel }),
       })
       .then((browser) => {
         browser.on('disconnected', () => {
@@ -90,7 +95,9 @@ async function getBrowser() {
       })
       .catch((launchError) => {
         browserPromise = null;
-        throw new PdfRenderError(`Could not start the PDF browser: ${launchError.message.split('\n')[0]}`, { cause: launchError });
+        throw new PdfRenderError(`Could not start the PDF browser: ${launchError.message.split('\n')[0]}`, {
+          cause: launchError,
+        });
       });
   }
   return browserPromise;
@@ -135,7 +142,9 @@ export async function renderHtmlToPdfStream(html) {
   try {
     const browser = await getBrowser();
     browserContext = await browser.newContext({ javaScriptEnabled: false, offline: true });
-    await browserContext.route('**/*', (route) => (route.request().url().startsWith('data:') ? route.continue() : route.abort('blockedbyclient')));
+    await browserContext.route('**/*', (route) =>
+      route.request().url().startsWith('data:') ? route.continue() : route.abort('blockedbyclient'),
+    );
     const page = await browserContext.newPage();
     page.setDefaultTimeout(PDF_RENDER_SETTINGS.RENDER_TIMEOUT_MS);
     await page.setContent(html, { waitUntil: 'load', timeout: PDF_RENDER_SETTINGS.RENDER_TIMEOUT_MS });

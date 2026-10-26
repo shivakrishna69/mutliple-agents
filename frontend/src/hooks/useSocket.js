@@ -137,7 +137,10 @@ export function useSocket({
       // a reconnect, whose `connect` handler re-joins.
       if (socketRef.current !== connectedSocket || activeConversationIdRef.current !== targetConversationId) return;
       setConversationJoinStatus(CONVERSATION_JOIN_STATUS.FAILED);
-      setLastSocketError({ code: CLIENT_SOCKET_ERROR_CODES.JOIN_TIMEOUT, message: SOCKET_CLIENT_MESSAGES.JOIN_TIMEOUT });
+      setLastSocketError({
+        code: CLIENT_SOCKET_ERROR_CODES.JOIN_TIMEOUT,
+        message: SOCKET_CLIENT_MESSAGES.JOIN_TIMEOUT,
+      });
       return;
     }
 
@@ -147,7 +150,11 @@ export function useSocket({
     if (joinAcknowledgement?.ok === true) {
       setConversationJoinStatus(CONVERSATION_JOIN_STATUS.JOINED);
       setLastSocketError(null);
-      invokeCallbackSafely('onConversationJoined', consumerCallbacksRef.current.onConversationJoined, joinAcknowledgement.conversation);
+      invokeCallbackSafely(
+        'onConversationJoined',
+        consumerCallbacksRef.current.onConversationJoined,
+        joinAcknowledgement.conversation,
+      );
     } else {
       setConversationJoinStatus(CONVERSATION_JOIN_STATUS.DENIED);
       setLastSocketError(isPlainObject(joinAcknowledgement?.error) ? joinAcknowledgement.error : null);
@@ -186,7 +193,9 @@ export function useSocket({
     const handleDisconnect = () => {
       // `socket.active` is true when the manager will reconnect by itself (transport loss), and
       // false when the server or this client closed the connection deliberately.
-      setConnectionStatus(socket.active ? SOCKET_CONNECTION_STATUS.RECONNECTING : SOCKET_CONNECTION_STATUS.DISCONNECTED);
+      setConnectionStatus(
+        socket.active ? SOCKET_CONNECTION_STATUS.RECONNECTING : SOCKET_CONNECTION_STATUS.DISCONNECTED,
+      );
       // Server-side room membership ended with the connection; the next `connect` re-joins.
       setConversationJoinStatus(CONVERSATION_JOIN_STATUS.IDLE);
     };
@@ -198,7 +207,10 @@ export function useSocket({
       if (socket.active) {
         // Transport-level failure; the manager is already scheduling the next attempt.
         setConnectionStatus(SOCKET_CONNECTION_STATUS.RECONNECTING);
-        setLastSocketError({ code: CLIENT_SOCKET_ERROR_CODES.CONNECTION_FAILED, message: SOCKET_CLIENT_MESSAGES.CONNECTION_FAILED });
+        setLastSocketError({
+          code: CLIENT_SOCKET_ERROR_CODES.CONNECTION_FAILED,
+          message: SOCKET_CLIENT_MESSAGES.CONNECTION_FAILED,
+        });
         return;
       }
 
@@ -211,7 +223,12 @@ export function useSocket({
 
       // Rejected for a reason that may be transient; Socket.IO will not retry this by itself.
       setConnectionStatus(SOCKET_CONNECTION_STATUS.RECONNECTING);
-      setLastSocketError(serverErrorPayload ?? { code: CLIENT_SOCKET_ERROR_CODES.CONNECTION_FAILED, message: SOCKET_CLIENT_MESSAGES.CONNECTION_FAILED });
+      setLastSocketError(
+        serverErrorPayload ?? {
+          code: CLIENT_SOCKET_ERROR_CODES.CONNECTION_FAILED,
+          message: SOCKET_CLIENT_MESSAGES.CONNECTION_FAILED,
+        },
+      );
       const retryDelayMs = computeReconnectDelayMs(rejectedHandshakeRetryCount);
       rejectedHandshakeRetryCount += 1;
       clearTimeout(rejectedHandshakeRetryTimer);
@@ -237,7 +254,11 @@ export function useSocket({
       // Not filtered by conversation: staff sockets receive every conversation's updates so that
       // queue views stay current; the caller decides which ones it needs.
       if (!isPlainObject(statusPayload)) return;
-      invokeCallbackSafely('onConversationStatusUpdated', consumerCallbacksRef.current.onConversationStatusUpdated, statusPayload);
+      invokeCallbackSafely(
+        'onConversationStatusUpdated',
+        consumerCallbacksRef.current.onConversationStatusUpdated,
+        statusPayload,
+      );
     };
 
     const handleConversationAccessRevoked = (revocationPayload) => {
@@ -246,7 +267,11 @@ export function useSocket({
         setConversationJoinStatus(CONVERSATION_JOIN_STATUS.REVOKED);
         setLastSocketError({ code: revocationPayload.code, message: revocationPayload.message });
       }
-      invokeCallbackSafely('onConversationAccessRevoked', consumerCallbacksRef.current.onConversationAccessRevoked, revocationPayload);
+      invokeCallbackSafely(
+        'onConversationAccessRevoked',
+        consumerCallbacksRef.current.onConversationAccessRevoked,
+        revocationPayload,
+      );
     };
 
     socket.on('connect', handleConnect);

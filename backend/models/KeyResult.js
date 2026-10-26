@@ -29,7 +29,12 @@ import { OKR_STATUSES } from './Objective.js';
 
 const { ObjectId } = mongoose.Schema.Types;
 
-export const KEY_RESULT_UNITS = Object.freeze({ PERCENT: 'percent', COUNT: 'count', CURRENCY_INR: 'currency_inr', SCORE: 'score' });
+export const KEY_RESULT_UNITS = Object.freeze({
+  PERCENT: 'percent',
+  COUNT: 'count',
+  CURRENCY_INR: 'currency_inr',
+  SCORE: 'score',
+});
 export const MILESTONE_STATUSES = Object.freeze({ PENDING: 'pending', DONE: 'done' });
 
 const finiteNumber = (label) => ({
@@ -41,7 +46,12 @@ const finiteNumber = (label) => ({
 const milestoneSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, minlength: 1, maxlength: OKR_FIELD_LIMITS.TITLE_MAX_LENGTH },
   dueDate: { type: String, match: [CALENDAR_DATE_PATTERN, 'dueDate must be YYYY-MM-DD'], default: null },
-  status: { type: String, enum: Object.values(MILESTONE_STATUSES), default: MILESTONE_STATUSES.PENDING, required: true },
+  status: {
+    type: String,
+    enum: Object.values(MILESTONE_STATUSES),
+    default: MILESTONE_STATUSES.PENDING,
+    required: true,
+  },
   completedAt: { type: Date, default: null },
   // ──► User._id
   completedByUserId: { type: ObjectId, ref: 'User', default: null },
@@ -62,15 +72,33 @@ const keyResultSchema = new mongoose.Schema(
   {
     // ──► Objective._id
     objectiveId: { type: ObjectId, ref: 'Objective', required: true, immutable: true },
-    title: { type: String, required: true, trim: true, minlength: OKR_FIELD_LIMITS.TITLE_MIN_LENGTH, maxlength: OKR_FIELD_LIMITS.TITLE_MAX_LENGTH },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: OKR_FIELD_LIMITS.TITLE_MIN_LENGTH,
+      maxlength: OKR_FIELD_LIMITS.TITLE_MAX_LENGTH,
+    },
     // ──► EmployeeProfile._id
     ownerEmployeeId: { type: ObjectId, ref: 'EmployeeProfile', required: true },
     unit: { type: String, enum: Object.values(KEY_RESULT_UNITS), required: true, immutable: true },
     startValue: { ...finiteNumber('startValue'), immutable: true },
     targetValue: finiteNumber('targetValue'),
     currentValue: finiteNumber('currentValue'),
-    weight: { type: Number, min: 1, max: OKR_FIELD_LIMITS.MAX_WEIGHT, default: 1, validate: { validator: Number.isInteger, message: 'weight must be a whole number' } },
-    milestones: { type: [milestoneSchema], validate: { validator: (milestones) => milestones.length <= OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT, message: `At most ${OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT} milestones` } },
+    weight: {
+      type: Number,
+      min: 1,
+      max: OKR_FIELD_LIMITS.MAX_WEIGHT,
+      default: 1,
+      validate: { validator: Number.isInteger, message: 'weight must be a whole number' },
+    },
+    milestones: {
+      type: [milestoneSchema],
+      validate: {
+        validator: (milestones) => milestones.length <= OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT,
+        message: `At most ${OKR_FIELD_LIMITS.MAX_MILESTONES_PER_KEY_RESULT} milestones`,
+      },
+    },
     checkIns: { type: [checkInSchema], default: [] },
     status: { type: String, enum: Object.values(OKR_STATUSES), default: OKR_STATUSES.ACTIVE, required: true },
   },
@@ -92,7 +120,8 @@ keyResultSchema.pre('validate', async function enforceKeyResultRules() {
   if (this.targetValue === this.startValue) this.invalidate('targetValue', 'targetValue must differ from startValue');
   if (this.unit === KEY_RESULT_UNITS.PERCENT) {
     for (const percentField of ['startValue', 'targetValue', 'currentValue']) {
-      if (this[percentField] < 0 || this[percentField] > 100) this.invalidate(percentField, `${percentField} must be between 0 and 100 for a percent key result`);
+      if (this[percentField] < 0 || this[percentField] > 100)
+        this.invalidate(percentField, `${percentField} must be between 0 and 100 for a percent key result`);
     }
   }
   for (const milestone of this.milestones) {

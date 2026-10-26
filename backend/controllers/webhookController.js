@@ -331,7 +331,11 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
       `reply failed schema validation on: ${Object.keys(validationError.errors).join(', ')}`,
       { durationMs: aiDecision.durationMs },
     );
-    const fallbackResult = await applyAiFallback({ conversationId, aiServiceError: invalidReplyError, logContext: stageContext });
+    const fallbackResult = await applyAiFallback({
+      conversationId,
+      aiServiceError: invalidReplyError,
+      logContext: stageContext,
+    });
     return { ...fallbackResult, customerMessageId: customerMessage._id.toString() };
   }
 
@@ -400,7 +404,9 @@ async function processCustomerMessage({ customerId, eventId, text, config, logCo
  * @returns {Promise<{ outcome: string, conversation: object|null, customerMessageId: string, reply: object|null }>}
  */
 export function ingestCustomerMessage({ customerId, eventId, text, config, logContext }) {
-  return runExclusivelyPerCustomer(customerId, () => processCustomerMessage({ customerId, eventId, text, config, logContext }));
+  return runExclusivelyPerCustomer(customerId, () =>
+    processCustomerMessage({ customerId, eventId, text, config, logContext }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +456,9 @@ export async function receiveIncomingMessage(req, res, next) {
     });
 
     const responseMessage =
-      processingResult.outcome === WEBHOOK_OUTCOME.DUPLICATE ? WEBHOOK_MESSAGES.DUPLICATE_EVENT : WEBHOOK_MESSAGES.MESSAGE_PROCESSED;
+      processingResult.outcome === WEBHOOK_OUTCOME.DUPLICATE
+        ? WEBHOOK_MESSAGES.DUPLICATE_EVENT
+        : WEBHOOK_MESSAGES.MESSAGE_PROCESSED;
     return sendSuccess(res, HTTP_STATUS.OK, responseMessage, processingResult);
   } catch (error) {
     return next(error);

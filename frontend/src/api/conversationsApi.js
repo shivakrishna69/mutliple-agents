@@ -23,7 +23,8 @@ function requireField({ responseData, httpStatus }, fieldName, isExpectedShape) 
   return fieldValue;
 }
 
-const isObject = (candidateValue) => typeof candidateValue === 'object' && candidateValue !== null && !Array.isArray(candidateValue);
+const isObject = (candidateValue) =>
+  typeof candidateValue === 'object' && candidateValue !== null && !Array.isArray(candidateValue);
 
 /** Conversations visible to the signed-in user, most recent activity first. */
 export async function requestConversationList({ signal } = {}) {
@@ -33,25 +34,43 @@ export async function requestConversationList({ signal } = {}) {
 
 /** One conversation's details, including the customer's public profile for staff. */
 export async function requestConversationDetails(conversationId, { signal } = {}) {
-  const apiResponse = await sendApiRequest({ method: 'GET', endpointPath: conversationPath(conversationId), callerSignal: signal });
+  const apiResponse = await sendApiRequest({
+    method: 'GET',
+    endpointPath: conversationPath(conversationId),
+    callerSignal: signal,
+  });
   return requireField(apiResponse, 'conversation', isObject);
 }
 
 /** The conversation's most recent messages, oldest first. */
 export async function requestConversationMessages(conversationId, { signal } = {}) {
-  const apiResponse = await sendApiRequest({ method: 'GET', endpointPath: conversationPath(conversationId, '/messages'), callerSignal: signal });
+  const apiResponse = await sendApiRequest({
+    method: 'GET',
+    endpointPath: conversationPath(conversationId, '/messages'),
+    callerSignal: signal,
+  });
   return requireField(apiResponse, 'messages', Array.isArray);
 }
 
 /** Staff: assign a waiting conversation to the caller. Resolves to the updated details. */
 export async function requestClaimConversation(conversationId, csrfToken) {
-  const apiResponse = await sendApiRequest({ method: 'POST', endpointPath: conversationPath(conversationId, '/claim'), requestPayload: {}, csrfToken });
+  const apiResponse = await sendApiRequest({
+    method: 'POST',
+    endpointPath: conversationPath(conversationId, '/claim'),
+    requestPayload: {},
+    csrfToken,
+  });
   return requireField(apiResponse, 'conversation', isObject);
 }
 
 /** Staff: hand the conversation back to the human queue. Resolves to the updated details. */
 export async function requestReleaseConversation(conversationId, csrfToken) {
-  const apiResponse = await sendApiRequest({ method: 'POST', endpointPath: conversationPath(conversationId, '/release'), requestPayload: {}, csrfToken });
+  const apiResponse = await sendApiRequest({
+    method: 'POST',
+    endpointPath: conversationPath(conversationId, '/release'),
+    requestPayload: {},
+    csrfToken,
+  });
   return requireField(apiResponse, 'conversation', isObject);
 }
 

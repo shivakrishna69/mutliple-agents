@@ -25,7 +25,11 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import Department from '../models/Department.js';
-import EmployeeInvitation, { INVITABLE_ROLES, INVITATION_LIMITS, INVITATION_STATUSES } from '../models/EmployeeInvitation.js';
+import EmployeeInvitation, {
+  INVITABLE_ROLES,
+  INVITATION_LIMITS,
+  INVITATION_STATUSES,
+} from '../models/EmployeeInvitation.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import User, { ROLES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
@@ -76,7 +80,9 @@ export function toInvitationSummary(invitation, { departmentNames = new Map(), m
     status: displayStatusOf(invitation),
     designation: draft.designation,
     department: { id: draft.departmentId.toString(), name: departmentNames.get(draft.departmentId.toString()) ?? null },
-    reportingManager: draft.reportingManagerId ? { id: draft.reportingManagerId.toString(), name: managerNames.get(draft.reportingManagerId.toString()) ?? null } : null,
+    reportingManager: draft.reportingManagerId
+      ? { id: draft.reportingManagerId.toString(), name: managerNames.get(draft.reportingManagerId.toString()) ?? null }
+      : null,
     workLocationType: draft.workLocationType,
     dateOfJoining: draft.dateOfJoining.toISOString().slice(0, 10),
     employmentStatus: draft.employmentStatus,
@@ -95,10 +101,14 @@ export function toInvitationSummary(invitation, { departmentNames = new Map(), m
 
 /** Current employees as { employeeId, name, designation, departmentId }, sorted by name. */
 async function loadCurrentEmployees() {
-  const profiles = await EmployeeProfile.find({ 'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED } })
+  const profiles = await EmployeeProfile.find({
+    'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
+  })
     .select('userId organizationData.designation organizationData.departmentId')
     .lean();
-  const accounts = await User.find({ _id: { $in: profiles.map((profile) => profile.userId) } }).select('name').lean();
+  const accounts = await User.find({ _id: { $in: profiles.map((profile) => profile.userId) } })
+    .select('name')
+    .lean();
   const nameByUserId = new Map(accounts.map((account) => [account._id.toString(), account.name]));
   return profiles
     .map((profile) => ({
@@ -112,9 +122,16 @@ async function loadCurrentEmployees() {
 
 /** Dropdown data for the invite form. */
 export async function loadInvitationFormOptions(inviterRole) {
-  const [departments, employees] = await Promise.all([Department.find().select('name code').sort({ name: 1 }).lean(), loadCurrentEmployees()]);
+  const [departments, employees] = await Promise.all([
+    Department.find().select('name code').sort({ name: 1 }).lean(),
+    loadCurrentEmployees(),
+  ]);
   return {
-    departments: departments.map((department) => ({ id: department._id.toString(), name: department.name, code: department.code })),
+    departments: departments.map((department) => ({
+      id: department._id.toString(),
+      name: department.name,
+      code: department.code,
+    })),
     managers: employees,
     roles: invitableRolesFor(inviterRole),
     workLocationTypes: ['Onsite', 'Hybrid', 'Remote'],
@@ -128,7 +145,9 @@ async function assertDraftReferences(profileDraft) {
     throw new InvitationError(400, 'DEPARTMENT_NOT_FOUND', 'The selected department no longer exists');
   }
   if (profileDraft.reportingManagerId) {
-    const manager = await EmployeeProfile.findById(profileDraft.reportingManagerId).select('organizationData.employmentStatus').lean();
+    const manager = await EmployeeProfile.findById(profileDraft.reportingManagerId)
+      .select('organizationData.employmentStatus')
+      .lean();
     if (!manager || manager.organizationData.employmentStatus === EMPLOYMENT_STATUSES.TERMINATED) {
       throw new InvitationError(400, 'MANAGER_NOT_FOUND', 'The selected reporting manager is not a current employee');
     }
@@ -174,9 +193,17 @@ export async function createInvitation({ inviter, input, appContext }) {
   }
   await assertDraftReferences(input.profileDraft);
 
-  const openInvitation = await EmployeeInvitation.findOne({ email: input.email, status: { $in: [INVITATION_STATUSES.PENDING, INVITATION_STATUSES.ACCEPTING] } });
+  const openInvitation = await EmployeeInvitation.findOne({
+    email: input.email,
+    status: { $in: [INVITATION_STATUSES.PENDING, INVITATION_STATUSES.ACCEPTING] },
+  });
   if (openInvitation) {
-    if (openInvitation.isUsable()) throw new InvitationError(409, 'INVITATION_EXISTS', 'This person already has an open invitation; resend it instead');
+    if (openInvitation.isUsable())
+      throw new InvitationError(
+        409,
+        'INVITATION_EXISTS',
+        'This person already has an open invitation; resend it instead',
+      );
     // An expired invitation should not block a fresh one.
     openInvitation.status = INVITATION_STATUSES.REVOKED;
     openInvitation.revokedAt = new Date();
@@ -201,7 +228,12 @@ export async function createInvitation({ inviter, input, appContext }) {
     });
   } catch (creationError) {
     // Two HR users inviting the same email at the same moment: the partial unique index decides.
-    if (creationError?.code === 11000) throw new InvitationError(409, 'INVITATION_EXISTS', 'This person already has an open invitation; resend it instead');
+    if (creationError?.code === 11000)
+      throw new InvitationError(
+        409,
+        'INVITATION_EXISTS',
+        'This person already has an open invitation; resend it instead',
+      );
     throw creationError;
   }
   const delivery = await deliverInvitation(invitation, rawToken, { inviterName: inviter.name, ...appContext });
@@ -212,9 +244,12 @@ export async function createInvitation({ inviter, input, appContext }) {
 export async function resendInvitation({ invitationId, inviter, appContext }) {
   const invitation = await EmployeeInvitation.findById(invitationId).select('+tokenHash');
   if (!invitation) throw new InvitationError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
-  if (invitation.status !== INVITATION_STATUSES.PENDING) throw new InvitationError(409, 'INVITATION_CLOSED', 'Only open invitations can be resent');
-  if (!invitableRolesFor(inviter.role).includes(invitation.role)) throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot manage invitations for this role');
-  if (await User.exists({ email: invitation.email })) throw new InvitationError(409, 'EMAIL_ALREADY_REGISTERED', 'Someone with this email already has an account');
+  if (invitation.status !== INVITATION_STATUSES.PENDING)
+    throw new InvitationError(409, 'INVITATION_CLOSED', 'Only open invitations can be resent');
+  if (!invitableRolesFor(inviter.role).includes(invitation.role))
+    throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot manage invitations for this role');
+  if (await User.exists({ email: invitation.email }))
+    throw new InvitationError(409, 'EMAIL_ALREADY_REGISTERED', 'Someone with this email already has an account');
 
   const { rawToken, tokenHash } = newInvitationToken();
   const now = new Date();
@@ -229,8 +264,10 @@ export async function resendInvitation({ invitationId, inviter, appContext }) {
 export async function revokeInvitation({ invitationId, inviter }) {
   const invitation = await EmployeeInvitation.findById(invitationId);
   if (!invitation) throw new InvitationError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
-  if (invitation.status !== INVITATION_STATUSES.PENDING) throw new InvitationError(409, 'INVITATION_CLOSED', 'This invitation is no longer open');
-  if (!invitableRolesFor(inviter.role).includes(invitation.role)) throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot manage invitations for this role');
+  if (invitation.status !== INVITATION_STATUSES.PENDING)
+    throw new InvitationError(409, 'INVITATION_CLOSED', 'This invitation is no longer open');
+  if (!invitableRolesFor(inviter.role).includes(invitation.role))
+    throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot manage invitations for this role');
   invitation.status = INVITATION_STATUSES.REVOKED;
   invitation.revokedAt = new Date();
   invitation.revokedByUserId = inviter.id;
@@ -241,24 +278,40 @@ export async function revokeInvitation({ invitationId, inviter }) {
 /** Newest first, optionally filtered by display status. */
 export async function listInvitations({ status }) {
   const now = new Date();
-  const statusFilter = {
-    pending: { status: { $in: [INVITATION_STATUSES.PENDING, INVITATION_STATUSES.ACCEPTING] }, expiresAt: { $gt: now } },
-    expired: { status: INVITATION_STATUSES.PENDING, expiresAt: { $lte: now } },
-    accepted: { status: INVITATION_STATUSES.ACCEPTED },
-    revoked: { status: INVITATION_STATUSES.REVOKED },
-  }[status] ?? {};
-  const invitations = await EmployeeInvitation.find(statusFilter).sort({ createdAt: -1 }).limit(INVITATION_LIMITS.LIST_LIMIT);
+  const statusFilter =
+    {
+      pending: {
+        status: { $in: [INVITATION_STATUSES.PENDING, INVITATION_STATUSES.ACCEPTING] },
+        expiresAt: { $gt: now },
+      },
+      expired: { status: INVITATION_STATUSES.PENDING, expiresAt: { $lte: now } },
+      accepted: { status: INVITATION_STATUSES.ACCEPTED },
+      revoked: { status: INVITATION_STATUSES.REVOKED },
+    }[status] ?? {};
+  const invitations = await EmployeeInvitation.find(statusFilter)
+    .sort({ createdAt: -1 })
+    .limit(INVITATION_LIMITS.LIST_LIMIT);
   const departmentIds = [...new Set(invitations.map((invitation) => invitation.profileDraft.departmentId.toString()))];
-  const managerIds = [...new Set(invitations.map((invitation) => invitation.profileDraft.reportingManagerId?.toString()).filter(Boolean))];
+  const managerIds = [
+    ...new Set(invitations.map((invitation) => invitation.profileDraft.reportingManagerId?.toString()).filter(Boolean)),
+  ];
   const [departments, managers] = await Promise.all([
-    Department.find({ _id: { $in: departmentIds } }).select('name').lean(),
-    EmployeeProfile.find({ _id: { $in: managerIds } }).select('userId').lean(),
+    Department.find({ _id: { $in: departmentIds } })
+      .select('name')
+      .lean(),
+    EmployeeProfile.find({ _id: { $in: managerIds } })
+      .select('userId')
+      .lean(),
   ]);
-  const managerAccounts = await User.find({ _id: { $in: managers.map((manager) => manager.userId) } }).select('name').lean();
+  const managerAccounts = await User.find({ _id: { $in: managers.map((manager) => manager.userId) } })
+    .select('name')
+    .lean();
   const accountNames = new Map(managerAccounts.map((account) => [account._id.toString(), account.name]));
   const lookups = {
     departmentNames: new Map(departments.map((department) => [department._id.toString(), department.name])),
-    managerNames: new Map(managers.map((manager) => [manager._id.toString(), accountNames.get(manager.userId.toString()) ?? null])),
+    managerNames: new Map(
+      managers.map((manager) => [manager._id.toString(), accountNames.get(manager.userId.toString()) ?? null]),
+    ),
   };
   return invitations.map((invitation) => toInvitationSummary(invitation, lookups));
 }
@@ -273,10 +326,18 @@ async function findInvitationByToken(rawToken) {
 }
 
 function assertUsable(invitation) {
-  if (!invitation || invitation.status === INVITATION_STATUSES.REVOKED) throw new InvitationError(404, 'INVITATION_INVALID', 'This invitation link is not valid. Ask HR for a new one.');
-  if (invitation.status === INVITATION_STATUSES.ACCEPTED) throw new InvitationError(410, 'INVITATION_USED', 'This invitation has already been used. Sign in with your email and password.');
-  if (invitation.status === INVITATION_STATUSES.ACCEPTING) throw new InvitationError(409, 'INVITATION_IN_PROGRESS', 'This invitation is being activated in another window.');
-  if (invitation.expiresAt <= new Date()) throw new InvitationError(410, 'INVITATION_EXPIRED', 'This invitation has expired. Ask HR to send a new one.');
+  if (!invitation || invitation.status === INVITATION_STATUSES.REVOKED)
+    throw new InvitationError(404, 'INVITATION_INVALID', 'This invitation link is not valid. Ask HR for a new one.');
+  if (invitation.status === INVITATION_STATUSES.ACCEPTED)
+    throw new InvitationError(
+      410,
+      'INVITATION_USED',
+      'This invitation has already been used. Sign in with your email and password.',
+    );
+  if (invitation.status === INVITATION_STATUSES.ACCEPTING)
+    throw new InvitationError(409, 'INVITATION_IN_PROGRESS', 'This invitation is being activated in another window.');
+  if (invitation.expiresAt <= new Date())
+    throw new InvitationError(410, 'INVITATION_EXPIRED', 'This invitation has expired. Ask HR to send a new one.');
 }
 
 /** What the accept page shows before the person sets a password. */
@@ -305,16 +366,26 @@ export async function acceptInvitation(rawToken, password) {
     { $set: { status: INVITATION_STATUSES.ACCEPTING } },
     { new: true },
   );
-  if (!claimedInvitation) throw new InvitationError(409, 'INVITATION_IN_PROGRESS', 'This invitation is being activated in another window.');
+  if (!claimedInvitation)
+    throw new InvitationError(409, 'INVITATION_IN_PROGRESS', 'This invitation is being activated in another window.');
 
   let createdUser = null;
   let createdProfileId = null;
   try {
     // Step 2: account, then profile.
     if (await User.exists({ email: claimedInvitation.email })) {
-      throw new InvitationError(409, 'EMAIL_ALREADY_REGISTERED', 'An account with this email already exists. Sign in instead, or ask HR for help.');
+      throw new InvitationError(
+        409,
+        'EMAIL_ALREADY_REGISTERED',
+        'An account with this email already exists. Sign in instead, or ask HR for help.',
+      );
     }
-    createdUser = await User.create({ name: claimedInvitation.name, email: claimedInvitation.email, password, role: claimedInvitation.role });
+    createdUser = await User.create({
+      name: claimedInvitation.name,
+      email: claimedInvitation.email,
+      password,
+      role: claimedInvitation.role,
+    });
     const draft = claimedInvitation.profileDraft;
     const createdProfile = await EmployeeProfile.create({
       userId: createdUser._id,
@@ -331,17 +402,47 @@ export async function acceptInvitation(rawToken, password) {
     createdProfileId = createdProfile._id;
 
     // Step 3: finish.
-    await EmployeeInvitation.updateOne({ _id: claimedInvitation._id }, { $set: { status: INVITATION_STATUSES.ACCEPTED, acceptedUserId: createdUser._id, acceptedAt: new Date() } });
+    await EmployeeInvitation.updateOne(
+      { _id: claimedInvitation._id },
+      { $set: { status: INVITATION_STATUSES.ACCEPTED, acceptedUserId: createdUser._id, acceptedAt: new Date() } },
+    );
     return createdUser;
   } catch (acceptError) {
-    if (createdProfileId) await EmployeeProfile.deleteOne({ _id: createdProfileId }).catch((cleanupError) => logger.error('Invitation rollback could not delete profile', { profileId: createdProfileId.toString(), error: cleanupError.message }));
-    if (createdUser) await User.deleteOne({ _id: createdUser._id }).catch((cleanupError) => logger.error('Invitation rollback could not delete user', { userId: createdUser._id.toString(), error: cleanupError.message }));
-    await EmployeeInvitation.updateOne({ _id: claimedInvitation._id, status: INVITATION_STATUSES.ACCEPTING }, { $set: { status: INVITATION_STATUSES.PENDING } });
+    if (createdProfileId)
+      await EmployeeProfile.deleteOne({ _id: createdProfileId }).catch((cleanupError) =>
+        logger.error('Invitation rollback could not delete profile', {
+          profileId: createdProfileId.toString(),
+          error: cleanupError.message,
+        }),
+      );
+    if (createdUser)
+      await User.deleteOne({ _id: createdUser._id }).catch((cleanupError) =>
+        logger.error('Invitation rollback could not delete user', {
+          userId: createdUser._id.toString(),
+          error: cleanupError.message,
+        }),
+      );
+    await EmployeeInvitation.updateOne(
+      { _id: claimedInvitation._id, status: INVITATION_STATUSES.ACCEPTING },
+      { $set: { status: INVITATION_STATUSES.PENDING } },
+    );
     if (acceptError instanceof InvitationError) throw acceptError;
-    if (acceptError?.code === 11000) throw new InvitationError(409, 'EMAIL_ALREADY_REGISTERED', 'An account with this email already exists. Sign in instead, or ask HR for help.');
+    if (acceptError?.code === 11000)
+      throw new InvitationError(
+        409,
+        'EMAIL_ALREADY_REGISTERED',
+        'An account with this email already exists. Sign in instead, or ask HR for help.',
+      );
     if (acceptError?.name === 'ValidationError') {
-      logger.warn('Invitation profile no longer valid', { invitationId: claimedInvitation._id.toString(), error: acceptError.message.slice(0, 200) });
-      throw new InvitationError(409, 'INVITATION_OUTDATED', 'Your invitation details changed (department or manager). Ask HR to send a new invitation.');
+      logger.warn('Invitation profile no longer valid', {
+        invitationId: claimedInvitation._id.toString(),
+        error: acceptError.message.slice(0, 200),
+      });
+      throw new InvitationError(
+        409,
+        'INVITATION_OUTDATED',
+        'Your invitation details changed (department or manager). Ask HR to send a new invitation.',
+      );
     }
     throw acceptError;
   }

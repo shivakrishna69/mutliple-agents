@@ -18,7 +18,17 @@ import { requestConversationList } from '../api/conversationsApi.js';
 import { ApiError, HTTP_STATUS_UNAUTHORIZED } from '../api/httpClient.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
-import { ArrowRightIcon, ChatIcon, ClockIcon, InboxIcon, KeyIcon, ShieldIcon, SparklesIcon, UserCircleIcon, UsersIcon } from '../components/Icons.jsx';
+import {
+  ArrowRightIcon,
+  ChatIcon,
+  ClockIcon,
+  InboxIcon,
+  KeyIcon,
+  ShieldIcon,
+  SparklesIcon,
+  UserCircleIcon,
+  UsersIcon,
+} from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import RoleBadge from '../components/RoleBadge.jsx';
 import { CONVERSATION_STATUS_DISPLAY, UNKNOWN_STATUS_DISPLAY } from '../constants/conversationDisplay.js';
@@ -46,7 +56,8 @@ function formatRelativeTime(isoTimestamp) {
     ['minute', 60],
   ];
   for (const [unitName, unitSeconds] of timeUnits) {
-    if (Math.abs(elapsedSeconds) >= unitSeconds) return relativeTimeFormatter.format(Math.round(elapsedSeconds / unitSeconds), unitName);
+    if (Math.abs(elapsedSeconds) >= unitSeconds)
+      return relativeTimeFormatter.format(Math.round(elapsedSeconds / unitSeconds), unitName);
   }
   return 'just now';
 }
@@ -71,7 +82,9 @@ function toDisplayableError(error) {
 function StatusChip({ status }) {
   const statusDisplay = CONVERSATION_STATUS_DISPLAY[status] ?? UNKNOWN_STATUS_DISPLAY;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusDisplay.chipClassName}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusDisplay.chipClassName}`}
+    >
       <span className={`h-1.5 w-1.5 rounded-full ${statusDisplay.dotClassName}`} aria-hidden="true" />
       {statusDisplay.label}
     </span>
@@ -88,7 +101,14 @@ function StatTile({ label, value, hint, Icon, accentClassName, isLoading }) {
         </span>
       </div>
       <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-        {isLoading ? <span className="inline-block h-8 w-12 animate-pulse rounded-lg bg-slate-100 align-middle" aria-label="Loading" /> : value}
+        {isLoading ? (
+          <span
+            className="inline-block h-8 w-12 animate-pulse rounded-lg bg-slate-100 align-middle"
+            aria-label="Loading"
+          />
+        ) : (
+          value
+        )}
       </p>
       <p className="mt-1 text-xs text-slate-500">{hint}</p>
     </div>
@@ -115,11 +135,15 @@ function CustomerOverview({ latestConversation, isLoading }) {
   return (
     <div className="grid gap-6 lg:grid-cols-5">
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-8 text-white shadow-xl shadow-indigo-500/20 lg:col-span-3">
-        <div className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
+        <div
+          className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-2xl"
+          aria-hidden="true"
+        />
         <SparklesIcon className="h-8 w-8 text-indigo-100" />
         <h2 className="mt-4 text-2xl font-bold tracking-tight">Need a hand? We reply in seconds.</h2>
         <p className="mt-2 max-w-md text-sm text-indigo-100">
-          Describe your problem in plain words. Our AI assistant answers right away, and a support specialist can take over the same chat whenever you need a person.
+          Describe your problem in plain words. Our AI assistant answers right away, and a support specialist can take
+          over the same chat whenever you need a person.
         </p>
         <Link
           to={ROUTE_PATHS.SUPPORT}
@@ -143,23 +167,39 @@ function CustomerOverview({ latestConversation, isLoading }) {
             <StatusChip status={latestConversation.status} />
             <p className="mt-3 text-sm text-slate-700">{CUSTOMER_STATUS_SUMMARY[latestConversation.status] ?? ''}</p>
             {latestConversation.lastMessagePreview && (
-              <p className="mt-3 line-clamp-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">“{latestConversation.lastMessagePreview}”</p>
+              <p className="mt-3 line-clamp-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                “{latestConversation.lastMessagePreview}”
+              </p>
             )}
             <p className="mt-3 text-xs text-slate-400">Updated {formatRelativeTime(latestConversation.updatedAt)}</p>
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-6 text-center">
             <ChatIcon className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-2 text-sm text-slate-500">No conversations yet. When you contact support, its status shows here.</p>
+            <p className="mt-2 text-sm text-slate-500">
+              No conversations yet. When you contact support, its status shows here.
+            </p>
           </div>
         )}
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3 lg:col-span-5">
         {[
-          { Icon: SparklesIcon, title: 'Instant answers', text: 'Billing and technical specialists reply immediately.' },
-          { Icon: UsersIcon, title: 'Real people on request', text: 'Ask for a person and a specialist joins the same chat.' },
-          { Icon: ShieldIcon, title: 'Private and secure', text: 'Only you and our support team can see your conversations.' },
+          {
+            Icon: SparklesIcon,
+            title: 'Instant answers',
+            text: 'Billing and technical specialists reply immediately.',
+          },
+          {
+            Icon: UsersIcon,
+            title: 'Real people on request',
+            text: 'Ask for a person and a specialist joins the same chat.',
+          },
+          {
+            Icon: ShieldIcon,
+            title: 'Private and secure',
+            text: 'Only you and our support team can see your conversations.',
+          },
         ].map(({ Icon, title, text }) => (
           <div key={title} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
             <Icon className="h-6 w-6 text-indigo-500" />
@@ -177,10 +217,18 @@ function TeamMemberOverview({ currentUser }) {
   return (
     <div className="grid gap-6 lg:grid-cols-5">
       <section className="relative overflow-hidden rounded-3xl bg-slate-950 p-8 text-white shadow-xl lg:col-span-3">
-        <div className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-amber-400/20 blur-2xl" aria-hidden="true" />
+        <div
+          className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-amber-400/20 blur-2xl"
+          aria-hidden="true"
+        />
         <ShieldIcon className="h-8 w-8 text-amber-300" />
-        <h2 className="mt-4 text-2xl font-bold tracking-tight">{ROLE_DISPLAY[currentUser.role]?.label ?? currentUser.role} workspace</h2>
-        <p className="mt-2 max-w-md text-sm text-slate-300">{ROLE_DISPLAY[currentUser.role]?.description}. Access to employee documents is granted per document and every access is audited.</p>
+        <h2 className="mt-4 text-2xl font-bold tracking-tight">
+          {ROLE_DISPLAY[currentUser.role]?.label ?? currentUser.role} workspace
+        </h2>
+        <p className="mt-2 max-w-md text-sm text-slate-300">
+          {ROLE_DISPLAY[currentUser.role]?.description}. Access to employee documents is granted per document and every
+          access is audited.
+        </p>
       </section>
       <section className="space-y-4 lg:col-span-2">
         {[
@@ -209,15 +257,33 @@ function TeamMemberOverview({ currentUser }) {
 function StaffOverview({ currentUser, conversations, isLoadingConversations, userCounts, isLoadingUsers }) {
   const isAdmin = currentUser.role === USER_ROLES.ADMIN;
   const waitingCount = conversations.filter((conversation) => conversation.status === 'escalated-to-human').length;
-  const mineCount = conversations.filter((conversation) => conversation.status === 'assigned-agent' && conversation.assignedAgentId === currentUser.id).length;
-  const aiCount = conversations.filter((conversation) => conversation.status === 'processing-ai' || conversation.status === 'unassigned').length;
+  const mineCount = conversations.filter(
+    (conversation) => conversation.status === 'assigned-agent' && conversation.assignedAgentId === currentUser.id,
+  ).length;
+  const aiCount = conversations.filter(
+    (conversation) => conversation.status === 'processing-ai' || conversation.status === 'unassigned',
+  ).length;
   const recentConversations = conversations.slice(0, 6);
 
   return (
     <div className="space-y-6">
       <div className={`grid gap-4 sm:grid-cols-2 ${isAdmin ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
-        <StatTile label="Waiting for an agent" value={waitingCount} hint="Escalated and not yet claimed" Icon={ClockIcon} accentClassName="bg-amber-50 text-amber-600" isLoading={isLoadingConversations} />
-        <StatTile label="Assigned to you" value={mineCount} hint="Conversations you are handling" Icon={InboxIcon} accentClassName="bg-emerald-50 text-emerald-600" isLoading={isLoadingConversations} />
+        <StatTile
+          label="Waiting for an agent"
+          value={waitingCount}
+          hint="Escalated and not yet claimed"
+          Icon={ClockIcon}
+          accentClassName="bg-amber-50 text-amber-600"
+          isLoading={isLoadingConversations}
+        />
+        <StatTile
+          label="Assigned to you"
+          value={mineCount}
+          hint="Conversations you are handling"
+          Icon={InboxIcon}
+          accentClassName="bg-emerald-50 text-emerald-600"
+          isLoading={isLoadingConversations}
+        />
         <StatTile
           label={isAdmin ? 'Handled by AI' : 'Visible to you'}
           value={isAdmin ? aiCount : conversations.length}
@@ -229,8 +295,16 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
         {isAdmin && (
           <StatTile
             label="Accounts"
-            value={userCounts ? Object.values(userCounts).reduce((runningTotal, roleCount) => runningTotal + roleCount, 0) : '—'}
-            hint={userCounts ? `${userCounts.admin ?? 0} admin · ${userCounts.agent ?? 0} agent · ${userCounts.customer ?? 0} customer` : 'Unavailable'}
+            value={
+              userCounts
+                ? Object.values(userCounts).reduce((runningTotal, roleCount) => runningTotal + roleCount, 0)
+                : '—'
+            }
+            hint={
+              userCounts
+                ? `${userCounts.admin ?? 0} admin · ${userCounts.agent ?? 0} agent · ${userCounts.customer ?? 0} customer`
+                : 'Unavailable'
+            }
             Icon={UsersIcon}
             accentClassName="bg-violet-50 text-violet-600"
             isLoading={isLoadingUsers}
@@ -242,7 +316,10 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
         <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm xl:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-semibold text-slate-900">Recent conversations</h2>
-            <Link to={ROUTE_PATHS.CONSOLE} className="inline-flex items-center gap-1 rounded text-sm font-medium text-indigo-600 hover:text-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none">
+            <Link
+              to={ROUTE_PATHS.CONSOLE}
+              className="inline-flex items-center gap-1 rounded text-sm font-medium text-indigo-600 hover:text-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+            >
               Open console <ArrowRightIcon className="h-4 w-4" />
             </Link>
           </div>
@@ -251,7 +328,9 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
           ) : recentConversations.length === 0 ? (
             <div className="px-5 py-12 text-center">
               <InboxIcon className="mx-auto h-8 w-8 text-slate-300" />
-              <p className="mt-2 text-sm text-slate-500">No conversations to show yet. New escalations appear here and in the console.</p>
+              <p className="mt-2 text-sm text-slate-500">
+                No conversations to show yet. New escalations appear here and in the console.
+              </p>
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
@@ -261,15 +340,24 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
                     to={`${ROUTE_PATHS.CONSOLE}?conversation=${encodeURIComponent(conversation.conversationId)}`}
                     className="flex items-center gap-4 px-5 py-4 transition hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600" aria-hidden="true">
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600"
+                      aria-hidden="true"
+                    >
                       {(conversation.customerName ?? '?').trim().charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-slate-900">{conversation.customerName ?? 'Unknown customer'}</span>
-                        <span className="shrink-0 text-xs text-slate-400">{formatRelativeTime(conversation.updatedAt)}</span>
+                        <span className="truncate text-sm font-semibold text-slate-900">
+                          {conversation.customerName ?? 'Unknown customer'}
+                        </span>
+                        <span className="shrink-0 text-xs text-slate-400">
+                          {formatRelativeTime(conversation.updatedAt)}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-sm text-slate-500">{conversation.lastMessagePreview ?? 'No messages yet'}</span>
+                      <span className="mt-0.5 block truncate text-sm text-slate-500">
+                        {conversation.lastMessagePreview ?? 'No messages yet'}
+                      </span>
                     </span>
                     <span className="hidden sm:block">
                       <StatusChip status={conversation.status} />
@@ -285,7 +373,9 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
           <div className="rounded-2xl bg-slate-950 p-6 text-white shadow-sm">
             <InboxIcon className="h-7 w-7 text-indigo-300" />
             <h2 className="mt-3 text-base font-semibold">Support console</h2>
-            <p className="mt-1 text-sm text-slate-400">Claim escalated chats, reply to customers live, and review the AI’s reasoning logs.</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Claim escalated chats, reply to customers live, and review the AI’s reasoning logs.
+            </p>
             <Link
               to={ROUTE_PATHS.CONSOLE}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-50 focus-visible:ring-4 focus-visible:ring-white/30 focus-visible:outline-none"
@@ -297,7 +387,9 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
               <UsersIcon className="h-7 w-7 text-violet-500" />
               <h2 className="mt-3 text-base font-semibold text-slate-900">Team & roles</h2>
-              <p className="mt-1 text-sm text-slate-500">Promote customers to agents or admins and manage who can work in the console.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Promote customers to agents or admins and manage who can work in the console.
+              </p>
               <Link
                 to={ROUTE_PATHS.ADMIN_USERS}
                 className="mt-5 inline-flex items-center gap-1 rounded text-sm font-semibold text-violet-600 hover:text-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none"
@@ -377,7 +469,14 @@ export default function Dashboard() {
         actions={<RoleBadge role={currentUser.role} />}
       />
 
-      {pageError && <ErrorBanner title="Some information could not be loaded" message={pageError.message} requestId={pageError.requestId} onDismiss={() => setPageError(null)} />}
+      {pageError && (
+        <ErrorBanner
+          title="Some information could not be loaded"
+          message={pageError.message}
+          requestId={pageError.requestId}
+          onDismiss={() => setPageError(null)}
+        />
+      )}
 
       {isStaff ? (
         <StaffOverview

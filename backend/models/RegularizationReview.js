@@ -57,7 +57,11 @@ const reviewDecisionSchema = new mongoose.Schema(
     decidedAt: { type: Date, required: true },
     note: { type: String, trim: true, maxlength: 500, default: null },
     // Approvals only: the punch-in time the reviewer accepted, local "HH:MM", and the entry written.
-    approvedPunchInTime: { type: String, match: [LOCAL_TIME_PATTERN, 'approvedPunchInTime must be HH:MM'], default: null },
+    approvedPunchInTime: {
+      type: String,
+      match: [LOCAL_TIME_PATTERN, 'approvedPunchInTime must be HH:MM'],
+      default: null,
+    },
     attendanceId: { type: ObjectId, ref: 'Attendance', default: null },
   },
   { _id: false },
@@ -73,11 +77,24 @@ const regularizationReviewSchema = new mongoose.Schema(
       type: String,
       default: null,
       immutable: true,
-      validate: { validator: (calendarDate) => calendarDate === null || isRealCalendarDate(calendarDate), message: 'date must be YYYY-MM-DD' },
+      validate: {
+        validator: (calendarDate) => calendarDate === null || isRealCalendarDate(calendarDate),
+        message: 'date must be YYYY-MM-DD',
+      },
     },
-    claimedPunchInTime: { type: String, match: [LOCAL_TIME_PATTERN, 'claimedPunchInTime must be HH:MM'], default: null, immutable: true },
+    claimedPunchInTime: {
+      type: String,
+      match: [LOCAL_TIME_PATTERN, 'claimedPunchInTime must be HH:MM'],
+      default: null,
+      immutable: true,
+    },
     reason: { type: String, trim: true, maxlength: 300, default: null, immutable: true },
-    routingReason: { type: String, enum: { values: REVIEW_ROUTING_REASONS, message: 'routingReason "{VALUE}" is not valid' }, required: true, immutable: true },
+    routingReason: {
+      type: String,
+      enum: { values: REVIEW_ROUTING_REASONS, message: 'routingReason "{VALUE}" is not valid' },
+      required: true,
+      immutable: true,
+    },
     qualifyingEventCount: { type: Number, min: 0, default: 0, immutable: true },
     // The employee's punch-in geofence radius when the review was filed, for the reviewer's context.
     allowedGeofenceRadius: { type: Number, min: 0, default: null, immutable: true },
@@ -105,7 +122,10 @@ regularizationReviewSchema.pre('validate', function enforceDecisionConsistency()
   if (isDecided !== Boolean(this.decision)) {
     this.invalidate('decision', 'A decided review must record its decision, and a pending one must not');
   }
-  if (this.status === REVIEW_STATUSES.APPROVED && (!this.decision?.approvedPunchInTime || !this.decision?.attendanceId)) {
+  if (
+    this.status === REVIEW_STATUSES.APPROVED &&
+    (!this.decision?.approvedPunchInTime || !this.decision?.attendanceId)
+  ) {
     this.invalidate('decision', 'An approved review must record the approved punch-in time and the attendance entry');
   }
 });

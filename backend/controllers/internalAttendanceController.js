@@ -26,7 +26,11 @@ import { REGULARIZATION_MESSAGES } from '../constants/messages.js';
 import { REGULARIZATION_METHODS } from '../models/Attendance.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
 import RegularizationReview from '../models/RegularizationReview.js';
-import { RegularizationRuleError, recordRegularizedAttendance, toRegularizedAttendanceSummary } from '../services/attendanceRegularization.js';
+import {
+  RegularizationRuleError,
+  recordRegularizedAttendance,
+  toRegularizedAttendanceSummary,
+} from '../services/attendanceRegularization.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { validateAgentRegularization, validateAgentReviewSubmission } from '../validators/regularizationValidators.js';
@@ -67,7 +71,13 @@ export async function createAgentRegularization(req, res, next) {
   try {
     const inputValidation = validateAgentRegularization(req.body);
     if (!inputValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, inputValidation.validationErrors[0].message, inputValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        inputValidation.validationErrors[0].message,
+        inputValidation.validationErrors,
+      );
     }
     const { employeeId, date, punchInTime, evidenceEventCount, reason, threadId } = inputValidation.sanitizedInput;
 
@@ -101,7 +111,9 @@ export async function createAgentRegularization(req, res, next) {
     return sendSuccess(
       res,
       writeResult.newlyCreated ? HTTP_STATUS.CREATED : HTTP_STATUS.OK,
-      writeResult.newlyCreated ? REGULARIZATION_MESSAGES.REGULARIZATION_RECORDED : REGULARIZATION_MESSAGES.REGULARIZATION_ALREADY_RECORDED,
+      writeResult.newlyCreated
+        ? REGULARIZATION_MESSAGES.REGULARIZATION_RECORDED
+        : REGULARIZATION_MESSAGES.REGULARIZATION_ALREADY_RECORDED,
       { attendance: attendanceSummary, newlyCreated: writeResult.newlyCreated },
     );
   } catch (error) {
@@ -114,18 +126,31 @@ export async function fileAgentReview(req, res, next) {
   try {
     const inputValidation = validateAgentReviewSubmission(req.body);
     if (!inputValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, inputValidation.validationErrors[0].message, inputValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        inputValidation.validationErrors[0].message,
+        inputValidation.validationErrors,
+      );
     }
     const reviewInput = inputValidation.sanitizedInput;
 
     const existingReview = await RegularizationReview.findOne({ idempotencyKey: reviewInput.idempotencyKey }).lean();
     if (existingReview) {
-      return sendSuccess(res, HTTP_STATUS.OK, REGULARIZATION_MESSAGES.REVIEW_ALREADY_FILED, { review: toReviewSummary(existingReview) });
+      return sendSuccess(res, HTTP_STATUS.OK, REGULARIZATION_MESSAGES.REVIEW_ALREADY_FILED, {
+        review: toReviewSummary(existingReview),
+      });
     }
 
-    const employeeProfile = await EmployeeProfile.findById(reviewInput.employeeId).select('userId organizationData.reportingManagerId').lean();
+    const employeeProfile = await EmployeeProfile.findById(reviewInput.employeeId)
+      .select('userId organizationData.reportingManagerId')
+      .lean();
     if (!employeeProfile) {
-      return sendCodedError(req, res, HTTP_STATUS.NOT_FOUND, { code: 'EMPLOYEE_NOT_FOUND', message: 'Employee not found' });
+      return sendCodedError(req, res, HTTP_STATUS.NOT_FOUND, {
+        code: 'EMPLOYEE_NOT_FOUND',
+        message: 'Employee not found',
+      });
     }
 
     let storedReview;
@@ -146,7 +171,9 @@ export async function fileAgentReview(req, res, next) {
       if (writeError?.code !== DUPLICATE_KEY_ERROR_CODE) throw writeError;
       // A concurrent retry stored it first.
       const racedReview = await RegularizationReview.findOne({ idempotencyKey: reviewInput.idempotencyKey }).lean();
-      return sendSuccess(res, HTTP_STATUS.OK, REGULARIZATION_MESSAGES.REVIEW_ALREADY_FILED, { review: toReviewSummary(racedReview) });
+      return sendSuccess(res, HTTP_STATUS.OK, REGULARIZATION_MESSAGES.REVIEW_ALREADY_FILED, {
+        review: toReviewSummary(racedReview),
+      });
     }
 
     auditAgentAction(req, 'file_review', AUDIT_OUTCOMES.ALLOWED, {
@@ -155,7 +182,9 @@ export async function fileAgentReview(req, res, next) {
       date: reviewInput.date,
       routingReason: reviewInput.routingReason,
     });
-    return sendSuccess(res, HTTP_STATUS.CREATED, REGULARIZATION_MESSAGES.REVIEW_FILED, { review: toReviewSummary(storedReview) });
+    return sendSuccess(res, HTTP_STATUS.CREATED, REGULARIZATION_MESSAGES.REVIEW_FILED, {
+      review: toReviewSummary(storedReview),
+    });
   } catch (error) {
     return next(error);
   }

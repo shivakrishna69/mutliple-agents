@@ -108,7 +108,13 @@ export async function punchIn(req, res, next) {
     // ---- 1. Input -----------------------------------------------------------------------------
     const inputValidation = validatePunchInInput(req.body);
     if (!inputValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, inputValidation.validationErrors[0].message, inputValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        inputValidation.validationErrors[0].message,
+        inputValidation.validationErrors,
+      );
     }
     const { lat, lng, accuracyMeters, deviceFingerprint, macAddress } = inputValidation.sanitizedInput;
     const punchPoint = { lat, lng };
@@ -119,20 +125,29 @@ export async function punchIn(req, res, next) {
       .lean();
     if (!employeeProfile) {
       auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { reason: 'profile_not_found' });
-      return sendCodedError(req, res, HTTP_STATUS.NOT_FOUND, { code: ATTENDANCE_ERROR_CODES.PROFILE_NOT_FOUND, message: ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND });
+      return sendCodedError(req, res, HTTP_STATUS.NOT_FOUND, {
+        code: ATTENDANCE_ERROR_CODES.PROFILE_NOT_FOUND,
+        message: ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND,
+      });
     }
     const employeeId = employeeProfile._id.toString();
     const { workLocationType, employmentStatus, officeLocationId } = employeeProfile.organizationData;
     if (employmentStatus === EMPLOYMENT_STATUSES.TERMINATED) {
       auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: 'employment_ended' });
-      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, { code: ATTENDANCE_ERROR_CODES.EMPLOYMENT_ENDED, message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED });
+      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
+        code: ATTENDANCE_ERROR_CODES.EMPLOYMENT_ENDED,
+        message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED,
+      });
     }
 
     // ---- 3. Office ----------------------------------------------------------------------------
     const office = officeLocationId ? await OfficeLocation.findById(officeLocationId).lean() : null;
     if (!office) {
       auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'office_not_configured' });
-      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, { code: ATTENDANCE_ERROR_CODES.OFFICE_NOT_CONFIGURED, message: ATTENDANCE_MESSAGES.OFFICE_NOT_CONFIGURED });
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: ATTENDANCE_ERROR_CODES.OFFICE_NOT_CONFIGURED,
+        message: ATTENDANCE_MESSAGES.OFFICE_NOT_CONFIGURED,
+      });
     }
 
     // ---- 4. Device ----------------------------------------------------------------------------
@@ -140,8 +155,14 @@ export async function punchIn(req, res, next) {
     // the reported address (if any) is only recorded.
     const registeredMacAddress = employeeProfile.biometricMetadata?.registeredDeviceMacAddress ?? null;
     if (registeredMacAddress && macAddress !== registeredMacAddress) {
-      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: macAddress ? 'device_mac_mismatch' : 'device_mac_missing' });
-      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, { code: ATTENDANCE_ERROR_CODES.DEVICE_NOT_RECOGNISED, message: ATTENDANCE_MESSAGES.DEVICE_NOT_RECOGNISED });
+      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, {
+        employeeId,
+        reason: macAddress ? 'device_mac_mismatch' : 'device_mac_missing',
+      });
+      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
+        code: ATTENDANCE_ERROR_CODES.DEVICE_NOT_RECOGNISED,
+        message: ATTENDANCE_MESSAGES.DEVICE_NOT_RECOGNISED,
+      });
     }
 
     // ---- 5. Precision -------------------------------------------------------------------------
@@ -159,18 +180,30 @@ export async function punchIn(req, res, next) {
     const punchedAt = new Date();
     const { calendarDate, minutesSinceMidnight } = readOfficeLocalClock(punchedAt, office.timeZone);
     if (await Attendance.exists({ employeeId, date: calendarDate })) {
-      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, { code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN, message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN });
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN,
+        message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN,
+      });
     }
 
     // ---- 7. Geofence --------------------------------------------------------------------------
     const isGeofenceEnforced = workLocationType !== WORK_LOCATION_TYPES.REMOTE;
-    const allowedRadiusMeters = isGeofenceEnforced ? (employeeProfile.biometricMetadata?.allowedGeofenceRadius ?? null) : null;
+    const allowedRadiusMeters = isGeofenceEnforced
+      ? (employeeProfile.biometricMetadata?.allowedGeofenceRadius ?? null)
+      : null;
     if (isGeofenceEnforced && allowedRadiusMeters === null) {
       auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'geofence_not_configured' });
-      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, { code: ATTENDANCE_ERROR_CODES.GEOFENCE_NOT_CONFIGURED, message: ATTENDANCE_MESSAGES.GEOFENCE_NOT_CONFIGURED });
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: ATTENDANCE_ERROR_CODES.GEOFENCE_NOT_CONFIGURED,
+        message: ATTENDANCE_MESSAGES.GEOFENCE_NOT_CONFIGURED,
+      });
     }
     // Remote employees are measured too (with an infinite radius), so the record shows where they punched from.
-    const { distanceMeters, isInsideGeofence } = evaluateGeofence(punchPoint, office.coordinates, isGeofenceEnforced ? allowedRadiusMeters : Number.POSITIVE_INFINITY);
+    const { distanceMeters, isInsideGeofence } = evaluateGeofence(
+      punchPoint,
+      office.coordinates,
+      isGeofenceEnforced ? allowedRadiusMeters : Number.POSITIVE_INFINITY,
+    );
     const roundedDistanceMeters = roundMetres(distanceMeters);
     if (!isInsideGeofence) {
       auditPunchIn(req, AUDIT_OUTCOMES.DENIED, {
@@ -210,7 +243,10 @@ export async function punchIn(req, res, next) {
     } catch (persistError) {
       // A concurrent punch-in for the same day won the unique index.
       if (persistError?.code === DUPLICATE_KEY_ERROR_CODE) {
-        return sendCodedError(req, res, HTTP_STATUS.CONFLICT, { code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN, message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN });
+        return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+          code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN,
+          message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN,
+        });
       }
       throw persistError;
     }
@@ -227,12 +263,13 @@ export async function punchIn(req, res, next) {
       accuracyMeters,
       deviceCheck: registeredMacAddress ? 'registered_mac_matched' : 'no_registered_device',
     });
-    return sendSuccess(res, HTTP_STATUS.CREATED, ATTENDANCE_MESSAGES.PUNCHED_IN, { attendance: toAttendanceSummary(attendanceRecord) });
+    return sendSuccess(res, HTTP_STATUS.CREATED, ATTENDANCE_MESSAGES.PUNCHED_IN, {
+      attendance: toAttendanceSummary(attendanceRecord),
+    });
   } catch (error) {
     return next(error);
   }
 }
-
 
 // =================================================================================================
 // POST /api/attendance/regularize
@@ -240,9 +277,21 @@ export async function punchIn(req, res, next) {
 
 /** Why the employee cannot use regularization, mapped to the response the client receives. */
 const CONTEXT_UNAVAILABLE_RESPONSES = Object.freeze({
-  [EMPLOYEE_CONTEXT_UNAVAILABLE.NO_PROFILE]: { httpStatus: HTTP_STATUS.NOT_FOUND, code: ATTENDANCE_ERROR_CODES.PROFILE_NOT_FOUND, message: ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND },
-  [EMPLOYEE_CONTEXT_UNAVAILABLE.EMPLOYMENT_ENDED]: { httpStatus: HTTP_STATUS.FORBIDDEN, code: ATTENDANCE_ERROR_CODES.EMPLOYMENT_ENDED, message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED },
-  [EMPLOYEE_CONTEXT_UNAVAILABLE.OFFICE_NOT_CONFIGURED]: { httpStatus: HTTP_STATUS.CONFLICT, code: ATTENDANCE_ERROR_CODES.OFFICE_NOT_CONFIGURED, message: ATTENDANCE_MESSAGES.OFFICE_NOT_CONFIGURED },
+  [EMPLOYEE_CONTEXT_UNAVAILABLE.NO_PROFILE]: {
+    httpStatus: HTTP_STATUS.NOT_FOUND,
+    code: ATTENDANCE_ERROR_CODES.PROFILE_NOT_FOUND,
+    message: ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND,
+  },
+  [EMPLOYEE_CONTEXT_UNAVAILABLE.EMPLOYMENT_ENDED]: {
+    httpStatus: HTTP_STATUS.FORBIDDEN,
+    code: ATTENDANCE_ERROR_CODES.EMPLOYMENT_ENDED,
+    message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED,
+  },
+  [EMPLOYEE_CONTEXT_UNAVAILABLE.OFFICE_NOT_CONFIGURED]: {
+    httpStatus: HTTP_STATUS.CONFLICT,
+    code: ATTENDANCE_ERROR_CODES.OFFICE_NOT_CONFIGURED,
+    message: ATTENDANCE_MESSAGES.OFFICE_NOT_CONFIGURED,
+  },
 });
 
 /**
@@ -272,15 +321,29 @@ export async function regularizeAttendance(req, res, next) {
   try {
     const inputValidation = validateRegularizeRequest(req.body);
     if (!inputValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, inputValidation.validationErrors[0].message, inputValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        inputValidation.validationErrors[0].message,
+        inputValidation.validationErrors,
+      );
     }
     const { message, startNew } = inputValidation.sanitizedInput;
 
     const contextLookup = await loadEmployeeAgentContext(req.user.id);
     if (!contextLookup.isAvailable) {
       const unavailableResponse = CONTEXT_UNAVAILABLE_RESPONSES[contextLookup.unavailableReason];
-      recordAuditEvent(req, { category: 'attendance', action: 'regularize_request', outcome: AUDIT_OUTCOMES.REJECTED, reason: contextLookup.unavailableReason });
-      return sendCodedError(req, res, unavailableResponse.httpStatus, { code: unavailableResponse.code, message: unavailableResponse.message });
+      recordAuditEvent(req, {
+        category: 'attendance',
+        action: 'regularize_request',
+        outcome: AUDIT_OUTCOMES.REJECTED,
+        reason: contextLookup.unavailableReason,
+      });
+      return sendCodedError(req, res, unavailableResponse.httpStatus, {
+        code: unavailableResponse.code,
+        message: unavailableResponse.message,
+      });
     }
     const { employeeContext } = contextLookup;
     const threadId = `attendance:${employeeContext.employee_id}`;
@@ -301,9 +364,20 @@ export async function regularizeAttendance(req, res, next) {
         httpStatus: agentError.httpStatus,
         durationMs: agentError.durationMs,
       });
-      recordAuditEvent(req, { category: 'attendance', action: 'regularize_request', outcome: AUDIT_OUTCOMES.FAILED, employeeId: employeeContext.employee_id, reason: agentError.failureKind });
+      recordAuditEvent(req, {
+        category: 'attendance',
+        action: 'regularize_request',
+        outcome: AUDIT_OUTCOMES.FAILED,
+        employeeId: employeeContext.employee_id,
+        reason: agentError.failureKind,
+      });
       const isTimeout = agentError.failureKind === AI_FAILURE_KIND.TIMEOUT;
-      return sendError(req, res, isTimeout ? HTTP_STATUS.GATEWAY_TIMEOUT : HTTP_STATUS.SERVICE_UNAVAILABLE, isTimeout ? REGULARIZATION_MESSAGES.AI_TIMEOUT : REGULARIZATION_MESSAGES.AI_UNAVAILABLE);
+      return sendError(
+        req,
+        res,
+        isTimeout ? HTTP_STATUS.GATEWAY_TIMEOUT : HTTP_STATUS.SERVICE_UNAVAILABLE,
+        isTimeout ? REGULARIZATION_MESSAGES.AI_TIMEOUT : REGULARIZATION_MESSAGES.AI_UNAVAILABLE,
+      );
     }
 
     recordAuditEvent(req, {

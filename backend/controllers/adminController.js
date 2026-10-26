@@ -60,7 +60,11 @@ export async function listUsers(req, res, next) {
     }
 
     const [userRecords, roleCounts] = await Promise.all([
-      User.find(userFilter).select('_id name email role createdAt').sort({ createdAt: -1 }).limit(USER_LIST_LIMIT).lean(),
+      User.find(userFilter)
+        .select('_id name email role createdAt')
+        .sort({ createdAt: -1 })
+        .limit(USER_LIST_LIMIT)
+        .lean(),
       User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }]),
     ]);
     const countsByRole = Object.fromEntries(ALLOWED_ROLES.map((role) => [role, 0]));
@@ -84,7 +88,9 @@ export async function updateUserRole(req, res, next) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, ADMIN_MESSAGES.INVALID_USER_ID);
     }
     if (typeof requestedRole !== 'string' || !ALLOWED_ROLES.includes(requestedRole)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, ADMIN_MESSAGES.INVALID_ROLE, [{ field: 'role', message: ADMIN_MESSAGES.INVALID_ROLE }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, ADMIN_MESSAGES.INVALID_ROLE, [
+        { field: 'role', message: ADMIN_MESSAGES.INVALID_ROLE },
+      ]);
     }
     if (userId === req.user.id) {
       return sendError(req, res, HTTP_STATUS.CONFLICT, ADMIN_MESSAGES.CANNOT_CHANGE_OWN_ROLE);
@@ -103,7 +109,13 @@ export async function updateUserRole(req, res, next) {
     await userRecord.save();
     disconnectUserSockets(userId, SOCKET_ERROR_CODES.ROLE_CHANGED);
 
-    logger.info('User role changed', { requestId: req.id, adminUserId: req.user.id, targetUserId: userId, previousRole, newRole: requestedRole });
+    logger.info('User role changed', {
+      requestId: req.id,
+      adminUserId: req.user.id,
+      targetUserId: userId,
+      previousRole,
+      newRole: requestedRole,
+    });
     return sendSuccess(res, HTTP_STATUS.OK, ADMIN_MESSAGES.ROLE_UPDATED, { user: toAdminUserSummary(userRecord) });
   } catch (error) {
     return next(error);

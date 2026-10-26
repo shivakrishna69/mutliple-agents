@@ -43,7 +43,11 @@ async function main() {
   try {
     response = await fetch(`${backendUrl}/api/webhooks/incoming`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Webhook-Timestamp': timestamp, 'X-Webhook-Signature': signature },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Timestamp': timestamp,
+        'X-Webhook-Signature': signature,
+      },
       body: rawBody,
     });
   } catch (networkError) {

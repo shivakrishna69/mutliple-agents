@@ -98,7 +98,9 @@ function loadS3StorageConfig(env, envPrefix) {
 
   const region = (process.env.AWS_REGION ?? '').trim();
   if (!AWS_REGION_PATTERN.test(region)) {
-    throw new Error(`AWS_REGION must be set to the bucket's region (e.g. ap-south-1) when ${settingName('BUCKET')} is set`);
+    throw new Error(
+      `AWS_REGION must be set to the bucket's region (e.g. ap-south-1) when ${settingName('BUCKET')} is set`,
+    );
   }
 
   const serverSideEncryption = (readSetting('SSE') ?? 'aws:kms').trim();
@@ -120,17 +122,30 @@ function loadS3StorageConfig(env, envPrefix) {
     } catch {
       throw new Error(`${settingName('ENDPOINT')} must be an absolute URL`);
     }
-    if (!['http:', 'https:'].includes(parsedEndpoint.protocol)) throw new Error(`${settingName('ENDPOINT')} must use http or https`);
-    if (env === 'production' && parsedEndpoint.protocol !== 'https:') throw new Error(`${settingName('ENDPOINT')} must use https in production`);
+    if (!['http:', 'https:'].includes(parsedEndpoint.protocol))
+      throw new Error(`${settingName('ENDPOINT')} must use http or https`);
+    if (env === 'production' && parsedEndpoint.protocol !== 'https:')
+      throw new Error(`${settingName('ENDPOINT')} must use https in production`);
     endpoint = parsedEndpoint.origin;
   }
 
   const forcePathStyleSetting = readSetting('FORCE_PATH_STYLE');
-  if (forcePathStyleSetting !== undefined && forcePathStyleSetting !== '' && !['true', 'false'].includes(forcePathStyleSetting)) {
+  if (
+    forcePathStyleSetting !== undefined &&
+    forcePathStyleSetting !== '' &&
+    !['true', 'false'].includes(forcePathStyleSetting)
+  ) {
     throw new Error(`${settingName('FORCE_PATH_STYLE')} must be "true" or "false"`);
   }
 
-  return { bucketName, region, serverSideEncryption, kmsKeyId, endpoint, forcePathStyle: forcePathStyleSetting === 'true' };
+  return {
+    bucketName,
+    region,
+    serverSideEncryption,
+    kmsKeyId,
+    endpoint,
+    forcePathStyle: forcePathStyleSetting === 'true',
+  };
 }
 
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -162,7 +177,9 @@ function loadPayslipConfig(env) {
 
   const signingSecret = process.env.PAYSLIP_SIGNING_SECRET ?? '';
   if (signingSecret.length < MIN_SECRET_LENGTH) {
-    throw new Error(`PAYSLIP_SIGNING_SECRET is required when PAYSLIP_S3_BUCKET is set and must be at least ${MIN_SECRET_LENGTH} characters`);
+    throw new Error(
+      `PAYSLIP_SIGNING_SECRET is required when PAYSLIP_S3_BUCKET is set and must be at least ${MIN_SECRET_LENGTH} characters`,
+    );
   }
   if (signingSecret === process.env.JWT_SECRET) throw new Error('PAYSLIP_SIGNING_SECRET must differ from JWT_SECRET');
 
@@ -221,25 +238,40 @@ function loadMailAndPublicConfig(env, corsOrigins) {
     throw new Error('APP_PUBLIC_URL must be an absolute URL (or set CORS_ORIGINS)');
   }
   if (!['http:', 'https:'].includes(parsedPublicUrl.protocol)) throw new Error('APP_PUBLIC_URL must use http or https');
-  if (env === 'production' && parsedPublicUrl.protocol !== 'https:') throw new Error('APP_PUBLIC_URL must use https in production');
+  if (env === 'production' && parsedPublicUrl.protocol !== 'https:')
+    throw new Error('APP_PUBLIC_URL must use https in production');
 
-  const companyName = (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? 'Nova Support').trim().slice(0, 120) || 'Nova Support';
+  const companyName =
+    (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? 'Nova Support').trim().slice(0, 120) ||
+    'Nova Support';
 
   const smtpHost = (process.env.SMTP_HOST ?? '').trim();
   if (!smtpHost) return { mail: null, appPublicUrl: parsedPublicUrl.origin, companyName };
   const smtpPort = Number(process.env.SMTP_PORT ?? 587);
-  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) throw new Error('SMTP_PORT must be a port number');
+  if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535)
+    throw new Error('SMTP_PORT must be a port number');
   const smtpSecureSetting = process.env.SMTP_SECURE;
-  if (smtpSecureSetting !== undefined && !['true', 'false'].includes(smtpSecureSetting)) throw new Error('SMTP_SECURE must be "true" or "false"');
+  if (smtpSecureSetting !== undefined && !['true', 'false'].includes(smtpSecureSetting))
+    throw new Error('SMTP_SECURE must be "true" or "false"');
   const mailFrom = (process.env.MAIL_FROM ?? '').trim();
   if (!mailFrom) throw new Error('MAIL_FROM is required when SMTP_HOST is set');
   const requireTlsSetting = process.env.SMTP_REQUIRE_TLS;
-  if (requireTlsSetting !== undefined && !['true', 'false'].includes(requireTlsSetting)) throw new Error('SMTP_REQUIRE_TLS must be "true" or "false"');
-  if (env === 'production' && requireTlsSetting === 'false') throw new Error('SMTP_REQUIRE_TLS cannot be "false" in production');
+  if (requireTlsSetting !== undefined && !['true', 'false'].includes(requireTlsSetting))
+    throw new Error('SMTP_REQUIRE_TLS must be "true" or "false"');
+  if (env === 'production' && requireTlsSetting === 'false')
+    throw new Error('SMTP_REQUIRE_TLS cannot be "false" in production');
   const smtpUser = (process.env.SMTP_USER ?? '').trim() || null;
   if (smtpUser && !process.env.SMTP_PASSWORD) throw new Error('SMTP_PASSWORD is required when SMTP_USER is set');
   return {
-    mail: { host: smtpHost, port: smtpPort, secure: smtpSecureSetting === undefined ? smtpPort === 465 : smtpSecureSetting === 'true', user: smtpUser, password: smtpUser ? process.env.SMTP_PASSWORD : null, from: mailFrom, requireTls: requireTlsSetting !== 'false' },
+    mail: {
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecureSetting === undefined ? smtpPort === 465 : smtpSecureSetting === 'true',
+      user: smtpUser,
+      password: smtpUser ? process.env.SMTP_PASSWORD : null,
+      from: mailFrom,
+      requireTls: requireTlsSetting !== 'false',
+    },
     appPublicUrl: parsedPublicUrl.origin,
     companyName,
   };
@@ -256,7 +288,9 @@ function loadConfig() {
       throw new Error(`${secretName} must be at least ${MIN_SECRET_LENGTH} characters`);
     }
   }
-  if (new Set([process.env.JWT_SECRET, process.env.WEBHOOK_SIGNING_SECRET, process.env.AI_SERVICE_API_KEY]).size !== 3) {
+  if (
+    new Set([process.env.JWT_SECRET, process.env.WEBHOOK_SIGNING_SECRET, process.env.AI_SERVICE_API_KEY]).size !== 3
+  ) {
     // Reusing one secret would let a leak in one integration forge credentials for the others.
     throw new Error('JWT_SECRET, WEBHOOK_SIGNING_SECRET and AI_SERVICE_API_KEY must all be different');
   }
@@ -304,7 +338,9 @@ function loadConfig() {
   }
 
   // Optional. The account that becomes the first administrator (see services/bootstrapAdmin.js).
-  const bootstrapAdminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL ? process.env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase() : null;
+  const bootstrapAdminEmail = process.env.BOOTSTRAP_ADMIN_EMAIL
+    ? process.env.BOOTSTRAP_ADMIN_EMAIL.trim().toLowerCase()
+    : null;
   if (bootstrapAdminEmail && !EMAIL_PATTERN.test(bootstrapAdminEmail)) {
     throw new Error('BOOTSTRAP_ADMIN_EMAIL must be a valid email address');
   }

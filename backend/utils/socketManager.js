@@ -283,7 +283,9 @@ function extractConversationId(eventPayload) {
   const isPlainObject = typeof eventPayload === 'object' && eventPayload !== null && !Array.isArray(eventPayload);
   if (!isPlainObject) return null;
   const { conversationId } = eventPayload;
-  return typeof conversationId === 'string' && OBJECT_ID_PATTERN.test(conversationId) ? conversationId.toLowerCase() : null;
+  return typeof conversationId === 'string' && OBJECT_ID_PATTERN.test(conversationId)
+    ? conversationId.toLowerCase()
+    : null;
 }
 
 /** Fixed-window limit on join/leave events per socket. Returns false when the budget is spent. */
@@ -407,7 +409,9 @@ function registerConversationHandlers(socket, connectionRecord) {
     if (!conversationId) {
       return respond(buildErrorAck(SOCKET_ERROR_CODES.INVALID_PAYLOAD, SOCKET_MESSAGES.INVALID_PAYLOAD));
     }
-    const roomName = isStaffSocket ? ROOM_NAMES.conversationStaff(conversationId) : ROOM_NAMES.conversationCustomer(conversationId);
+    const roomName = isStaffSocket
+      ? ROOM_NAMES.conversationStaff(conversationId)
+      : ROOM_NAMES.conversationCustomer(conversationId);
     if (
       !socket.rooms.has(roomName) &&
       countJoinedConversations(socket) >= SOCKET_SERVER_SETTINGS.MAX_JOINED_CONVERSATIONS_PER_SOCKET
@@ -421,8 +425,14 @@ function registerConversationHandlers(socket, connectionRecord) {
         .select('_id customerId assignedAgentId status currentActiveWorker updatedAt')
         .lean();
       if (!conversationRecord || !canUserAccessConversation(user, conversationRecord)) {
-        logger.warn('Conversation join denied', { ...eventContext, conversationId, conversationExists: Boolean(conversationRecord) });
-        return respond(buildErrorAck(SOCKET_ERROR_CODES.CONVERSATION_NOT_ACCESSIBLE, SOCKET_MESSAGES.CONVERSATION_NOT_ACCESSIBLE));
+        logger.warn('Conversation join denied', {
+          ...eventContext,
+          conversationId,
+          conversationExists: Boolean(conversationRecord),
+        });
+        return respond(
+          buildErrorAck(SOCKET_ERROR_CODES.CONVERSATION_NOT_ACCESSIBLE, SOCKET_MESSAGES.CONVERSATION_NOT_ACCESSIBLE),
+        );
       }
       // The client may have disconnected during the database read; joining now would be a no-op leak.
       if (socket.disconnected) return undefined;
@@ -650,7 +660,11 @@ async function connectRedisAdapterClients(redisUrl) {
     ['subscriber', subscriberClient],
   ]) {
     redisClient.on('error', (redisError) => {
-      logger.error('Redis adapter connection error', { connectionRole, redisUrl: redactedRedisUrl, error: redisError.message });
+      logger.error('Redis adapter connection error', {
+        connectionRole,
+        redisUrl: redactedRedisUrl,
+        error: redisError.message,
+      });
     });
     redisClient.on('reconnecting', () => {
       logger.warn('Redis adapter connection reconnecting', { connectionRole, redisUrl: redactedRedisUrl });
@@ -703,7 +717,10 @@ export async function initSocketServer(httpServer, config) {
       const requestOrigin = handshakeRequest.headers.origin;
       const isOriginAllowed = typeof requestOrigin === 'string' && allowedOrigins.has(requestOrigin);
       if (!isOriginAllowed) {
-        logger.warn('Socket handshake rejected', { reason: SOCKET_ERROR_CODES.ORIGIN_NOT_ALLOWED, origin: requestOrigin ?? null });
+        logger.warn('Socket handshake rejected', {
+          reason: SOCKET_ERROR_CODES.ORIGIN_NOT_ALLOWED,
+          origin: requestOrigin ?? null,
+        });
       }
       decide(isOriginAllowed ? null : SOCKET_MESSAGES.ORIGIN_NOT_ALLOWED, isOriginAllowed);
     },
@@ -798,12 +815,16 @@ export async function closeSocketServer() {
  */
 export function emitNewMessage(conversationId, messagePayload) {
   if (!socketIoInstance) {
-    logger.debug('Socket server not initialised; NEW_MESSAGE not published', { conversationId: String(conversationId) });
+    logger.debug('Socket server not initialised; NEW_MESSAGE not published', {
+      conversationId: String(conversationId),
+    });
     return false;
   }
   try {
     const normalizedConversationId = String(conversationId);
-    socketIoInstance.to(ROOM_NAMES.conversationStaff(normalizedConversationId)).emit(SOCKET_EVENTS.NEW_MESSAGE, messagePayload);
+    socketIoInstance
+      .to(ROOM_NAMES.conversationStaff(normalizedConversationId))
+      .emit(SOCKET_EVENTS.NEW_MESSAGE, messagePayload);
     socketIoInstance
       .to(ROOM_NAMES.conversationCustomer(normalizedConversationId))
       .emit(SOCKET_EVENTS.NEW_MESSAGE, toCustomerMessagePayload(messagePayload));
@@ -908,9 +929,10 @@ export function disconnectSessionSockets(sessionId) {
   if (!socketIoInstance) return;
   try {
     const sessionRoomName = ROOM_NAMES.session(sessionId);
-    socketIoInstance
-      .in(sessionRoomName)
-      .emit(SOCKET_EVENTS.SESSION_ENDED, { code: SOCKET_ERROR_CODES.SESSION_LOGGED_OUT, message: SOCKET_MESSAGES.SESSION_ENDED });
+    socketIoInstance.in(sessionRoomName).emit(SOCKET_EVENTS.SESSION_ENDED, {
+      code: SOCKET_ERROR_CODES.SESSION_LOGGED_OUT,
+      message: SOCKET_MESSAGES.SESSION_ENDED,
+    });
     socketIoInstance.in(sessionRoomName).disconnectSockets(true);
   } catch (disconnectError) {
     logger.error('Failed to disconnect session sockets', {
