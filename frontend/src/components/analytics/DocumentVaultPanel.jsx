@@ -22,7 +22,7 @@ import {
   requestWorkforceRisk,
 } from '../../api/workforceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { ROUTE_PATHS, USER_ROLES } from '../../constants/routes.js';
+import { ROUTE_PATHS, WORKFORCE_ADMIN_ROLES } from '../../constants/routes.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { CheckBadgeIcon, DocumentIcon, DownloadIcon, ShieldIcon, UploadIcon } from '../Icons.jsx';
 import {
@@ -252,7 +252,7 @@ function DocumentRow({ vaultDocument, canVerify, onChanged }) {
 
 export default function DocumentVaultPanel() {
   const { currentUser } = useAuth();
-  const isRecordsAdmin = [USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser.role);
+  const isRecordsAdmin = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('me');
   const documentsResource = useApiResource(
     (signal) => requestEmployeeDocuments(selectedEmployeeId, signal),

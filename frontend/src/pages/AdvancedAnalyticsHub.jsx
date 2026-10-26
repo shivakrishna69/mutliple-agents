@@ -18,11 +18,11 @@ import { ChartIcon, DocumentIcon, TargetIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import { Tabs } from '../components/ui.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { USER_ROLES } from '../constants/routes.js';
+import { WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
 
 export default function AdvancedAnalyticsHub() {
   const { currentUser } = useAuth();
-  const canSeeWorkforceRisk = [USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser.role);
+  const canSeeWorkforceRisk = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
   const tabs = [
     ...(canSeeWorkforceRisk ? [{ id: 'risk', label: 'Predictive analytics', Icon: ChartIcon }] : []),
     { id: 'okrs', label: 'OKR alignment', Icon: TargetIcon },

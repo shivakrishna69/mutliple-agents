@@ -28,7 +28,7 @@ import {
   requestWorkforceRisk,
 } from '../../api/workforceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { USER_ROLES } from '../../constants/routes.js';
+import { WORKFORCE_ADMIN_ROLES } from '../../constants/routes.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { FlagIcon, PlusIcon, TargetIcon } from '../Icons.jsx';
 import {
@@ -687,7 +687,7 @@ function ObjectiveComposer({
 
 export default function OkrAlignmentCanvas() {
   const { currentUser } = useAuth();
-  const isOrganisationWide = [USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser.role);
+  const isOrganisationWide = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
   const [period, setPeriod] = useState(currentQuarter);
   const [composer, setComposer] = useState(null); // { level, parentObjective? }
   const [actionError, setActionError] = useState(null);
