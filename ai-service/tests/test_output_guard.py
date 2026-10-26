@@ -32,14 +32,35 @@ def test_honest_statements_pass_unchanged(honest_reply):
     assert result.final_text == honest_reply
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known false positive: 'invoice was issued' matches passive_completion, so factual billing "
-    "records the billing prompt asks for are stripped. Fix in the guard, then remove this marker.",
+@pytest.mark.parametrize(
+    "cited_record",
+    [
+        "Our records show your latest invoice was issued on 1 October and was paid on 3 October.",
+        "According to our records, your refund was processed on 2 October.",
+        "The billing records indicate your September charge was reversed on 5 September.",
+    ],
 )
-def test_factual_billing_records_pass_unchanged():
-    factual_reply = "Our records show your latest invoice was issued on 1 October and was paid on 3 October."
-    assert validate_and_sanitize_output(factual_reply).outcome is GuardOutcome.PASSED
+def test_past_events_cited_from_the_records_pass_unchanged(cited_record):
+    assert validate_and_sanitize_output(cited_record).outcome is GuardOutcome.PASSED
+
+
+@pytest.mark.parametrize(
+    "claim_after_citation",
+    [
+        "Our records show a failed payment, so your account will be updated today.",
+        "Our records show the charge, and I've refunded it for you.",
+        "Our records show the duplicate charge, and our billing team will review it.",
+        "Our records show the issue. Your ticket number is #48213.",
+        "Our records show your invoice was issued on 1 October, and your plan will be changed tomorrow.",
+    ],
+)
+def test_a_records_citation_does_not_excuse_promises_or_claimed_actions(claim_after_citation):
+    assert validate_and_sanitize_output(claim_after_citation).outcome is not GuardOutcome.PASSED
+
+
+def test_a_passive_claim_before_the_citation_is_still_caught():
+    reply = "Your refund has been processed, as our records show."
+    assert validate_and_sanitize_output(reply).outcome is not GuardOutcome.PASSED
 
 
 @pytest.mark.parametrize(
