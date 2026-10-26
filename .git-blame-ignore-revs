@@ -1,0 +1,8 @@
+# Formatting-only commits, skipped by `git blame`.
+# GitHub applies this file automatically; locally run:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Apply Ruff formatting to ai-service
+a1a35446d3e435966efb18cbd51a95fd44290b61
+# Apply Prettier formatting to backend and frontend
+8d50ee64096361dbf51689c7e4dd55e65620240e
