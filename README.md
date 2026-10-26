@@ -85,7 +85,9 @@ by the backend; the frontend only hides what a role cannot use.
 | Payroll tax calculator, payslip PDFs + verification | Done; monthly payroll run not yet |
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
 | Leave management | Planned (next) |
-| Automated tests, linting, CI | In progress (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| Linting and formatting | Done |
+| Backend tests | Done (`npm test` in `backend/`) |
+| AI-service tests, frontend tests, CI | In progress (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
 
 ## Contributing
 
