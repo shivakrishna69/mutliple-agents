@@ -1,4 +1,6 @@
 # Development-only tools for the ai-service (not installed in the runtime image).
-# Install with: python -m pip install -r requirements-dev.txt
+# Install with: python -m pip install -r requirements.txt -r requirements-dev.txt
 
 ruff==0.17.2
+pytest==9.1.1
+pytest-asyncio==1.4.1

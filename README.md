@@ -87,7 +87,8 @@ by the backend; the frontend only hides what a role cannot use.
 | Leave management | Planned (next) |
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
-| AI-service tests, frontend tests, CI | In progress (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| AI-service tests | Done (`python -m pytest` in `ai-service/`) |
+| Frontend tests, CI | In progress (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
 
 ## Contributing
 
