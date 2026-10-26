@@ -12,7 +12,10 @@
     "start": "node server.js",
     "dev": "node --watch --env-file-if-exists=.env server.js",
     "set-role": "node scripts/setUserRole.js",
-    "send-test-message": "node scripts/sendTestMessage.js"
+    "send-test-message": "node scripts/sendTestMessage.js",
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.js\"",
+    "format:check": "prettier --check \"**/*.js\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
@@ -31,5 +34,11 @@
     "playwright-core": "^1.63.0",
     "redis": "^6.3.0",
     "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "globals": "17.13.0",
+    "prettier": "3.9.10"
   }
 }
