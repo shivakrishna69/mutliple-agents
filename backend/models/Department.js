@@ -115,7 +115,10 @@ const departmentSchema = new mongoose.Schema(
 departmentSchema.index({ parentDepartmentId: 1, name: 1 }, { unique: true });
 
 // "Which units does this person head?" Partial: units without a head are not indexed.
-departmentSchema.index({ departmentHeadId: 1 }, { partialFilterExpression: { departmentHeadId: { $type: 'objectId' } } });
+departmentSchema.index(
+  { departmentHeadId: 1 },
+  { partialFilterExpression: { departmentHeadId: { $type: 'objectId' } } },
+);
 
 // ---------------------------------------------------------------------------
 // Referential integrity
@@ -136,11 +139,18 @@ departmentSchema.pre('validate', async function enforceHierarchyIntegrity() {
   if (this.isModified('departmentHeadId') && this.departmentHeadId) {
     // Resolved lazily: EmployeeProfile.js also references Department, so a top-level import
     // would be circular.
-    await assertReferenceExists({ model: mongoose.model('EmployeeProfile'), referencedId: this.departmentHeadId, entityLabel: 'Department head' });
+    await assertReferenceExists({
+      model: mongoose.model('EmployeeProfile'),
+      referencedId: this.departmentHeadId,
+      entityLabel: 'Department head',
+    });
   }
 });
 
-departmentSchema.pre(QUERY_UPDATE_OPERATIONS, createGuardedFieldUpdateBlocker('Department', ['parentDepartmentId', 'departmentHeadId']));
+departmentSchema.pre(
+  QUERY_UPDATE_OPERATIONS,
+  createGuardedFieldUpdateBlocker('Department', ['parentDepartmentId', 'departmentHeadId']),
+);
 
 const Department = mongoose.model('Department', departmentSchema);
 

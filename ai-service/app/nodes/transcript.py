@@ -40,6 +40,8 @@ def conversation_messages_for_model(messages: Sequence[BaseMessage], max_message
     appends its own tool exchange separately.
     """
     conversation_messages = [
-        message for message in messages if not isinstance(message, ToolMessage) and not (isinstance(message, AIMessage) and message.tool_calls)
+        message
+        for message in messages
+        if not isinstance(message, ToolMessage) and not (isinstance(message, AIMessage) and message.tool_calls)
     ]
     return conversation_messages[-max_messages:]

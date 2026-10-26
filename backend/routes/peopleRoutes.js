@@ -4,7 +4,13 @@
  */
 
 import { Router } from 'express';
-import { getInvitationOptions, getInvitations, postInvitation, postResendInvitation, postRevokeInvitation } from '../controllers/peopleController.js';
+import {
+  getInvitationOptions,
+  getInvitations,
+  postInvitation,
+  postResendInvitation,
+  postRevokeInvitation,
+} from '../controllers/peopleController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { invitationSendRateLimitByUser } from '../middleware/rateLimiter.js';
 

@@ -257,7 +257,9 @@ class GuardResult:
             f'{violation.category.value}: "{violation.matched_phrase}"' for violation in self.violations
         )
         sentence_word = "sentence" if self.removed_sentence_count == 1 else "sentences"
-        return f"{self.outcome.value}: {self.removed_sentence_count} {sentence_word} with violations ({violation_summary})"
+        return (
+            f"{self.outcome.value}: {self.removed_sentence_count} {sentence_word} with violations ({violation_summary})"
+        )
 
 
 def find_violations(sentence: str) -> list[GuardViolation]:
@@ -267,7 +269,9 @@ def find_violations(sentence: str) -> list[GuardViolation]:
         pattern_match = prohibited_pattern.expression.search(sentence)
         if pattern_match:
             matched_phrase = " ".join(pattern_match.group(0).split())[:MAX_MATCHED_PHRASE_LENGTH]
-            violations.append(GuardViolation(prohibited_pattern.pattern_id, prohibited_pattern.category, matched_phrase))
+            violations.append(
+                GuardViolation(prohibited_pattern.pattern_id, prohibited_pattern.category, matched_phrase)
+            )
     return violations
 
 

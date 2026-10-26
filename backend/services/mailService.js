@@ -60,7 +60,11 @@ export async function sendMail({ to, subject, html, text }) {
     await mailTransport.sendMail({ from: mailFrom, to, subject, html, text });
     return { outcome: MAIL_OUTCOMES.SENT };
   } catch (mailError) {
-    logger.error('Email delivery failed', { code: mailError.code ?? null, responseCode: mailError.responseCode ?? null, message: String(mailError.message).slice(0, 200) });
+    logger.error('Email delivery failed', {
+      code: mailError.code ?? null,
+      responseCode: mailError.responseCode ?? null,
+      message: String(mailError.message).slice(0, 200),
+    });
     return { outcome: MAIL_OUTCOMES.FAILED };
   }
 }

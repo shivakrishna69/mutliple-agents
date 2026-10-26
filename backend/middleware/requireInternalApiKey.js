@@ -25,9 +25,14 @@ export function requireInternalApiKey(req, res, next) {
   const expectedApiKey = req.app.locals.config.aiServiceApiKey;
   const presentedApiKey = req.get(INTERNAL_API_KEY_HEADER) ?? '';
   const isAuthentic =
-    presentedApiKey.length > 0 && timingSafeEqual(digestKey(presentedApiKey, expectedApiKey), digestKey(expectedApiKey, expectedApiKey));
+    presentedApiKey.length > 0 &&
+    timingSafeEqual(digestKey(presentedApiKey, expectedApiKey), digestKey(expectedApiKey, expectedApiKey));
   if (!isAuthentic) {
-    logger.warn('Internal API call rejected: missing or invalid key', { requestId: req.id, path: req.originalUrl, clientIp: req.ip });
+    logger.warn('Internal API call rejected: missing or invalid key', {
+      requestId: req.id,
+      path: req.originalUrl,
+      clientIp: req.ip,
+    });
     return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, REGULARIZATION_MESSAGES.INTERNAL_KEY_INVALID);
   }
   return next();

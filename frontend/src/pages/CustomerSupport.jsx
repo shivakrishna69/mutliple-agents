@@ -28,18 +28,47 @@ import { useSocket } from '../hooks/useSocket.js';
 
 /** How each sender appears to the customer. Their own messages are on the right. */
 const CUSTOMER_VIEW_SENDERS = Object.freeze({
-  customer: { label: 'You', isOwn: true, bubbleClassName: 'bg-indigo-600 text-white', labelClassName: 'text-indigo-700' },
-  ai_supervisor: { label: 'Support Assistant (AI)', isOwn: false, bubbleClassName: 'bg-white text-slate-900 ring-1 ring-slate-200', labelClassName: 'text-slate-600' },
-  ai_worker: { label: 'Support Assistant (AI)', isOwn: false, bubbleClassName: 'bg-white text-slate-900 ring-1 ring-slate-200', labelClassName: 'text-slate-600' },
-  human_agent: { label: 'Support Agent', isOwn: false, bubbleClassName: 'bg-emerald-50 text-emerald-950 ring-1 ring-emerald-200', labelClassName: 'text-emerald-700' },
+  customer: {
+    label: 'You',
+    isOwn: true,
+    bubbleClassName: 'bg-indigo-600 text-white',
+    labelClassName: 'text-indigo-700',
+  },
+  ai_supervisor: {
+    label: 'Support Assistant (AI)',
+    isOwn: false,
+    bubbleClassName: 'bg-white text-slate-900 ring-1 ring-slate-200',
+    labelClassName: 'text-slate-600',
+  },
+  ai_worker: {
+    label: 'Support Assistant (AI)',
+    isOwn: false,
+    bubbleClassName: 'bg-white text-slate-900 ring-1 ring-slate-200',
+    labelClassName: 'text-slate-600',
+  },
+  human_agent: {
+    label: 'Support Agent',
+    isOwn: false,
+    bubbleClassName: 'bg-emerald-50 text-emerald-950 ring-1 ring-emerald-200',
+    labelClassName: 'text-emerald-700',
+  },
 });
 
 /** What the customer is told about who is handling their conversation. */
 const STATUS_NOTICES = Object.freeze({
   unassigned: { text: "You're chatting with our AI support assistant.", className: 'bg-indigo-50 text-indigo-800' },
-  'processing-ai': { text: "You're chatting with our AI support assistant.", className: 'bg-indigo-50 text-indigo-800' },
-  'escalated-to-human': { text: 'A member of our support team will join this chat shortly.', className: 'bg-amber-50 text-amber-900' },
-  'assigned-agent': { text: "You're chatting with a member of our support team.", className: 'bg-emerald-50 text-emerald-900' },
+  'processing-ai': {
+    text: "You're chatting with our AI support assistant.",
+    className: 'bg-indigo-50 text-indigo-800',
+  },
+  'escalated-to-human': {
+    text: 'A member of our support team will join this chat shortly.',
+    className: 'bg-amber-50 text-amber-900',
+  },
+  'assigned-agent': {
+    text: "You're chatting with a member of our support team.",
+    className: 'bg-emerald-50 text-emerald-900',
+  },
 });
 
 const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -197,7 +226,9 @@ export default function CustomerSupport() {
     const pendingMessageId = `pending-${clientMessageId}`;
     const sentAt = new Date().toISOString();
     setPageError(null);
-    mergeMessages([{ messageId: pendingMessageId, senderType: 'customer', text: messageText, createdAt: sentAt, isPending: true }]);
+    mergeMessages([
+      { messageId: pendingMessageId, senderType: 'customer', text: messageText, createdAt: sentAt, isPending: true },
+    ]);
     setIsAwaitingReply(true);
     try {
       const sendResult = await requestSendSupportMessage(messageText, clientMessageId, csrfToken);
@@ -205,7 +236,9 @@ export default function CustomerSupport() {
         setConversationId(sendResult.conversation.id);
         setConversationStatus(sendResult.conversation.status);
       }
-      const confirmedMessages = [{ messageId: sendResult.customerMessageId, senderType: 'customer', text: messageText, createdAt: sentAt }];
+      const confirmedMessages = [
+        { messageId: sendResult.customerMessageId, senderType: 'customer', text: messageText, createdAt: sentAt },
+      ];
       if (sendResult.reply) {
         confirmedMessages.push({ ...sendResult.reply, createdAt: new Date().toISOString() });
       }
@@ -237,35 +270,60 @@ export default function CustomerSupport() {
           <div>
             <h1 className="text-base font-bold text-slate-900">Support chat</h1>
             <p className="text-xs text-slate-500">
-              {connectionStatus === 'connected' || !conversationId ? 'Online · we usually reply within seconds' : 'Reconnecting…'}
+              {connectionStatus === 'connected' || !conversationId
+                ? 'Online · we usually reply within seconds'
+                : 'Reconnecting…'}
             </p>
           </div>
         </div>
       </header>
 
       <section aria-label="Support conversation" className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
-        {statusNotice && <p className={`mx-4 mt-3 rounded-lg px-3 py-2 text-sm ${statusNotice.className}`}>{statusNotice.text}</p>}
+        {statusNotice && (
+          <p className={`mx-4 mt-3 rounded-lg px-3 py-2 text-sm ${statusNotice.className}`}>{statusNotice.text}</p>
+        )}
         {pageError && (
           <div className="mx-4 mt-3">
-            <ErrorBanner title="Something went wrong" message={pageError.message} requestId={pageError.requestId} onDismiss={() => setPageError(null)} />
+            <ErrorBanner
+              title="Something went wrong"
+              message={pageError.message}
+              requestId={pageError.requestId}
+              onDismiss={() => setPageError(null)}
+            />
           </div>
         )}
 
-        <div ref={messageLogRef} role="log" aria-live="polite" aria-label="Conversation" className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <div
+          ref={messageLogRef}
+          role="log"
+          aria-live="polite"
+          aria-label="Conversation"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4"
+        >
           {isLoading ? (
-            <p className="py-12 text-center text-sm text-slate-500" role="status">Loading your conversation…</p>
+            <p className="py-12 text-center text-sm text-slate-500" role="status">
+              Loading your conversation…
+            </p>
           ) : messages.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-base font-semibold text-slate-800">How can we help?</p>
-              <p className="mt-1 text-sm text-slate-500">Describe your problem below and our assistant will reply right away.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Describe your problem below and our assistant will reply right away.
+              </p>
             </div>
           ) : (
-            groupMessagesBySender(messages).map((messageGroup) => <CustomerMessageGroup key={messageGroup.groupKey} messageGroup={messageGroup} />)
+            groupMessagesBySender(messages).map((messageGroup) => (
+              <CustomerMessageGroup key={messageGroup.groupKey} messageGroup={messageGroup} />
+            ))
           )}
           {isAwaitingReply && <ReplyingIndicator />}
         </div>
 
-        <MessageComposer canSendMessage={!isLoading} sendDisabledReason="Loading your conversation…" onSendMessage={sendMessage} />
+        <MessageComposer
+          canSendMessage={!isLoading}
+          sendDisabledReason="Loading your conversation…"
+          onSendMessage={sendMessage}
+        />
       </section>
     </div>
   );

@@ -16,7 +16,12 @@
 
 import { logger } from './logger.js';
 
-export const AUDIT_OUTCOMES = Object.freeze({ ALLOWED: 'allowed', DENIED: 'denied', REJECTED: 'rejected', FAILED: 'failed' });
+export const AUDIT_OUTCOMES = Object.freeze({
+  ALLOWED: 'allowed',
+  DENIED: 'denied',
+  REJECTED: 'rejected',
+  FAILED: 'failed',
+});
 
 const USER_AGENT_MAX_LENGTH = 200;
 

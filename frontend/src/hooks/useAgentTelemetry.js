@@ -127,7 +127,9 @@ export function useAgentTelemetry() {
 
     async function subscribe() {
       try {
-        const subscribeAck = await socket.timeout(SUBSCRIBE_ACK_TIMEOUT_MS).emitWithAck(SOCKET_EVENTS.SUBSCRIBE_AGENT_TELEMETRY, {});
+        const subscribeAck = await socket
+          .timeout(SUBSCRIBE_ACK_TIMEOUT_MS)
+          .emitWithAck(SOCKET_EVENTS.SUBSCRIBE_AGENT_TELEMETRY, {});
         if (isDisposed) return;
         if (subscribeAck?.ok) setConnectionStatus(TELEMETRY_CONNECTION_STATUS.LIVE);
         else if (subscribeAck?.error?.code === 'telemetry_forbidden') {
@@ -140,7 +142,8 @@ export function useAgentTelemetry() {
     }
 
     function handleDisconnect(disconnectReason) {
-      if (!isDisposed && disconnectReason !== 'io client disconnect') setConnectionStatus(TELEMETRY_CONNECTION_STATUS.RECONNECTING);
+      if (!isDisposed && disconnectReason !== 'io client disconnect')
+        setConnectionStatus(TELEMETRY_CONNECTION_STATUS.RECONNECTING);
     }
 
     function handleConnectError(connectionError) {

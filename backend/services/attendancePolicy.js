@@ -50,8 +50,10 @@ export function classifyArrival(minutesSinceMidnight, workday) {
   const minutesAfterShiftStart = minutesSinceMidnight - (shiftStartHour * 60 + shiftStartMinute);
   const lateByMinutes = Math.max(0, minutesAfterShiftStart);
 
-  if (minutesAfterShiftStart > workday.halfDayAfterMinutes) return { calculationStatus: ATTENDANCE_STATUSES.HALF_DAY, lateByMinutes };
-  if (minutesAfterShiftStart > workday.lateGraceMinutes) return { calculationStatus: ATTENDANCE_STATUSES.LATE, lateByMinutes };
+  if (minutesAfterShiftStart > workday.halfDayAfterMinutes)
+    return { calculationStatus: ATTENDANCE_STATUSES.HALF_DAY, lateByMinutes };
+  if (minutesAfterShiftStart > workday.lateGraceMinutes)
+    return { calculationStatus: ATTENDANCE_STATUSES.LATE, lateByMinutes };
   return { calculationStatus: ATTENDANCE_STATUSES.NORMAL, lateByMinutes };
 }
 
@@ -108,7 +110,14 @@ function utcOffsetMs(instant, timeZone) {
     second: '2-digit',
   }).formatToParts(instant);
   const partNumber = (partType) => Number(dateTimeParts.find((datePart) => datePart.type === partType).value);
-  const wallClockAsUtcMs = Date.UTC(partNumber('year'), partNumber('month') - 1, partNumber('day'), partNumber('hour'), partNumber('minute'), partNumber('second'));
+  const wallClockAsUtcMs = Date.UTC(
+    partNumber('year'),
+    partNumber('month') - 1,
+    partNumber('day'),
+    partNumber('hour'),
+    partNumber('minute'),
+    partNumber('second'),
+  );
   return wallClockAsUtcMs - Math.floor(instant.getTime() / 1000) * 1000;
 }
 
@@ -131,6 +140,7 @@ export function zonedLocalTimeToInstant(calendarDate, localTime, timeZone) {
   const firstGuessMs = wallClockAsUtcMs - utcOffsetMs(new Date(wallClockAsUtcMs), timeZone);
   const instant = new Date(wallClockAsUtcMs - utcOffsetMs(new Date(firstGuessMs), timeZone));
   const roundTrip = readOfficeLocalClock(instant, timeZone);
-  const isExactRoundTrip = roundTrip.calendarDate === calendarDate && roundTrip.minutesSinceMidnight === hours * 60 + minutes;
+  const isExactRoundTrip =
+    roundTrip.calendarDate === calendarDate && roundTrip.minutesSinceMidnight === hours * 60 + minutes;
   return isExactRoundTrip ? instant : null;
 }

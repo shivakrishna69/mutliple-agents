@@ -24,7 +24,11 @@ import { emitAgentTelemetryEvents } from '../utils/socketManager.js';
 export function ingestAgentTelemetry(req, res, next) {
   try {
     const rawEvents = req.body?.events;
-    if (!Array.isArray(rawEvents) || rawEvents.length === 0 || rawEvents.length > TELEMETRY_LIMITS.MAX_EVENTS_PER_BATCH) {
+    if (
+      !Array.isArray(rawEvents) ||
+      rawEvents.length === 0 ||
+      rawEvents.length > TELEMETRY_LIMITS.MAX_EVENTS_PER_BATCH
+    ) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, AGENT_TELEMETRY_MESSAGES.BATCH_INVALID, [
         { field: 'events', message: `must be a list of 1-${TELEMETRY_LIMITS.MAX_EVENTS_PER_BATCH} events` },
       ]);

@@ -50,7 +50,13 @@ export const INVITATION_LIMITS = Object.freeze({
 const invitationSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, lowercase: true, trim: true, maxlength: 254 },
-    name: { type: String, required: true, trim: true, minlength: INVITATION_LIMITS.NAME_MIN_LENGTH, maxlength: INVITATION_LIMITS.NAME_MAX_LENGTH },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: INVITATION_LIMITS.NAME_MIN_LENGTH,
+      maxlength: INVITATION_LIMITS.NAME_MAX_LENGTH,
+    },
     role: { type: String, enum: INVITABLE_ROLES, required: true },
     profileDraft: {
       designation: { type: String, required: true, trim: true, maxlength: INVITATION_LIMITS.DESIGNATION_MAX_LENGTH },
@@ -62,7 +68,12 @@ const invitationSchema = new mongoose.Schema(
     },
     tokenHash: { type: String, required: true, match: /^[0-9a-f]{64}$/, select: false },
     expiresAt: { type: Date, required: true },
-    status: { type: String, enum: Object.values(INVITATION_STATUSES), default: INVITATION_STATUSES.PENDING, required: true },
+    status: {
+      type: String,
+      enum: Object.values(INVITATION_STATUSES),
+      default: INVITATION_STATUSES.PENDING,
+      required: true,
+    },
     invitedByUserId: { type: ObjectId, ref: 'User', required: true },
     sendCount: { type: Number, default: 1, min: 1 },
     lastSentAt: { type: Date, required: true },
@@ -82,7 +93,11 @@ const invitationSchema = new mongoose.Schema(
 invitationSchema.index({ tokenHash: 1 }, { unique: true });
 invitationSchema.index(
   { email: 1 },
-  { unique: true, partialFilterExpression: { status: { $in: [INVITATION_STATUSES.PENDING, INVITATION_STATUSES.ACCEPTING] } }, name: 'one_open_invitation_per_email' },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: [INVITATION_STATUSES.PENDING, INVITATION_STATUSES.ACCEPTING] } },
+    name: 'one_open_invitation_per_email',
+  },
 );
 invitationSchema.index({ status: 1, createdAt: -1 });
 

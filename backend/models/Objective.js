@@ -35,7 +35,13 @@ export const OKR_STATUSES = Object.freeze({ ACTIVE: 'active', ARCHIVED: 'archive
 
 const objectiveSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true, trim: true, minlength: OKR_FIELD_LIMITS.TITLE_MIN_LENGTH, maxlength: OKR_FIELD_LIMITS.TITLE_MAX_LENGTH },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: OKR_FIELD_LIMITS.TITLE_MIN_LENGTH,
+      maxlength: OKR_FIELD_LIMITS.TITLE_MAX_LENGTH,
+    },
     description: { type: String, trim: true, maxlength: OKR_FIELD_LIMITS.DESCRIPTION_MAX_LENGTH, default: null },
     level: { type: String, enum: Object.values(OBJECTIVE_LEVELS), required: true, immutable: true },
     period: {
@@ -67,7 +73,8 @@ objectiveSchema.pre('validate', async function enforceObjectiveStructure() {
   }
   if (this.level === OBJECTIVE_LEVELS.TEAM) {
     if (!this.departmentId) this.invalidate('departmentId', 'A team objective must belong to a department');
-    if (!this.parentObjectiveId) this.invalidate('parentObjectiveId', 'A team objective must align to a company objective');
+    if (!this.parentObjectiveId)
+      this.invalidate('parentObjectiveId', 'A team objective must align to a company objective');
   }
 
   if (this.isModified('ownerEmployeeId')) {
@@ -77,10 +84,15 @@ objectiveSchema.pre('validate', async function enforceObjectiveStructure() {
     await assertReferenceExists({ model: Department, referencedId: this.departmentId, entityLabel: 'Department' });
   }
   if (this.isNew && this.parentObjectiveId) {
-    const parentObjective = await this.constructor.findById(this.parentObjectiveId).select('level period status').lean();
+    const parentObjective = await this.constructor
+      .findById(this.parentObjectiveId)
+      .select('level period status')
+      .lean();
     if (!parentObjective) throw new Error(`Parent objective ${this.parentObjectiveId} does not exist`);
-    if (parentObjective.level !== OBJECTIVE_LEVELS.COMPANY) throw new Error('A team objective must align to a company objective');
-    if (parentObjective.status !== OKR_STATUSES.ACTIVE) throw new Error('A team objective cannot align to an archived company objective');
+    if (parentObjective.level !== OBJECTIVE_LEVELS.COMPANY)
+      throw new Error('A team objective must align to a company objective');
+    if (parentObjective.status !== OKR_STATUSES.ACTIVE)
+      throw new Error('A team objective cannot align to an archived company objective');
     if (parentObjective.period.year !== this.period.year || parentObjective.period.quarter !== this.period.quarter) {
       throw new Error('A team objective must be in the same quarter as its company objective');
     }

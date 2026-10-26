@@ -89,7 +89,7 @@ export default function Login() {
   /** The message to display under a field once it has been touched or a submit was attempted. */
   function resolveVisibleFieldError(fieldName) {
     const isFieldRevealed = hasAttemptedSubmit || touchedFields[fieldName];
-    return isFieldRevealed ? clientFieldErrors[fieldName] ?? null : null;
+    return isFieldRevealed ? (clientFieldErrors[fieldName] ?? null) : null;
   }
 
   // ==========================================================================

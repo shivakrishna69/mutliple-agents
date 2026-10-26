@@ -53,7 +53,11 @@ import mongoose from 'mongoose';
 import { VAULT_FIELD_LIMITS } from '../constants/validation.js';
 import EmployeeProfile from './EmployeeProfile.js';
 import { ROLES } from './User.js';
-import { QUERY_UPDATE_OPERATIONS, assertReferenceExists, createGuardedFieldUpdateBlocker } from './hierarchyIntegrity.js';
+import {
+  QUERY_UPDATE_OPERATIONS,
+  assertReferenceExists,
+  createGuardedFieldUpdateBlocker,
+} from './hierarchyIntegrity.js';
 
 const { ObjectId } = mongoose.Schema.Types;
 
@@ -148,7 +152,8 @@ const documentVaultSchema = new mongoose.Schema(
       select: false,
       immutable: true,
       validate: {
-        validator: (initializationVector) => initializationVector === null || AES_GCM_IV_HEX_PATTERN.test(initializationVector),
+        validator: (initializationVector) =>
+          initializationVector === null || AES_GCM_IV_HEX_PATTERN.test(initializationVector),
         message: 'encryptionIv must be 24 lowercase hex characters (96-bit AES-GCM IV)',
       },
     },
@@ -162,7 +167,10 @@ const documentVaultSchema = new mongoose.Schema(
     },
     serverSideEncryption: {
       type: String,
-      enum: { values: Object.values(VAULT_SERVER_SIDE_ENCRYPTION), message: 'Server-side encryption "{VALUE}" is not supported' },
+      enum: {
+        values: Object.values(VAULT_SERVER_SIDE_ENCRYPTION),
+        message: 'Server-side encryption "{VALUE}" is not supported',
+      },
       required: true,
       immutable: true,
     },
@@ -173,10 +181,21 @@ const documentVaultSchema = new mongoose.Schema(
       required: true,
     },
     accessibleRoles: {
-      type: [{ type: String, enum: { values: VAULT_GRANTABLE_ROLES, message: 'Role "{VALUE}" cannot be granted vault access' } }],
+      type: [
+        {
+          type: String,
+          enum: { values: VAULT_GRANTABLE_ROLES, message: 'Role "{VALUE}" cannot be granted vault access' },
+        },
+      ],
       validate: [
-        { validator: (roleList) => Array.isArray(roleList) && roleList.length > 0, message: 'accessibleRoles must list at least one role' },
-        { validator: (roleList) => new Set(roleList).size === roleList.length, message: 'accessibleRoles must not repeat a role' },
+        {
+          validator: (roleList) => Array.isArray(roleList) && roleList.length > 0,
+          message: 'accessibleRoles must list at least one role',
+        },
+        {
+          validator: (roleList) => new Set(roleList).size === roleList.length,
+          message: 'accessibleRoles must not repeat a role',
+        },
       ],
     },
     // ──► User._id
@@ -232,7 +251,10 @@ documentVaultSchema.pre('validate', async function enforceVaultConsistency() {
   const isVerified = this.status === VAULT_DOCUMENT_STATUSES.VERIFIED;
   const hasVerificationRecord = Boolean(this.verifiedByUserId && this.verifiedAt);
   if (isVerified !== hasVerificationRecord) {
-    this.invalidate('status', 'A verified document must record who verified it and when, and only a verified document may');
+    this.invalidate(
+      'status',
+      'A verified document must record who verified it and when, and only a verified document may',
+    );
   }
   if (this.isNew) {
     await assertReferenceExists({ model: EmployeeProfile, referencedId: this.employeeId, entityLabel: 'Employee' });
@@ -249,7 +271,14 @@ documentVaultSchema.methods.markVerified = function markVerified(verifierUserId)
 
 documentVaultSchema.pre(
   QUERY_UPDATE_OPERATIONS,
-  createGuardedFieldUpdateBlocker('DocumentVault', ['employeeId', 's3KeyPath', 'encryptionIv', 'status', 'verifiedByUserId', 'verifiedAt']),
+  createGuardedFieldUpdateBlocker('DocumentVault', [
+    'employeeId',
+    's3KeyPath',
+    'encryptionIv',
+    'status',
+    'verifiedByUserId',
+    'verifiedAt',
+  ]),
 );
 
 const DocumentVault = mongoose.model('DocumentVault', documentVaultSchema);

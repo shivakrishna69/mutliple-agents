@@ -140,7 +140,9 @@ class TelemetryPublisher:
             self._dropped_since_last_log += 1
             now_monotonic = time.monotonic()
             if now_monotonic - self._last_drop_log_monotonic >= DROP_LOG_INTERVAL_SECONDS:
-                logger.warning("Telemetry queue full; events dropped", extra={"dropped_events": self._dropped_since_last_log})
+                logger.warning(
+                    "Telemetry queue full; events dropped", extra={"dropped_events": self._dropped_since_last_log}
+                )
                 self._dropped_since_last_log = 0
                 self._last_drop_log_monotonic = now_monotonic
 
@@ -162,7 +164,9 @@ class TelemetryPublisher:
                 while not self._event_queue.empty():
                     await self._send_batch(self._take_available(BATCH_SIZE))
         except TimeoutError:
-            logger.warning("Telemetry flush on shutdown timed out", extra={"abandoned_events": self._event_queue.qsize()})
+            logger.warning(
+                "Telemetry flush on shutdown timed out", extra={"abandoned_events": self._event_queue.qsize()}
+            )
 
     def _take_available(self, max_events: int) -> list[dict[str, Any]]:
         taken_events: list[dict[str, Any]] = []
@@ -194,7 +198,9 @@ class TelemetryPublisher:
         except (BackendUnavailableError, BackendRejectedError) as delivery_error:
             now_monotonic = time.monotonic()
             if now_monotonic - self._last_failure_log_monotonic >= DROP_LOG_INTERVAL_SECONDS:
-                logger.warning("Telemetry batch not delivered", extra={"events": len(batch), "error": str(delivery_error)[:200]})
+                logger.warning(
+                    "Telemetry batch not delivered", extra={"events": len(batch), "error": str(delivery_error)[:200]}
+                )
                 self._last_failure_log_monotonic = now_monotonic
             return
         rejected_events = delivery_result.get("rejected") or []
@@ -217,7 +223,9 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
     def __init__(self, publisher: TelemetryPublisher, *, workflow: str, conversation_id: str | None) -> None:
         self._publisher = publisher
         self.workflow = workflow
-        self.conversation_id = conversation_id if conversation_id and _OBJECT_ID_PATTERN.match(conversation_id) else None
+        self.conversation_id = (
+            conversation_id if conversation_id and _OBJECT_ID_PATTERN.match(conversation_id) else None
+        )
         self.turn_id = uuid.uuid4().hex
         self.route_decision: str | None = None
         self.model_call_count = 0
@@ -260,11 +268,15 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
                 "tool_name": _identifier_or_none(tool_name),
                 "status": status,
                 "error_type": _identifier_or_none(type(error).__name__) if error else None,
-                "metrics": {metric_name: metric_value for metric_name, metric_value in (metrics or {}).items() if metric_value is not None},
+                "metrics": {
+                    metric_name: metric_value
+                    for metric_name, metric_value in (metrics or {}).items()
+                    if metric_value is not None
+                },
             }
             self._sequence += 1
             self._publisher.publish(telemetry_event)
-        except Exception:  # noqa: BLE001 - telemetry must never break a turn
+        except Exception:
             logger.debug("Telemetry event could not be built", exc_info=True)
 
     def emit_turn_started(self, transcript_messages: int | None) -> None:
@@ -319,7 +331,10 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
             phase="node_completed",
             node=node_name,
             status="success",
-            metrics={"duration_ms": _elapsed_ms(started_monotonic), "route_decision": _identifier_or_none(route_decision)},
+            metrics={
+                "duration_ms": _elapsed_ms(started_monotonic),
+                "route_decision": _identifier_or_none(route_decision),
+            },
         )
 
     async def on_chain_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
@@ -350,7 +365,11 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
         **kwargs: Any,
     ) -> None:
         call_metadata = metadata or {}
-        self._model_runs[run_id] = (call_metadata.get("langgraph_node"), call_metadata.get("ls_model_name"), time.monotonic())
+        self._model_runs[run_id] = (
+            call_metadata.get("langgraph_node"),
+            call_metadata.get("ls_model_name"),
+            time.monotonic(),
+        )
 
     async def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
         model_run = self._model_runs.pop(run_id, None)
@@ -372,7 +391,9 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 # Generation speed as the caller experiences it (includes network and queueing).
-                "tokens_per_second": round(output_tokens / (duration_ms / 1000), 1) if output_tokens and duration_ms > 0 else None,
+                "tokens_per_second": round(output_tokens / (duration_ms / 1000), 1)
+                if output_tokens and duration_ms > 0
+                else None,
             },
         )
 
@@ -470,7 +491,9 @@ class TurnTelemetryHandler(AsyncCallbackHandler):
                 "duration_ms": _elapsed_ms(started_monotonic),
                 "documents_returned": len(documents),
                 "top_relevance_score": round(max(relevance_scores), 4) if relevance_scores else None,
-                "mean_relevance_score": round(sum(relevance_scores) / len(relevance_scores), 4) if relevance_scores else None,
+                "mean_relevance_score": round(sum(relevance_scores) / len(relevance_scores), 4)
+                if relevance_scores
+                else None,
             },
         )
 
@@ -510,7 +533,11 @@ def _relevance_scores(documents: Sequence[Any]) -> list[float]:
         document_metadata = getattr(document, "metadata", None) or {}
         for metadata_key in _RELEVANCE_METADATA_KEYS:
             candidate_score = document_metadata.get(metadata_key)
-            if isinstance(candidate_score, (int, float)) and not isinstance(candidate_score, bool) and 0 <= candidate_score <= 1:
+            if (
+                isinstance(candidate_score, (int, float))
+                and not isinstance(candidate_score, bool)
+                and 0 <= candidate_score <= 1
+            ):
                 relevance_scores.append(float(candidate_score))
                 break
     return relevance_scores

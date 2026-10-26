@@ -18,11 +18,27 @@ function initialsOf(fullName) {
   return ((nameParts[0]?.[0] ?? '') + (nameParts.length > 1 ? nameParts.at(-1)[0] : '')).toUpperCase() || '?';
 }
 
-const AVATAR_GRADIENTS = ['from-indigo-500 to-violet-500', 'from-sky-500 to-cyan-500', 'from-emerald-500 to-teal-500', 'from-amber-500 to-orange-500', 'from-rose-500 to-pink-500'];
+const AVATAR_GRADIENTS = [
+  'from-indigo-500 to-violet-500',
+  'from-sky-500 to-cyan-500',
+  'from-emerald-500 to-teal-500',
+  'from-amber-500 to-orange-500',
+  'from-rose-500 to-pink-500',
+];
 
 function Avatar({ person, size = 'h-9 w-9 text-xs' }) {
-  const gradient = AVATAR_GRADIENTS[[...(person.id ?? '')].reduce((runningTotal, character) => runningTotal + character.charCodeAt(0), 0) % AVATAR_GRADIENTS.length];
-  return <span className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white ${gradient} ${size}`}>{initialsOf(person.name)}</span>;
+  const gradient =
+    AVATAR_GRADIENTS[
+      [...(person.id ?? '')].reduce((runningTotal, character) => runningTotal + character.charCodeAt(0), 0) %
+        AVATAR_GRADIENTS.length
+    ];
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white ${gradient} ${size}`}
+    >
+      {initialsOf(person.name)}
+    </span>
+  );
 }
 
 /** Keeps nodes that match the query or have a matching descendant. */
@@ -42,7 +58,9 @@ function TreeNode({ node, depth, selectedId, onSelect, forceExpanded }) {
   const isSelected = node.id === selectedId;
   return (
     <li>
-      <div className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition ${isSelected ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'hover:bg-slate-50'}`}>
+      <div
+        className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition ${isSelected ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'hover:bg-slate-50'}`}
+      >
         <button
           type="button"
           onClick={() => setIsExpanded((wasExpanded) => !wasExpanded)}
@@ -52,19 +70,34 @@ function TreeNode({ node, depth, selectedId, onSelect, forceExpanded }) {
         >
           <span className={`transition-transform ${showChildren ? 'rotate-90' : ''}`}>▸</span>
         </button>
-        <button type="button" onClick={() => onSelect(node)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <button
+          type="button"
+          onClick={() => onSelect(node)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
           <Avatar person={node} />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-slate-900">{node.name ?? 'Unnamed'}</span>
             <span className="block truncate text-xs text-slate-500">{node.designation}</span>
           </span>
-          {hasChildren && <Badge tone="slate" className="ml-auto">{node.children.length}</Badge>}
+          {hasChildren && (
+            <Badge tone="slate" className="ml-auto">
+              {node.children.length}
+            </Badge>
+          )}
         </button>
       </div>
       {showChildren && (
         <ul className="ml-5 border-l border-slate-200 pl-3">
           {node.children.map((childNode) => (
-            <TreeNode key={childNode.id} node={childNode} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} forceExpanded={forceExpanded} />
+            <TreeNode
+              key={childNode.id}
+              node={childNode}
+              depth={depth + 1}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              forceExpanded={forceExpanded}
+            />
           ))}
         </ul>
       )}
@@ -84,7 +117,11 @@ function ReportsPanel({ person }) {
         <div>
           <p className="text-lg font-bold">{data.manager.name}</p>
           <p className="text-sm text-slate-300">{data.manager.designation}</p>
-          {!data.manager.isCurrentEmployee && <Badge tone="amber" className="mt-2">Former employee: reports need reassignment</Badge>}
+          {!data.manager.isCurrentEmployee && (
+            <Badge tone="amber" className="mt-2">
+              Former employee: reports need reassignment
+            </Badge>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
@@ -101,7 +138,10 @@ function ReportsPanel({ person }) {
             <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{sectionTitle}</p>
             <ul className="mt-2 grid gap-2 sm:grid-cols-2">
               {reports.map((report) => (
-                <li key={report.id} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70">
+                <li
+                  key={report.id}
+                  className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200/70"
+                >
                   <Avatar person={report} size="h-8 w-8 text-[0.65rem]" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-900">{report.name}</p>
@@ -116,7 +156,9 @@ function ReportsPanel({ person }) {
           </div>
         ) : null,
       )}
-      {data.meta.totalReportCount === 0 && <EmptyState Icon={UsersIcon} title="No reports" description="Nobody reports to this person." />}
+      {data.meta.totalReportCount === 0 && (
+        <EmptyState Icon={UsersIcon} title="No reports" description="Nobody reports to this person." />
+      )}
     </div>
   );
 }
@@ -134,8 +176,19 @@ export default function OrgDirectory() {
       {data && (
         <div className="grid gap-4 sm:grid-cols-3">
           <StatTile label="Employees" value={data.meta.employeeCount} Icon={UsersIcon} accent="indigo" />
-          <StatTile label="Levels" value={data.meta.maxDepth} hint={`${data.meta.rootCount} top-level leaders`} Icon={SitemapIcon} accent="emerald" />
-          <StatTile label="Snapshot" value={formatDateTime(data.meta.generatedAt)} hint="Refreshed automatically" accent="sky" />
+          <StatTile
+            label="Levels"
+            value={data.meta.maxDepth}
+            hint={`${data.meta.rootCount} top-level leaders`}
+            Icon={SitemapIcon}
+            accent="emerald"
+          />
+          <StatTile
+            label="Snapshot"
+            value={formatDateTime(data.meta.generatedAt)}
+            hint="Refreshed automatically"
+            accent="sky"
+          />
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-5">
@@ -158,15 +211,32 @@ export default function OrgDirectory() {
         >
           {isLoading && !data && <LoadingBlock label="Loading organisation…" />}
           {error && <Notice tone="error" title={error.message} />}
-          {data && visibleRoots.length === 0 && <EmptyState Icon={SitemapIcon} title={normalizedQuery ? 'Nobody matches' : 'No employees yet'} />}
+          {data && visibleRoots.length === 0 && (
+            <EmptyState Icon={SitemapIcon} title={normalizedQuery ? 'Nobody matches' : 'No employees yet'} />
+          )}
           <ul className="max-h-[36rem] space-y-0.5 overflow-y-auto scroll-thin">
             {visibleRoots.map((rootNode) => (
-              <TreeNode key={rootNode.id} node={rootNode} depth={0} selectedId={selectedPerson?.id} onSelect={setSelectedPerson} forceExpanded={Boolean(normalizedQuery)} />
+              <TreeNode
+                key={rootNode.id}
+                node={rootNode}
+                depth={0}
+                selectedId={selectedPerson?.id}
+                onSelect={setSelectedPerson}
+                forceExpanded={Boolean(normalizedQuery)}
+              />
             ))}
           </ul>
         </Card>
         <Card title="Reporting line" className="lg:col-span-3">
-          {selectedPerson ? <ReportsPanel person={selectedPerson} /> : <EmptyState Icon={UsersIcon} title="Select a person" description="Choose anyone in the hierarchy to see who reports to them." />}
+          {selectedPerson ? (
+            <ReportsPanel person={selectedPerson} />
+          ) : (
+            <EmptyState
+              Icon={UsersIcon}
+              title="Select a person"
+              description="Choose anyone in the hierarchy to see who reports to them."
+            />
+          )}
         </Card>
       </div>
     </div>

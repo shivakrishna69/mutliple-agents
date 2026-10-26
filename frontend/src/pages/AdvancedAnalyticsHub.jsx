@@ -34,8 +34,16 @@ export default function AdvancedAnalyticsHub() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-8">
-      <PageHeader title="Analytics hub" description="Workforce health, strategic alignment and your documents in one place." />
-      <Tabs tabs={tabs} activeTabId={activeTabId} onChange={(tabId) => setSearchParameters({ tab: tabId }, { replace: true })} label="Analytics hub sections" />
+      <PageHeader
+        title="Analytics hub"
+        description="Workforce health, strategic alignment and your documents in one place."
+      />
+      <Tabs
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onChange={(tabId) => setSearchParameters({ tab: tabId }, { replace: true })}
+        label="Analytics hub sections"
+      />
       <div role="tabpanel">
         {activeTabId === 'risk' && <WorkforceRiskPanel />}
         {activeTabId === 'okrs' && <OkrAlignmentCanvas />}

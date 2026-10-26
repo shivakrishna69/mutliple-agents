@@ -59,7 +59,10 @@ export function receiveVaultUpload(req, res, next) {
     return sendError(req, res, HTTP_STATUS.UNSUPPORTED_MEDIA_TYPE, VAULT_MESSAGES.MULTIPART_REQUIRED);
   }
   const declaredContentLength = Number(req.get('content-length'));
-  if (Number.isFinite(declaredContentLength) && declaredContentLength > VAULT_FIELD_LIMITS.MAX_FILE_BYTES + MULTIPART_OVERHEAD_BYTES) {
+  if (
+    Number.isFinite(declaredContentLength) &&
+    declaredContentLength > VAULT_FIELD_LIMITS.MAX_FILE_BYTES + MULTIPART_OVERHEAD_BYTES
+  ) {
     return sendError(req, res, HTTP_STATUS.PAYLOAD_TOO_LARGE, VAULT_MESSAGES.FILE_TOO_LARGE);
   }
 
@@ -67,11 +70,19 @@ export function receiveVaultUpload(req, res, next) {
     if (!uploadError) return next();
     if (uploadError instanceof multer.MulterError) {
       const { statusCode, message } = describeMulterError(uploadError);
-      logger.warn('Vault upload rejected while reading', { requestId: req.id, userId: req.user?.id, code: uploadError.code });
+      logger.warn('Vault upload rejected while reading', {
+        requestId: req.id,
+        userId: req.user?.id,
+        code: uploadError.code,
+      });
       return sendError(req, res, statusCode, message);
     }
     // Errors from the multipart parser itself (truncated body, broken boundary) are client errors.
-    logger.warn('Vault upload could not be parsed', { requestId: req.id, userId: req.user?.id, error: uploadError.message });
+    logger.warn('Vault upload could not be parsed', {
+      requestId: req.id,
+      userId: req.user?.id,
+      error: uploadError.message,
+    });
     return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.MALFORMED_UPLOAD);
   });
 }

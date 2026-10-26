@@ -119,7 +119,10 @@ SYSTEM_LOG_CATALOG: dict[str, dict[str, Any]] = {
         "http_status": 502,
         "sample_log_line": "upstream connect error or disconnect/reset before headers. reset reason: connection termination",
         "probable_cause": "An upstream service instance was restarting and briefly refused connections.",
-        "customer_steps": ["Retry the request after a few seconds.", "If it persists for more than 10 minutes, share the request ID and timestamp."],
+        "customer_steps": [
+            "Retry the request after a few seconds.",
+            "If it persists for more than 10 minutes, share the request ID and timestamp.",
+        ],
         "incident_open": False,
     },
     "ERR_401_UNAUTHORIZED": {
@@ -127,7 +130,10 @@ SYSTEM_LOG_CATALOG: dict[str, dict[str, Any]] = {
         "http_status": 401,
         "sample_log_line": "token verification failed: signature expired",
         "probable_cause": "The access token or API key used for the request has expired or was revoked.",
-        "customer_steps": ["Sign out and sign in again.", "For API access, generate a new API key and update the integration."],
+        "customer_steps": [
+            "Sign out and sign in again.",
+            "For API access, generate a new API key and update the integration.",
+        ],
         "incident_open": False,
     },
     "ERR_403_FORBIDDEN": {
@@ -135,7 +141,10 @@ SYSTEM_LOG_CATALOG: dict[str, dict[str, Any]] = {
         "http_status": 403,
         "sample_log_line": "permission denied: role lacks scope 'billing:read'",
         "probable_cause": "The signed-in user's role does not include the permission this action needs.",
-        "customer_steps": ["Ask a workspace admin to grant the required role.", "Confirm you are signed in to the correct workspace."],
+        "customer_steps": [
+            "Ask a workspace admin to grant the required role.",
+            "Confirm you are signed in to the correct workspace.",
+        ],
         "incident_open": False,
     },
     "ERR_429_RATE_LIMITED": {
@@ -143,7 +152,10 @@ SYSTEM_LOG_CATALOG: dict[str, dict[str, Any]] = {
         "http_status": 429,
         "sample_log_line": "rate limit exceeded: 600 requests/minute for key prefix pk_live",
         "probable_cause": "The client sent more requests than the plan's rate limit allows.",
-        "customer_steps": ["Add exponential backoff and respect the Retry-After header.", "Batch requests where the API supports it."],
+        "customer_steps": [
+            "Add exponential backoff and respect the Retry-After header.",
+            "Batch requests where the API supports it.",
+        ],
         "incident_open": False,
     },
     "ERR_500_INTERNAL": {
@@ -330,8 +342,7 @@ BILLING_WORKER_TOOL_INSTRUCTIONS = (
 
 SUPERVISOR_RESPONSE_SYSTEM_PROMPT = (
     "You are the support team lead answering general questions. Greet the customer, answer general questions, "
-    "and ask a clarifying question when the request is unclear. "
-    + SHARED_POLICY_PROMPT
+    "and ask a clarifying question when the request is unclear. " + SHARED_POLICY_PROMPT
 )
 
 
@@ -353,9 +364,19 @@ class WorkerProfile:
         return self.system_prompt + (self.tool_instructions if self.resolved_tools(simulated_tools_enabled) else "")
 
 
-TECH_WORKER_PROFILE = WorkerProfile(TECH_WORKER_NODE_NAME, "tech_agent", TECH_WORKER_SYSTEM_PROMPT, TECH_WORKER_TOOL_INSTRUCTIONS, (query_system_logs,))
-BILLING_WORKER_PROFILE = WorkerProfile(BILLING_WORKER_NODE_NAME, "billing_agent", BILLING_WORKER_SYSTEM_PROMPT, BILLING_WORKER_TOOL_INSTRUCTIONS, (check_invoice_status,))
-SUPERVISOR_RESPONSE_PROFILE = WorkerProfile(SUPERVISOR_RESPONSE_NODE_NAME, "supervisor", SUPERVISOR_RESPONSE_SYSTEM_PROMPT, "", ())
+TECH_WORKER_PROFILE = WorkerProfile(
+    TECH_WORKER_NODE_NAME, "tech_agent", TECH_WORKER_SYSTEM_PROMPT, TECH_WORKER_TOOL_INSTRUCTIONS, (query_system_logs,)
+)
+BILLING_WORKER_PROFILE = WorkerProfile(
+    BILLING_WORKER_NODE_NAME,
+    "billing_agent",
+    BILLING_WORKER_SYSTEM_PROMPT,
+    BILLING_WORKER_TOOL_INSTRUCTIONS,
+    (check_invoice_status,),
+)
+SUPERVISOR_RESPONSE_PROFILE = WorkerProfile(
+    SUPERVISOR_RESPONSE_NODE_NAME, "supervisor", SUPERVISOR_RESPONSE_SYSTEM_PROMPT, "", ()
+)
 
 # Added to a worker's system prompt when the graph looped back and a colleague already replied.
 COLLEAGUE_ALREADY_REPLIED_INSTRUCTION = (
@@ -389,7 +410,11 @@ def extract_reply_text(model_reply: BaseMessage) -> str:
 
 def _token_usage(model_reply: BaseMessage) -> dict[str, int]:
     usage_metadata = getattr(model_reply, "usage_metadata", None) or {}
-    return {key: usage_metadata[key] for key in ("input_tokens", "output_tokens", "total_tokens") if isinstance(usage_metadata.get(key), int)}
+    return {
+        key: usage_metadata[key]
+        for key in ("input_tokens", "output_tokens", "total_tokens")
+        if isinstance(usage_metadata.get(key), int)
+    }
 
 
 def _error_tool_message(tool_call_id: str, tool_name: str, error_description: str) -> ToolMessage:
@@ -420,7 +445,9 @@ async def execute_tool_call(
     selected_tool = tools_by_name.get(tool_name)
     if selected_tool is None:
         return (
-            _error_tool_message(tool_call_id, tool_name, f"Unknown tool '{tool_name}'. Available: {sorted(tools_by_name)}"),
+            _error_tool_message(
+                tool_call_id, tool_name, f"Unknown tool '{tool_name}'. Available: {sorted(tools_by_name)}"
+            ),
             f"{node_name}: rejected call to unknown tool '{tool_name[:40]}'",
         )
     if not isinstance(model_arguments, dict):
@@ -451,19 +478,30 @@ async def execute_tool_call(
     except ToolExecutionError:
         raise
     except Exception as unexpected_tool_error:
-        raise ToolExecutionError(f"{tool_name} failed: {type(unexpected_tool_error).__name__}") from unexpected_tool_error
+        raise ToolExecutionError(
+            f"{tool_name} failed: {type(unexpected_tool_error).__name__}"
+        ) from unexpected_tool_error
 
     duration_ms = round((time.perf_counter() - started_at) * 1000, 1)
     result_text = str(tool_result)[:MAX_TOOL_RESULT_CHARACTERS]
-    logger.info("Tool executed", extra={"node": node_name, "tool": tool_name, "result_length": len(result_text), "duration_ms": duration_ms})
-    visible_arguments = {key: value for key, value in model_arguments.items() if key not in SERVER_INJECTED_TOOL_ARGUMENTS.get(tool_name, {})}
+    logger.info(
+        "Tool executed",
+        extra={"node": node_name, "tool": tool_name, "result_length": len(result_text), "duration_ms": duration_ms},
+    )
+    visible_arguments = {
+        key: value
+        for key, value in model_arguments.items()
+        if key not in SERVER_INJECTED_TOOL_ARGUMENTS.get(tool_name, {})
+    }
     return (
         ToolMessage(content=result_text, tool_call_id=tool_call_id, name=tool_name, status="success"),
         f"{node_name}: called {tool_name}({json.dumps(visible_arguments)[:120]}) -> {len(result_text)} chars in {duration_ms} ms",
     )
 
 
-def build_handoff_update(node_name: str, failure_category: str, failure_detail: str, log_entries: list[str]) -> dict[str, Any]:
+def build_handoff_update(
+    node_name: str, failure_category: str, failure_detail: str, log_entries: list[str]
+) -> dict[str, Any]:
     """
     Fallback state update: hand the conversation to a human. Sets next_worker and
     last_replying_worker to "human"; the graph's route_after_worker then ends the turn, and the
@@ -477,7 +515,10 @@ def build_handoff_update(node_name: str, failure_category: str, failure_detail: 
         "messages": [AIMessage(content=HUMAN_HANDOFF_REPLY, id=f"ai-{uuid.uuid4().hex}")],
         "next_worker": HUMAN_WORKER,
         "last_replying_worker": HUMAN_WORKER,
-        "internal_logs": [*log_entries, f"{node_name}: handed off to a human ({failure_category}: {failure_detail[:200]})"],
+        "internal_logs": [
+            *log_entries,
+            f"{node_name}: handed off to a human ({failure_category}: {failure_detail[:200]})",
+        ],
     }
 
 
@@ -524,7 +565,9 @@ def build_guarded_reply_update(
     }
 
 
-async def run_worker_turn(profile: WorkerProfile, state: dict[str, Any], runtime: Runtime[AgentContext]) -> dict[str, Any]:
+async def run_worker_turn(
+    profile: WorkerProfile, state: dict[str, Any], runtime: Runtime[AgentContext]
+) -> dict[str, Any]:
     """The tool execution pathway shared by every worker (see the module docstring, steps 1-5)."""
     agent_context = runtime.context
     started_at = time.perf_counter()
@@ -540,7 +583,9 @@ async def run_worker_turn(profile: WorkerProfile, state: dict[str, Any], runtime
     if profile.tools and routing_reasoning:
         # Specialists get the supervisor's reason for routing to them as a concrete assignment,
         # which keeps a multi-topic message from being answered in full by the first specialist.
-        system_prompt += f" The triage supervisor assigned you this part of the customer's latest message: {routing_reasoning}"
+        system_prompt += (
+            f" The triage supervisor assigned you this part of the customer's latest message: {routing_reasoning}"
+        )
     if replies_given_this_turn(all_messages):
         # The graph looped back: a colleague already answered part of this customer message.
         system_prompt += COLLEAGUE_ALREADY_REPLIED_INSTRUCTION
@@ -578,7 +623,9 @@ async def run_worker_turn(profile: WorkerProfile, state: dict[str, Any], runtime
             tool_rounds_used += 1
             tool_exchange_messages.append(model_reply)
             for requested_tool_call in requested_tool_calls:
-                tool_message, tool_log_entry = await execute_tool_call(requested_tool_call, tools_by_name, state, profile.node_name)
+                tool_message, tool_log_entry = await execute_tool_call(
+                    requested_tool_call, tools_by_name, state, profile.node_name
+                )
                 tool_exchange_messages.append(tool_message)
                 log_entries.append(tool_log_entry)
 

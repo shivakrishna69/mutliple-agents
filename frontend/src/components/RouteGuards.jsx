@@ -66,7 +66,8 @@ export function PeopleManagerRoute() {
   const { authStatus, currentUser } = useAuth();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (![USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser?.role)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  if (![USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser?.role))
+    return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
   return <Outlet />;
 }
 

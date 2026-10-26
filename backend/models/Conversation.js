@@ -275,9 +275,7 @@ conversationSchema.pre(
   function blockWorkflowFieldUpdates() {
     const update = this.getUpdate() ?? {};
     const touched = WORKFLOW_FIELDS.filter(
-      (field) =>
-        field in update ||
-        Object.values(update).some((op) => op && typeof op === 'object' && field in op),
+      (field) => field in update || Object.values(update).some((op) => op && typeof op === 'object' && field in op),
     );
     if (touched.length > 0) {
       throw new Error(

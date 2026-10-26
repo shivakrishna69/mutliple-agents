@@ -92,14 +92,20 @@ const officeLocationSchema = new mongoose.Schema(
         type: Number,
         default: 15,
         min: [0, 'Late grace cannot be negative'],
-        max: [ATTENDANCE_FIELD_LIMITS.LATE_GRACE_MAX_MINUTES, `Late grace cannot exceed ${ATTENDANCE_FIELD_LIMITS.LATE_GRACE_MAX_MINUTES} minutes`],
+        max: [
+          ATTENDANCE_FIELD_LIMITS.LATE_GRACE_MAX_MINUTES,
+          `Late grace cannot exceed ${ATTENDANCE_FIELD_LIMITS.LATE_GRACE_MAX_MINUTES} minutes`,
+        ],
         validate: { validator: Number.isInteger, message: 'Late grace must be a whole number of minutes' },
       },
       halfDayAfterMinutes: {
         type: Number,
         default: 240,
         min: [1, 'Half-day threshold must be at least 1 minute'],
-        max: [ATTENDANCE_FIELD_LIMITS.HALF_DAY_AFTER_MAX_MINUTES, `Half-day threshold cannot exceed ${ATTENDANCE_FIELD_LIMITS.HALF_DAY_AFTER_MAX_MINUTES} minutes`],
+        max: [
+          ATTENDANCE_FIELD_LIMITS.HALF_DAY_AFTER_MAX_MINUTES,
+          `Half-day threshold cannot exceed ${ATTENDANCE_FIELD_LIMITS.HALF_DAY_AFTER_MAX_MINUTES} minutes`,
+        ],
         validate: { validator: Number.isInteger, message: 'Half-day threshold must be a whole number of minutes' },
       },
     },
@@ -119,7 +125,11 @@ officeLocationSchema.pre('validate', function enforceOfficeConsistency() {
   if (this.coordinates && isNullIsland(this.coordinates)) {
     this.invalidate('coordinates', 'Office coordinates (0, 0) are a missing-location placeholder, not a real site');
   }
-  if (this.workday?.shiftStartLocalTime && this.workday?.shiftEndLocalTime && this.workday.shiftEndLocalTime <= this.workday.shiftStartLocalTime) {
+  if (
+    this.workday?.shiftStartLocalTime &&
+    this.workday?.shiftEndLocalTime &&
+    this.workday.shiftEndLocalTime <= this.workday.shiftStartLocalTime
+  ) {
     // "HH:MM" strings compare correctly as text. Shifts crossing midnight are not supported.
     this.invalidate('workday.shiftEndLocalTime', 'The shift must end later on the same day than it starts');
   }

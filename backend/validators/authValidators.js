@@ -42,10 +42,15 @@ function normalizeEmail(rawEmail) {
  * Returns the first failure's message, or null. Not trimmed: spaces are part of the password.
  */
 export function checkNewPassword(rawPassword) {
-  const presenceError = checkRequiredString(rawPassword, VALIDATION_MESSAGES.PASSWORD_REQUIRED, VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING);
+  const presenceError = checkRequiredString(
+    rawPassword,
+    VALIDATION_MESSAGES.PASSWORD_REQUIRED,
+    VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING,
+  );
   if (presenceError) return presenceError;
   if (rawPassword.length < USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH) return VALIDATION_MESSAGES.PASSWORD_TOO_SHORT;
-  if (Buffer.byteLength(rawPassword, 'utf8') > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES) return VALIDATION_MESSAGES.PASSWORD_TOO_LONG;
+  if (Buffer.byteLength(rawPassword, 'utf8') > USER_FIELD_LIMITS.PASSWORD_MAX_BYTES)
+    return VALIDATION_MESSAGES.PASSWORD_TOO_LONG;
   // The first unmet strength rule; one message per field keeps the response shape uniform.
   const firstUnmetRule = PASSWORD_STRENGTH_RULES.find((strengthRule) => !strengthRule.pattern.test(rawPassword));
   return firstUnmetRule ? PASSWORD_RULE_MESSAGES[firstUnmetRule.ruleId] : null;
@@ -67,7 +72,11 @@ export function validateChangePasswordInput(requestBody) {
   const { currentPassword: rawCurrentPassword, newPassword: rawNewPassword } = requestBody;
   const validationErrors = [];
 
-  const currentPasswordError = checkRequiredString(rawCurrentPassword, VALIDATION_MESSAGES.PASSWORD_REQUIRED, VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING);
+  const currentPasswordError = checkRequiredString(
+    rawCurrentPassword,
+    VALIDATION_MESSAGES.PASSWORD_REQUIRED,
+    VALIDATION_MESSAGES.PASSWORD_MUST_BE_STRING,
+  );
   if (currentPasswordError) validationErrors.push({ field: 'currentPassword', message: currentPasswordError });
 
   const newPasswordError = checkNewPassword(rawNewPassword);
@@ -80,7 +89,11 @@ export function validateChangePasswordInput(requestBody) {
   if (validationErrors.length > 0) {
     return { isValid: false, validationErrors, sanitizedInput: null };
   }
-  return { isValid: true, validationErrors: [], sanitizedInput: { currentPassword: rawCurrentPassword, newPassword: rawNewPassword } };
+  return {
+    isValid: true,
+    validationErrors: [],
+    sanitizedInput: { currentPassword: rawCurrentPassword, newPassword: rawNewPassword },
+  };
 }
 
 /**
@@ -104,7 +117,11 @@ export function validateRegistrationInput(requestBody) {
   const { name: rawName, email: rawEmail, password: rawPassword } = requestBody;
   const validationErrors = [];
 
-  const nameError = checkRequiredString(rawName, VALIDATION_MESSAGES.NAME_REQUIRED, VALIDATION_MESSAGES.NAME_MUST_BE_STRING);
+  const nameError = checkRequiredString(
+    rawName,
+    VALIDATION_MESSAGES.NAME_REQUIRED,
+    VALIDATION_MESSAGES.NAME_MUST_BE_STRING,
+  );
   if (nameError) {
     validationErrors.push({ field: 'name', message: nameError });
   } else {
@@ -117,7 +134,11 @@ export function validateRegistrationInput(requestBody) {
     }
   }
 
-  const emailError = checkRequiredString(rawEmail, VALIDATION_MESSAGES.EMAIL_REQUIRED, VALIDATION_MESSAGES.EMAIL_MUST_BE_STRING);
+  const emailError = checkRequiredString(
+    rawEmail,
+    VALIDATION_MESSAGES.EMAIL_REQUIRED,
+    VALIDATION_MESSAGES.EMAIL_MUST_BE_STRING,
+  );
   if (emailError) {
     validationErrors.push({ field: 'email', message: emailError });
   } else {
@@ -165,7 +186,11 @@ export function validateLoginInput(requestBody) {
   const { email: rawEmail, password: rawPassword } = requestBody;
   const validationErrors = [];
 
-  const emailError = checkRequiredString(rawEmail, VALIDATION_MESSAGES.EMAIL_REQUIRED, VALIDATION_MESSAGES.EMAIL_MUST_BE_STRING);
+  const emailError = checkRequiredString(
+    rawEmail,
+    VALIDATION_MESSAGES.EMAIL_REQUIRED,
+    VALIDATION_MESSAGES.EMAIL_MUST_BE_STRING,
+  );
   if (emailError) validationErrors.push({ field: 'email', message: emailError });
 
   const passwordError = checkRequiredString(

@@ -311,7 +311,12 @@ def build_support_graph(memory_checkpointer: BaseCheckpointSaver) -> CompiledSta
     )
 
     # Worker exits loop back to the supervisor, unless the worker ended the turn.
-    for worker_node_name in (NODE_BILLING_AGENT, NODE_TECH_AGENT, NODE_ATTENDANCE_REGULARIZATION, NODE_SUPERVISOR_RESPONSE):
+    for worker_node_name in (
+        NODE_BILLING_AGENT,
+        NODE_TECH_AGENT,
+        NODE_ATTENDANCE_REGULARIZATION,
+        NODE_SUPERVISOR_RESPONSE,
+    ):
         graph_builder.add_conditional_edges(
             worker_node_name,
             route_after_worker,

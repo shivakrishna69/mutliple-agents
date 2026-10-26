@@ -73,7 +73,6 @@ import time
 from enum import Enum
 from typing import Any
 
-from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.runtime import Runtime
@@ -299,7 +298,9 @@ def _build_routing_prompt(state: dict[str, Any], max_context_messages: int, is_r
     """
     system_prompt = SUPERVISOR_SYSTEM_PROMPT
     if is_review:
-        system_prompt += REVIEW_MODE_INSTRUCTIONS.format(replying_worker=state.get("last_replying_worker") or "a specialist")
+        system_prompt += REVIEW_MODE_INSTRUCTIONS.format(
+            replying_worker=state.get("last_replying_worker") or "a specialist"
+        )
     else:
         previous_worker = state.get("last_replying_worker") or state.get("next_worker")
         if previous_worker:
@@ -310,7 +311,9 @@ def _build_routing_prompt(state: dict[str, Any], max_context_messages: int, is_r
     return [SystemMessage(content=system_prompt), *recent_conversation]
 
 
-def _routing_state_update(next_action: NextActionEnum, reasoning: str, log_entry: str, *, is_review: bool) -> dict[str, Any]:
+def _routing_state_update(
+    next_action: NextActionEnum, reasoning: str, log_entry: str, *, is_review: bool
+) -> dict[str, Any]:
     """
     The partial state the node returns; see the module docstring for how each channel merges.
     A routing decision that sends the customer's message anywhere except the attendance assistant
@@ -367,7 +370,9 @@ async def supervisor_node(state: dict[str, Any], runtime: Runtime[AgentContext])
         )
     except ValidationError as validation_error:
         # Well-formed JSON with a missing field, an unknown action, or a non-object value.
-        failing_fields = sorted({".".join(str(location) for location in error["loc"]) or "<root>" for error in validation_error.errors()})
+        failing_fields = sorted(
+            {".".join(str(location) for location in error["loc"]) or "<root>" for error in validation_error.errors()}
+        )
         return _fallback_routing(
             fallback_action=fallback_action,
             mode_name=mode_name,

@@ -132,7 +132,11 @@ export async function deleteVaultObjectQuietly(objectKey, requestId) {
   try {
     await vaultStorage.s3Client.send(new DeleteObjectCommand({ Bucket: vaultStorage.bucketName, Key: objectKey }));
   } catch (deleteError) {
-    logger.error('Vault object cleanup failed; remove it manually', { requestId, objectKey, error: deleteError.message });
+    logger.error('Vault object cleanup failed; remove it manually', {
+      requestId,
+      objectKey,
+      error: deleteError.message,
+    });
   }
 }
 
@@ -142,7 +146,10 @@ export async function deleteVaultObjectQuietly(objectKey, requestId) {
  */
 function buildAttachmentDisposition(downloadFileName) {
   const asciiFallbackName = downloadFileName.replace(/[^\x20-\x7E]|["\\]/g, '_');
-  const encodedName = encodeURIComponent(downloadFileName).replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+  const encodedName = encodeURIComponent(downloadFileName).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
   return `attachment; filename="${asciiFallbackName}"; filename*=UTF-8''${encodedName}`;
 }
 

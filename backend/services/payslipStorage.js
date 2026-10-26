@@ -53,7 +53,11 @@ export function initPayslipStorage(storageConfig) {
     serverSideEncryption: storageConfig.serverSideEncryption,
     kmsKeyId: storageConfig.serverSideEncryption === 'aws:kms' ? storageConfig.kmsKeyId : null,
   };
-  logger.info('Payslip storage ready', { bucketName: storageConfig.bucketName, serverSideEncryption: storageConfig.serverSideEncryption, customEndpoint: Boolean(storageConfig.endpoint) });
+  logger.info('Payslip storage ready', {
+    bucketName: storageConfig.bucketName,
+    serverSideEncryption: storageConfig.serverSideEncryption,
+    customEndpoint: Boolean(storageConfig.endpoint),
+  });
 }
 
 export function isPayslipStorageConfigured() {
@@ -141,7 +145,11 @@ export async function deletePayslipObjectQuietly(objectKey, requestId) {
   try {
     await payslipStorage.s3Client.send(new DeleteObjectCommand({ Bucket: payslipStorage.bucketName, Key: objectKey }));
   } catch (deleteError) {
-    logger.error('Payslip object cleanup failed; remove it manually', { requestId, objectKey, error: deleteError.message });
+    logger.error('Payslip object cleanup failed; remove it manually', {
+      requestId,
+      objectKey,
+      error: deleteError.message,
+    });
   }
 }
 

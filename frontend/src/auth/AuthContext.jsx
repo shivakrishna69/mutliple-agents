@@ -33,7 +33,11 @@ const SIGNED_OUT_STATE = Object.freeze({ authStatus: AUTH_STATUS.UNAUTHENTICATED
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [sessionState, setSessionState] = useState({ authStatus: AUTH_STATUS.CHECKING, currentUser: null, csrfToken: null });
+  const [sessionState, setSessionState] = useState({
+    authStatus: AUTH_STATUS.CHECKING,
+    currentUser: null,
+    csrfToken: null,
+  });
 
   // Restore the session on page load. The request is aborted if the provider unmounts.
   useEffect(() => {
@@ -44,7 +48,11 @@ export function AuthProvider({ children }) {
         if (sessionCheckController.signal.aborted) return;
         setSessionState(
           currentSession
-            ? { authStatus: AUTH_STATUS.AUTHENTICATED, currentUser: currentSession.user, csrfToken: currentSession.csrfToken }
+            ? {
+                authStatus: AUTH_STATUS.AUTHENTICATED,
+                currentUser: currentSession.user,
+                csrfToken: currentSession.csrfToken,
+              }
             : SIGNED_OUT_STATE,
         );
       })

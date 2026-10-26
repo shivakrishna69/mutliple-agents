@@ -71,9 +71,15 @@ class EmployeeContext(BaseModel):
 
     employee_id: IdentifierString = Field(description="EmployeeProfile id.")
     display_name: Annotated[str, StringConstraints(min_length=1, max_length=100)]
-    time_zone: Annotated[str, StringConstraints(min_length=1, max_length=64)] = Field(description="The office's IANA time zone.")
-    shift_start_time: Annotated[str, StringConstraints(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")] = Field(description="Office shift start, HH:MM.")
-    shift_end_time: Annotated[str, StringConstraints(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")] = Field(description="Office shift end, HH:MM.")
+    time_zone: Annotated[str, StringConstraints(min_length=1, max_length=64)] = Field(
+        description="The office's IANA time zone."
+    )
+    shift_start_time: Annotated[str, StringConstraints(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")] = Field(
+        description="Office shift start, HH:MM."
+    )
+    shift_end_time: Annotated[str, StringConstraints(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")] = Field(
+        description="Office shift end, HH:MM."
+    )
     manager_id: IdentifierString | None = Field(default=None, description="The reporting manager's EmployeeProfile id.")
     allowed_geofence_radius: Annotated[int, Field(ge=0, le=100_000)] | None = Field(
         default=None, description="Punch-in geofence radius in metres, recorded with manager reviews."
@@ -85,7 +91,9 @@ class ConversationMessage(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    message_id: IdentifierString = Field(description="Stable id of the stored message; used to merge, not duplicate, history.")
+    message_id: IdentifierString = Field(
+        description="Stable id of the stored message; used to merge, not duplicate, history."
+    )
     role: ChatRole
     content: Annotated[str, StringConstraints(min_length=1, max_length=MESSAGE_CONTENT_MAX_LENGTH)]
 
@@ -112,7 +120,7 @@ class ConversationInput(BaseModel):
     messages: Annotated[list[ConversationMessage], Field(min_length=1, max_length=MAX_MESSAGES_PER_REQUEST)]
 
     @model_validator(mode="after")
-    def validate_transcript(self) -> "ConversationInput":
+    def validate_transcript(self) -> ConversationInput:
         message_ids = [conversation_message.message_id for conversation_message in self.messages]
         if len(message_ids) != len(set(message_ids)):
             raise ValueError("message_id values must be unique within a request")
@@ -167,10 +175,14 @@ class RegularizationTurnInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    thread_id: IdentifierString = Field(description="One regularization conversation per employee, e.g. attendance:<employeeId>.")
+    thread_id: IdentifierString = Field(
+        description="One regularization conversation per employee, e.g. attendance:<employeeId>."
+    )
     message: Annotated[str, StringConstraints(min_length=1, max_length=REGULARIZATION_MESSAGE_MAX_LENGTH)]
     employee_context: EmployeeContext
-    start_new: bool = Field(default=False, description="Discard any unanswered question and treat the message as a new request.")
+    start_new: bool = Field(
+        default=False, description="Discard any unanswered question and treat the message as a new request."
+    )
 
 
 class RegularizationApprovalSummary(BaseModel):
@@ -197,7 +209,9 @@ class RegularizationTurnResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     thread_id: IdentifierString
-    outcome: Annotated[str, StringConstraints(pattern=r"^(approved|awaiting_employee_input|routed_to_manager|out_of_scope)$")]
+    outcome: Annotated[
+        str, StringConstraints(pattern=r"^(approved|awaiting_employee_input|routed_to_manager|out_of_scope)$")
+    ]
     reply: Annotated[str, StringConstraints(min_length=1, max_length=MESSAGE_CONTENT_MAX_LENGTH)]
     approval: RegularizationApprovalSummary | None
     manager_review: RegularizationReviewSummary | None

@@ -63,10 +63,13 @@ function ChangePasswordForm() {
 
   const isSubmittingRef = useRef(false);
   const activeRequestControllerRef = useRef(null);
+  const currentPasswordInputRef = useRef(null);
+  const newPasswordInputRef = useRef(null);
+  const confirmPasswordInputRef = useRef(null);
   const inputRefsByField = {
-    currentPassword: useRef(null),
-    newPassword: useRef(null),
-    confirmPassword: useRef(null),
+    currentPassword: currentPasswordInputRef,
+    newPassword: newPasswordInputRef,
+    confirmPassword: confirmPasswordInputRef,
   };
 
   useEffect(() => () => activeRequestControllerRef.current?.abort(), []);
@@ -74,7 +77,9 @@ function ChangePasswordForm() {
   const clientFieldErrors = validateChangePasswordForm(formValues);
   const passwordRuleResults = evaluatePasswordRules(formValues.newPassword);
   const passwordMatchError =
-    formValues.confirmPassword.length > 0 && formValues.confirmPassword !== formValues.newPassword ? FORM_MESSAGES.PASSWORDS_DO_NOT_MATCH : null;
+    formValues.confirmPassword.length > 0 && formValues.confirmPassword !== formValues.newPassword
+      ? FORM_MESSAGES.PASSWORDS_DO_NOT_MATCH
+      : null;
 
   function resolveVisibleFieldError(fieldName) {
     const isFieldRevealed = hasAttemptedSubmit || touchedFields[fieldName];
@@ -96,7 +101,9 @@ function ChangePasswordForm() {
 
   function handleFieldBlur(blurEvent) {
     const fieldName = blurEvent.target.name;
-    setTouchedFields((previousTouched) => (previousTouched[fieldName] ? previousTouched : { ...previousTouched, [fieldName]: true }));
+    setTouchedFields((previousTouched) =>
+      previousTouched[fieldName] ? previousTouched : { ...previousTouched, [fieldName]: true },
+    );
   }
 
   async function handleFormSubmit(submitEvent) {
@@ -141,7 +148,10 @@ function ChangePasswordForm() {
         setServerFieldErrors(changeError.fieldErrors);
         // A field-level error is shown inline; a banner is only needed for anything else.
         if (Object.keys(changeError.fieldErrors).length === 0) {
-          setSubmissionError({ message: changeError.message, requestId: changeError.status >= 500 ? changeError.requestId : null });
+          setSubmissionError({
+            message: changeError.message,
+            requestId: changeError.status >= 500 ? changeError.requestId : null,
+          });
         } else if (changeError.fieldErrors.currentPassword) {
           inputRefsByField.currentPassword.current?.focus();
         }
@@ -160,10 +170,18 @@ function ChangePasswordForm() {
   return (
     <form onSubmit={handleFormSubmit} noValidate className="space-y-5" key={formGeneration}>
       {submissionError && (
-        <ErrorBanner title={BANNER_TITLES.PASSWORD_CHANGE_FAILED} message={submissionError.message} requestId={submissionError.requestId} onDismiss={() => setSubmissionError(null)} />
+        <ErrorBanner
+          title={BANNER_TITLES.PASSWORD_CHANGE_FAILED}
+          message={submissionError.message}
+          requestId={submissionError.requestId}
+          onDismiss={() => setSubmissionError(null)}
+        />
       )}
       {successMessage && (
-        <p role="status" className="flex items-start gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-600/20 ring-inset">
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-600/20 ring-inset"
+        >
           <ShieldIcon className="mt-0.5 h-4 w-4 shrink-0" />
           {successMessage}
         </p>
@@ -177,7 +195,7 @@ function ChangePasswordForm() {
           fieldValue={formValues.currentPassword}
           errorMessage={resolveVisibleFieldError('currentPassword')}
           autoCompleteHint="current-password"
-          inputRef={inputRefsByField.currentPassword}
+          inputRef={currentPasswordInputRef}
           onFieldChange={handleFieldChange}
           onFieldBlur={handleFieldBlur}
         />
@@ -188,7 +206,7 @@ function ChangePasswordForm() {
           fieldValue={formValues.newPassword}
           errorMessage={resolveVisibleFieldError('newPassword')}
           autoCompleteHint="new-password"
-          inputRef={inputRefsByField.newPassword}
+          inputRef={newPasswordInputRef}
           describedByIds={[NEW_PASSWORD_REQUIREMENTS_ID]}
           onFieldChange={handleFieldChange}
           onFieldBlur={handleFieldBlur}
@@ -202,7 +220,7 @@ function ChangePasswordForm() {
           fieldValue={formValues.confirmPassword}
           errorMessage={resolveVisibleFieldError('confirmPassword')}
           autoCompleteHint="new-password"
-          inputRef={inputRefsByField.confirmPassword}
+          inputRef={confirmPasswordInputRef}
           onFieldChange={handleFieldChange}
           onFieldBlur={handleFieldBlur}
         />
@@ -227,7 +245,10 @@ export default function Account() {
         <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2">
           <div className="h-20 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500" aria-hidden="true" />
           <div className="px-6 pb-6">
-            <span className="-mt-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-xl font-bold text-white ring-4 ring-white" aria-hidden="true">
+            <span
+              className="-mt-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-xl font-bold text-white ring-4 ring-white"
+              aria-hidden="true"
+            >
               {currentUser.name.trim().charAt(0).toUpperCase()}
             </span>
             <h2 className="mt-3 text-lg font-semibold text-slate-900">{currentUser.name}</h2>
@@ -251,7 +272,9 @@ export default function Account() {
             </span>
             <div>
               <h2 className="text-base font-semibold text-slate-900">Change password</h2>
-              <p className="mt-0.5 text-sm text-slate-500">You’ll stay signed in here; every other device will be signed out.</p>
+              <p className="mt-0.5 text-sm text-slate-500">
+                You’ll stay signed in here; every other device will be signed out.
+              </p>
             </div>
           </div>
           <div className="mt-6">

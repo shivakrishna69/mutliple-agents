@@ -72,7 +72,11 @@ const payslipSchema = new mongoose.Schema(
       dateOfJoining: { type: String, required: true, match: CALENDAR_DATE_PATTERN, immutable: true },
     },
 
-    earnings: { type: [lineItemSchema], immutable: true, validate: { validator: (lineItems) => lineItems.length > 0, message: 'A payslip needs at least one earning' } },
+    earnings: {
+      type: [lineItemSchema],
+      immutable: true,
+      validate: { validator: (lineItems) => lineItems.length > 0, message: 'A payslip needs at least one earning' },
+    },
     deductions: { type: [lineItemSchema], immutable: true },
     grossEarnings: moneyField,
     totalDeductions: moneyField,
@@ -87,12 +91,23 @@ const payslipSchema = new mongoose.Schema(
     },
 
     verification: {
-      verificationId: { type: String, required: true, match: /^PS-\d{6}-[0-9A-F]{4}(?:-[0-9A-F]{4}){3}$/, immutable: true },
+      verificationId: {
+        type: String,
+        required: true,
+        match: /^PS-\d{6}-[0-9A-F]{4}(?:-[0-9A-F]{4}){3}$/,
+        immutable: true,
+      },
       contentHmac: { type: String, required: true, match: /^[0-9a-f]{64}$/, select: false, immutable: true },
     },
 
     storage: {
-      s3Key: { type: String, required: true, select: false, immutable: true, match: /^company-payslips\/\d{4}\/\d{2}\/[0-9a-f]{24}_[0-9a-f]{24}\.pdf$/ },
+      s3Key: {
+        type: String,
+        required: true,
+        select: false,
+        immutable: true,
+        match: /^company-payslips\/\d{4}\/\d{2}\/[0-9a-f]{24}_[0-9a-f]{24}\.pdf$/,
+      },
       sizeBytes: { type: Number, required: true, min: 1, immutable: true },
       sha256: { type: String, required: true, match: /^[0-9a-f]{64}$/, immutable: true },
       contentType: { type: String, enum: ['application/pdf'], required: true, immutable: true },
@@ -132,10 +147,14 @@ payslipSchema.index({ 'verification.verificationId': 1 }, { unique: true });
 payslipSchema.index({ 'period.year': 1, 'period.month': 1, status: 1 });
 
 payslipSchema.pre('validate', function enforcePayslipArithmetic() {
-  const sumOf = (lineItems) => Math.round(lineItems.reduce((runningTotal, lineItem) => runningTotal + lineItem.amount, 0) * 100) / 100;
-  if (Math.abs(sumOf(this.earnings) - this.grossEarnings) > 0.005) this.invalidate('grossEarnings', 'grossEarnings must equal the sum of the earnings');
-  if (Math.abs(sumOf(this.deductions) - this.totalDeductions) > 0.005) this.invalidate('totalDeductions', 'totalDeductions must equal the sum of the deductions');
-  if (Math.abs(this.grossEarnings - this.totalDeductions - this.netPay) > 0.005) this.invalidate('netPay', 'netPay must equal grossEarnings minus totalDeductions');
+  const sumOf = (lineItems) =>
+    Math.round(lineItems.reduce((runningTotal, lineItem) => runningTotal + lineItem.amount, 0) * 100) / 100;
+  if (Math.abs(sumOf(this.earnings) - this.grossEarnings) > 0.005)
+    this.invalidate('grossEarnings', 'grossEarnings must equal the sum of the earnings');
+  if (Math.abs(sumOf(this.deductions) - this.totalDeductions) > 0.005)
+    this.invalidate('totalDeductions', 'totalDeductions must equal the sum of the deductions');
+  if (Math.abs(this.grossEarnings - this.totalDeductions - this.netPay) > 0.005)
+    this.invalidate('netPay', 'netPay must equal grossEarnings minus totalDeductions');
 });
 
 const Payslip = mongoose.model('Payslip', payslipSchema);

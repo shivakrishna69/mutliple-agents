@@ -45,7 +45,11 @@ import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { logger } from '../utils/logger.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
-import { detectVaultFileType, sanitizeOriginalFileName, validateVaultUploadFields } from '../validators/vaultValidators.js';
+import {
+  detectVaultFileType,
+  sanitizeOriginalFileName,
+  validateVaultUploadFields,
+} from '../validators/vaultValidators.js';
 
 const AUDIT_CATEGORY = 'document_vault';
 const AUDIT_ACTIONS = Object.freeze({ UPLOAD: 'upload', LIST: 'list', DOWNLOAD: 'download', VERIFY: 'verify' });
@@ -92,18 +96,30 @@ export async function uploadDocument(req, res, next) {
       return sendError(req, res, HTTP_STATUS.SERVICE_UNAVAILABLE, VAULT_MESSAGES.STORAGE_NOT_CONFIGURED);
     }
     if (!req.file) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.FILE_REQUIRED, [{ field: 'file', message: VAULT_MESSAGES.FILE_REQUIRED }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.FILE_REQUIRED, [
+        { field: 'file', message: VAULT_MESSAGES.FILE_REQUIRED },
+      ]);
     }
 
     const fieldValidation = validateVaultUploadFields(req.body);
     if (!fieldValidation.isValid) {
       audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.REJECTED, { reason: 'invalid_fields' });
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, fieldValidation.validationErrors[0].message, fieldValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        fieldValidation.validationErrors[0].message,
+        fieldValidation.validationErrors,
+      );
     }
     const { employeeId, documentType, accessibleRoles: requestedAccessibleRoles } = fieldValidation.sanitizedInput;
 
     if (!(await EmployeeProfile.exists({ _id: employeeId }))) {
-      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.REJECTED, { employeeId, documentType, reason: 'employee_not_found' });
+      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.REJECTED, {
+        employeeId,
+        documentType,
+        reason: 'employee_not_found',
+      });
       return sendError(req, res, HTTP_STATUS.NOT_FOUND, VAULT_MESSAGES.EMPLOYEE_NOT_FOUND);
     }
 
@@ -115,16 +131,27 @@ export async function uploadDocument(req, res, next) {
       requestedAccessibleRoles,
     });
     if (!uploadAccess.isAllowed) {
-      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.DENIED, { employeeId, documentType, reason: uploadAccess.denialReason });
+      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.DENIED, {
+        employeeId,
+        documentType,
+        reason: uploadAccess.denialReason,
+      });
       const denialMessage =
-        uploadAccess.denialReason === VAULT_DENIAL_REASONS.ROLE_GRANT_BY_NON_MANAGER ? VAULT_MESSAGES.ROLE_GRANT_NOT_ALLOWED : VAULT_MESSAGES.UPLOAD_NOT_ALLOWED;
+        uploadAccess.denialReason === VAULT_DENIAL_REASONS.ROLE_GRANT_BY_NON_MANAGER
+          ? VAULT_MESSAGES.ROLE_GRANT_NOT_ALLOWED
+          : VAULT_MESSAGES.UPLOAD_NOT_ALLOWED;
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, denialMessage);
     }
 
     const fileBuffer = req.file.buffer;
     const detectedFileType = detectVaultFileType(fileBuffer);
     if (!detectedFileType) {
-      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.REJECTED, { employeeId, documentType, reason: 'unsupported_file_type', declaredContentType: req.file.mimetype });
+      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.REJECTED, {
+        employeeId,
+        documentType,
+        reason: 'unsupported_file_type',
+        declaredContentType: req.file.mimetype,
+      });
       return sendError(req, res, HTTP_STATUS.UNSUPPORTED_MEDIA_TYPE, VAULT_MESSAGES.UNSUPPORTED_FILE_TYPE);
     }
 
@@ -138,10 +165,24 @@ export async function uploadDocument(req, res, next) {
     });
 
     try {
-      await putVaultObject({ objectKey, fileBuffer, contentType: detectedFileType.contentType, sha256Base64: sha256Digest.toString('base64') });
+      await putVaultObject({
+        objectKey,
+        fileBuffer,
+        contentType: detectedFileType.contentType,
+        sha256Base64: sha256Digest.toString('base64'),
+      });
     } catch (storageError) {
-      logger.error('Vault upload to S3 failed', { requestId: req.id, error: storageError.message, errorName: storageError.name, httpStatus: storageError.$metadata?.httpStatusCode });
-      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.FAILED, { employeeId, documentType, reason: 'storage_unavailable' });
+      logger.error('Vault upload to S3 failed', {
+        requestId: req.id,
+        error: storageError.message,
+        errorName: storageError.name,
+        httpStatus: storageError.$metadata?.httpStatusCode,
+      });
+      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.FAILED, {
+        employeeId,
+        documentType,
+        reason: 'storage_unavailable',
+      });
       return sendError(req, res, HTTP_STATUS.SERVICE_UNAVAILABLE, VAULT_MESSAGES.STORAGE_UNAVAILABLE);
     }
 
@@ -163,7 +204,11 @@ export async function uploadDocument(req, res, next) {
     } catch (metadataError) {
       // The file is in S3 but nothing references it; remove it before reporting the failure.
       await deleteVaultObjectQuietly(objectKey, req.id);
-      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.FAILED, { employeeId, documentType, reason: 'metadata_save_failed' });
+      audit(req, AUDIT_ACTIONS.UPLOAD, AUDIT_OUTCOMES.FAILED, {
+        employeeId,
+        documentType,
+        reason: 'metadata_save_failed',
+      });
       throw metadataError;
     }
 
@@ -174,7 +219,9 @@ export async function uploadDocument(req, res, next) {
       sizeBytes: documentRecord.sizeBytes,
       accessibleRoles: documentRecord.accessibleRoles,
     });
-    return sendSuccess(res, HTTP_STATUS.CREATED, VAULT_MESSAGES.DOCUMENT_UPLOADED, { document: toDocumentSummary(documentRecord) });
+    return sendSuccess(res, HTTP_STATUS.CREATED, VAULT_MESSAGES.DOCUMENT_UPLOADED, {
+      document: toDocumentSummary(documentRecord),
+    });
   } catch (error) {
     return next(error);
   }
@@ -199,7 +246,9 @@ export async function listEmployeeDocuments(req, res, next) {
       if (!employeeId) return sendError(req, res, HTTP_STATUS.NOT_FOUND, VAULT_MESSAGES.EMPLOYEE_NOT_FOUND);
     }
     if (!isValidObjectIdString(employeeId)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_EMPLOYEE_ID, [{ field: 'employeeId', message: VAULT_MESSAGES.INVALID_EMPLOYEE_ID }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_EMPLOYEE_ID, [
+        { field: 'employeeId', message: VAULT_MESSAGES.INVALID_EMPLOYEE_ID },
+      ]);
     }
     const normalizedEmployeeId = employeeId.toLowerCase();
     if (!(await EmployeeProfile.exists({ _id: normalizedEmployeeId }))) {
@@ -209,14 +258,26 @@ export async function listEmployeeDocuments(req, res, next) {
     const ownEmployeeProfileId = await findOwnEmployeeProfileId(req.user.id);
     const isOwner = ownEmployeeProfileId === normalizedEmployeeId;
     if (!isOwner && !isVaultManagerRole(req.user.role)) {
-      audit(req, AUDIT_ACTIONS.LIST, AUDIT_OUTCOMES.DENIED, { employeeId: normalizedEmployeeId, reason: VAULT_DENIAL_REASONS.NOT_OWNER_AND_ROLE_NOT_GRANTED });
+      audit(req, AUDIT_ACTIONS.LIST, AUDIT_OUTCOMES.DENIED, {
+        employeeId: normalizedEmployeeId,
+        reason: VAULT_DENIAL_REASONS.NOT_OWNER_AND_ROLE_NOT_GRANTED,
+      });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, VAULT_MESSAGES.ACCESS_DENIED);
     }
 
-    const visibilityFilter = isOwner ? { employeeId: normalizedEmployeeId } : { employeeId: normalizedEmployeeId, accessibleRoles: req.user.role };
-    const documentRecords = await DocumentVault.find(visibilityFilter).sort({ createdAt: -1 }).limit(VAULT_FIELD_LIMITS.LIST_LIMIT).lean();
+    const visibilityFilter = isOwner
+      ? { employeeId: normalizedEmployeeId }
+      : { employeeId: normalizedEmployeeId, accessibleRoles: req.user.role };
+    const documentRecords = await DocumentVault.find(visibilityFilter)
+      .sort({ createdAt: -1 })
+      .limit(VAULT_FIELD_LIMITS.LIST_LIMIT)
+      .lean();
 
-    audit(req, AUDIT_ACTIONS.LIST, AUDIT_OUTCOMES.ALLOWED, { employeeId: normalizedEmployeeId, grantBasis: isOwner ? 'owner' : 'role', documentCount: documentRecords.length });
+    audit(req, AUDIT_ACTIONS.LIST, AUDIT_OUTCOMES.ALLOWED, {
+      employeeId: normalizedEmployeeId,
+      grantBasis: isOwner ? 'owner' : 'role',
+      documentCount: documentRecords.length,
+    });
     return sendSuccess(res, HTTP_STATUS.OK, VAULT_MESSAGES.DOCUMENTS_RETRIEVED, {
       documents: documentRecords.map(toDocumentSummary),
       meta: { employeeId: normalizedEmployeeId, count: documentRecords.length, limit: VAULT_FIELD_LIMITS.LIST_LIMIT },
@@ -248,7 +309,9 @@ export async function downloadDocument(req, res, next) {
     const { documentId } = req.params;
     if (!isValidObjectIdString(documentId)) {
       audit(req, AUDIT_ACTIONS.DOWNLOAD, AUDIT_OUTCOMES.REJECTED, { reason: 'invalid_document_id' });
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_DOCUMENT_ID, [{ field: 'documentId', message: VAULT_MESSAGES.INVALID_DOCUMENT_ID }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_DOCUMENT_ID, [
+        { field: 'documentId', message: VAULT_MESSAGES.INVALID_DOCUMENT_ID },
+      ]);
     }
 
     const documentRecord = await DocumentVault.findById(documentId).select('+s3KeyPath').lean();
@@ -259,9 +322,17 @@ export async function downloadDocument(req, res, next) {
 
     const ownEmployeeProfileId = await findOwnEmployeeProfileId(req.user.id);
     const readAccess = evaluateDocumentReadAccess({ user: req.user, ownEmployeeProfileId, documentRecord });
-    const auditContext = { documentId, employeeId: documentRecord.employeeId.toString(), documentType: documentRecord.documentType };
+    const auditContext = {
+      documentId,
+      employeeId: documentRecord.employeeId.toString(),
+      documentType: documentRecord.documentType,
+    };
     if (!readAccess.isAllowed) {
-      audit(req, AUDIT_ACTIONS.DOWNLOAD, AUDIT_OUTCOMES.DENIED, { ...auditContext, reason: readAccess.denialReason, accessibleRoles: documentRecord.accessibleRoles });
+      audit(req, AUDIT_ACTIONS.DOWNLOAD, AUDIT_OUTCOMES.DENIED, {
+        ...auditContext,
+        reason: readAccess.denialReason,
+        accessibleRoles: documentRecord.accessibleRoles,
+      });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, VAULT_MESSAGES.ACCESS_DENIED);
     }
 
@@ -279,7 +350,12 @@ export async function downloadDocument(req, res, next) {
       });
     } catch (signingError) {
       // Signing needs valid AWS credentials; a failure here is a server-side credential problem.
-      logger.error('Vault download URL signing failed', { requestId: req.id, documentId, error: signingError.message, errorName: signingError.name });
+      logger.error('Vault download URL signing failed', {
+        requestId: req.id,
+        documentId,
+        error: signingError.message,
+        errorName: signingError.name,
+      });
       audit(req, AUDIT_ACTIONS.DOWNLOAD, AUDIT_OUTCOMES.FAILED, { ...auditContext, reason: 'signing_failed' });
       return sendError(req, res, HTTP_STATUS.SERVICE_UNAVAILABLE, VAULT_MESSAGES.STORAGE_UNAVAILABLE);
     }
@@ -317,7 +393,9 @@ export async function verifyDocument(req, res, next) {
   try {
     const { documentId } = req.params;
     if (!isValidObjectIdString(documentId)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_DOCUMENT_ID, [{ field: 'documentId', message: VAULT_MESSAGES.INVALID_DOCUMENT_ID }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_DOCUMENT_ID, [
+        { field: 'documentId', message: VAULT_MESSAGES.INVALID_DOCUMENT_ID },
+      ]);
     }
     const documentRecord = await DocumentVault.findById(documentId);
     if (!documentRecord) {
@@ -327,10 +405,17 @@ export async function verifyDocument(req, res, next) {
 
     const ownEmployeeProfileId = await findOwnEmployeeProfileId(req.user.id);
     const verifyAccess = evaluateVerifyAccess({ user: req.user, ownEmployeeProfileId, documentRecord });
-    const auditContext = { documentId, employeeId: documentRecord.employeeId.toString(), documentType: documentRecord.documentType };
+    const auditContext = {
+      documentId,
+      employeeId: documentRecord.employeeId.toString(),
+      documentType: documentRecord.documentType,
+    };
     if (!verifyAccess.isAllowed) {
       audit(req, AUDIT_ACTIONS.VERIFY, AUDIT_OUTCOMES.DENIED, { ...auditContext, reason: verifyAccess.denialReason });
-      const denialMessage = verifyAccess.denialReason === VAULT_DENIAL_REASONS.SELF_VERIFICATION ? VAULT_MESSAGES.CANNOT_VERIFY_OWN_DOCUMENT : VAULT_MESSAGES.VERIFY_NOT_ALLOWED;
+      const denialMessage =
+        verifyAccess.denialReason === VAULT_DENIAL_REASONS.SELF_VERIFICATION
+          ? VAULT_MESSAGES.CANNOT_VERIFY_OWN_DOCUMENT
+          : VAULT_MESSAGES.VERIFY_NOT_ALLOWED;
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, denialMessage);
     }
     if (documentRecord.status === VAULT_DOCUMENT_STATUSES.VERIFIED) {
@@ -348,7 +433,9 @@ export async function verifyDocument(req, res, next) {
     }
 
     audit(req, AUDIT_ACTIONS.VERIFY, AUDIT_OUTCOMES.ALLOWED, auditContext);
-    return sendSuccess(res, HTTP_STATUS.OK, VAULT_MESSAGES.DOCUMENT_VERIFIED, { document: toDocumentSummary(documentRecord) });
+    return sendSuccess(res, HTTP_STATUS.OK, VAULT_MESSAGES.DOCUMENT_VERIFIED, {
+      document: toDocumentSummary(documentRecord),
+    });
   } catch (error) {
     return next(error);
   }

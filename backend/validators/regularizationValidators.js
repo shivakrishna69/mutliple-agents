@@ -33,7 +33,10 @@ function result(validationErrors, sanitizedInput) {
 }
 
 function bodyError() {
-  return { isValid: false, validationErrors: [{ field: 'body', message: REGULARIZATION_MESSAGES.BODY_MUST_BE_OBJECT }] };
+  return {
+    isValid: false,
+    validationErrors: [{ field: 'body', message: REGULARIZATION_MESSAGES.BODY_MUST_BE_OBJECT }],
+  };
 }
 
 /** null/undefined -> null; otherwise a trimmed string of at most `maxLength`, or an error. */
@@ -51,7 +54,10 @@ export function validateRegularizeRequest(requestBody) {
   const { message, startNew } = requestBody;
 
   const trimmedMessage = typeof message === 'string' ? message.trim() : '';
-  if (trimmedMessage.length === 0 || trimmedMessage.length > ATTENDANCE_FIELD_LIMITS.REGULARIZATION_MESSAGE_MAX_LENGTH) {
+  if (
+    trimmedMessage.length === 0 ||
+    trimmedMessage.length > ATTENDANCE_FIELD_LIMITS.REGULARIZATION_MESSAGE_MAX_LENGTH
+  ) {
     validationErrors.push({ field: 'message', message: REGULARIZATION_MESSAGES.MESSAGE_INVALID });
   }
   if (startNew !== undefined && typeof startNew !== 'boolean') {
@@ -70,7 +76,10 @@ export function validateReviewDecision(requestBody) {
   if (!Object.values(REVIEW_DECISIONS).includes(decision)) {
     validationErrors.push({ field: 'decision', message: REGULARIZATION_MESSAGES.DECISION_INVALID });
   }
-  if (decision === REVIEW_DECISIONS.APPROVE && (typeof punchInTime !== 'string' || !LOCAL_TIME_PATTERN.test(punchInTime))) {
+  if (
+    decision === REVIEW_DECISIONS.APPROVE &&
+    (typeof punchInTime !== 'string' || !LOCAL_TIME_PATTERN.test(punchInTime))
+  ) {
     validationErrors.push({ field: 'punchInTime', message: REGULARIZATION_MESSAGES.PUNCH_IN_TIME_INVALID });
   }
   const noteCheck = optionalText(note, ATTENDANCE_FIELD_LIMITS.REVIEW_NOTE_MAX_LENGTH);
@@ -86,16 +95,26 @@ export function validateReviewDecision(requestBody) {
 export function validateAgentRegularization(requestBody) {
   if (!isPlainObject(requestBody)) return bodyError();
   const validationErrors = [];
-  const { employee_id: employeeId, date, punch_in_time: rawPunchInTime, evidence_event_count: evidenceEventCount, reason, thread_id: threadId } = requestBody;
+  const {
+    employee_id: employeeId,
+    date,
+    punch_in_time: rawPunchInTime,
+    evidence_event_count: evidenceEventCount,
+    reason,
+    thread_id: threadId,
+  } = requestBody;
 
-  if (!isValidObjectIdString(employeeId)) validationErrors.push({ field: 'employee_id', message: REGULARIZATION_MESSAGES.EMPLOYEE_ID_INVALID });
-  if (!isRealCalendarDate(date)) validationErrors.push({ field: 'date', message: REGULARIZATION_MESSAGES.DATE_INVALID });
+  if (!isValidObjectIdString(employeeId))
+    validationErrors.push({ field: 'employee_id', message: REGULARIZATION_MESSAGES.EMPLOYEE_ID_INVALID });
+  if (!isRealCalendarDate(date))
+    validationErrors.push({ field: 'date', message: REGULARIZATION_MESSAGES.DATE_INVALID });
 
   let punchInTime = null;
   if (typeof rawPunchInTime === 'string' && ZONED_DATE_TIME_PATTERN.test(rawPunchInTime)) {
     punchInTime = new Date(rawPunchInTime);
   }
-  if (!punchInTime || Number.isNaN(punchInTime.getTime())) validationErrors.push({ field: 'punch_in_time', message: REGULARIZATION_MESSAGES.ZONED_TIME_INVALID });
+  if (!punchInTime || Number.isNaN(punchInTime.getTime()))
+    validationErrors.push({ field: 'punch_in_time', message: REGULARIZATION_MESSAGES.ZONED_TIME_INVALID });
 
   // An automatic regularization is only ever made on evidence, so at least one event is required.
   if (!Number.isInteger(evidenceEventCount) || evidenceEventCount < 1 || evidenceEventCount > MAX_EVIDENCE_EVENTS) {
@@ -103,7 +122,11 @@ export function validateAgentRegularization(requestBody) {
   }
   const reasonCheck = optionalText(reason, REASON_MAX_LENGTH);
   if (reasonCheck.error) validationErrors.push({ field: 'reason', message: REGULARIZATION_MESSAGES.REASON_INVALID });
-  if (threadId !== undefined && threadId !== null && (typeof threadId !== 'string' || threadId.length > 200 || !PRINTABLE_TOKEN_PATTERN.test(threadId))) {
+  if (
+    threadId !== undefined &&
+    threadId !== null &&
+    (typeof threadId !== 'string' || threadId.length > 200 || !PRINTABLE_TOKEN_PATTERN.test(threadId))
+  ) {
     validationErrors.push({ field: 'thread_id', message: REGULARIZATION_MESSAGES.THREAD_ID_INVALID });
   }
 
@@ -131,21 +154,44 @@ export function validateAgentReviewSubmission(requestBody) {
     idempotency_key: idempotencyKey,
   } = requestBody;
 
-  if (!isValidObjectIdString(employeeId)) validationErrors.push({ field: 'employee_id', message: REGULARIZATION_MESSAGES.EMPLOYEE_ID_INVALID });
-  if (date !== null && date !== undefined && !isRealCalendarDate(date)) validationErrors.push({ field: 'date', message: REGULARIZATION_MESSAGES.DATE_INVALID });
-  if (claimedPunchInTime !== null && claimedPunchInTime !== undefined && (typeof claimedPunchInTime !== 'string' || !LOCAL_TIME_PATTERN.test(claimedPunchInTime))) {
+  if (!isValidObjectIdString(employeeId))
+    validationErrors.push({ field: 'employee_id', message: REGULARIZATION_MESSAGES.EMPLOYEE_ID_INVALID });
+  if (date !== null && date !== undefined && !isRealCalendarDate(date))
+    validationErrors.push({ field: 'date', message: REGULARIZATION_MESSAGES.DATE_INVALID });
+  if (
+    claimedPunchInTime !== null &&
+    claimedPunchInTime !== undefined &&
+    (typeof claimedPunchInTime !== 'string' || !LOCAL_TIME_PATTERN.test(claimedPunchInTime))
+  ) {
     validationErrors.push({ field: 'claimed_punch_in_time', message: REGULARIZATION_MESSAGES.PUNCH_IN_TIME_INVALID });
   }
   const reasonCheck = optionalText(reason, REASON_MAX_LENGTH);
   if (reasonCheck.error) validationErrors.push({ field: 'reason', message: REGULARIZATION_MESSAGES.REASON_INVALID });
-  if (!REVIEW_ROUTING_REASONS.includes(routingReason)) validationErrors.push({ field: 'routing_reason', message: REGULARIZATION_MESSAGES.ROUTING_REASON_INVALID });
-  if (!Number.isInteger(qualifyingEventCount) || qualifyingEventCount < 0 || qualifyingEventCount > MAX_EVIDENCE_EVENTS) {
+  if (!REVIEW_ROUTING_REASONS.includes(routingReason))
+    validationErrors.push({ field: 'routing_reason', message: REGULARIZATION_MESSAGES.ROUTING_REASON_INVALID });
+  if (
+    !Number.isInteger(qualifyingEventCount) ||
+    qualifyingEventCount < 0 ||
+    qualifyingEventCount > MAX_EVIDENCE_EVENTS
+  ) {
     validationErrors.push({ field: 'qualifying_event_count', message: REGULARIZATION_MESSAGES.EVIDENCE_COUNT_INVALID });
   }
-  if (allowedGeofenceRadius !== null && allowedGeofenceRadius !== undefined && (!Number.isInteger(allowedGeofenceRadius) || allowedGeofenceRadius < 0 || allowedGeofenceRadius > 100_000)) {
-    validationErrors.push({ field: 'allowed_geofence_radius', message: REGULARIZATION_MESSAGES.GEOFENCE_RADIUS_INVALID });
+  if (
+    allowedGeofenceRadius !== null &&
+    allowedGeofenceRadius !== undefined &&
+    (!Number.isInteger(allowedGeofenceRadius) || allowedGeofenceRadius < 0 || allowedGeofenceRadius > 100_000)
+  ) {
+    validationErrors.push({
+      field: 'allowed_geofence_radius',
+      message: REGULARIZATION_MESSAGES.GEOFENCE_RADIUS_INVALID,
+    });
   }
-  if (typeof idempotencyKey !== 'string' || idempotencyKey.length === 0 || idempotencyKey.length > 300 || !PRINTABLE_TOKEN_PATTERN.test(idempotencyKey)) {
+  if (
+    typeof idempotencyKey !== 'string' ||
+    idempotencyKey.length === 0 ||
+    idempotencyKey.length > 300 ||
+    !PRINTABLE_TOKEN_PATTERN.test(idempotencyKey)
+  ) {
     validationErrors.push({ field: 'idempotency_key', message: REGULARIZATION_MESSAGES.IDEMPOTENCY_KEY_INVALID });
   }
 

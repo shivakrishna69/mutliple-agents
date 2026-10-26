@@ -30,7 +30,11 @@ import OfficeLocation from '../models/OfficeLocation.js';
 import RegularizationReview, { REVIEW_STATUSES } from '../models/RegularizationReview.js';
 import User, { ROLES } from '../models/User.js';
 import { zonedLocalTimeToInstant } from '../services/attendancePolicy.js';
-import { RegularizationRuleError, recordRegularizedAttendance, toRegularizedAttendanceSummary } from '../services/attendanceRegularization.js';
+import {
+  RegularizationRuleError,
+  recordRegularizedAttendance,
+  toRegularizedAttendanceSummary,
+} from '../services/attendanceRegularization.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
@@ -55,7 +59,9 @@ export async function listRegularizationReviews(req, res, next) {
   try {
     const requestedStatus = typeof req.query.status === 'string' ? req.query.status : REVIEW_STATUSES.PENDING;
     if (!Object.values(REVIEW_STATUSES).includes(requestedStatus)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, 'status must be Pending, Approved, or Rejected', [{ field: 'status', message: 'status must be Pending, Approved, or Rejected' }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, 'status must be Pending, Approved, or Rejected', [
+        { field: 'status', message: 'status must be Pending, Approved, or Rejected' },
+      ]);
     }
 
     const isOrganisationWideReviewer = ORGANISATION_WIDE_REVIEWER_ROLES.includes(req.user.role);
@@ -63,26 +69,49 @@ export async function listRegularizationReviews(req, res, next) {
     if (!isOrganisationWideReviewer && !ownProfileId) {
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, REGULARIZATION_MESSAGES.REVIEWS_FORBIDDEN);
     }
-    const reviewFilter = isOrganisationWideReviewer ? { status: requestedStatus } : { status: requestedStatus, reportingManagerId: ownProfileId };
+    const reviewFilter = isOrganisationWideReviewer
+      ? { status: requestedStatus }
+      : { status: requestedStatus, reportingManagerId: ownProfileId };
 
-    const reviewRecords = await RegularizationReview.find(reviewFilter).sort({ createdAt: 1 }).limit(REVIEW_LIST_LIMIT).lean();
+    const reviewRecords = await RegularizationReview.find(reviewFilter)
+      .sort({ createdAt: 1 })
+      .limit(REVIEW_LIST_LIMIT)
+      .lean();
 
     // Names and job titles of the employees the reviews are about, for the reviewer's list.
-    const employeeProfiles = await EmployeeProfile.find({ _id: { $in: reviewRecords.map((reviewRecord) => reviewRecord.employeeId) } })
+    const employeeProfiles = await EmployeeProfile.find({
+      _id: { $in: reviewRecords.map((reviewRecord) => reviewRecord.employeeId) },
+    })
       .select('userId organizationData.designation')
       .lean();
-    const employeeAccounts = await User.find({ _id: { $in: employeeProfiles.map((employeeProfile) => employeeProfile.userId) } }).select('name').lean();
-    const accountNameById = new Map(employeeAccounts.map((employeeAccount) => [employeeAccount._id.toString(), employeeAccount.name]));
+    const employeeAccounts = await User.find({
+      _id: { $in: employeeProfiles.map((employeeProfile) => employeeProfile.userId) },
+    })
+      .select('name')
+      .lean();
+    const accountNameById = new Map(
+      employeeAccounts.map((employeeAccount) => [employeeAccount._id.toString(), employeeAccount.name]),
+    );
     const employeeById = new Map(
       employeeProfiles.map((employeeProfile) => [
         employeeProfile._id.toString(),
-        { name: accountNameById.get(employeeProfile.userId.toString()) ?? null, designation: employeeProfile.organizationData.designation },
+        {
+          name: accountNameById.get(employeeProfile.userId.toString()) ?? null,
+          designation: employeeProfile.organizationData.designation,
+        },
       ]),
     );
 
     return sendSuccess(res, HTTP_STATUS.OK, REGULARIZATION_MESSAGES.REVIEWS_RETRIEVED, {
-      reviews: reviewRecords.map((reviewRecord) => ({ ...toReviewSummary(reviewRecord), employee: employeeById.get(reviewRecord.employeeId.toString()) ?? null })),
-      meta: { count: reviewRecords.length, limit: REVIEW_LIST_LIMIT, scope: isOrganisationWideReviewer ? 'organisation' : 'direct_reports' },
+      reviews: reviewRecords.map((reviewRecord) => ({
+        ...toReviewSummary(reviewRecord),
+        employee: employeeById.get(reviewRecord.employeeId.toString()) ?? null,
+      })),
+      meta: {
+        count: reviewRecords.length,
+        limit: REVIEW_LIST_LIMIT,
+        scope: isOrganisationWideReviewer ? 'organisation' : 'direct_reports',
+      },
     });
   } catch (error) {
     return next(error);
@@ -94,11 +123,19 @@ export async function decideRegularizationReview(req, res, next) {
   try {
     const { reviewId } = req.params;
     if (!isValidObjectIdString(reviewId)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, REGULARIZATION_MESSAGES.INVALID_REVIEW_ID, [{ field: 'reviewId', message: REGULARIZATION_MESSAGES.INVALID_REVIEW_ID }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, REGULARIZATION_MESSAGES.INVALID_REVIEW_ID, [
+        { field: 'reviewId', message: REGULARIZATION_MESSAGES.INVALID_REVIEW_ID },
+      ]);
     }
     const decisionValidation = validateReviewDecision(req.body);
     if (!decisionValidation.isValid) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, decisionValidation.validationErrors[0].message, decisionValidation.validationErrors);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        decisionValidation.validationErrors[0].message,
+        decisionValidation.validationErrors,
+      );
     }
     const { decision, punchInTime, note } = decisionValidation.sanitizedInput;
 
@@ -112,10 +149,17 @@ export async function decideRegularizationReview(req, res, next) {
       auditReview(req, 'decide_review', AUDIT_OUTCOMES.DENIED, { ...auditContext, reason: 'own_request' });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, REGULARIZATION_MESSAGES.CANNOT_DECIDE_OWN_REVIEW);
     }
-    const isReportingManager = Boolean(ownProfileId && reviewRecord.reportingManagerId && reviewRecord.reportingManagerId.toString() === ownProfileId);
+    const isReportingManager = Boolean(
+      ownProfileId && reviewRecord.reportingManagerId && reviewRecord.reportingManagerId.toString() === ownProfileId,
+    );
     if (!isReportingManager && !ORGANISATION_WIDE_REVIEWER_ROLES.includes(req.user.role)) {
       auditReview(req, 'decide_review', AUDIT_OUTCOMES.DENIED, { ...auditContext, reason: 'not_reviewer' });
-      return sendError(req, res, HTTP_STATUS.FORBIDDEN, ownProfileId ? REGULARIZATION_MESSAGES.REVIEW_NOT_YOURS : REGULARIZATION_MESSAGES.REVIEWS_FORBIDDEN);
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.FORBIDDEN,
+        ownProfileId ? REGULARIZATION_MESSAGES.REVIEW_NOT_YOURS : REGULARIZATION_MESSAGES.REVIEWS_FORBIDDEN,
+      );
     }
     if (reviewRecord.status !== REVIEW_STATUSES.PENDING) {
       return sendError(req, res, HTTP_STATUS.CONFLICT, REGULARIZATION_MESSAGES.REVIEW_ALREADY_DECIDED);
@@ -124,15 +168,29 @@ export async function decideRegularizationReview(req, res, next) {
     // ---- Approve: write the Attendance entry first ---------------------------------------------
     let writeResult = null;
     if (decision === REVIEW_DECISIONS.APPROVE) {
-      if (!reviewRecord.date) return sendError(req, res, HTTP_STATUS.CONFLICT, REGULARIZATION_MESSAGES.REVIEW_HAS_NO_DATE);
-      const employeeProfile = await EmployeeProfile.findById(reviewRecord.employeeId).select('organizationData.officeLocationId').lean();
-      const office = employeeProfile?.organizationData.officeLocationId ? await OfficeLocation.findById(employeeProfile.organizationData.officeLocationId).select('timeZone').lean() : null;
+      if (!reviewRecord.date)
+        return sendError(req, res, HTTP_STATUS.CONFLICT, REGULARIZATION_MESSAGES.REVIEW_HAS_NO_DATE);
+      const employeeProfile = await EmployeeProfile.findById(reviewRecord.employeeId)
+        .select('organizationData.officeLocationId')
+        .lean();
+      const office = employeeProfile?.organizationData.officeLocationId
+        ? await OfficeLocation.findById(employeeProfile.organizationData.officeLocationId).select('timeZone').lean()
+        : null;
       if (!office) {
-        return sendCodedError(req, res, HTTP_STATUS.CONFLICT, { code: 'OFFICE_NOT_CONFIGURED', message: 'The employee has no office with a shift configured' });
+        return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+          code: 'OFFICE_NOT_CONFIGURED',
+          message: 'The employee has no office with a shift configured',
+        });
       }
       const punchInInstant = zonedLocalTimeToInstant(reviewRecord.date, punchInTime, office.timeZone);
       if (!punchInInstant) {
-        return sendError(req, res, HTTP_STATUS.UNPROCESSABLE_CONTENT, REGULARIZATION_MESSAGES.PUNCH_TIME_DOES_NOT_EXIST, [{ field: 'punchInTime', message: REGULARIZATION_MESSAGES.PUNCH_TIME_DOES_NOT_EXIST }]);
+        return sendError(
+          req,
+          res,
+          HTTP_STATUS.UNPROCESSABLE_CONTENT,
+          REGULARIZATION_MESSAGES.PUNCH_TIME_DOES_NOT_EXIST,
+          [{ field: 'punchInTime', message: REGULARIZATION_MESSAGES.PUNCH_TIME_DOES_NOT_EXIST }],
+        );
       }
       try {
         writeResult = await recordRegularizedAttendance({

@@ -14,7 +14,12 @@
  */
 
 import { Router } from 'express';
-import { downloadDocument, listEmployeeDocuments, uploadDocument, verifyDocument } from '../controllers/vaultController.js';
+import {
+  downloadDocument,
+  listEmployeeDocuments,
+  uploadDocument,
+  verifyDocument,
+} from '../controllers/vaultController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { vaultDownloadRateLimitByUser, vaultUploadRateLimitByUser } from '../middleware/rateLimiter.js';
 import { receiveVaultUpload } from '../middleware/vaultUpload.js';

@@ -17,11 +17,29 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/httpClient.js';
-import { requestPunchIn, requestRegularization, requestRegularizationReviews, requestReviewDecision } from '../api/workforceApi.js';
+import {
+  requestPunchIn,
+  requestRegularization,
+  requestRegularizationReviews,
+  requestReviewDecision,
+} from '../api/workforceApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { CheckBadgeIcon, ClockIcon, InboxIcon, MapPinIcon, SparklesIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, SelectInput, StatTile, Tabs, TextInput, formatDate, formatDateTime } from '../components/ui.jsx';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  LoadingBlock,
+  Notice,
+  SelectInput,
+  StatTile,
+  Tabs,
+  TextInput,
+  formatDate,
+  formatDateTime,
+} from '../components/ui.jsx';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 
 const DEVICE_FINGERPRINT_STORAGE_KEY = 'nova.attendance.deviceFingerprint';
@@ -34,7 +52,8 @@ const PUNCH_IN_ERROR_HELP = Object.freeze({
   OFFICE_NOT_CONFIGURED: 'No office is assigned to your profile. Ask HR to assign one.',
   GEOFENCE_NOT_CONFIGURED: 'Your office has no geofence configured yet. Ask an administrator.',
   DEVICE_NOT_RECOGNISED: 'This device is not registered for you. Share the device ID below with HR to register it.',
-  LOCATION_TOO_IMPRECISE: 'Your location fix is too imprecise. Move near a window or enable precise location, then retry.',
+  LOCATION_TOO_IMPRECISE:
+    'Your location fix is too imprecise. Move near a window or enable precise location, then retry.',
   UNAUTHORIZED_SPATIAL_LOCATION: 'You appear to be outside the office geofence.',
   ALREADY_PUNCHED_IN: 'You have already punched in today.',
 });
@@ -59,10 +78,18 @@ function readCurrentPosition() {
       reject(new Error('This browser cannot share your location.'));
       return;
     }
-    navigator.geolocation.getCurrentPosition(resolve, (positionError) => {
-      const reasons = { 1: 'Location permission was denied. Allow location access for this site and retry.', 2: 'Your location is unavailable right now.', 3: 'Getting your location took too long. Retry.' };
-      reject(new Error(reasons[positionError.code] ?? 'Your location could not be read.'));
-    }, { enableHighAccuracy: true, timeout: GEOLOCATION_TIMEOUT_MS, maximumAge: 0 });
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      (positionError) => {
+        const reasons = {
+          1: 'Location permission was denied. Allow location access for this site and retry.',
+          2: 'Your location is unavailable right now.',
+          3: 'Getting your location took too long. Retry.',
+        };
+        reject(new Error(reasons[positionError.code] ?? 'Your location could not be read.'));
+      },
+      { enableHighAccuracy: true, timeout: GEOLOCATION_TIMEOUT_MS, maximumAge: 0 },
+    );
   });
 }
 
@@ -83,14 +110,23 @@ function PunchInPanel() {
     setPhase('locating');
     try {
       const position = await readCurrentPosition();
-      const fix = { lat: position.coords.latitude, lng: position.coords.longitude, accuracyMeters: Math.max(1, Math.round(position.coords.accuracy * 10) / 10) };
+      const fix = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracyMeters: Math.max(1, Math.round(position.coords.accuracy * 10) / 10),
+      };
       setLastFix(fix);
       setPhase('submitting');
       const { attendance: recordedAttendance } = await requestPunchIn({ ...fix, deviceFingerprint }, csrfToken);
       setAttendance(recordedAttendance);
     } catch (punchError) {
       if (punchError instanceof ApiError) {
-        setFailure({ title: punchError.message, help: PUNCH_IN_ERROR_HELP[punchError.code] ?? null, context: punchError.context, requestId: punchError.status >= 500 ? punchError.requestId : null });
+        setFailure({
+          title: punchError.message,
+          help: PUNCH_IN_ERROR_HELP[punchError.code] ?? null,
+          context: punchError.context,
+          requestId: punchError.status >= 500 ? punchError.requestId : null,
+        });
       } else {
         setFailure({ title: punchError.message, help: null, context: null });
       }
@@ -105,12 +141,23 @@ function PunchInPanel() {
     <div className="grid gap-6 lg:grid-cols-5">
       <Card className="lg:col-span-3" bodyClassName="p-0">
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 px-6 py-10 text-white sm:px-10">
-          <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-500/30 blur-3xl" aria-hidden="true" />
-          <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" aria-hidden="true" />
-          <p className="text-sm font-medium text-indigo-200">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight">{attendance ? 'You are checked in' : 'Ready to start your day?'}</h2>
+          <div
+            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-500/30 blur-3xl"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl"
+            aria-hidden="true"
+          />
+          <p className="text-sm font-medium text-indigo-200">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight">
+            {attendance ? 'You are checked in' : 'Ready to start your day?'}
+          </h2>
           <p className="mt-2 max-w-md text-sm text-slate-300">
-            Your position is checked against your office geofence. Location is read once, only when you press the button.
+            Your position is checked against your office geofence. Location is read once, only when you press the
+            button.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
@@ -120,10 +167,20 @@ function PunchInPanel() {
               className="group relative inline-flex h-16 items-center gap-3 rounded-2xl bg-white px-7 text-base font-semibold text-indigo-700 shadow-xl shadow-indigo-950/40 transition hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-indigo-300 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
             >
               <span className="relative flex h-3 w-3">
-                {phase === 'idle' && !attendance && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
-                <span className={`relative inline-flex h-3 w-3 rounded-full ${attendance ? 'bg-emerald-500' : 'bg-emerald-400'}`} />
+                {phase === 'idle' && !attendance && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                )}
+                <span
+                  className={`relative inline-flex h-3 w-3 rounded-full ${attendance ? 'bg-emerald-500' : 'bg-emerald-400'}`}
+                />
               </span>
-              {phase === 'locating' ? 'Getting your location…' : phase === 'submitting' ? 'Verifying…' : attendance ? 'Punched in' : 'Punch in now'}
+              {phase === 'locating'
+                ? 'Getting your location…'
+                : phase === 'submitting'
+                  ? 'Verifying…'
+                  : attendance
+                    ? 'Punched in'
+                    : 'Punch in now'}
             </button>
             {lastFix && <span className="text-xs text-slate-400">GPS accuracy ±{lastFix.accuracyMeters} m</span>}
           </div>
@@ -142,7 +199,9 @@ function PunchInPanel() {
                 <dt className="text-xs text-slate-500">Status</dt>
                 <dd className="mt-1">
                   <Badge tone={statusTone}>{attendance.calculationStatus.replaceAll('_', ' ')}</Badge>
-                  {attendance.lateByMinutes > 0 && <span className="ml-2 text-xs text-amber-700">{attendance.lateByMinutes} min late</span>}
+                  {attendance.lateByMinutes > 0 && (
+                    <span className="ml-2 text-xs text-amber-700">{attendance.lateByMinutes} min late</span>
+                  )}
                 </dd>
               </div>
               <div>
@@ -151,7 +210,9 @@ function PunchInPanel() {
               </div>
               <div>
                 <dt className="text-xs text-slate-500">Allowed radius</dt>
-                <dd className="mt-1 font-semibold text-slate-900">{attendance.geofence.allowedRadiusMeters ?? '—'} m</dd>
+                <dd className="mt-1 font-semibold text-slate-900">
+                  {attendance.geofence.allowedRadiusMeters ?? '—'} m
+                </dd>
               </div>
             </dl>
           </Card>
@@ -206,11 +267,17 @@ function RegularizationChat() {
     if (!message || isSending) return;
     setDraft('');
     setSendError(null);
-    setChatMessages((previousMessages) => [...previousMessages, { id: crypto.randomUUID(), author: 'me', text: message }]);
+    setChatMessages((previousMessages) => [
+      ...previousMessages,
+      { id: crypto.randomUUID(), author: 'me', text: message },
+    ]);
     setIsSending(true);
     try {
       const { regularization } = await requestRegularization({ message, startNew: startNext }, csrfToken);
-      setChatMessages((previousMessages) => [...previousMessages, { id: crypto.randomUUID(), author: 'agent', text: regularization.reply, regularization }]);
+      setChatMessages((previousMessages) => [
+        ...previousMessages,
+        { id: crypto.randomUUID(), author: 'agent', text: regularization.reply, regularization },
+      ]);
       // The next message continues this request only while the agent is waiting for an answer.
       setStartNext(!regularization.awaitingInput);
     } catch (regularizationError) {
@@ -228,7 +295,14 @@ function RegularizationChat() {
       subtitle="Describe a missed punch, e.g. “I forgot to punch in yesterday, I arrived at 9:40”"
       actions={
         chatMessages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => { setChatMessages([]); setStartNext(true); }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setChatMessages([]);
+              setStartNext(true);
+            }}
+          >
             New request
           </Button>
         )
@@ -237,11 +311,17 @@ function RegularizationChat() {
     >
       <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5 scroll-thin" aria-live="polite">
         {chatMessages.length === 0 && (
-          <EmptyState Icon={SparklesIcon} title="No requests yet" description="The assistant checks your activity evidence, records the entry when it is clear, or asks your manager when it is not." />
+          <EmptyState
+            Icon={SparklesIcon}
+            title="No requests yet"
+            description="The assistant checks your activity evidence, records the entry when it is clear, or asks your manager when it is not."
+          />
         )}
         {chatMessages.map((chatMessage) => (
           <div key={chatMessage.id} className={`flex ${chatMessage.author === 'me' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${chatMessage.author === 'me' ? 'rounded-br-md bg-gradient-to-br from-indigo-600 to-violet-600 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800'}`}>
+            <div
+              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${chatMessage.author === 'me' ? 'rounded-br-md bg-gradient-to-br from-indigo-600 to-violet-600 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800'}`}
+            >
               <p className="whitespace-pre-wrap">{chatMessage.text}</p>
               {chatMessage.regularization && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -260,9 +340,16 @@ function RegularizationChat() {
         ))}
         {isSending && (
           <div className="flex justify-start">
-            <div className="flex gap-1 rounded-2xl rounded-bl-md bg-slate-100 px-4 py-3" aria-label="Assistant is typing">
+            <div
+              className="flex gap-1 rounded-2xl rounded-bl-md bg-slate-100 px-4 py-3"
+              aria-label="Assistant is typing"
+            >
               {[0, 150, 300].map((delayMs) => (
-                <span key={delayMs} className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: `${delayMs}ms` }} />
+                <span
+                  key={delayMs}
+                  className="h-2 w-2 animate-bounce rounded-full bg-slate-400"
+                  style={{ animationDelay: `${delayMs}ms` }}
+                />
               ))}
             </div>
           </div>
@@ -312,7 +399,11 @@ function ReviewCard({ review, onDecided }) {
     setBusyDecision(decision);
     setDecisionError(null);
     try {
-      await requestReviewDecision(review.id, { decision, ...(decision === 'approve' && { punchInTime }), ...(note.trim() && { note: note.trim() }) }, csrfToken);
+      await requestReviewDecision(
+        review.id,
+        { decision, ...(decision === 'approve' && { punchInTime }), ...(note.trim() && { note: note.trim() }) },
+        csrfToken,
+      );
       onDecided();
     } catch (reviewError) {
       setDecisionError(toDisplayError(reviewError));
@@ -329,7 +420,9 @@ function ReviewCard({ review, onDecided }) {
           <p className="font-semibold text-slate-900">{review.employee?.name ?? 'Employee'}</p>
           <p className="text-xs text-slate-500">{review.employee?.designation}</p>
         </div>
-        <Badge tone={{ Pending: 'amber', Approved: 'emerald', Rejected: 'rose' }[review.status] ?? 'slate'}>{review.status}</Badge>
+        <Badge tone={{ Pending: 'amber', Approved: 'emerald', Rejected: 'rose' }[review.status] ?? 'slate'}>
+          {review.status}
+        </Badge>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div>
@@ -349,16 +442,38 @@ function ReviewCard({ review, onDecided }) {
           <dd className="font-medium text-slate-800">{String(review.routingReason ?? '—').replaceAll('_', ' ')}</dd>
         </div>
       </dl>
-      {review.reason && <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">“{review.reason}”</p>}
+      {review.reason && (
+        <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">“{review.reason}”</p>
+      )}
       {isPending ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-[8rem_1fr_auto] sm:items-end">
-          <TextInput label="Approve at" type="time" value={punchInTime} onChange={(changeEvent) => setPunchInTime(changeEvent.target.value)} />
-          <TextInput label="Note (optional)" value={note} maxLength={300} onChange={(changeEvent) => setNote(changeEvent.target.value)} />
+          <TextInput
+            label="Approve at"
+            type="time"
+            value={punchInTime}
+            onChange={(changeEvent) => setPunchInTime(changeEvent.target.value)}
+          />
+          <TextInput
+            label="Note (optional)"
+            value={note}
+            maxLength={300}
+            onChange={(changeEvent) => setNote(changeEvent.target.value)}
+          />
           <div className="flex gap-2">
-            <Button variant="success" isBusy={busyDecision === 'approve'} disabled={Boolean(busyDecision)} onClick={() => decide('approve')}>
+            <Button
+              variant="success"
+              isBusy={busyDecision === 'approve'}
+              disabled={Boolean(busyDecision)}
+              onClick={() => decide('approve')}
+            >
               Approve
             </Button>
-            <Button variant="secondary" isBusy={busyDecision === 'reject'} disabled={Boolean(busyDecision)} onClick={() => decide('reject')}>
+            <Button
+              variant="secondary"
+              isBusy={busyDecision === 'reject'}
+              disabled={Boolean(busyDecision)}
+              onClick={() => decide('reject')}
+            >
               Reject
             </Button>
           </div>
@@ -383,22 +498,45 @@ function ReviewCard({ review, onDecided }) {
 
 function ManagerReviews() {
   const [statusFilter, setStatusFilter] = useState('Pending');
-  const { data, error, isLoading, reload } = useApiResource((signal) => requestRegularizationReviews(statusFilter, signal), [statusFilter]);
+  const { data, error, isLoading, reload } = useApiResource(
+    (signal) => requestRegularizationReviews(statusFilter, signal),
+    [statusFilter],
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <SelectInput label="Status" options={REVIEW_STATUS_OPTIONS} value={statusFilter} onChange={(changeEvent) => setStatusFilter(changeEvent.target.value)} className="w-48" />
-        {data?.meta && <p className="text-xs text-slate-500">Scope: {data.meta.scope === 'organisation' ? 'whole organisation' : 'your direct reports'}</p>}
+        <SelectInput
+          label="Status"
+          options={REVIEW_STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(changeEvent) => setStatusFilter(changeEvent.target.value)}
+          className="w-48"
+        />
+        {data?.meta && (
+          <p className="text-xs text-slate-500">
+            Scope: {data.meta.scope === 'organisation' ? 'whole organisation' : 'your direct reports'}
+          </p>
+        )}
       </div>
       {isLoading && !data && <LoadingBlock label="Loading reviews…" />}
       {error &&
         (error.status === 403 ? (
-          <EmptyState Icon={InboxIcon} title="Nothing to review" description="Reviews appear here when someone who reports to you asks for an attendance correction." />
+          <EmptyState
+            Icon={InboxIcon}
+            title="Nothing to review"
+            description="Reviews appear here when someone who reports to you asks for an attendance correction."
+          />
         ) : (
           <Notice tone="error" title={error.message} />
         ))}
-      {data && data.reviews.length === 0 && <EmptyState Icon={CheckBadgeIcon} title="All caught up" description={`No ${statusFilter.toLowerCase()} reviews.`} />}
+      {data && data.reviews.length === 0 && (
+        <EmptyState
+          Icon={CheckBadgeIcon}
+          title="All caught up"
+          description={`No ${statusFilter.toLowerCase()} reviews.`}
+        />
+      )}
       <div className="grid gap-4 xl:grid-cols-2">
         {data?.reviews.map((review) => (
           <ReviewCard key={review.id} review={review} onDecided={reload} />
@@ -424,8 +562,20 @@ export default function AttendanceCenter() {
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-8">
       <PageHeader title="Attendance" description="Geofenced punch-in, AI-assisted corrections and manager approvals." />
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Check-in" value="Geofenced" hint="GPS verified against your office" Icon={MapPinIcon} accent="indigo" />
-        <StatTile label="Corrections" value="AI assisted" hint="Evidence-checked, manager fallback" Icon={SparklesIcon} accent="emerald" />
+        <StatTile
+          label="Check-in"
+          value="Geofenced"
+          hint="GPS verified against your office"
+          Icon={MapPinIcon}
+          accent="indigo"
+        />
+        <StatTile
+          label="Corrections"
+          value="AI assisted"
+          hint="Evidence-checked, manager fallback"
+          Icon={SparklesIcon}
+          accent="emerald"
+        />
         <StatTile label="Approvals" value="One click" hint="For managers and HR" Icon={ClockIcon} accent="amber" />
       </div>
       <Tabs tabs={TABS} activeTabId={activeTabId} onChange={setActiveTabId} label="Attendance tools" />

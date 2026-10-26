@@ -131,9 +131,12 @@ async def run_thread_eviction_loop(agent_runtime: AgentRuntime) -> None:
             if evicted_thread_count:
                 logger.info(
                     "Idle threads evicted",
-                    extra={"evicted_threads": evicted_thread_count, "tracked_threads": agent_runtime.thread_registry.tracked_thread_count},
+                    extra={
+                        "evicted_threads": evicted_thread_count,
+                        "tracked_threads": agent_runtime.thread_registry.tracked_thread_count,
+                    },
                 )
-        except Exception:  # noqa: BLE001 - one failed sweep must not stop future sweeps
+        except Exception:
             logger.exception("Thread eviction sweep failed")
 
 
@@ -147,7 +150,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     if agent_runtime.is_llm_configured:
         logger.info("ai-service started", extra={"env": settings.environment, "model": settings.groq_model})
     else:
-        logger.warning("ai-service started without GROQ_API_KEY; /ai/process will answer 503", extra={"env": settings.environment})
+        logger.warning(
+            "ai-service started without GROQ_API_KEY; /ai/process will answer 503", extra={"env": settings.environment}
+        )
 
     try:
         yield
@@ -190,7 +195,13 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
 
     response.headers[REQUEST_ID_HEADER] = request_id
-    log_level = logging.ERROR if response.status_code >= 500 else logging.WARNING if response.status_code >= 400 else logging.INFO
+    log_level = (
+        logging.ERROR
+        if response.status_code >= 500
+        else logging.WARNING
+        if response.status_code >= 400
+        else logging.INFO
+    )
     logger.log(
         log_level,
         "request completed",
@@ -223,7 +234,10 @@ async def handle_validation_error(request: Request, validation_error: RequestVal
     ]
     logger.warning(
         "Request validation failed",
-        extra={"requestId": getattr(request.state, "request_id", None), "fields": [detail["loc"] for detail in validation_details]},
+        extra={
+            "requestId": getattr(request.state, "request_id", None),
+            "fields": [detail["loc"] for detail in validation_details],
+        },
     )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -267,9 +281,13 @@ def convert_to_langchain_messages(conversation_messages: list[ConversationMessag
     langchain_messages: list[BaseMessage] = []
     for conversation_message in conversation_messages:
         if conversation_message.role is ChatRole.USER:
-            langchain_messages.append(HumanMessage(content=conversation_message.content, id=conversation_message.message_id))
+            langchain_messages.append(
+                HumanMessage(content=conversation_message.content, id=conversation_message.message_id)
+            )
         else:
-            langchain_messages.append(AIMessage(content=conversation_message.content, id=conversation_message.message_id))
+            langchain_messages.append(
+                AIMessage(content=conversation_message.content, id=conversation_message.message_id)
+            )
     return langchain_messages
 
 
@@ -277,10 +295,7 @@ def convert_to_langchain_messages(conversation_messages: list[ConversationMessag
 # Routes
 # ---------------------------------------------------------------------------------------------
 
-ERROR_RESPONSES = {
-    status_code: {"model": ErrorResponse}
-    for status_code in (401, 422, 500, 502, 503, 504)
-}
+ERROR_RESPONSES = {status_code: {"model": ErrorResponse} for status_code in (401, 422, 500, 502, 503, 504)}
 
 
 @app.get("/health", tags=["system"])
@@ -293,7 +308,9 @@ async def health(request: Request) -> JSONResponse:
             "status": "ok" if is_ready else "degraded",
             "service": "ai-service",
             "llm": "configured" if is_ready else "not_configured",
-            "attendanceRegularization": "configured" if agent_runtime.is_regularization_configured else "not_configured",
+            "attendanceRegularization": "configured"
+            if agent_runtime.is_regularization_configured
+            else "not_configured",
             "model": agent_runtime.model_name,
             "trackedThreads": agent_runtime.thread_registry.tracked_thread_count,
         },
@@ -312,7 +329,11 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
     agent_runtime: AgentRuntime = request.app.state.agent_runtime
     request_id = getattr(request.state, "request_id", None)
     thread_id = conversation_input.resolved_thread_id
-    log_context = {"requestId": request_id, "conversation_id": conversation_input.conversation_id, "thread_id": thread_id}
+    log_context = {
+        "requestId": request_id,
+        "conversation_id": conversation_input.conversation_id,
+        "thread_id": thread_id,
+    }
     started_at = time.perf_counter()
 
     try:
@@ -333,9 +354,15 @@ async def process_conversation_turn(conversation_input: ConversationInput, reque
     except InvalidModelOutputError as invalid_output_error:
         logger.error(
             "AI turn failed: unusable model output",
-            extra={**log_context, "failure_kind": invalid_output_error.failure_kind, "detail": invalid_output_error.detail},
+            extra={
+                **log_context,
+                "failure_kind": invalid_output_error.failure_kind,
+                "detail": invalid_output_error.detail,
+            },
         )
-        raise ServiceError(status.HTTP_502_BAD_GATEWAY, "AI model returned an unusable response") from invalid_output_error
+        raise ServiceError(
+            status.HTTP_502_BAD_GATEWAY, "AI model returned an unusable response"
+        ) from invalid_output_error
 
     logger.info(
         "AI turn completed",
@@ -382,7 +409,9 @@ async def regularize_attendance(turn_input: RegularizationTurnInput, request: Re
         raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI model is not configured") from not_configured_error
     except RegularizationUnavailableError as unavailable_error:
         logger.error("Regularization rejected: backend internal URL not configured", extra=log_context)
-        raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "Attendance regularization is not configured") from unavailable_error
+        raise ServiceError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Attendance regularization is not configured"
+        ) from unavailable_error
     except AgentTimeoutError as timeout_error:
         logger.error("Regularization timed out", extra={**log_context, "detail": timeout_error.detail})
         raise ServiceError(status.HTTP_504_GATEWAY_TIMEOUT, "AI processing timed out") from timeout_error
@@ -408,7 +437,11 @@ async def regularize_attendance(turn_input: RegularizationTurnInput, request: Re
 
     logger.info(
         "Regularization turn completed",
-        extra={**log_context, "outcome": turn_result.outcome.value, "duration_ms": round((time.perf_counter() - started_at) * 1000, 1)},
+        extra={
+            **log_context,
+            "outcome": turn_result.outcome.value,
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 1),
+        },
     )
     return RegularizationTurnResponse(
         thread_id=turn_input.thread_id,

@@ -20,7 +20,12 @@ import { API_MESSAGES } from '../constants/messages.js';
 
 export function toDisplayError(caughtError) {
   if (caughtError instanceof ApiError) {
-    return { message: caughtError.message, status: caughtError.status, requestId: caughtError.status >= 500 ? caughtError.requestId : null, fieldErrors: caughtError.fieldErrors ?? {} };
+    return {
+      message: caughtError.message,
+      status: caughtError.status,
+      requestId: caughtError.status >= 500 ? caughtError.requestId : null,
+      fieldErrors: caughtError.fieldErrors ?? {},
+    };
   }
   return { message: API_MESSAGES.UNEXPECTED_SERVER_ERROR, status: 0, requestId: null, fieldErrors: {} };
 }
@@ -61,7 +66,10 @@ export function useApiResource(loadResource, dependencies, { enabled = true } = 
   }, [enabled, reload, ...dependencies]);
 
   const setData = useCallback((updateData) => {
-    setResourceState((previousState) => ({ ...previousState, data: typeof updateData === 'function' ? updateData(previousState.data) : updateData }));
+    setResourceState((previousState) => ({
+      ...previousState,
+      data: typeof updateData === 'function' ? updateData(previousState.data) : updateData,
+    }));
   }, []);
 
   return { ...resourceState, reload, setData };

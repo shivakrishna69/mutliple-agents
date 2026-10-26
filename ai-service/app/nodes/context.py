@@ -32,4 +32,4 @@ class AgentContext:
     simulated_tools_enabled: bool
     # The attendance regularization sub-agent, shared with POST /ai/attendance/regularize. None when
     # BACKEND_INTERNAL_URL is not configured (the attendance node then says the feature is unavailable).
-    regularization_agent: "RegularizationAgent | None" = None
+    regularization_agent: RegularizationAgent | None = None

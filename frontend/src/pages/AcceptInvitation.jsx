@@ -46,7 +46,8 @@ export default function AcceptInvitation() {
   async function handleSubmit(submitEvent) {
     submitEvent.preventDefault();
     const nextErrors = {};
-    if (!passwordRuleResults.every((ruleResult) => ruleResult.isSatisfied)) nextErrors.password = 'Choose a password that meets every rule below';
+    if (!passwordRuleResults.every((ruleResult) => ruleResult.isSatisfied))
+      nextErrors.password = 'Choose a password that meets every rule below';
     if (formValues.confirmPassword !== formValues.password) nextErrors.confirmPassword = 'The passwords do not match';
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -75,7 +76,10 @@ export default function AcceptInvitation() {
 
   if (error) {
     return (
-      <AuthLayout heading="This invitation can't be used" subheading="Invitation links work once and expire after a few days.">
+      <AuthLayout
+        heading="This invitation can't be used"
+        subheading="Invitation links work once and expire after a few days."
+      >
         <Notice tone="error" title={error.message} />
         <p className="mt-6 text-sm text-slate-600">
           Already activated your account?{' '}

@@ -61,7 +61,9 @@ function isConversationVisibleToUser(statusPayload, currentUser) {
 }
 
 function sortByRecentActivity(conversations) {
-  return [...conversations].sort((first, second) => String(second.updatedAt ?? '').localeCompare(String(first.updatedAt ?? '')));
+  return [...conversations].sort((first, second) =>
+    String(second.updatedAt ?? '').localeCompare(String(first.updatedAt ?? '')),
+  );
 }
 
 function isAbortError(error) {
@@ -72,7 +74,9 @@ function isAbortError(error) {
 function resolveReplyRestriction(conversationDetails, currentUser) {
   if (!conversationDetails) return 'Select a conversation.';
   if (conversationDetails.status === STATUS.ASSIGNED_AGENT) {
-    return conversationDetails.assignedAgentId === currentUser.id ? null : 'Another agent is handling this conversation.';
+    return conversationDetails.assignedAgentId === currentUser.id
+      ? null
+      : 'Another agent is handling this conversation.';
   }
   if (conversationDetails.status === STATUS.PROCESSING_AI) return 'The AI assistant is handling this conversation.';
   return 'Claim this conversation to reply.';
@@ -220,15 +224,21 @@ export default function AgentConsole() {
           isVisible
             ? sortByRecentActivity(
                 previousConversations.map((conversation) =>
-                  conversation.conversationId === statusPayload.conversationId ? { ...conversation, ...statusPayload } : conversation,
+                  conversation.conversationId === statusPayload.conversationId
+                    ? { ...conversation, ...statusPayload }
+                    : conversation,
                 ),
               )
-            : previousConversations.filter((conversation) => conversation.conversationId !== statusPayload.conversationId),
+            : previousConversations.filter(
+                (conversation) => conversation.conversationId !== statusPayload.conversationId,
+              ),
         );
       }
 
       if (statusPayload.conversationId === selectedConversationIdRef.current) {
-        setConversationDetails((previousDetails) => (previousDetails ? { ...previousDetails, ...statusPayload } : previousDetails));
+        setConversationDetails((previousDetails) =>
+          previousDetails ? { ...previousDetails, ...statusPayload } : previousDetails,
+        );
       }
     },
     [currentUser, scheduleListReload],
@@ -316,11 +326,16 @@ export default function AgentConsole() {
         </div>
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
-            connectionStatus === 'connected' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : 'bg-amber-50 text-amber-800 ring-amber-600/30'
+            connectionStatus === 'connected'
+              ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+              : 'bg-amber-50 text-amber-800 ring-amber-600/30'
           }`}
           title="Live updates connection"
         >
-          <span className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'}`} aria-hidden="true" />
+          <span
+            className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'}`}
+            aria-hidden="true"
+          />
           {connectionStatus === 'connected' ? 'Live' : 'Reconnecting…'}
         </span>
       </header>

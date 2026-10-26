@@ -66,7 +66,8 @@ export function evaluateUploadAccess({ user, isOwnProfile, documentType, request
   if (!SELF_UPLOADABLE_DOCUMENT_TYPES.includes(documentType)) {
     return { isAllowed: false, denialReason: VAULT_DENIAL_REASONS.SELF_UPLOAD_TYPE_NOT_ALLOWED };
   }
-  if (requestedAccessibleRoles) return { isAllowed: false, denialReason: VAULT_DENIAL_REASONS.ROLE_GRANT_BY_NON_MANAGER };
+  if (requestedAccessibleRoles)
+    return { isAllowed: false, denialReason: VAULT_DENIAL_REASONS.ROLE_GRANT_BY_NON_MANAGER };
   return { isAllowed: true };
 }
 

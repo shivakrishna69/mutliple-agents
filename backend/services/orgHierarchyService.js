@@ -43,7 +43,11 @@ import { ORG_HIERARCHY_CACHE_SETTINGS, hierarchySnapshotKey, readHierarchyGenera
 import { logger } from '../utils/logger.js';
 
 /** Employment statuses that appear on the org chart. */
-export const CURRENT_EMPLOYMENT_STATUSES = Object.freeze([EMPLOYMENT_STATUSES.PROBATION, EMPLOYMENT_STATUSES.ACTIVE, EMPLOYMENT_STATUSES.NOTICE]);
+export const CURRENT_EMPLOYMENT_STATUSES = Object.freeze([
+  EMPLOYMENT_STATUSES.PROBATION,
+  EMPLOYMENT_STATUSES.ACTIVE,
+  EMPLOYMENT_STATUSES.NOTICE,
+]);
 
 export const CACHE_STATUS = Object.freeze({ HIT: 'hit', MISS: 'miss' });
 
@@ -113,7 +117,11 @@ export async function loadHierarchySnapshot() {
       const nodes = await queryHierarchyRows();
       const snapshot = { generatedAt: new Date().toISOString(), nodes };
       if (generation !== null) {
-        await setCachedJson(hierarchySnapshotKey(generation), snapshot, ORG_HIERARCHY_CACHE_SETTINGS.SNAPSHOT_TTL_SECONDS);
+        await setCachedJson(
+          hierarchySnapshotKey(generation),
+          snapshot,
+          ORG_HIERARCHY_CACHE_SETTINGS.SNAPSHOT_TTL_SECONDS,
+        );
       }
       logger.info('Org hierarchy snapshot built', {
         employeeCount: nodes.length,
@@ -156,7 +164,10 @@ export function indexHierarchyRows(rows) {
   }
   const childIdsByManagerId = new Map();
   for (const [managerId, childRows] of childRowsByManagerId) {
-    childIdsByManagerId.set(managerId, childRows.sort(compareRowsByName).map((childRow) => childRow.id));
+    childIdsByManagerId.set(
+      managerId,
+      childRows.sort(compareRowsByName).map((childRow) => childRow.id),
+    );
   }
   return { nodeById, childIdsByManagerId };
 }
@@ -223,7 +234,10 @@ export function buildHierarchyForest(rows) {
     visitedIds.add(rootRow.id);
     const rootTreeNode = toTreeNode(rootRow);
     roots.push(rootTreeNode);
-    maxDepth = Math.max(maxDepth, attachDescendants({ startId: rootRow.id, startTreeNode: rootTreeNode, index, visitedIds }));
+    maxDepth = Math.max(
+      maxDepth,
+      attachDescendants({ startId: rootRow.id, startTreeNode: rootTreeNode, index, visitedIds }),
+    );
   };
 
   const rootRows = rows
@@ -237,7 +251,9 @@ export function buildHierarchyForest(rows) {
   rootRows.forEach(growFromRoot);
 
   if (visitedIds.size < rows.length) {
-    const unreachedRows = rows.filter((row) => !visitedIds.has(row.id)).sort((firstRow, secondRow) => firstRow.id.localeCompare(secondRow.id));
+    const unreachedRows = rows
+      .filter((row) => !visitedIds.has(row.id))
+      .sort((firstRow, secondRow) => firstRow.id.localeCompare(secondRow.id));
     for (const unreachedRow of unreachedRows) {
       if (visitedIds.has(unreachedRow.id)) continue;
       // An unreached employee is in a loop or hangs below one; every manager above them is also
@@ -258,7 +274,10 @@ export function buildHierarchyForest(rows) {
     });
   }
 
-  return { roots, stats: { employeeCount: rows.length, rootCount: roots.length, orphanedCount, cycleBreakCount, maxDepth } };
+  return {
+    roots,
+    stats: { employeeCount: rows.length, rootCount: roots.length, orphanedCount, cycleBreakCount, maxDepth },
+  };
 }
 
 /**
@@ -286,7 +305,14 @@ export function buildReportsSubtree(rows, managerRow) {
     index,
     visitedIds,
     onVisit: (reportRow, level, parentId) => {
-      const flatReport = { id: reportRow.id, name: reportRow.name, designation: reportRow.designation, avatar: null, managerId: parentId, level };
+      const flatReport = {
+        id: reportRow.id,
+        name: reportRow.name,
+        designation: reportRow.designation,
+        avatar: null,
+        managerId: parentId,
+        level,
+      };
       (level === 1 ? directReports : indirectReports).push(flatReport);
     },
   });
@@ -295,7 +321,11 @@ export function buildReportsSubtree(rows, managerRow) {
     tree,
     directReports,
     indirectReports,
-    stats: { directReportCount: directReports.length, totalReportCount: directReports.length + indirectReports.length, maxDepth },
+    stats: {
+      directReportCount: directReports.length,
+      totalReportCount: directReports.length + indirectReports.length,
+      maxDepth,
+    },
   };
 }
 

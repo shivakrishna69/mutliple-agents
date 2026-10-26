@@ -27,7 +27,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** Same limit as the backend (adminController MAX_SEARCH_LENGTH). */
 const SEARCH_MAX_LENGTH = 100;
 const ROLE_OPTIONS = Object.freeze([USER_ROLES.CUSTOMER, USER_ROLES.AGENT, USER_ROLES.HR, USER_ROLES.ADMIN]);
-const ROLE_FILTER_TABS = Object.freeze([{ value: '', label: 'All' }, ...ROLE_OPTIONS.map((role) => ({ value: role, label: ROLE_DISPLAY[role].pluralLabel }))]);
+const ROLE_FILTER_TABS = Object.freeze([
+  { value: '', label: 'All' },
+  ...ROLE_OPTIONS.map((role) => ({ value: role, label: ROLE_DISPLAY[role].pluralLabel })),
+]);
 
 const joinedDateFormatter = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -45,7 +48,10 @@ function toDisplayableError(error) {
 
 function UserAvatar({ name }) {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-700" aria-hidden="true">
+    <span
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-700"
+      aria-hidden="true"
+    >
       {(name ?? '?').trim().charAt(0).toUpperCase()}
     </span>
   );
@@ -174,13 +180,19 @@ export default function AdminUsers() {
       const updatedUser = await requestUpdateUserRole(userSummary.id, newRole, csrfToken);
       setUsers((previousUsers) =>
         previousUsers
-          .map((listedUser) => (listedUser.id === updatedUser.id ? { ...listedUser, role: updatedUser.role } : listedUser))
+          .map((listedUser) =>
+            listedUser.id === updatedUser.id ? { ...listedUser, role: updatedUser.role } : listedUser,
+          )
           // Under a role filter, a user who no longer matches leaves the list.
           .filter((listedUser) => !roleFilter || listedUser.role === roleFilter),
       );
       setCountsByRole((previousCounts) =>
         previousCounts && userSummary.role !== updatedUser.role
-          ? { ...previousCounts, [userSummary.role]: previousCounts[userSummary.role] - 1, [updatedUser.role]: (previousCounts[updatedUser.role] ?? 0) + 1 }
+          ? {
+              ...previousCounts,
+              [userSummary.role]: previousCounts[userSummary.role] - 1,
+              [updatedUser.role]: (previousCounts[updatedUser.role] ?? 0) + 1,
+            }
           : previousCounts,
       );
       setSuccessMessage(`${updatedUser.name} is now ${ROLE_DISPLAY[updatedUser.role].assignmentPhrase}.`);
@@ -192,11 +204,16 @@ export default function AdminUsers() {
     }
   }
 
-  const totalUsers = countsByRole ? Object.values(countsByRole).reduce((runningTotal, roleCount) => runningTotal + roleCount, 0) : null;
+  const totalUsers = countsByRole
+    ? Object.values(countsByRole).reduce((runningTotal, roleCount) => runningTotal + roleCount, 0)
+    : null;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-8 lg:py-10">
-      <PageHeader title="Users & roles" description="Give teammates access to the support console or HR tools, or make them administrators." />
+      <PageHeader
+        title="Users & roles"
+        description="Give teammates access to the support console or HR tools, or make them administrators."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {ROLE_OPTIONS.slice()
@@ -205,16 +222,28 @@ export default function AdminUsers() {
             <div key={role} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <RoleBadge role={role} />
-                <span className="text-2xl font-bold tracking-tight text-slate-900">{countsByRole ? countsByRole[role] ?? 0 : '—'}</span>
+                <span className="text-2xl font-bold tracking-tight text-slate-900">
+                  {countsByRole ? (countsByRole[role] ?? 0) : '—'}
+                </span>
               </div>
               <p className="mt-3 text-sm text-slate-500">{ROLE_DISPLAY[role].description}</p>
             </div>
           ))}
       </div>
 
-      {pageError && <ErrorBanner title={pageError.title} message={pageError.message} requestId={pageError.requestId} onDismiss={() => setPageError(null)} />}
+      {pageError && (
+        <ErrorBanner
+          title={pageError.title}
+          message={pageError.message}
+          requestId={pageError.requestId}
+          onDismiss={() => setPageError(null)}
+        />
+      )}
       {successMessage && (
-        <p role="status" className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-600/20 ring-inset">
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-600/20 ring-inset"
+        >
           <ShieldIcon className="h-4 w-4 shrink-0" />
           {successMessage} Their open sessions pick up the change immediately.
         </p>
@@ -238,7 +267,11 @@ export default function AdminUsers() {
                   }`}
                 >
                   {filterTab.label}
-                  {typeof tabCount === 'number' && <span className={`ml-1.5 text-xs ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`}>{tabCount}</span>}
+                  {typeof tabCount === 'number' && (
+                    <span className={`ml-1.5 text-xs ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`}>
+                      {tabCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -264,9 +297,15 @@ export default function AdminUsers() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50/80 text-xs font-semibold tracking-wide text-slate-500 uppercase">
               <tr>
-                <th scope="col" className="px-5 py-3">User</th>
-                <th scope="col" className="px-5 py-3">Role</th>
-                <th scope="col" className="hidden px-5 py-3 md:table-cell">Joined</th>
+                <th scope="col" className="px-5 py-3">
+                  User
+                </th>
+                <th scope="col" className="px-5 py-3">
+                  Role
+                </th>
+                <th scope="col" className="hidden px-5 py-3 md:table-cell">
+                  Joined
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100" aria-busy={isLoading}>
@@ -289,23 +328,37 @@ export default function AdminUsers() {
                 users.map((userSummary) => {
                   const isCurrentUser = userSummary.id === currentUser.id;
                   return (
-                    <tr key={userSummary.id} className={`transition ${isLoading ? 'opacity-60' : ''} hover:bg-slate-50/60`}>
+                    <tr
+                      key={userSummary.id}
+                      className={`transition ${isLoading ? 'opacity-60' : ''} hover:bg-slate-50/60`}
+                    >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <UserAvatar name={userSummary.name} />
                           <div className="min-w-0">
                             <p className="flex items-center gap-2 truncate font-semibold text-slate-900">
                               {userSummary.name}
-                              {isCurrentUser && <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[0.65rem] font-semibold text-indigo-700">You</span>}
+                              {isCurrentUser && (
+                                <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[0.65rem] font-semibold text-indigo-700">
+                                  You
+                                </span>
+                              )}
                             </p>
                             <p className="truncate text-slate-500">{userSummary.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <RoleEditor userSummary={userSummary} isCurrentUser={isCurrentUser} isSaving={savingUserId === userSummary.id} onSaveRole={saveRole} />
+                        <RoleEditor
+                          userSummary={userSummary}
+                          isCurrentUser={isCurrentUser}
+                          isSaving={savingUserId === userSummary.id}
+                          onSaveRole={saveRole}
+                        />
                       </td>
-                      <td className="hidden px-5 py-4 whitespace-nowrap text-slate-500 md:table-cell">{formatJoinedDate(userSummary.createdAt)}</td>
+                      <td className="hidden px-5 py-4 whitespace-nowrap text-slate-500 md:table-cell">
+                        {formatJoinedDate(userSummary.createdAt)}
+                      </td>
                     </tr>
                   );
                 })
@@ -313,7 +366,11 @@ export default function AdminUsers() {
             </tbody>
           </table>
         </div>
-        {users.length >= 200 && <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">Showing the 200 newest matches. Refine the search to find others.</p>}
+        {users.length >= 200 && (
+          <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+            Showing the 200 newest matches. Refine the search to find others.
+          </p>
+        )}
       </section>
     </div>
   );

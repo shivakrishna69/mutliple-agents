@@ -93,13 +93,31 @@ function okrHandler(action, handlerBody, { isWrite = true } = {}) {
       try {
         const handlerResult = await handlerBody(req, viewer);
         if (handlerResult.validationErrors) {
-          return sendError(req, res, HTTP_STATUS.BAD_REQUEST, OKR_MESSAGES.INPUT_INVALID, handlerResult.validationErrors);
+          return sendError(
+            req,
+            res,
+            HTTP_STATUS.BAD_REQUEST,
+            OKR_MESSAGES.INPUT_INVALID,
+            handlerResult.validationErrors,
+          );
         }
-        if (isWrite) recordAuditEvent(req, { category: 'okr', action, outcome: AUDIT_OUTCOMES.ALLOWED, ...handlerResult.auditDetails });
+        if (isWrite)
+          recordAuditEvent(req, {
+            category: 'okr',
+            action,
+            outcome: AUDIT_OUTCOMES.ALLOWED,
+            ...handlerResult.auditDetails,
+          });
         return sendSuccess(res, handlerResult.httpStatus ?? HTTP_STATUS.OK, handlerResult.message, handlerResult.data);
       } catch (okrError) {
         if (!(okrError instanceof OkrError)) throw okrError;
-        if (isWrite) recordAuditEvent(req, { category: 'okr', action, outcome: okrError.httpStatus === 403 ? AUDIT_OUTCOMES.DENIED : AUDIT_OUTCOMES.REJECTED, reason: okrError.code });
+        if (isWrite)
+          recordAuditEvent(req, {
+            category: 'okr',
+            action,
+            outcome: okrError.httpStatus === 403 ? AUDIT_OUTCOMES.DENIED : AUDIT_OUTCOMES.REJECTED,
+            reason: okrError.code,
+          });
         return sendCodedError(req, res, okrError.httpStatus, { code: okrError.code, message: okrError.message });
       }
     } catch (error) {
@@ -109,7 +127,9 @@ function okrHandler(action, handlerBody, { isWrite = true } = {}) {
 }
 
 function idParamErrors(params, paramNames) {
-  const validationErrors = paramNames.filter((paramName) => !isValidObjectIdString(params[paramName])).map((paramName) => ({ field: paramName, message: 'must be a valid id' }));
+  const validationErrors = paramNames
+    .filter((paramName) => !isValidObjectIdString(params[paramName]))
+    .map((paramName) => ({ field: paramName, message: 'must be a valid id' }));
   return validationErrors.length ? { validationErrors } : null;
 }
 
@@ -120,8 +140,10 @@ export const getAlignment = okrHandler(
     const year = Number(req.query.year);
     const quarter = Number(req.query.quarter);
     const validationErrors = [];
-    if (!Number.isInteger(year) || year < 2000 || year > 2100) validationErrors.push({ field: 'year', message: 'must be a year' });
-    if (!Number.isInteger(quarter) || quarter < 1 || quarter > 4) validationErrors.push({ field: 'quarter', message: 'must be 1-4' });
+    if (!Number.isInteger(year) || year < 2000 || year > 2100)
+      validationErrors.push({ field: 'year', message: 'must be a year' });
+    if (!Number.isInteger(quarter) || quarter < 1 || quarter > 4)
+      validationErrors.push({ field: 'quarter', message: 'must be 1-4' });
     if (validationErrors.length) return { validationErrors };
     return { message: OKR_MESSAGES.ALIGNMENT_RETRIEVED, data: await buildAlignmentTree(viewer, { year, quarter }) };
   },
@@ -133,7 +155,12 @@ export const postObjective = okrHandler('create_objective', async (req, viewer) 
   const validation = validateObjectiveCreation(req.body);
   if (!validation.isValid) return validation;
   const objective = await createObjective(viewer, validation.sanitizedInput);
-  return { httpStatus: HTTP_STATUS.CREATED, message: OKR_MESSAGES.OBJECTIVE_CREATED, data: { objective: toObjectiveSummary(objective) }, auditDetails: { objectiveId: objective._id.toString(), level: objective.level } };
+  return {
+    httpStatus: HTTP_STATUS.CREATED,
+    message: OKR_MESSAGES.OBJECTIVE_CREATED,
+    data: { objective: toObjectiveSummary(objective) },
+    auditDetails: { objectiveId: objective._id.toString(), level: objective.level },
+  };
 });
 
 /** PATCH /api/okrs/objectives/:objectiveId */
@@ -143,7 +170,11 @@ export const patchObjective = okrHandler('update_objective', async (req, viewer)
   const validation = validateObjectiveChanges(req.body);
   if (!validation.isValid) return validation;
   const objective = await updateObjective(viewer, req.params.objectiveId, validation.sanitizedInput);
-  return { message: OKR_MESSAGES.OBJECTIVE_UPDATED, data: { objective: toObjectiveSummary(objective) }, auditDetails: { objectiveId: req.params.objectiveId } };
+  return {
+    message: OKR_MESSAGES.OBJECTIVE_UPDATED,
+    data: { objective: toObjectiveSummary(objective) },
+    auditDetails: { objectiveId: req.params.objectiveId },
+  };
 });
 
 /** POST /api/okrs/objectives/:objectiveId/key-results */
@@ -153,7 +184,12 @@ export const postKeyResult = okrHandler('create_key_result', async (req, viewer)
   const validation = validateKeyResultCreation(req.body);
   if (!validation.isValid) return validation;
   const keyResult = await addKeyResult(viewer, req.params.objectiveId, validation.sanitizedInput);
-  return { httpStatus: HTTP_STATUS.CREATED, message: OKR_MESSAGES.KEY_RESULT_CREATED, data: { keyResult: toKeyResultSummary(keyResult) }, auditDetails: { objectiveId: req.params.objectiveId, keyResultId: keyResult._id.toString() } };
+  return {
+    httpStatus: HTTP_STATUS.CREATED,
+    message: OKR_MESSAGES.KEY_RESULT_CREATED,
+    data: { keyResult: toKeyResultSummary(keyResult) },
+    auditDetails: { objectiveId: req.params.objectiveId, keyResultId: keyResult._id.toString() },
+  };
 });
 
 /** PATCH /api/okrs/key-results/:keyResultId/progress */
@@ -163,7 +199,11 @@ export const patchKeyResultProgress = okrHandler('update_progress', async (req, 
   const validation = validateProgressUpdate(req.body);
   if (!validation.isValid) return validation;
   const keyResult = await updateKeyResultProgress(viewer, req.params.keyResultId, validation.sanitizedInput);
-  return { message: OKR_MESSAGES.PROGRESS_UPDATED, data: { keyResult: toKeyResultSummary(keyResult) }, auditDetails: { keyResultId: req.params.keyResultId, currentValue: keyResult.currentValue } };
+  return {
+    message: OKR_MESSAGES.PROGRESS_UPDATED,
+    data: { keyResult: toKeyResultSummary(keyResult) },
+    auditDetails: { keyResultId: req.params.keyResultId, currentValue: keyResult.currentValue },
+  };
 });
 
 /** POST /api/okrs/key-results/:keyResultId/milestones */
@@ -173,7 +213,12 @@ export const postMilestone = okrHandler('create_milestone', async (req, viewer) 
   const validation = validateMilestoneCreation(req.body);
   if (!validation.isValid) return validation;
   const keyResult = await addMilestone(viewer, req.params.keyResultId, validation.sanitizedInput);
-  return { httpStatus: HTTP_STATUS.CREATED, message: OKR_MESSAGES.MILESTONE_CREATED, data: { keyResult: toKeyResultSummary(keyResult) }, auditDetails: { keyResultId: req.params.keyResultId } };
+  return {
+    httpStatus: HTTP_STATUS.CREATED,
+    message: OKR_MESSAGES.MILESTONE_CREATED,
+    data: { keyResult: toKeyResultSummary(keyResult) },
+    auditDetails: { keyResultId: req.params.keyResultId },
+  };
 });
 
 /** PATCH /api/okrs/key-results/:keyResultId/milestones/:milestoneId */
@@ -182,6 +227,19 @@ export const patchMilestone = okrHandler('update_milestone', async (req, viewer)
   if (paramErrors) return paramErrors;
   const validation = validateMilestoneChanges(req.body);
   if (!validation.isValid) return validation;
-  const keyResult = await updateMilestone(viewer, req.params.keyResultId, req.params.milestoneId, validation.sanitizedInput);
-  return { message: OKR_MESSAGES.MILESTONE_UPDATED, data: { keyResult: toKeyResultSummary(keyResult) }, auditDetails: { keyResultId: req.params.keyResultId, milestoneId: req.params.milestoneId, status: validation.sanitizedInput.status } };
+  const keyResult = await updateMilestone(
+    viewer,
+    req.params.keyResultId,
+    req.params.milestoneId,
+    validation.sanitizedInput,
+  );
+  return {
+    message: OKR_MESSAGES.MILESTONE_UPDATED,
+    data: { keyResult: toKeyResultSummary(keyResult) },
+    auditDetails: {
+      keyResultId: req.params.keyResultId,
+      milestoneId: req.params.milestoneId,
+      status: validation.sanitizedInput.status,
+    },
+  };
 });

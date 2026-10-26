@@ -28,7 +28,14 @@
  * @param {number}   options.maxDepth  Deepest ancestor level to walk.
  * @param {string}   options.entityLabel  Used in error messages, e.g. "Reporting manager".
  */
-export async function assertParentKeepsTreeAcyclic({ model, documentId, proposedParentId, parentFieldPath, maxDepth, entityLabel }) {
+export async function assertParentKeepsTreeAcyclic({
+  model,
+  documentId,
+  proposedParentId,
+  parentFieldPath,
+  maxDepth,
+  entityLabel,
+}) {
   const [parentWithAncestors] = await model.aggregate([
     { $match: { _id: proposedParentId } },
     {
@@ -71,19 +78,34 @@ export async function assertReferenceExists({ model, referencedId, entityLabel }
  */
 export function createGuardedFieldUpdateBlocker(modelName, guardedFieldPaths) {
   const touchesGuardedPath = (updatePath) =>
-    guardedFieldPaths.some((guardedPath) => updatePath === guardedPath || guardedPath.startsWith(`${updatePath}.`) || updatePath.startsWith(`${guardedPath}.`));
+    guardedFieldPaths.some(
+      (guardedPath) =>
+        updatePath === guardedPath ||
+        guardedPath.startsWith(`${updatePath}.`) ||
+        updatePath.startsWith(`${guardedPath}.`),
+    );
 
   return function blockGuardedFieldUpdates() {
     const update = this.getUpdate() ?? {};
     const updatePaths = Object.entries(update).flatMap(([updateKey, updateValue]) =>
-      updateKey.startsWith('$') && updateValue && typeof updateValue === 'object' ? Object.keys(updateValue) : [updateKey],
+      updateKey.startsWith('$') && updateValue && typeof updateValue === 'object'
+        ? Object.keys(updateValue)
+        : [updateKey],
     );
     const touchedPaths = [...new Set(updatePaths.filter(touchesGuardedPath))];
     if (touchedPaths.length > 0) {
       // A programming mistake, not a client error: it surfaces as HTTP 500.
-      throw new Error(`${modelName} fields (${touchedPaths.join(', ')}) must be changed with save(), not a query update`);
+      throw new Error(
+        `${modelName} fields (${touchedPaths.join(', ')}) must be changed with save(), not a query update`,
+      );
     }
   };
 }
 
-export const QUERY_UPDATE_OPERATIONS = Object.freeze(['updateOne', 'updateMany', 'findOneAndUpdate', 'replaceOne', 'findOneAndReplace']);
+export const QUERY_UPDATE_OPERATIONS = Object.freeze([
+  'updateOne',
+  'updateMany',
+  'findOneAndUpdate',
+  'replaceOne',
+  'findOneAndReplace',
+]);

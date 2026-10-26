@@ -34,10 +34,34 @@ import { PayrollInputError, computeTaxLiability, SUPPORTED_FINANCIAL_YEAR } from
 
 /** The calendar months of FY 2026-27. */
 const FINANCIAL_YEAR_PERIODS = Object.freeze([
-  [2026, 4], [2026, 5], [2026, 6], [2026, 7], [2026, 8], [2026, 9], [2026, 10], [2026, 11], [2026, 12], [2027, 1], [2027, 2], [2027, 3],
+  [2026, 4],
+  [2026, 5],
+  [2026, 6],
+  [2026, 7],
+  [2026, 8],
+  [2026, 9],
+  [2026, 10],
+  [2026, 11],
+  [2026, 12],
+  [2027, 1],
+  [2027, 2],
+  [2027, 3],
 ]);
 
-const MONTH_NAMES = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);
+const MONTH_NAMES = Object.freeze([
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]);
 
 const rupeesToPaise = (rupees) => Math.round(rupees * 100);
 const paiseToRupees = (paise) => paise / 100;
@@ -46,8 +70,40 @@ const paiseToRupees = (paise) => paise / 100;
 // Amount in words (Indian numbering: thousand, lakh, crore)
 // =================================================================================================
 
-const UNIT_WORDS = Object.freeze(['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']);
-const TENS_WORDS = Object.freeze(['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']);
+const UNIT_WORDS = Object.freeze([
+  '',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+  'Thirteen',
+  'Fourteen',
+  'Fifteen',
+  'Sixteen',
+  'Seventeen',
+  'Eighteen',
+  'Nineteen',
+]);
+const TENS_WORDS = Object.freeze([
+  '',
+  '',
+  'Twenty',
+  'Thirty',
+  'Forty',
+  'Fifty',
+  'Sixty',
+  'Seventy',
+  'Eighty',
+  'Ninety',
+]);
 
 /** 0-99 in words ("Forty-Five"). */
 function twoDigitWords(number) {
@@ -61,7 +117,9 @@ function twoDigitWords(number) {
 function threeDigitWords(number) {
   const hundreds = Math.floor(number / 100);
   const remainder = number % 100;
-  return [hundreds ? `${UNIT_WORDS[hundreds]} Hundred` : '', remainder ? twoDigitWords(remainder) : ''].filter(Boolean).join(' ');
+  return [hundreds ? `${UNIT_WORDS[hundreds]} Hundred` : '', remainder ? twoDigitWords(remainder) : '']
+    .filter(Boolean)
+    .join(' ');
 }
 
 /** A whole number of rupees in Indian-system words ("One Lakh Twenty Thousand Five Hundred"). */
@@ -108,16 +166,29 @@ const formatRupees = (amount) => `₹${amount.toLocaleString('en-IN', { maximumF
  * @returns {object} PayslipFigures
  * @throws {PayrollInputError} invalid salary inputs, a period outside FY 2026-27, or a period before joining
  */
-export function buildPayslipFigures({ employee, period, salaryStructure, investmentsDeclared, taxRegimeChoice, employmentDetails }) {
-  const isSupportedPeriod = FINANCIAL_YEAR_PERIODS.some(([year, month]) => year === period.year && month === period.month);
+export function buildPayslipFigures({
+  employee,
+  period,
+  salaryStructure,
+  investmentsDeclared,
+  taxRegimeChoice,
+  employmentDetails,
+}) {
+  const isSupportedPeriod = FINANCIAL_YEAR_PERIODS.some(
+    ([year, month]) => year === period.year && month === period.month,
+  );
   if (!isSupportedPeriod) {
-    throw new PayrollInputError([{ field: 'period', message: `must be a month of FY ${SUPPORTED_FINANCIAL_YEAR} (April 2026 to March 2027)` }]);
+    throw new PayrollInputError([
+      { field: 'period', message: `must be a month of FY ${SUPPORTED_FINANCIAL_YEAR} (April 2026 to March 2027)` },
+    ]);
   }
   const periodLabel = `${period.year}-${String(period.month).padStart(2, '0')}`;
   const daysInMonth = new Date(Date.UTC(period.year, period.month, 0)).getUTCDate();
   const periodEndDate = `${periodLabel}-${String(daysInMonth).padStart(2, '0')}`;
   if (employee.dateOfJoining > periodEndDate) {
-    throw new PayrollInputError([{ field: 'period', message: `is before the employee's date of joining (${employee.dateOfJoining})` }]);
+    throw new PayrollInputError([
+      { field: 'period', message: `is before the employee's date of joining (${employee.dateOfJoining})` },
+    ]);
   }
 
   const estimate = computeTaxLiability(salaryStructure, investmentsDeclared, taxRegimeChoice, employmentDetails);
@@ -143,7 +214,12 @@ export function buildPayslipFigures({ employee, period, salaryStructure, investm
     const ceilingNote = epf.contributionOnFullBasic
       ? 'on full basic + DA (voluntary)'
       : `on wages up to the ceiling (${epfMonth.ceilingSegments.map((segment) => `${formatRupees(segment.monthlyCeiling)} for ${segment.days} days`).join(', ')})`;
-    deductionLines.push({ code: 'EPF', label: 'Provident Fund (EPF)', paise: rupeesToPaise(epfMonth.employeeContribution), reference: `12% of ${formatRupees(epfMonth.contributoryWages)} ${ceilingNote}` });
+    deductionLines.push({
+      code: 'EPF',
+      label: 'Provident Fund (EPF)',
+      paise: rupeesToPaise(epfMonth.employeeContribution),
+      reference: `12% of ${formatRupees(epfMonth.contributoryWages)} ${ceilingNote}`,
+    });
   }
   if (esi.isCovered) {
     const esiMonth = esi.months.find((monthEntry) => monthEntry.month === periodLabel);
@@ -151,12 +227,19 @@ export function buildPayslipFigures({ employee, period, salaryStructure, investm
       code: 'ESI',
       label: 'Employees’ State Insurance',
       paise: rupeesToPaise(esiMonth.employeeContribution),
-      reference: esiMonth.employeeShareExempt ? 'employee share exempt (average daily wage ≤ ₹176)' : '0.75% of gross wages',
+      reference: esiMonth.employeeShareExempt
+        ? 'employee share exempt (average daily wage ≤ ₹176)'
+        : '0.75% of gross wages',
     });
   }
   if (professionalTax.state !== 'NONE') {
     const professionalTaxMonth = professionalTax.months.find((monthEntry) => monthEntry.month === periodLabel);
-    deductionLines.push({ code: 'PROFESSIONAL_TAX', label: 'Professional Tax', paise: rupeesToPaise(professionalTaxMonth.amount), reference: `${professionalTax.state === 'KA' ? 'Karnataka' : 'Maharashtra'} slab` });
+    deductionLines.push({
+      code: 'PROFESSIONAL_TAX',
+      label: 'Professional Tax',
+      paise: rupeesToPaise(professionalTaxMonth.amount),
+      reference: `${professionalTax.state === 'KA' ? 'Karnataka' : 'Maharashtra'} slab`,
+    });
   }
   deductionLines.push({
     code: 'TDS',
@@ -173,10 +256,19 @@ export function buildPayslipFigures({ employee, period, salaryStructure, investm
     throw new PayrollInputError([{ field: 'salaryStructure', message: 'deductions exceed gross pay for the month' }]);
   }
 
-  const toAmountLine = ({ paise, ...lineFields }) => ({ ...lineFields, amount: paiseToRupees(paise), reference: lineFields.reference ?? null });
+  const toAmountLine = ({ paise, ...lineFields }) => ({
+    ...lineFields,
+    amount: paiseToRupees(paise),
+    reference: lineFields.reference ?? null,
+  });
   return {
     financialYear: SUPPORTED_FINANCIAL_YEAR,
-    period: { year: period.year, month: period.month, label: `${MONTH_NAMES[period.month - 1]} ${period.year}`, daysInMonth },
+    period: {
+      year: period.year,
+      month: period.month,
+      label: `${MONTH_NAMES[period.month - 1]} ${period.year}`,
+      daysInMonth,
+    },
     employee,
     earnings: earningLines.map(toAmountLine),
     deductions: deductionLines.map(toAmountLine),

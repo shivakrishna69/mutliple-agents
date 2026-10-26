@@ -41,12 +41,22 @@ const RADIANS_PER_DEGREE = Math.PI / 180;
 
 /** A latitude: a finite JSON number from −90 to 90 inclusive. */
 export function isValidLatitude(candidateLatitude) {
-  return typeof candidateLatitude === 'number' && Number.isFinite(candidateLatitude) && candidateLatitude >= -90 && candidateLatitude <= 90;
+  return (
+    typeof candidateLatitude === 'number' &&
+    Number.isFinite(candidateLatitude) &&
+    candidateLatitude >= -90 &&
+    candidateLatitude <= 90
+  );
 }
 
 /** A longitude: a finite JSON number from −180 to 180 inclusive. */
 export function isValidLongitude(candidateLongitude) {
-  return typeof candidateLongitude === 'number' && Number.isFinite(candidateLongitude) && candidateLongitude >= -180 && candidateLongitude <= 180;
+  return (
+    typeof candidateLongitude === 'number' &&
+    Number.isFinite(candidateLongitude) &&
+    candidateLongitude >= -180 &&
+    candidateLongitude <= 180
+  );
 }
 
 /**
@@ -72,7 +82,8 @@ export function haversineDistanceMetres(fromPoint, toPoint) {
   const sinHalfLatitudeDelta = Math.sin(latitudeDeltaRadians / 2);
   const sinHalfLongitudeDelta = Math.sin(longitudeDeltaRadians / 2);
   const haversineOfCentralAngle =
-    sinHalfLatitudeDelta * sinHalfLatitudeDelta + Math.cos(fromLatitudeRadians) * Math.cos(toLatitudeRadians) * sinHalfLongitudeDelta * sinHalfLongitudeDelta;
+    sinHalfLatitudeDelta * sinHalfLatitudeDelta +
+    Math.cos(fromLatitudeRadians) * Math.cos(toLatitudeRadians) * sinHalfLongitudeDelta * sinHalfLongitudeDelta;
 
   const clampedHaversine = Math.min(1, Math.max(0, haversineOfCentralAngle));
   const centralAngleRadians = 2 * Math.atan2(Math.sqrt(clampedHaversine), Math.sqrt(1 - clampedHaversine));

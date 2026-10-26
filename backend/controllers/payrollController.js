@@ -32,7 +32,12 @@ import {
 import EmployeeProfile from '../models/EmployeeProfile.js';
 import Payslip from '../models/Payslip.js';
 import { ROLES } from '../models/User.js';
-import { PayslipGenerationError, createPayslipDownload, generatePayslip, verifyPayslip } from '../services/payslipService.js';
+import {
+  PayslipGenerationError,
+  createPayslipDownload,
+  generatePayslip,
+  verifyPayslip,
+} from '../services/payslipService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { logger } from '../utils/logger.js';
@@ -66,7 +71,9 @@ export function getPayrollRules(req, res) {
 export function createTaxEstimate(req, res, next) {
   try {
     if (!isPlainObject(req.body)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT, [{ field: 'body', message: PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT, [
+        { field: 'body', message: PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT },
+      ]);
     }
     const { salaryStructure, investmentsDeclared = null, taxRegimeChoice, employmentDetails } = req.body;
 
@@ -89,7 +96,6 @@ export function createTaxEstimate(req, res, next) {
     return next(error);
   }
 }
-
 
 // =================================================================================================
 // Payslips
@@ -126,7 +132,11 @@ function toPayslipSummary(payslip) {
     netPayInWords: payslip.netPayInWords,
     taxSummary: payslip.taxSummary,
     verificationId: payslip.verification.verificationId,
-    document: { sizeBytes: payslip.storage.sizeBytes, sha256: payslip.storage.sha256, contentType: payslip.storage.contentType },
+    document: {
+      sizeBytes: payslip.storage.sizeBytes,
+      sha256: payslip.storage.sha256,
+      contentType: payslip.storage.contentType,
+    },
     issuedAt: new Date(payslip.issuedAt).toISOString(),
     supersededAt: payslip.supersededAt ? new Date(payslip.supersededAt).toISOString() : null,
   };
@@ -152,15 +162,29 @@ export async function createPayslip(req, res, next) {
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PAYROLL_MESSAGES.PAYSLIP_MANAGERS_ONLY);
     }
     if (!isPlainObject(req.body)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT, [{ field: 'body', message: PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT, [
+        { field: 'body', message: PAYROLL_MESSAGES.BODY_MUST_BE_OBJECT },
+      ]);
     }
-    const { employeeId, year, month, reissue = false, salaryStructure, investmentsDeclared = null, taxRegimeChoice, employmentDetails } = req.body;
+    const {
+      employeeId,
+      year,
+      month,
+      reissue = false,
+      salaryStructure,
+      investmentsDeclared = null,
+      taxRegimeChoice,
+      employmentDetails,
+    } = req.body;
     const fieldErrors = [];
-    if (!isValidObjectIdString(employeeId)) fieldErrors.push({ field: 'employeeId', message: 'must be an employee id' });
+    if (!isValidObjectIdString(employeeId))
+      fieldErrors.push({ field: 'employeeId', message: 'must be an employee id' });
     if (!Number.isInteger(year)) fieldErrors.push({ field: 'year', message: 'must be a whole number' });
-    if (!Number.isInteger(month) || month < 1 || month > 12) fieldErrors.push({ field: 'month', message: 'must be 1-12' });
+    if (!Number.isInteger(month) || month < 1 || month > 12)
+      fieldErrors.push({ field: 'month', message: 'must be 1-12' });
     if (typeof reissue !== 'boolean') fieldErrors.push({ field: 'reissue', message: 'must be true or false' });
-    if (fieldErrors.length > 0) return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, fieldErrors);
+    if (fieldErrors.length > 0)
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, fieldErrors);
 
     let payslip;
     try {
@@ -177,17 +201,36 @@ export async function createPayslip(req, res, next) {
       });
     } catch (generationError) {
       if (generationError instanceof PayrollInputError) {
-        return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, generationError.fieldErrors);
+        return sendError(
+          req,
+          res,
+          HTTP_STATUS.BAD_REQUEST,
+          PAYROLL_MESSAGES.INPUT_INVALID,
+          generationError.fieldErrors,
+        );
       }
       if (generationError instanceof PayslipGenerationError) {
-        auditPayslip(req, 'generate_payslip', generationError.httpStatus >= 500 ? AUDIT_OUTCOMES.FAILED : AUDIT_OUTCOMES.REJECTED, { employeeId, year, month, reason: generationError.code });
+        auditPayslip(
+          req,
+          'generate_payslip',
+          generationError.httpStatus >= 500 ? AUDIT_OUTCOMES.FAILED : AUDIT_OUTCOMES.REJECTED,
+          { employeeId, year, month, reason: generationError.code },
+        );
         return sendPayslipError(req, res, generationError);
       }
       throw generationError;
     }
 
-    auditPayslip(req, 'generate_payslip', AUDIT_OUTCOMES.ALLOWED, { payslipId: payslip._id.toString(), employeeId, year, month, revision: payslip.revision });
-    return sendSuccess(res, HTTP_STATUS.CREATED, PAYROLL_MESSAGES.PAYSLIP_ISSUED, { payslip: toPayslipSummary(payslip) });
+    auditPayslip(req, 'generate_payslip', AUDIT_OUTCOMES.ALLOWED, {
+      payslipId: payslip._id.toString(),
+      employeeId,
+      year,
+      month,
+      revision: payslip.revision,
+    });
+    return sendSuccess(res, HTTP_STATUS.CREATED, PAYROLL_MESSAGES.PAYSLIP_ISSUED, {
+      payslip: toPayslipSummary(payslip),
+    });
   } catch (error) {
     return next(error);
   }
@@ -202,28 +245,45 @@ export async function listPayslips(req, res, next) {
   try {
     const isPayrollManager = PAYROLL_MANAGER_ROLES.includes(req.user.role);
     const ownProfileId = await findOwnEmployeeProfileId(req.user.id);
-    const requestedEmployeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId.toLowerCase() : ownProfileId;
+    const requestedEmployeeId =
+      typeof req.query.employeeId === 'string' ? req.query.employeeId.toLowerCase() : ownProfileId;
     if (!requestedEmployeeId) return sendError(req, res, HTTP_STATUS.NOT_FOUND, PAYROLL_MESSAGES.NO_EMPLOYEE_PROFILE);
     if (!isValidObjectIdString(requestedEmployeeId)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, [{ field: 'employeeId', message: 'must be an employee id' }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, [
+        { field: 'employeeId', message: 'must be an employee id' },
+      ]);
     }
     if (!isPayrollManager && requestedEmployeeId !== ownProfileId) {
-      auditPayslip(req, 'list_payslips', AUDIT_OUTCOMES.DENIED, { employeeId: requestedEmployeeId, reason: 'not_owner' });
+      auditPayslip(req, 'list_payslips', AUDIT_OUTCOMES.DENIED, {
+        employeeId: requestedEmployeeId,
+        reason: 'not_owner',
+      });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PAYROLL_MESSAGES.PAYSLIP_ACCESS_DENIED);
     }
 
     const listFilter = { employeeId: requestedEmployeeId };
     if (req.query.includeSuperseded !== 'true') listFilter.status = 'Issued';
-    for (const [queryKey, fieldPath] of [['year', 'period.year'], ['month', 'period.month']]) {
+    for (const [queryKey, fieldPath] of [
+      ['year', 'period.year'],
+      ['month', 'period.month'],
+    ]) {
       if (req.query[queryKey] === undefined) continue;
       const parsedValue = Number(req.query[queryKey]);
       if (!Number.isInteger(parsedValue)) {
-        return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, [{ field: queryKey, message: 'must be a whole number' }]);
+        return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, [
+          { field: queryKey, message: 'must be a whole number' },
+        ]);
       }
       listFilter[fieldPath] = parsedValue;
     }
-    const payslips = await Payslip.find(listFilter).sort({ 'period.year': -1, 'period.month': -1, revision: -1 }).limit(PAYSLIP_LIST_LIMIT).lean();
-    return sendSuccess(res, HTTP_STATUS.OK, PAYROLL_MESSAGES.PAYSLIPS_RETRIEVED, { payslips: payslips.map(toPayslipSummary), meta: { count: payslips.length, limit: PAYSLIP_LIST_LIMIT } });
+    const payslips = await Payslip.find(listFilter)
+      .sort({ 'period.year': -1, 'period.month': -1, revision: -1 })
+      .limit(PAYSLIP_LIST_LIMIT)
+      .lean();
+    return sendSuccess(res, HTTP_STATUS.OK, PAYROLL_MESSAGES.PAYSLIPS_RETRIEVED, {
+      payslips: payslips.map(toPayslipSummary),
+      meta: { count: payslips.length, limit: PAYSLIP_LIST_LIMIT },
+    });
   } catch (error) {
     return next(error);
   }
@@ -234,7 +294,9 @@ export async function downloadPayslip(req, res, next) {
   try {
     const { payslipId } = req.params;
     if (!isValidObjectIdString(payslipId)) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, [{ field: 'payslipId', message: 'must be a payslip id' }]);
+      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, PAYROLL_MESSAGES.INPUT_INVALID, [
+        { field: 'payslipId', message: 'must be a payslip id' },
+      ]);
     }
     const payslipOwner = await Payslip.findById(payslipId).select('employeeId').lean();
     if (!payslipOwner) return sendError(req, res, HTTP_STATUS.NOT_FOUND, PAYROLL_MESSAGES.PAYSLIP_NOT_FOUND);
@@ -251,7 +313,10 @@ export async function downloadPayslip(req, res, next) {
       if (downloadError instanceof PayslipGenerationError) return sendPayslipError(req, res, downloadError);
       throw downloadError;
     }
-    auditPayslip(req, 'download_payslip', AUDIT_OUTCOMES.ALLOWED, { payslipId, grantBasis: isOwner ? 'owner' : 'role' });
+    auditPayslip(req, 'download_payslip', AUDIT_OUTCOMES.ALLOWED, {
+      payslipId,
+      grantBasis: isOwner ? 'owner' : 'role',
+    });
     return sendSuccess(res, HTTP_STATUS.OK, PAYROLL_MESSAGES.DOWNLOAD_ISSUED, { download: downloadResult.download });
   } catch (error) {
     return next(error);
@@ -277,8 +342,11 @@ export async function verifyPayslipById(req, res, next) {
       if (verificationError instanceof PayslipGenerationError) return sendPayslipError(req, res, verificationError);
       throw verificationError;
     }
-    if (!verificationResult.found) return sendError(req, res, HTTP_STATUS.NOT_FOUND, PAYROLL_MESSAGES.VERIFICATION_NOT_FOUND);
-    return sendSuccess(res, HTTP_STATUS.OK, PAYROLL_MESSAGES.VERIFICATION_COMPLETED, { verification: { authentic: verificationResult.authentic, ...verificationResult.details } });
+    if (!verificationResult.found)
+      return sendError(req, res, HTTP_STATUS.NOT_FOUND, PAYROLL_MESSAGES.VERIFICATION_NOT_FOUND);
+    return sendSuccess(res, HTTP_STATUS.OK, PAYROLL_MESSAGES.VERIFICATION_COMPLETED, {
+      verification: { authentic: verificationResult.authentic, ...verificationResult.details },
+    });
   } catch (error) {
     return next(error);
   }

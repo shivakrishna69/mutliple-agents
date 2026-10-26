@@ -43,15 +43,21 @@ export function validatePunchInInput(requestBody) {
     validationErrors.push({ field: 'lat', message: ATTENDANCE_MESSAGES.LOCATION_MISSING });
   }
 
-  const isValidAccuracy = typeof accuracyMeters === 'number' && Number.isFinite(accuracyMeters) && accuracyMeters > 0 && accuracyMeters <= ACCURACY_SANITY_MAX_METRES;
-  if (!isValidAccuracy) validationErrors.push({ field: 'accuracyMeters', message: ATTENDANCE_MESSAGES.ACCURACY_INVALID });
+  const isValidAccuracy =
+    typeof accuracyMeters === 'number' &&
+    Number.isFinite(accuracyMeters) &&
+    accuracyMeters > 0 &&
+    accuracyMeters <= ACCURACY_SANITY_MAX_METRES;
+  if (!isValidAccuracy)
+    validationErrors.push({ field: 'accuracyMeters', message: ATTENDANCE_MESSAGES.ACCURACY_INVALID });
 
   const isValidFingerprint =
     typeof deviceFingerprint === 'string' &&
     deviceFingerprint.length >= ATTENDANCE_FIELD_LIMITS.DEVICE_FINGERPRINT_MIN_LENGTH &&
     deviceFingerprint.length <= ATTENDANCE_FIELD_LIMITS.DEVICE_FINGERPRINT_MAX_LENGTH &&
     PRINTABLE_TOKEN_PATTERN.test(deviceFingerprint);
-  if (!isValidFingerprint) validationErrors.push({ field: 'deviceFingerprint', message: ATTENDANCE_MESSAGES.FINGERPRINT_INVALID });
+  if (!isValidFingerprint)
+    validationErrors.push({ field: 'deviceFingerprint', message: ATTENDANCE_MESSAGES.FINGERPRINT_INVALID });
 
   let normalizedMacAddress = null;
   if (macAddress !== undefined && macAddress !== null) {
@@ -64,5 +70,8 @@ export function validatePunchInInput(requestBody) {
   }
 
   if (validationErrors.length > 0) return { isValid: false, validationErrors };
-  return { isValid: true, sanitizedInput: { lat, lng, accuracyMeters, deviceFingerprint, macAddress: normalizedMacAddress } };
+  return {
+    isValid: true,
+    sanitizedInput: { lat, lng, accuracyMeters, deviceFingerprint, macAddress: normalizedMacAddress },
+  };
 }
