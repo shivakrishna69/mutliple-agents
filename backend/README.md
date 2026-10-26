@@ -20,6 +20,8 @@ missing or weak secrets (e.g. `JWT_SECRET`, `AI_SERVICE_API_KEY` shorter than 32
 | `npm start` | production start |
 | `npm run set-role -- <email> <admin\|agent\|hr\|customer>` | recovery tool to change a role directly in the database |
 | `npm run send-test-message` | sends a signed test message to the inbound webhook |
+| `npm test` | unit and integration tests (integration needs MongoDB; see [tests/README.md](tests/README.md)) |
+| `npm run lint` / `npm run format:check` | ESLint and Prettier checks |
 
 ## Structure
 
