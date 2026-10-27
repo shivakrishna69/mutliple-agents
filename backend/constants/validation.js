@@ -159,6 +159,11 @@ export const LEAVE_LIMITS = Object.freeze({
   // Leave years are named by the calendar year they start in.
   EARLIEST_LEAVE_YEAR: 2000,
   LATEST_LEAVE_YEAR: 2100,
+  // Sandwich rule across two requests: the longest run of non-working days between them that is
+  // still charged (a long festival break is still "between" two leaves; a month off is not).
+  MAX_SANDWICH_GAP_DAYS: 15,
+  // Request lists (own requests, approval queues, payroll export) return at most this many rows.
+  MAX_LIST_ROWS: 200,
 });
 
 /** Limits for the work calendar (models/Holiday.js, OfficeLocation weekly offs, services/workCalendar.js). */

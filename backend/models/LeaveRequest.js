@@ -15,6 +15,11 @@
  *
  * The days a request occupies are claimed in models/LeaveDayClaim.js, whose unique index stops two
  * requests from covering the same half day, even when they arrive at the same moment.
+ *
+ * Without multi-document transactions, every change after submission runs under `processing`, a
+ * lock taken by one atomic update: it records the ledger movement to post and the fields to set,
+ * so services/leaveRequestSettlement.js can finish (or, for an approval whose debit was never
+ * posted, undo) an operation the server stopped in the middle of.
  */
 
 import mongoose from 'mongoose';
@@ -32,6 +37,9 @@ export const LEAVE_REQUEST_STATUSES = Object.freeze({
 });
 
 export const CHANGE_REQUEST_KINDS = Object.freeze({ CANCEL: 'CANCEL', SHORTEN: 'SHORTEN' });
+
+/** What an approver works through: pending requests, or approved leave with a change waiting. */
+export const APPROVAL_QUEUES = Object.freeze({ REQUESTS: 'requests', CHANGES: 'changes' });
 
 const calendarDateField = (required = true) => ({
   type: String,
@@ -94,6 +102,38 @@ const changeRequestSchema = new mongoose.Schema(
   { _id: false },
 );
 
+/** A change request once decided, kept for the record. */
+const decidedChangeSchema = new mongoose.Schema(
+  {
+    kind: { type: String, enum: Object.values(CHANGE_REQUEST_KINDS), required: true },
+    newEndDate: { type: String, default: null },
+    newEndDayPortion: { type: String, default: null },
+    reason: { type: String, required: true },
+    requestedByUserId: { type: ObjectId, ref: 'User', required: true },
+    requestedAt: { type: Date, required: true },
+    isApproved: { type: Boolean, required: true },
+    decision: { type: decisionSchema, required: true },
+    creditedCentidays: { type: Number, default: 0 },
+  },
+  { _id: false },
+);
+
+/**
+ * An operation in progress. `posting` is the ledger movement it makes (null for none) and
+ * `result` the fields it sets once that is posted; both are plain data, so the repair job can
+ * complete the operation exactly as the request would have.
+ */
+const processingSchema = new mongoose.Schema(
+  {
+    lockId: { type: String, required: true },
+    operation: { type: String, required: true },
+    startedAt: { type: Date, required: true },
+    posting: { type: mongoose.Schema.Types.Mixed, default: null },
+    result: { type: mongoose.Schema.Types.Mixed, required: true },
+  },
+  { _id: false },
+);
+
 const leaveRequestSchema = new mongoose.Schema(
   {
     employeeId: { type: ObjectId, ref: 'EmployeeProfile', required: true, immutable: true },
@@ -111,6 +151,8 @@ const leaveRequestSchema = new mongoose.Schema(
     chargedCentidays: { type: Number, required: true, min: 0 },
     // Whether the type keeps a balance (Loss of Pay does not), fixed when submitted.
     tracksBalance: { type: Boolean, required: true, immutable: true },
+    // What was reserved at submission (0 for a type without a balance); approval or release closes it.
+    holdCentidays: { type: Number, required: true, min: 0, immutable: true },
     reason: textField({ required: true }),
     // One of the employee's own document-vault files (e.g. a medical certificate).
     attachmentDocumentId: { type: ObjectId, ref: 'DocumentVault', default: null },
@@ -125,6 +167,10 @@ const leaveRequestSchema = new mongoose.Schema(
     decision: { type: decisionSchema, default: null },
     cancellation: { type: decisionSchema, default: null },
     pendingChange: { type: changeRequestSchema, default: null },
+    changeHistory: { type: [decidedChangeSchema], default: [] },
+    processing: { type: processingSchema, default: null },
+    // Set when the request gave days up (closed or shortened) until their claims are deleted.
+    hasClaimsToRelease: { type: Boolean, default: false },
   },
   { timestamps: true, optimisticConcurrency: true },
 );
@@ -145,5 +191,11 @@ leaveRequestSchema.index({ approverEmployeeId: 1, status: 1, createdAt: 1 });
 leaveRequestSchema.index({ status: 1, createdAt: 1 });
 // Neighbours whose border charges depend on a request.
 leaveRequestSchema.index({ 'borderCharges.neighbourRequestId': 1 });
+// The repair job: operations left unfinished, and claims left to delete.
+leaveRequestSchema.index(
+  { 'processing.startedAt': 1 },
+  { partialFilterExpression: { 'processing.startedAt': { $type: 'date' } } },
+);
+leaveRequestSchema.index({ updatedAt: 1 }, { partialFilterExpression: { hasClaimsToRelease: true } });
 
 export default mongoose.model('LeaveRequest', leaveRequestSchema);

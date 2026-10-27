@@ -50,7 +50,7 @@ import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js'
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
-import { startLeaveAccrualScheduler, stopLeaveAccrualScheduler } from './services/leaveAccrualJob.js';
+import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
 import { runStartupMigrations } from './migrations/index.js';
 import { loadConfig } from './config/environment.js';
@@ -220,8 +220,9 @@ async function start() {
   });
   httpServer.listen(config.port, () => {
     logger.info('HTTP server listening', { port: config.port, env: config.env });
-    // Accruals and year ends, now and hourly (idempotent, so several instances may run it).
-    startLeaveAccrualScheduler();
+    // Accruals, year ends and leave request repair, now and hourly (idempotent, so several
+    // instances may run it).
+    startLeaveScheduler();
   });
 
   /**
@@ -241,7 +242,7 @@ async function start() {
     forceExit.unref();
 
     try {
-      stopLeaveAccrualScheduler();
+      stopLeaveScheduler();
       await closeSocketServer();
       await closeCacheStore();
       closeVaultStorage();

@@ -16,6 +16,7 @@ import { LEAVE_MESSAGES } from '../constants/messages.js';
 import { runLeaveAccruals } from '../services/leaveAccrualJob.js';
 import { getEmployeeBalances, getEmployeeLedger } from '../services/leaveBalances.js';
 import { reconcileLeaveBalances } from '../services/leaveLedger.js';
+import { repairLeaveRequests } from '../services/leaveRequestSettlement.js';
 import { postEncashment, postHrAdjustment } from '../services/leaveMovements.js';
 import {
   employeeToday,
@@ -38,26 +39,27 @@ import {
 } from '../validators/leaveValidators.js';
 import { createWorkforceHandlerFactory, idParamErrors } from './workforceHandler.js';
 
-const leaveHandler = createWorkforceHandlerFactory({
+export const leaveHandler = createWorkforceHandlerFactory({
   auditCategory: 'leave',
   restrictedMessage: LEAVE_MESSAGES.RESTRICTED,
   inputInvalidMessage: LEAVE_MESSAGES.INPUT_INVALID,
 });
 
-const ANY_VIEWER = Object.freeze({ requiresWorkforceAdmin: false, isWrite: false });
-const ADMIN_READ = Object.freeze({ requiresWorkforceAdmin: true, isWrite: false });
-const ADMIN_WRITE = Object.freeze({ requiresWorkforceAdmin: true, isWrite: true });
+export const ANY_VIEWER = Object.freeze({ requiresWorkforceAdmin: false, isWrite: false });
+export const ADMIN_READ = Object.freeze({ requiresWorkforceAdmin: true, isWrite: false });
+export const ADMIN_WRITE = Object.freeze({ requiresWorkforceAdmin: true, isWrite: true });
 
-const employeesOnly = () => new ServiceError(HTTP_STATUS.FORBIDDEN, 'EMPLOYEES_ONLY', LEAVE_MESSAGES.EMPLOYEES_ONLY);
+export const employeesOnly = () =>
+  new ServiceError(HTTP_STATUS.FORBIDDEN, 'EMPLOYEES_ONLY', LEAVE_MESSAGES.EMPLOYEES_ONLY);
 
 /** HR and admins, or a user with an employee profile; anyone else is refused. */
-async function assertLeaveViewer(req) {
+export async function assertLeaveViewer(req) {
   if (isWorkforceAdmin(req.user.role)) return;
   if (!(await findOwnEmployeeProfileId(req.user.id))) throw employeesOnly();
 }
 
 /** The caller's own employee profile id. */
-async function requireOwnEmployeeId(req) {
+export async function requireOwnEmployeeId(req) {
   const ownEmployeeId = await findOwnEmployeeProfileId(req.user.id);
   if (!ownEmployeeId) throw employeesOnly();
   return ownEmployeeId;
@@ -246,8 +248,12 @@ export const postAccrualJobRun = leaveHandler('run_leave_job', ADMIN_WRITE, asyn
   return { message: LEAVE_MESSAGES.JOB_COMPLETED, data: { summary }, auditDetails: { asOfDate, ...summary } };
 });
 
-/** POST /api/leave/jobs/reconcile : bring every balance back in line with the ledger */
+/** POST /api/leave/jobs/reconcile : finish interrupted request changes, then bring every balance in line with the ledger */
 export const postReconcileRun = leaveHandler('reconcile_leave_balances', ADMIN_WRITE, async () => {
-  const summary = await reconcileLeaveBalances();
-  return { message: LEAVE_MESSAGES.RECONCILED, data: { summary }, auditDetails: summary };
+  const summary = { requests: await repairLeaveRequests(), balances: await reconcileLeaveBalances() };
+  return {
+    message: LEAVE_MESSAGES.RECONCILED,
+    data: { summary },
+    auditDetails: { ...summary.requests, ...summary.balances },
+  };
 });

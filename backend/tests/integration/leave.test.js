@@ -422,14 +422,16 @@ describe('leave policies and balances', { skip: skipReason ?? false }, () => {
         },
       },
     });
-    const summary = (await expectStatus(operationsClient.post('/api/leave/jobs/reconcile', {}), 200)).data.summary;
+    const summary = (await expectStatus(operationsClient.post('/api/leave/jobs/reconcile', {}), 200)).data.summary
+      .balances;
     assert.equal(summary.abandonedReversed, 1);
     assert.ok(summary.totalsCorrected >= 1);
     const repaired = await balances.findOne(key);
     assert.equal(repaired.balanceCentidays, original.balanceCentidays);
     assert.equal(repaired.appliedEntries.length, original.appliedEntries.length);
 
-    const again = (await expectStatus(operationsClient.post('/api/leave/jobs/reconcile', {}), 200)).data.summary;
+    const again = (await expectStatus(operationsClient.post('/api/leave/jobs/reconcile', {}), 200)).data.summary
+      .balances;
     assert.deepEqual([again.missingApplied, again.abandonedReversed, again.totalsCorrected], [0, 0, 0]);
   });
 

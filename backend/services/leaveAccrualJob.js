@@ -1,6 +1,6 @@
 /**
  * The leave job: accrual credits and year-end movements for every employee, run at startup and
- * then periodically (startLeaveAccrualScheduler), and on demand by HR. It is idempotent: every
+ * then periodically (services/leaveScheduler.js), and on demand by HR. It is idempotent: every
  * movement has a unique key in the ledger (models/LeaveLedgerEntry.js), so running it again, or on
  * several servers at once, never credits twice; it only posts what is due and not yet posted.
  *
@@ -26,15 +26,11 @@ import LeaveType from '../models/LeaveType.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { addDaysToCalendarDate, calendarDateOfUtcInstant } from '../utils/calendarDates.js';
 import { daysToCentidays } from '../utils/leaveDays.js';
-import { logger } from '../utils/logger.js';
 import { dueAccrualCredits, isAccruingStatus, yearEndMovements } from './leaveAccrualRules.js';
 import { postCredit } from './leaveLedger.js';
 import { employeeToday, getLeaveSettings, leaveYearForDate } from './leaveSettings.js';
 import { accrualPolicyOf } from './leaveTypes.js';
 import { leaveYearRange } from './leaveYear.js';
-
-/** How often the job runs. Hourly keeps joiner credits within an hour of the joining date. */
-export const LEAVE_JOB_INTERVAL_MS = 60 * 60 * 1000;
 
 const YEAR_END_PAYROLL_REFERENCE_PREFIX = 'YEAR-END-';
 
@@ -238,30 +234,4 @@ export async function runLeaveAccruals({ asOfDate = null, now = new Date() } = {
     }
   }
   return summary;
-}
-
-let schedulerTimer = null;
-
-/** Runs the job now and then every LEAVE_JOB_INTERVAL_MS; failures are logged, never thrown. */
-export function startLeaveAccrualScheduler() {
-  if (schedulerTimer) return;
-  const runAndLog = async () => {
-    try {
-      const summary = await runLeaveAccruals();
-      if (summary.accrualsPosted + summary.yearEndMovementsPosted > 0)
-        logger.info('Leave job posted movements', summary);
-    } catch (jobError) {
-      logger.error('Leave job failed', {
-        error: { name: jobError.name, message: jobError.message, stack: jobError.stack },
-      });
-    }
-  };
-  runAndLog();
-  schedulerTimer = setInterval(runAndLog, LEAVE_JOB_INTERVAL_MS);
-  schedulerTimer.unref();
-}
-
-export function stopLeaveAccrualScheduler() {
-  clearInterval(schedulerTimer);
-  schedulerTimer = null;
 }
