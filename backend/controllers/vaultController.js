@@ -21,7 +21,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import mongoose from 'mongoose';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { VAULT_MESSAGES } from '../constants/messages.js';
+import { COMMON_MESSAGES, VAULT_MESSAGES } from '../constants/messages.js';
 import { VAULT_FIELD_LIMITS } from '../constants/validation.js';
 import DocumentVault, { VAULT_DOCUMENT_STATUSES, buildVaultObjectKey } from '../models/DocumentVault.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
@@ -120,7 +120,7 @@ export async function uploadDocument(req, res, next) {
         documentType,
         reason: 'employee_not_found',
       });
-      return sendError(req, res, HTTP_STATUS.NOT_FOUND, VAULT_MESSAGES.EMPLOYEE_NOT_FOUND);
+      return sendError(req, res, HTTP_STATUS.NOT_FOUND, COMMON_MESSAGES.EMPLOYEE_NOT_FOUND);
     }
 
     const ownEmployeeProfileId = await findOwnEmployeeProfileId(req.user.id);
@@ -243,7 +243,7 @@ export async function listEmployeeDocuments(req, res, next) {
     let { employeeId } = req.params;
     if (employeeId === 'me') {
       employeeId = await findOwnEmployeeProfileId(req.user.id);
-      if (!employeeId) return sendError(req, res, HTTP_STATUS.NOT_FOUND, VAULT_MESSAGES.EMPLOYEE_NOT_FOUND);
+      if (!employeeId) return sendError(req, res, HTTP_STATUS.NOT_FOUND, COMMON_MESSAGES.EMPLOYEE_NOT_FOUND);
     }
     if (!isValidObjectIdString(employeeId)) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, VAULT_MESSAGES.INVALID_EMPLOYEE_ID, [
@@ -252,7 +252,7 @@ export async function listEmployeeDocuments(req, res, next) {
     }
     const normalizedEmployeeId = employeeId.toLowerCase();
     if (!(await EmployeeProfile.exists({ _id: normalizedEmployeeId }))) {
-      return sendError(req, res, HTTP_STATUS.NOT_FOUND, VAULT_MESSAGES.EMPLOYEE_NOT_FOUND);
+      return sendError(req, res, HTTP_STATUS.NOT_FOUND, COMMON_MESSAGES.EMPLOYEE_NOT_FOUND);
     }
 
     const ownEmployeeProfileId = await findOwnEmployeeProfileId(req.user.id);

@@ -111,7 +111,7 @@ export async function deleteOffice(officeLocationId) {
  */
 export async function assignEmployeeOffice({ employeeId, officeLocationId }) {
   const profile = await EmployeeProfile.findById(employeeId);
-  if (!profile) throw new ServiceError(HTTP_STATUS.NOT_FOUND, 'EMPLOYEE_NOT_FOUND', OFFICE_MESSAGES.EMPLOYEE_NOT_FOUND);
+  if (!profile) throw new ServiceError(HTTP_STATUS.NOT_FOUND, 'EMPLOYEE_NOT_FOUND', COMMON_MESSAGES.EMPLOYEE_NOT_FOUND);
   if (officeLocationId && !(await OfficeLocation.exists({ _id: officeLocationId }))) throw officeNotFound();
   profile.organizationData.officeLocationId = officeLocationId;
   await profile.save();

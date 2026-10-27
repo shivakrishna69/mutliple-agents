@@ -159,6 +159,13 @@ export const payslipVerificationRateLimitByClientIp = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_VERIFICATIONS,
 });
 
+export const leaveAdminWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'leave_admin_writes_per_user',
+  ...RATE_LIMITS.LEAVE_ADMIN_WRITES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_LEAVE_ADMIN_UPDATES,
+});
+
 export const workplaceSetupWriteRateLimitByUser = createRateLimiter({
   limiterName: 'workplace_setup_writes_per_user',
   ...RATE_LIMITS.WORKPLACE_SETUP_WRITES_PER_USER,
