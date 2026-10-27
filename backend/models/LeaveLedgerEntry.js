@@ -22,6 +22,9 @@
  *   ACCRUAL      (employeeId, leaveTypeId, accrualPeriod)
  *   ENCASHMENT   (employeeId, leaveTypeId, payrollReference)
  *   year end     (employeeId, leaveTypeId, leaveYear, yearEndKind)
+ *   requests     idempotencyKey, "<leaveRequestId>:<movement>": each movement of a leave request
+ *                (its hold, debit, release, each credit) is posted once, so a retry or the repair
+ *                job can post it again safely.
  */
 
 import mongoose from 'mongoose';
@@ -65,6 +68,13 @@ export const CLOSING_YEAR_END_KINDS = Object.freeze([
   YEAR_END_KINDS.ENCASHMENT,
 ]);
 
+/** Entry types only a leave request posts. */
+const REQUEST_ENTRY_TYPES = Object.freeze([
+  LEDGER_ENTRY_TYPES.HOLD,
+  LEDGER_ENTRY_TYPES.CONFIRM_DEBIT,
+  LEDGER_ENTRY_TYPES.RELEASE_HOLD,
+]);
+
 const isWholeNumber = (value) => Number.isInteger(value);
 
 const leaveLedgerEntrySchema = new mongoose.Schema(
@@ -103,6 +113,7 @@ const leaveLedgerEntrySchema = new mongoose.Schema(
     createdByUserId: { type: ObjectId, ref: 'User', default: null, immutable: true },
     // The leave request a HOLD / CONFIRM_DEBIT / RELEASE_HOLD / CANCELLATION_CREDIT belongs to (Phase 3).
     leaveRequestId: { type: ObjectId, default: null, immutable: true },
+    idempotencyKey: { type: String, default: null, immutable: true, maxlength: 200 },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );
@@ -140,6 +151,11 @@ leaveLedgerEntrySchema.pre('validate', function enforceEntryShape() {
     default:
       break;
   }
+  const belongsToRequest =
+    REQUEST_ENTRY_TYPES.includes(entryType) || this.reasonCode === ADJUSTMENT_REASON_CODES.CANCELLATION_CREDIT;
+  if (belongsToRequest && (!this.leaveRequestId || !this.idempotencyKey)) {
+    fail('leaveRequestId', 'A leave request movement needs its request and idempotency key');
+  }
 });
 
 leaveLedgerEntrySchema.index(
@@ -165,6 +181,15 @@ leaveLedgerEntrySchema.index(
     partialFilterExpression: { yearEndKind: { $type: 'string' } },
     name: 'unique_year_end_movement',
   },
+);
+leaveLedgerEntrySchema.index(
+  { idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } }, name: 'unique_idempotency_key' },
+);
+// A request's movements.
+leaveLedgerEntrySchema.index(
+  { leaveRequestId: 1 },
+  { partialFilterExpression: { leaveRequestId: { $type: 'objectId' } } },
 );
 // History and balance rebuilds: one employee's entries for a leave year, oldest first.
 leaveLedgerEntrySchema.index({ employeeId: 1, leaveYear: 1, leaveTypeId: 1, createdAt: 1 });

@@ -4,10 +4,11 @@
  *
  *   Credits   postCredit: the ledger entry is written first (its unique key makes a second post of
  *             the same accrual or year-end movement impossible), then applied to the balance.
- *   Debits    postDebit: the amount is reserved on the balance first, in one conditional update that
- *             refuses to take the available days below the allowed minimum (so two requests at once
- *             cannot overdraw), then the ledger entry is written. If writing the entry fails, the
- *             reservation is reversed straight away.
+ *   Debits    postDebit (anything that lowers the available days: a debit, an encashment, a
+ *             request's hold or its confirmed debit): the change is reserved on the balance first,
+ *             in one conditional update that refuses to take the available days below the allowed
+ *             minimum (so two requests at once cannot overdraw), then the ledger entry is written.
+ *             If writing the entry fails, the reservation is reversed straight away.
  *   Repair    reconcileLeaveBalances applies entries a balance is missing, reverses reservations
  *             whose ledger entry was never written (the server stopped in between), and corrects
  *             totals that do not match the applied entries.
@@ -76,6 +77,7 @@ async function ensureBalanceExists(balanceKey) {
 
 /** The filter that finds the existing entry behind a duplicate-key error. */
 function uniqueKeyFilter(fields) {
+  if (fields.idempotencyKey) return { idempotencyKey: fields.idempotencyKey };
   const base = { employeeId: fields.employeeId, leaveTypeId: fields.leaveTypeId };
   if (fields.yearEndKind) return { ...base, leaveYear: fields.leaveYear, yearEndKind: fields.yearEndKind };
   if (fields.entryType === LEDGER_ENTRY_TYPES.ACCRUAL) {
@@ -109,28 +111,35 @@ export async function postCredit(fields) {
 }
 
 /**
- * Posts a debit (negative balanceDeltaCentidays) only if, afterwards, the available days
- * (balance - held) stay at or above `minimumAvailableCentidays` (0, or minus the type's negative
- * limit).
+ * Posts a movement that lowers the available days (balance - held) only if, afterwards, they stay
+ * at or above `minimumAvailableCentidays` (0, or minus the type's negative limit; pass
+ * -Infinity for a movement that must post regardless, such as one already approved).
  * @throws {InsufficientLeaveBalanceError | DuplicateLedgerEntryError}
  */
 export async function postDebit(fields, { minimumAvailableCentidays = 0 } = {}) {
+  // Already posted under this key: report it before reserving anything.
+  if (fields.idempotencyKey && (await LeaveLedgerEntry.exists({ idempotencyKey: fields.idempotencyKey }))) {
+    throw new DuplicateLedgerEntryError();
+  }
   const entryId = new mongoose.Types.ObjectId();
   const balanceKey = balanceKeyOf(fields);
-  const debitCentidays = -fields.balanceDeltaCentidays;
+  const heldDeltaCentidays = fields.heldDeltaCentidays ?? 0;
+  const debitCentidays = heldDeltaCentidays - fields.balanceDeltaCentidays;
   await ensureBalanceExists(balanceKey);
+  const coversDebit = Number.isFinite(minimumAvailableCentidays)
+    ? {
+        $expr: {
+          $gte: [
+            { $subtract: [{ $subtract: ['$balanceCentidays', '$heldCentidays'] }, debitCentidays] },
+            minimumAvailableCentidays,
+          ],
+        },
+      }
+    : {};
   const reservation = await LeaveBalance.updateOne(
+    { ...balanceKey, ...coversDebit },
     {
-      ...balanceKey,
-      $expr: {
-        $gte: [
-          { $subtract: [{ $subtract: ['$balanceCentidays', '$heldCentidays'] }, debitCentidays] },
-          minimumAvailableCentidays,
-        ],
-      },
-    },
-    {
-      $inc: { balanceCentidays: fields.balanceDeltaCentidays },
+      $inc: { balanceCentidays: fields.balanceDeltaCentidays, heldCentidays: heldDeltaCentidays },
       $push: { appliedEntries: appliedEntryOf(entryId, fields) },
     },
   );
@@ -144,7 +153,10 @@ export async function postDebit(fields, { minimumAvailableCentidays = 0 } = {}) 
   } catch (createError) {
     await LeaveBalance.updateOne(
       { ...balanceKey, 'appliedEntries.entryId': entryId },
-      { $inc: { balanceCentidays: -fields.balanceDeltaCentidays }, $pull: { appliedEntries: { entryId } } },
+      {
+        $inc: { balanceCentidays: -fields.balanceDeltaCentidays, heldCentidays: -heldDeltaCentidays },
+        $pull: { appliedEntries: { entryId } },
+      },
     );
     if (isDuplicateKeyError(createError)) throw new DuplicateLedgerEntryError();
     throw createError;
