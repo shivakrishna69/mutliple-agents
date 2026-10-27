@@ -96,8 +96,8 @@ describe('calculateLeaveDays', () => {
     );
   });
 
-  it('treats a half day next to a weekend as taking that day for the sandwich rule', () => {
-    // Friday afternoon + weekend + Monday: 0.5 + 2 + 1.
+  it('does not sandwich a weekend next to a half day, which counts as half a day worked', () => {
+    // Friday afternoon + Monday: 0.5 + 1, the weekend stays free.
     assert.equal(
       totalFor({
         startDate: '2026-10-09',
@@ -105,7 +105,30 @@ describe('calculateLeaveDays', () => {
         startDayPortion: DAY_PORTIONS.SECOND_HALF,
         sandwich: true,
       }),
-      3.5,
+      1.5,
+    );
+    // Friday + Monday morning: 1 + 0.5.
+    assert.equal(
+      totalFor({
+        startDate: '2026-10-09',
+        endDate: '2026-10-12',
+        endDayPortion: DAY_PORTIONS.FIRST_HALF,
+        sandwich: true,
+      }),
+      1.5,
+    );
+  });
+
+  it('still sandwiches a weekend between full days when the range starts or ends with a half day', () => {
+    // Thursday afternoon, Friday, weekend, Monday: 0.5 + 1 + 2 + 1 (Friday and Monday are full days).
+    assert.equal(
+      totalFor({
+        startDate: '2026-10-08',
+        endDate: '2026-10-12',
+        startDayPortion: DAY_PORTIONS.SECOND_HALF,
+        sandwich: true,
+      }),
+      4.5,
     );
   });
 

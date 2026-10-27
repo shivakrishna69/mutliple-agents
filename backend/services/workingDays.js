@@ -17,9 +17,10 @@
  *   A one-day range may be the first half (endDayPortion FIRST_HALF) or the second half
  *   (startDayPortion SECOND_HALF), not both.
  *   Weekly offs and holidays cost nothing, unless `sandwich` is on: then a non-working day costs a
- *   full day when the leave takes a working day both before and after it within the range (a
- *   half day counts as taking that day). Non-working days at the start or end of the range never
- *   cost anything, so a Friday-only leave never charges the weekend after it.
+ *   full day when the nearest working days on both sides of it, within the range, are FULL leave
+ *   days. A half day is half a day worked, so it never triggers the rule: Friday afternoon plus
+ *   Monday costs 1.5 days and the weekend stays free. Non-working days at the start or end of the
+ *   range never cost anything, so a Friday-only leave never charges the weekend after it.
  */
 
 import { WORK_CALENDAR_LIMITS } from '../constants/validation.js';
@@ -114,22 +115,34 @@ export function calculateLeaveDays(
 ) {
   assertPricableRange({ startDate, endDate, startDayPortion, endDayPortion });
   const classifiedDays = classifyCalendarRange(startDate, endDate, calendar);
-  const workingDayIndexes = classifiedDays
-    .map((day, dayIndex) => (day.kind === DAY_KINDS.WORKING ? dayIndex : null))
-    .filter((dayIndex) => dayIndex !== null);
-  const firstWorkingIndex = workingDayIndexes[0] ?? Infinity;
-  const lastWorkingIndex = workingDayIndexes.at(-1) ?? -Infinity;
   const lastIndex = classifiedDays.length - 1;
 
-  const days = classifiedDays.map((day, dayIndex) => {
-    if (day.kind !== DAY_KINDS.WORKING) {
-      const isSandwiched = sandwich && dayIndex > firstWorkingIndex && dayIndex < lastWorkingIndex;
-      return { ...day, chargedDays: isSandwiched ? FULL_DAY : 0 };
-    }
+  // Working days first: each costs a full day, less half a day at a half-day edge.
+  const workingDayCharges = classifiedDays.map((day, dayIndex) => {
+    if (day.kind !== DAY_KINDS.WORKING) return null;
     let chargedDays = FULL_DAY;
     if (dayIndex === 0 && startDayPortion === DAY_PORTIONS.SECOND_HALF) chargedDays -= HALF_DAY;
     if (dayIndex === lastIndex && endDayPortion === DAY_PORTIONS.FIRST_HALF) chargedDays -= HALF_DAY;
-    return { ...day, chargedDays };
+    return chargedDays;
+  });
+
+  // A non-working day is sandwiched only between two FULL leave days (the nearest working days on
+  // either side within the range); the edges of the range have no neighbour on one side.
+  const isFullLeaveDay = (dayIndex) => dayIndex !== -1 && workingDayCharges[dayIndex] === FULL_DAY;
+  const nearestWorkingDayIndex = (fromIndex, step) => {
+    for (let dayIndex = fromIndex + step; dayIndex >= 0 && dayIndex <= lastIndex; dayIndex += step) {
+      if (workingDayCharges[dayIndex] !== null) return dayIndex;
+    }
+    return -1;
+  };
+
+  const days = classifiedDays.map((day, dayIndex) => {
+    if (workingDayCharges[dayIndex] !== null) return { ...day, chargedDays: workingDayCharges[dayIndex] };
+    const isSandwiched =
+      sandwich &&
+      isFullLeaveDay(nearestWorkingDayIndex(dayIndex, -1)) &&
+      isFullLeaveDay(nearestWorkingDayIndex(dayIndex, 1));
+    return { ...day, chargedDays: isSandwiched ? FULL_DAY : 0 };
   });
 
   return { totalDays: days.reduce((total, day) => total + day.chargedDays, 0), days };
