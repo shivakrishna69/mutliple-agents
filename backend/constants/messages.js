@@ -41,6 +41,7 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
   TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
+  TOO_MANY_WORK_CALENDAR_UPDATES: 'Too many calendar changes in a short time. Please wait a moment and try again',
 });
 
 export const SUPPORT_MESSAGES = Object.freeze({
@@ -203,6 +204,25 @@ export const OKR_MESSAGES = Object.freeze({
   MILESTONE_UPDATED: 'Milestone updated',
   INPUT_INVALID: 'The OKR details are invalid',
   OKRS_EMPLOYEES_ONLY: 'OKRs are available to employees, HR and administrators',
+});
+
+export const WORK_CALENDAR_MESSAGES = Object.freeze({
+  OFFICES_RETRIEVED: 'Office working days retrieved',
+  WEEKLY_OFFS_UPDATED: 'Weekly offs updated',
+  HOLIDAYS_RETRIEVED: 'Holidays retrieved',
+  HOLIDAY_CREATED: 'Holiday added',
+  HOLIDAY_UPDATED: 'Holiday updated',
+  HOLIDAY_DELETED: 'Holiday removed',
+  DAYS_RETRIEVED: 'Calendar retrieved',
+  INPUT_INVALID: 'The calendar details are invalid',
+  RESTRICTED: 'Only HR and administrators can change the work calendar',
+  OFFICE_NOT_FOUND: 'Office not found',
+  OFFICE_REQUIRED: 'Choose the office whose calendar you want to see',
+  OFFICE_NOT_ASSIGNED: 'You have no base office yet, so there is no work calendar to show. Please ask HR',
+  HOLIDAY_NOT_FOUND: 'Holiday not found',
+  HOLIDAY_CLASHES: 'Another holiday already covers this date for one of these offices',
+  STALE_VERSION: 'This was changed by someone else. Reload and try again',
+  EMPLOYEES_ONLY: 'The work calendar is available to employees, HR and administrators',
 });
 
 export const PEOPLE_MESSAGES = Object.freeze({

@@ -42,6 +42,7 @@ import peopleRoutes from './routes/peopleRoutes.js';
 import invitationRoutes from './routes/invitationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import okrRoutes from './routes/okrRoutes.js';
+import workCalendarRoutes from './routes/workCalendarRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
@@ -133,6 +134,8 @@ export function createApp(config) {
   app.use('/api/analytics', analyticsRoutes);
   // OKRs: company goals, team objectives, key results, milestones
   app.use('/api/okrs', okrRoutes);
+  // Weekly offs, holidays and day classification per office (HR edits, employees read).
+  app.use('/api/work-calendar', workCalendarRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
