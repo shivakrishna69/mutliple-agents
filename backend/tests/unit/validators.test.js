@@ -7,6 +7,15 @@ import {
   validateLoginInput,
   validateRegistrationInput,
 } from '../../validators/authValidators.js';
+import {
+  validateApprovalQueueQuery,
+  validateChangeDecision,
+  validateChangeRequest,
+  validateDecision,
+  validateLeaveRequestInput,
+  validatePayrollExportQuery,
+  validateRequestListQuery,
+} from '../../validators/leaveRequestValidators.js';
 import { validateInvitationInput } from '../../validators/peopleValidators.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../../models/EmployeeProfile.js';
 
@@ -112,5 +121,96 @@ describe('validateInvitationInput', () => {
   it('rejects a malformed reporting manager id', () => {
     const result = validateInvitationInput({ ...validInvitation, reportingManagerId: 'not-an-id' });
     assert.deepEqual(fieldsOf(result), ['reportingManagerId']);
+  });
+});
+
+describe('leave request validators', () => {
+  const leaveTypeId = '0123456789abcdef01234567';
+
+  it('accepts a request with full days by default and trims the reason', () => {
+    const result = validateLeaveRequestInput({
+      leaveTypeId,
+      startDate: '2026-11-02',
+      endDate: '2026-11-03',
+      reason: '  Family visit  ',
+    });
+    assert.equal(result.isValid, true);
+    assert.deepEqual(result.sanitizedInput, {
+      leaveTypeId,
+      startDate: '2026-11-02',
+      startDayPortion: 'full',
+      endDate: '2026-11-03',
+      endDayPortion: 'full',
+      reason: 'Family visit',
+      attachmentDocumentId: null,
+    });
+  });
+
+  it('rejects impossible dates, a reversed range, wrong half days and a missing reason', () => {
+    const result = validateLeaveRequestInput({
+      leaveTypeId: 'nope',
+      startDate: '2026-02-30',
+      endDate: '2026-11-03',
+      startDayPortion: 'first_half',
+      endDayPortion: 'second_half',
+    });
+    assert.deepEqual(fieldsOf(result).sort(), [
+      'endDayPortion',
+      'leaveTypeId',
+      'reason',
+      'startDate',
+      'startDayPortion',
+    ]);
+    assert.deepEqual(
+      fieldsOf(
+        validateLeaveRequestInput({ leaveTypeId, startDate: '2026-11-03', endDate: '2026-11-02', reason: 'abc' }),
+      ),
+      ['endDate'],
+    );
+    assert.equal(
+      validateLeaveRequestInput({ leaveTypeId, startDate: '2026-11-03', endDate: '2026-11-03' }, { isPreview: true })
+        .isValid,
+      true,
+    );
+    assert.equal(validateLeaveRequestInput([]).isValid, false);
+  });
+
+  it('needs a note to reject, and to refuse a change', () => {
+    assert.equal(validateDecision({}, { noteRequired: false }).isValid, true);
+    assert.equal(validateDecision(undefined, { noteRequired: false }).isValid, true);
+    assert.deepEqual(fieldsOf(validateDecision({ note: ' ' }, { noteRequired: true })), ['note']);
+    assert.deepEqual(fieldsOf(validateChangeDecision({ approve: false })), ['note']);
+    assert.deepEqual(fieldsOf(validateChangeDecision({ approve: 'yes' })), ['approve']);
+    assert.deepEqual(validateChangeDecision({ approve: true }).sanitizedInput, { isApproved: true, note: null });
+  });
+
+  it('needs the new last day to shorten, but not to cancel', () => {
+    assert.deepEqual(fieldsOf(validateChangeRequest({ kind: 'SHORTEN', reason: 'Back early' })), ['newEndDate']);
+    assert.deepEqual(
+      validateChangeRequest({ kind: 'CANCEL', reason: 'Never went', newEndDate: '2026-11-03' }).sanitizedInput,
+      {
+        kind: 'CANCEL',
+        newEndDate: null,
+        newEndDayPortion: null,
+        reason: 'Never went',
+      },
+    );
+    assert.deepEqual(fieldsOf(validateChangeRequest({ reason: 'Never went' })), ['kind']);
+    assert.deepEqual(fieldsOf(validateChangeRequest({ kind: 'EXTEND', reason: 'More' })), ['kind']);
+  });
+
+  it('checks list, queue and payroll export queries', () => {
+    assert.deepEqual(validateRequestListQuery({}).sanitizedInput, { leaveYear: null, status: null });
+    assert.deepEqual(fieldsOf(validateRequestListQuery({ status: 'DONE', leaveYear: '1999' })).sort(), [
+      'leaveYear',
+      'status',
+    ]);
+    assert.equal(validateApprovalQueueQuery({}).sanitizedInput.queue, 'requests');
+    assert.deepEqual(fieldsOf(validateApprovalQueueQuery({ queue: 'all' })), ['queue']);
+    assert.equal(validatePayrollExportQuery({ month: '2026-11' }).isValid, true);
+    assert.deepEqual(fieldsOf(validatePayrollExportQuery({ month: '2026-13', changedSince: 'yesterday' })).sort(), [
+      'changedSince',
+      'month',
+    ]);
   });
 });
