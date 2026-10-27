@@ -35,6 +35,8 @@ validators/      pure input validators
 middleware/      auth (session + CSRF), roles, rate limits, uploads, webhook/internal-key checks
 utils/           responses, audit log, logger, Socket.IO manager, payroll calculator, S3 client
 constants/       messages, limits, rate-limit budgets, HTTP statuses
+migrations/      idempotent data migrations, run in order at every startup
+data/            data shipped with the server (the leave-type template seeded on first start)
 scripts/         operational scripts
 ```
 
@@ -55,4 +57,20 @@ scripts/         operational scripts
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
 | `/api/employees` | employee records (base office assignment) | HR, admin |
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
+| `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job | HR, admin manage / employees read their own |
 | `/api/internal` | calls from the AI service | internal API key |
+
+## Leave balances
+
+Every leave policy is data HR edits (`models/LeaveType.js`, `models/LeaveSettings.js`); a company
+with no leave types gets the India standard template (`data/leave-templates/`) on first start.
+
+- The ledger (`models/LeaveLedgerEntry.js`) is the source of truth and is never edited; balances
+  (`models/LeaveBalance.js`) are its running totals. Amounts are whole hundredths of a day.
+- Unique indexes make every accrual, year-end movement and payroll reference post at most once, so
+  the leave job is safe to rerun and to run on several instances.
+- Debits are reserved with one conditional update, so concurrent requests can never overdraw;
+  `POST /api/leave/jobs/reconcile` repairs a balance if the server stopped half way through a write.
+- The leave job (`services/leaveAccrualJob.js`) runs at startup and hourly: monthly or yearly
+  accruals in each employee's office time zone, then each leave year's carry forward, lapse and
+  encashment once the next year has started. HR can run it on demand.
