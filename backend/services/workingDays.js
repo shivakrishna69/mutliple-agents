@@ -23,6 +23,7 @@
  *   range never cost anything, so a Friday-only leave never charges the weekend after it.
  */
 
+import { DAY_KINDS, DAY_PORTIONS } from '../constants/calendarDays.js';
 import { WORK_CALENDAR_LIMITS } from '../constants/validation.js';
 import {
   daysBetweenCalendarDates,
@@ -31,10 +32,6 @@ import {
   weekdayOccurrenceInMonth,
   weekdayOfCalendarDate,
 } from '../utils/calendarDates.js';
-
-export const DAY_KINDS = Object.freeze({ WORKING: 'working', WEEKLY_OFF: 'weekly_off', HOLIDAY: 'holiday' });
-
-export const DAY_PORTIONS = Object.freeze({ FULL: 'full', FIRST_HALF: 'first_half', SECOND_HALF: 'second_half' });
 
 const FULL_DAY = 1;
 const HALF_DAY = 0.5;

@@ -7,15 +7,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { DAY_KINDS, DAY_PORTIONS } from '../../constants/calendarDays.js';
 import { WEEKDAYS, defaultWeeklyOffRules } from '../../models/OfficeLocation.js';
-import {
-  DAY_KINDS,
-  DAY_PORTIONS,
-  LeaveRangeError,
-  calculateLeaveDays,
-  classifyCalendarDay,
-  isWeeklyOff,
-} from '../../services/workingDays.js';
+import { LeaveRangeError, calculateLeaveDays, classifyCalendarDay, isWeeklyOff } from '../../services/workingDays.js';
 
 const SATURDAY_AND_SUNDAY_OFFICE = {
   weeklyOffRules: defaultWeeklyOffRules(),
