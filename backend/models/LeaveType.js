@@ -13,8 +13,10 @@
  *                            happens to the rest: LAPSE or ENCASH.
  *   encashment               whether HR may encash it, and the days that must remain afterwards.
  *   usage                    rules applied when employees apply (Phase 3): sandwich rule, half
- *                            days, longest single leave, notice, who may use it, minimum service,
- *                            when an attachment is needed, and whether the balance may go negative.
+ *                            days, longest single leave, notice, how many days back a request may
+ *                            start (applying after the fact, e.g. sick leave), who may use it,
+ *                            minimum service, when an attachment is needed, and whether the
+ *                            balance may go negative.
  *
  * Day values are in days, in half-day steps; services convert them to centidays.
  */
@@ -102,6 +104,7 @@ const leaveTypeSchema = new mongoose.Schema(
       allowHalfDay: { type: Boolean, default: true },
       maxConsecutiveDays: policyDaysField({ allowNull: true, defaultValue: null }),
       minNoticeDays: policyDaysField(),
+      maxBackdatedDays: policyDaysField(),
       eligibleEmploymentStatuses: {
         type: [{ type: String, enum: Object.values(EMPLOYMENT_STATUSES) }],
         default: () => [...DEFAULT_ELIGIBLE_STATUSES],

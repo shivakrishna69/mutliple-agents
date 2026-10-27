@@ -123,6 +123,10 @@ describe('leave policies and balances', { skip: skipReason ?? false }, () => {
     assert.equal(byCode.LOP.isPaid, false);
     assert.equal(byCode.LOP.tracksBalance, false);
     assert.equal(byCode.LOP.usage.sandwichRule, true);
+    assert.deepEqual(
+      ['CL', 'SL', 'EL', 'LOP'].map((code) => byCode[code].usage.maxBackdatedDays),
+      [3, 7, 0, 30],
+    );
   });
 
   it('keeps leave to employees, HR and admins, and management to HR and admins', async () => {

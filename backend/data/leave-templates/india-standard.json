@@ -5,35 +5,73 @@
       "code": "CL",
       "name": "Casual Leave",
       "isPaid": true,
-      "accrual": { "method": "MONTHLY", "annualQuotaDays": 12, "timing": "START_OF_MONTH" },
-      "carryForward": { "maxDays": 0, "yearEndExcessAction": "LAPSE" },
-      "usage": { "sandwichRule": false }
+      "accrual": {
+        "method": "MONTHLY",
+        "annualQuotaDays": 12,
+        "timing": "START_OF_MONTH"
+      },
+      "carryForward": {
+        "maxDays": 0,
+        "yearEndExcessAction": "LAPSE"
+      },
+      "usage": {
+        "sandwichRule": false,
+        "maxBackdatedDays": 3
+      }
     },
     {
       "code": "SL",
       "name": "Sick Leave",
       "isPaid": true,
-      "accrual": { "method": "MONTHLY", "annualQuotaDays": 12, "timing": "START_OF_MONTH" },
-      "carryForward": { "maxDays": 0, "yearEndExcessAction": "LAPSE" },
-      "usage": { "sandwichRule": false }
+      "accrual": {
+        "method": "MONTHLY",
+        "annualQuotaDays": 12,
+        "timing": "START_OF_MONTH"
+      },
+      "carryForward": {
+        "maxDays": 0,
+        "yearEndExcessAction": "LAPSE"
+      },
+      "usage": {
+        "sandwichRule": false,
+        "maxBackdatedDays": 7
+      }
     },
     {
       "code": "EL",
       "name": "Earned Leave",
       "isPaid": true,
-      "accrual": { "method": "MONTHLY", "annualQuotaDays": 15, "timing": "END_OF_MONTH" },
+      "accrual": {
+        "method": "MONTHLY",
+        "annualQuotaDays": 15,
+        "timing": "END_OF_MONTH"
+      },
       "accrueDuringNotice": false,
-      "carryForward": { "maxDays": 30, "yearEndExcessAction": "ENCASH" },
-      "encashment": { "isEncashable": true, "minBalanceRetainedDays": 15 },
-      "usage": { "sandwichRule": true }
+      "carryForward": {
+        "maxDays": 30,
+        "yearEndExcessAction": "ENCASH"
+      },
+      "encashment": {
+        "isEncashable": true,
+        "minBalanceRetainedDays": 15
+      },
+      "usage": {
+        "sandwichRule": true,
+        "maxBackdatedDays": 0
+      }
     },
     {
       "code": "LOP",
       "name": "Loss of Pay",
       "isPaid": false,
       "tracksBalance": false,
-      "accrual": { "method": "NONE" },
-      "usage": { "sandwichRule": true }
+      "accrual": {
+        "method": "NONE"
+      },
+      "usage": {
+        "sandwichRule": true,
+        "maxBackdatedDays": 30
+      }
     }
   ]
 }
