@@ -97,34 +97,37 @@ async function waitUntilHealthy(baseUrl, serverProcess, readOutput) {
 
 /**
  * Starts server.js on a fresh database.
- * @param {{ port?: number, appOrigin?: string }} [options]  A fixed port and the browser origin to allow
- *   (the frontend's browser tests need both to be known in advance); by default a free port and
- *   TEST_APP_ORIGIN.
+ * @param {{ port?: number, appOrigin?: string, seedBeforeStart?: (database: mongoose.Connection) => Promise<void> }} [options]
+ *   A fixed port and the browser origin to allow (the frontend's browser tests need both to be known
+ *   in advance); by default a free port and TEST_APP_ORIGIN. `seedBeforeStart` writes data before the
+ *   server starts, so its startup migrations see that data.
  * @returns {Promise<{ baseUrl: string, database: mongoose.Connection, createClient: () => TestClient, stop: () => Promise<void> }>}
  */
-export async function startTestServer({ port: requestedPort, appOrigin = TEST_APP_ORIGIN } = {}) {
+export async function startTestServer({ port: requestedPort, appOrigin = TEST_APP_ORIGIN, seedBeforeStart } = {}) {
   const port = requestedPort ?? (await findFreePort());
   const databaseName = `nova_test_${process.pid}_${randomBytes(4).toString('hex')}`;
   const mongoUri = `${MONGO_BASE_URL}/${databaseName}`;
   const workingDirectory = await mkdtemp(path.join(tmpdir(), 'nova-backend-test-'));
-
-  const serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
-    cwd: workingDirectory,
-    env: buildServerEnvironment({ port, mongoUri, appOrigin }),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let capturedOutput = '';
-  const captureOutput = (chunk) => {
-    capturedOutput = (capturedOutput + chunk.toString()).slice(-20_000);
-  };
-  serverProcess.stdout.on('data', captureOutput);
-  serverProcess.stderr.on('data', captureOutput);
-
   const baseUrl = `http://127.0.0.1:${port}`;
   const database = mongoose.createConnection(mongoUri, { serverSelectionTimeoutMS: 5_000 });
+  let serverProcess = null;
+  let capturedOutput = '';
+
+  function spawnServer() {
+    serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
+      cwd: workingDirectory,
+      env: buildServerEnvironment({ port, mongoUri, appOrigin }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const captureOutput = (chunk) => {
+      capturedOutput = (capturedOutput + chunk.toString()).slice(-20_000);
+    };
+    serverProcess.stdout.on('data', captureOutput);
+    serverProcess.stderr.on('data', captureOutput);
+  }
 
   async function stop() {
-    if (serverProcess.exitCode === null) {
+    if (serverProcess && serverProcess.exitCode === null) {
       const exited = new Promise((resolve) => serverProcess.once('exit', resolve));
       serverProcess.kill();
       await exited;
@@ -136,6 +139,8 @@ export async function startTestServer({ port: requestedPort, appOrigin = TEST_AP
 
   try {
     await database.asPromise();
+    if (seedBeforeStart) await seedBeforeStart(database);
+    spawnServer();
     await waitUntilHealthy(baseUrl, serverProcess, () => capturedOutput);
   } catch (startupError) {
     await stop();

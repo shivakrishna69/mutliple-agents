@@ -25,11 +25,74 @@
  *   workday.lateGraceMinutes      arriving up to this many minutes after the start is still Normal
  *   workday.halfDayAfterMinutes   arriving more than this many minutes after the start is Half_Day;
  *                                 between the grace period and this, the punch is Late
+ *   workday.weeklyOffRules        the office's days off each week, set by HR. Each rule names a
+ *                                 weekday and, optionally, which of its occurrences in the month are
+ *                                 off: { weekday: SATURDAY, occurrencesInMonth: [2, 4] } is "2nd and
+ *                                 4th Saturday"; an empty list means every week. Holidays are kept
+ *                                 separately (models/Holiday.js); services/workCalendar.js combines both.
  */
 
 import mongoose from 'mongoose';
-import { ATTENDANCE_FIELD_LIMITS, DEPARTMENT_CODE_PATTERN, LOCAL_TIME_PATTERN } from '../constants/validation.js';
+import {
+  ATTENDANCE_FIELD_LIMITS,
+  DEPARTMENT_CODE_PATTERN,
+  LOCAL_TIME_PATTERN,
+  WORK_CALENDAR_LIMITS,
+} from '../constants/validation.js';
 import { isNullIsland, isValidLatitude, isValidLongitude } from '../utils/geoDistance.js';
+
+/** Days of the week, numbered as JavaScript dates do (utils/calendarDates.js weekdayOfCalendarDate). */
+export const WEEKDAYS = Object.freeze({
+  SUNDAY: 0,
+  MONDAY: 1,
+  TUESDAY: 2,
+  WEDNESDAY: 3,
+  THURSDAY: 4,
+  FRIDAY: 5,
+  SATURDAY: 6,
+});
+
+/**
+ * Weekly offs for a new office, and for existing offices when weekly offs were introduced
+ * (migrations/). A starting point only: HR sets each office's own rules.
+ */
+export const DEFAULT_WEEKLY_OFF_RULES = Object.freeze([
+  Object.freeze({ weekday: WEEKDAYS.SATURDAY, occurrencesInMonth: Object.freeze([]) }),
+  Object.freeze({ weekday: WEEKDAYS.SUNDAY, occurrencesInMonth: Object.freeze([]) }),
+]);
+
+/** A fresh, mutable copy of the default rules, for a document field. */
+export function defaultWeeklyOffRules() {
+  return DEFAULT_WEEKLY_OFF_RULES.map((rule) => ({ weekday: rule.weekday, occurrencesInMonth: [] }));
+}
+
+const isWholeNumberBetween = (minimum, maximum) => (value) =>
+  Number.isInteger(value) && value >= minimum && value <= maximum;
+
+const weeklyOffRuleSchema = new mongoose.Schema(
+  {
+    weekday: {
+      type: Number,
+      required: [true, 'Weekly off weekday is required'],
+      validate: {
+        validator: isWholeNumberBetween(WEEKDAYS.SUNDAY, WEEKDAYS.SATURDAY),
+        message: 'Weekly off weekday must be 0 (Sunday) to 6 (Saturday)',
+      },
+    },
+    // Which occurrences of the weekday in the month are off (1 = first ... 5 = fifth); empty = all.
+    occurrencesInMonth: {
+      type: [Number],
+      default: [],
+      validate: {
+        validator: (occurrences) =>
+          occurrences.every(isWholeNumberBetween(1, WORK_CALENDAR_LIMITS.MAX_WEEKDAY_OCCURRENCE)) &&
+          new Set(occurrences).size === occurrences.length,
+        message: `Weekly off occurrences must be distinct numbers from 1 to ${WORK_CALENDAR_LIMITS.MAX_WEEKDAY_OCCURRENCE}`,
+      },
+    },
+  },
+  { _id: false },
+);
 
 /** True when `timeZone` is an IANA zone this runtime knows ("Asia/Kolkata", "UTC"). */
 export function isValidIanaTimeZone(timeZone) {
@@ -108,10 +171,20 @@ const officeLocationSchema = new mongoose.Schema(
         ],
         validate: { validator: Number.isInteger, message: 'Half-day threshold must be a whole number of minutes' },
       },
+      weeklyOffRules: {
+        type: [weeklyOffRuleSchema],
+        default: defaultWeeklyOffRules,
+        validate: {
+          validator: (rules) => new Set(rules.map((rule) => rule.weekday)).size === rules.length,
+          message: 'Each weekday may appear in only one weekly off rule',
+        },
+      },
     },
   },
   {
     timestamps: true,
+    // HR edits weekly offs; a stale save is rejected rather than overwriting another edit.
+    optimisticConcurrency: true,
     toJSON: {
       transform(doc, ret) {
         delete ret.__v;

@@ -88,15 +88,6 @@ export function minutesToLocalTime(minutesSinceMidnight) {
   return `${String(Math.floor(minutesSinceMidnight / 60)).padStart(2, '0')}:${String(minutesSinceMidnight % 60).padStart(2, '0')}`;
 }
 
-/** Whole days from one "YYYY-MM-DD" to a later one (negative when `laterDate` is earlier). */
-export function daysBetweenCalendarDates(earlierDate, laterDate) {
-  const toUtcMs = (calendarDate) => {
-    const [year, month, day] = calendarDate.split('-').map(Number);
-    return Date.UTC(year, month - 1, day);
-  };
-  return Math.round((toUtcMs(laterDate) - toUtcMs(earlierDate)) / 86_400_000);
-}
-
 /** The zone's UTC offset at `instant`, in milliseconds (positive east of Greenwich). */
 function utcOffsetMs(instant, timeZone) {
   const dateTimeParts = new Intl.DateTimeFormat('en-US', {

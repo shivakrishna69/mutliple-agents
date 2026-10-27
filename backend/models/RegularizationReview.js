@@ -29,7 +29,7 @@
 
 import mongoose from 'mongoose';
 import { LOCAL_TIME_PATTERN } from '../constants/validation.js';
-import { isRealCalendarDate } from './Attendance.js';
+import { isRealCalendarDate } from '../utils/calendarDates.js';
 
 const { ObjectId } = mongoose.Schema.Types;
 

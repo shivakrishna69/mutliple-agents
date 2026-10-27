@@ -52,4 +52,7 @@ scripts/         operational scripts
 | `/api/vault` | employee documents | owner / HR / admin |
 | `/api/org` | org chart and reporting lines | staff |
 | `/api/people`, `/api/invitations` | onboarding by email invitation | HR, admin / public token |
+| `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
+| `/api/employees` | employee records (base office assignment) | HR, admin |
+| `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
 | `/api/internal` | calls from the AI service | internal API key |

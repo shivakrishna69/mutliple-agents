@@ -9,8 +9,8 @@ import { EMAIL_PATTERN } from '../constants/validation.js';
 import { INVITABLE_ROLES, INVITATION_LIMITS } from '../models/EmployeeInvitation.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
 import { isValidObjectIdString } from './conversationValidators.js';
+import { isRealCalendarDate } from '../utils/calendarDates.js';
 
-const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_JOINING_DATE_DISTANCE_DAYS = 366;
 const INVITABLE_EMPLOYMENT_STATUSES = [EMPLOYMENT_STATUSES.PROBATION, EMPLOYMENT_STATUSES.ACTIVE];
 
@@ -20,9 +20,8 @@ function readTrimmedString(rawValue) {
 
 /** "YYYY-MM-DD" that is a real date within a year of today, as a UTC Date; otherwise null. */
 function parseJoiningDate(rawValue) {
-  if (typeof rawValue !== 'string' || !CALENDAR_DATE_PATTERN.test(rawValue)) return null;
+  if (!isRealCalendarDate(rawValue)) return null;
   const parsedDate = new Date(`${rawValue}T00:00:00.000Z`);
-  if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== rawValue) return null;
   const distanceDays = Math.abs(parsedDate.getTime() - Date.now()) / 86_400_000;
   return distanceDays <= MAX_JOINING_DATE_DISTANCE_DAYS ? parsedDate : null;
 }

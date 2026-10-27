@@ -36,6 +36,8 @@ export const RATE_LIMITS = Object.freeze({
   PAYSLIP_VERIFICATIONS_PER_CLIENT_IP: Object.freeze({ windowMs: 60 * 1000, maxRequests: 20 }),
   // OKR writes: progress sliders can fire often (clients should debounce); this stops runaway loops.
   OKR_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 120 }),
+  // Workplace setup (offices, weekly offs, holidays): plenty for entering a year of holidays at once.
+  WORKPLACE_SETUP_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Invitations send email: generous for onboarding a batch, low enough to stop mail abuse.
   INVITATION_SENDS_PER_USER: Object.freeze({ windowMs: 10 * 60 * 1000, maxRequests: 60 }),
   // Public invite links: enough to open a link and set a password a few times, too few to scan tokens.

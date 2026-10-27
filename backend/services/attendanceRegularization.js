@@ -20,20 +20,12 @@
  * (services/attendancePolicy.js classifyArrival), the same rule a device punch uses.
  */
 
-import Attendance, {
-  ATTENDANCE_ENTRY_SOURCES,
-  REGULARIZATION_METHODS,
-  isRealCalendarDate,
-} from '../models/Attendance.js';
+import Attendance, { ATTENDANCE_ENTRY_SOURCES, REGULARIZATION_METHODS } from '../models/Attendance.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { ATTENDANCE_FIELD_LIMITS } from '../constants/validation.js';
-import {
-  classifyArrival,
-  daysBetweenCalendarDates,
-  localTimeToMinutes,
-  readOfficeLocalClock,
-} from './attendancePolicy.js';
+import { classifyArrival, localTimeToMinutes, readOfficeLocalClock } from './attendancePolicy.js';
+import { daysBetweenCalendarDates, isRealCalendarDate } from '../utils/calendarDates.js';
 
 const DUPLICATE_KEY_ERROR_CODE = 11000;
 

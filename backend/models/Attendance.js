@@ -58,7 +58,8 @@
  */
 
 import mongoose from 'mongoose';
-import { ATTENDANCE_FIELD_LIMITS, CALENDAR_DATE_PATTERN, MAC_ADDRESS_PATTERN } from '../constants/validation.js';
+import { ATTENDANCE_FIELD_LIMITS, MAC_ADDRESS_PATTERN } from '../constants/validation.js';
+import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { isNullIsland, isValidLatitude, isValidLongitude } from '../utils/geoDistance.js';
 import { isValidIanaTimeZone } from './OfficeLocation.js';
 
@@ -83,14 +84,6 @@ export const REGULARIZATION_METHODS = Object.freeze({
   AUTOMATIC_EVIDENCE: 'automatic_evidence',
   MANAGER_APPROVED: 'manager_approved',
 });
-
-/** True when "YYYY-MM-DD" names a real calendar day (rejects 2026-02-30). */
-export function isRealCalendarDate(calendarDate) {
-  if (typeof calendarDate !== 'string' || !CALENDAR_DATE_PATTERN.test(calendarDate)) return false;
-  const [year, month, day] = calendarDate.split('-').map(Number);
-  const utcDate = new Date(Date.UTC(year, month - 1, day));
-  return utcDate.getUTCFullYear() === year && utcDate.getUTCMonth() === month - 1 && utcDate.getUTCDate() === day;
-}
 
 /** A device-reported position. `_id: false`: it is a value, not an entity. */
 const coordinatesSchema = new mongoose.Schema(

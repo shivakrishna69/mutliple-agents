@@ -42,11 +42,15 @@ import peopleRoutes from './routes/peopleRoutes.js';
 import invitationRoutes from './routes/invitationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import okrRoutes from './routes/okrRoutes.js';
+import workCalendarRoutes from './routes/workCalendarRoutes.js';
+import officeRoutes from './routes/officeRoutes.js';
+import employeeRoutes from './routes/employeeRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
+import { runStartupMigrations } from './migrations/index.js';
 import { loadConfig } from './config/environment.js';
 import { asyncHandler, createErrorHandler, notFoundHandler } from './middleware/errorHandling.js';
 import { requestLogger } from './middleware/requestLogger.js';
@@ -132,6 +136,11 @@ export function createApp(config) {
   app.use('/api/analytics', analyticsRoutes);
   // OKRs: company goals, team objectives, key results, milestones
   app.use('/api/okrs', okrRoutes);
+  // Holidays and day classification per office (HR edits, employees read).
+  app.use('/api/work-calendar', workCalendarRoutes);
+  // Offices (with their weekly offs) and employee records, managed by HR.
+  app.use('/api/offices', officeRoutes);
+  app.use('/api/employees', employeeRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -172,6 +181,7 @@ async function start() {
   try {
     config = loadConfig();
     await connectDatabase(config.mongoUri);
+    await runStartupMigrations();
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);
