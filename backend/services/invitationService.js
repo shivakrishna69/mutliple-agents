@@ -35,6 +35,7 @@ import User, { ROLES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { buildInvitationEmail } from './invitationEmail.js';
 import { MAIL_OUTCOMES, sendMail } from './mailService.js';
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 export class InvitationError extends Error {
   constructor(httpStatus, code, message) {
@@ -228,7 +229,7 @@ export async function createInvitation({ inviter, input, appContext }) {
     });
   } catch (creationError) {
     // Two HR users inviting the same email at the same moment: the partial unique index decides.
-    if (creationError?.code === 11000)
+    if (isDuplicateKeyError(creationError))
       throw new InvitationError(
         409,
         'INVITATION_EXISTS',
@@ -427,7 +428,7 @@ export async function acceptInvitation(rawToken, password) {
       { $set: { status: INVITATION_STATUSES.PENDING } },
     );
     if (acceptError instanceof InvitationError) throw acceptError;
-    if (acceptError?.code === 11000)
+    if (isDuplicateKeyError(acceptError))
       throw new InvitationError(
         409,
         'EMAIL_ALREADY_REGISTERED',

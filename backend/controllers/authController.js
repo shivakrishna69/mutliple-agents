@@ -40,10 +40,9 @@ import {
   validateLoginInput,
   validateRegistrationInput,
 } from '../validators/authValidators.js';
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 /** MongoDB's error code for a unique-index violation. */
-const DUPLICATE_KEY_ERROR_CODE = 11000;
-
 /**
  * A bcrypt hash of a random value nobody knows, computed once at startup at the same cost
  * as real password hashes. When a login names an email that has no account, the password is
@@ -123,7 +122,7 @@ export async function registerUser(req, res, next) {
     });
   } catch (error) {
     // The concurrent-signup race described above: the unique index rejected the second insert.
-    if (error?.code === DUPLICATE_KEY_ERROR_CODE && error?.keyPattern?.email) {
+    if (isDuplicateKeyError(error) && error?.keyPattern?.email) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, AUTH_MESSAGES.EMAIL_ALREADY_REGISTERED);
     }
     return next(error);
@@ -248,7 +247,7 @@ export async function logoutUser(req, res, next) {
       await RevokedSession.create({ sessionId, userId: req.user.id, expiresAt: new Date(expiresAtMs) });
     } catch (revocationError) {
       // Already revoked by a concurrent logout request; the outcome is the same.
-      if (revocationError?.code !== DUPLICATE_KEY_ERROR_CODE) throw revocationError;
+      if (!isDuplicateKeyError(revocationError)) throw revocationError;
     }
 
     clearSessionCookies(res, req.app.locals.config);
@@ -322,7 +321,7 @@ export async function changePassword(req, res, next) {
         expiresAt: new Date(previousExpiresAtMs),
       });
     } catch (revocationError) {
-      if (revocationError?.code !== DUPLICATE_KEY_ERROR_CODE) throw revocationError;
+      if (!isDuplicateKeyError(revocationError)) throw revocationError;
     }
     disconnectUserSockets(req.user.id, SOCKET_ERROR_CODES.PASSWORD_CHANGED);
 

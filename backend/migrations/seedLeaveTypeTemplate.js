@@ -6,8 +6,8 @@
 
 import { readFileSync } from 'node:fs';
 import LeaveType from '../models/LeaveType.js';
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
-const DUPLICATE_KEY_ERROR_CODE = 11000;
 const TEMPLATE_URL = new URL('../data/leave-templates/india-standard.json', import.meta.url);
 
 export function readLeaveTypeTemplate() {
@@ -23,7 +23,7 @@ export default Object.freeze({
       return { changedCount: created.length };
     } catch (insertError) {
       // Another instance starting at the same time seeded them first.
-      if (insertError?.code !== DUPLICATE_KEY_ERROR_CODE) throw insertError;
+      if (!isDuplicateKeyError(insertError)) throw insertError;
       return { changedCount: insertError.insertedDocs?.length ?? 0 };
     }
   },

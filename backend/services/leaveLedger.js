@@ -16,8 +16,8 @@
 import mongoose from 'mongoose';
 import LeaveBalance from '../models/LeaveBalance.js';
 import LeaveLedgerEntry, { LEDGER_ENTRY_TYPES } from '../models/LeaveLedgerEntry.js';
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
-const DUPLICATE_KEY_ERROR_CODE = 11000;
 /** A reservation older than this without its ledger entry is treated as abandoned by reconciliation. */
 export const ABANDONED_RESERVATION_AGE_MS = 10 * 60 * 1000;
 
@@ -54,7 +54,7 @@ async function applyToBalance(balanceKey, appliedEntry) {
   try {
     await LeaveBalance.updateOne(notYetApplied, update, { upsert: true });
   } catch (upsertError) {
-    if (upsertError?.code !== DUPLICATE_KEY_ERROR_CODE) throw upsertError;
+    if (!isDuplicateKeyError(upsertError)) throw upsertError;
     // The balance exists: either it already counts this entry (nothing matches, nothing changes)
     // or another writer created it a moment ago (this applies the entry to it).
     await LeaveBalance.updateOne(notYetApplied, update);
@@ -70,7 +70,7 @@ async function ensureBalanceExists(balanceKey) {
       { upsert: true },
     );
   } catch (upsertError) {
-    if (upsertError?.code !== DUPLICATE_KEY_ERROR_CODE) throw upsertError;
+    if (!isDuplicateKeyError(upsertError)) throw upsertError;
   }
 }
 
@@ -98,7 +98,7 @@ export async function postCredit(fields) {
   try {
     entry = await LeaveLedgerEntry.create(fields);
   } catch (createError) {
-    const existingFilter = createError?.code === DUPLICATE_KEY_ERROR_CODE ? uniqueKeyFilter(fields) : null;
+    const existingFilter = isDuplicateKeyError(createError) ? uniqueKeyFilter(fields) : null;
     if (!existingFilter) throw createError;
     entry = await LeaveLedgerEntry.findOne(existingFilter);
     isNew = false;
@@ -146,7 +146,7 @@ export async function postDebit(fields, { minimumAvailableCentidays = 0 } = {}) 
       { ...balanceKey, 'appliedEntries.entryId': entryId },
       { $inc: { balanceCentidays: -fields.balanceDeltaCentidays }, $pull: { appliedEntries: { entryId } } },
     );
-    if (createError?.code === DUPLICATE_KEY_ERROR_CODE) throw new DuplicateLedgerEntryError();
+    if (isDuplicateKeyError(createError)) throw new DuplicateLedgerEntryError();
     throw createError;
   }
 }
