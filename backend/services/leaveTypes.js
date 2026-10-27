@@ -48,6 +48,10 @@ export function accrualPolicyOf(leaveType) {
   };
 }
 
+/** The lowest a debit may take the available days: zero, or minus the type's negative limit. */
+export const lowestAvailableCentidays = (leaveType) =>
+  leaveType.usage.allowNegativeBalance ? -daysToCentidays(leaveType.usage.maxNegativeDays) : 0;
+
 const saveLeaveType = (leaveType) => saveVersioned(leaveType, { onDuplicateKey: codeTaken });
 
 /** Active types, ordered by code; HR may include retired ones. */

@@ -67,7 +67,10 @@ export function leaveYearForDate(calendarDate, settings) {
  */
 export async function loadEmployeeLeaveContext(employeeId, { now = new Date() } = {}) {
   const employee = await EmployeeProfile.findById(employeeId)
-    .select('organizationData.dateOfJoining organizationData.employmentStatus organizationData.officeLocationId')
+    .select(
+      'organizationData.dateOfJoining organizationData.employmentStatus organizationData.officeLocationId ' +
+        'organizationData.reportingManagerId',
+    )
     .lean();
   if (!employee) throw employeeNotFound();
   const settings = await getLeaveSettings();

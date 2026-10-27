@@ -24,7 +24,7 @@ import LeaveLedgerEntry, {
 import LeaveBalance from '../models/LeaveBalance.js';
 import LeaveType from '../models/LeaveType.js';
 import OfficeLocation from '../models/OfficeLocation.js';
-import { addDaysToCalendarDate } from '../utils/calendarDates.js';
+import { addDaysToCalendarDate, calendarDateOfUtcInstant } from '../utils/calendarDates.js';
 import { daysToCentidays } from '../utils/leaveDays.js';
 import { logger } from '../utils/logger.js';
 import { dueAccrualCredits, isAccruingStatus, yearEndMovements } from './leaveAccrualRules.js';
@@ -44,8 +44,6 @@ export const yearEndPayrollReference = (leaveYear) => `${YEAR_END_PAYROLL_REFERE
 /** True for references reserved for year-end encashments, which HR cannot use by hand. */
 export const isYearEndPayrollReference = (payrollReference) =>
   payrollReference.toUpperCase().startsWith(YEAR_END_PAYROLL_REFERENCE_PREFIX);
-
-const toCalendarDate = (date) => date.toISOString().slice(0, 10);
 
 async function postAccruals({
   employeeId,
@@ -178,7 +176,7 @@ export async function runLeaveAccruals({ asOfDate = null, now = new Date() } = {
 
   for await (const employee of employees) {
     const { dateOfJoining, employmentStatus, officeLocationId } = employee.organizationData;
-    const joiningDate = toCalendarDate(dateOfJoining);
+    const joiningDate = calendarDateOfUtcInstant(dateOfJoining);
     const today =
       asOfDate ??
       employeeToday({ officeTimeZone: timeZoneByOfficeId.get(officeLocationId?.toString()), settings, now });
