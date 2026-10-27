@@ -39,7 +39,8 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 | `errors.test.js` | Request ids, JSON 404 for unknown routes, malformed JSON answered with 400 |
 | `socket.test.js` | Socket.IO handshake (session, tampered cookie, foreign origin), conversation rooms, live delivery, admin-only telemetry, sockets ended on role change and logout |
 | `workforceAccess.test.js` | Payslip listing and the regularization review queue: own data, HR access, accounts without a profile |
-| `workCalendar.test.js` | The weekly-off startup migration, HR-only changes, 2nd/4th Saturday rules, holiday clashes and office scoping, employees limited to their own office |
+| `offices.test.js` | The weekly-off startup migration, office CRUD with version checks and model validation, 2nd/4th Saturday rules, offices in use cannot be removed, base-office assignment |
+| `workCalendar.test.js` | HR-only holiday changes, holiday clashes and office scoping, employees limited to their own office, employees without an office told to ask HR |
 
 MongoDB comes from `TEST_MONGO_URL` (default `mongodb://127.0.0.1:27017`, e.g. the
 `multiagent-mongo` container). If it is not reachable, the integration suites are skipped with a
@@ -50,4 +51,7 @@ message locally, and fail when `CI=true`.
 - Put pure logic tests in `unit/` and anything that needs HTTP or the database in `integration/`.
 - Start one server per file in `before()` and stop it in `after()`. Files run in parallel.
 - Keep each file under the signup rate limit (10 signups per hour per IP).
-- Seed data the API cannot create yet (such as departments) directly through `testServer.database`.
+- Build common data with `fixtures.js` (offices, departments, onboarded employees) rather than a
+  local helper. Seed data the API cannot create yet (such as departments) directly through
+  `testServer.database`; use `startTestServer({ seedBeforeStart })` for data that must exist before
+  the server starts (for example to test a startup migration).
