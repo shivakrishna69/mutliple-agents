@@ -3,19 +3,20 @@
  * the centidays the accrual rules work in. Field values are validated by the model.
  */
 
-import mongoose from 'mongoose';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { COMMON_MESSAGES, LEAVE_MESSAGES } from '../constants/messages.js';
+import { LEAVE_MESSAGES } from '../constants/messages.js';
+import LeaveLedgerEntry from '../models/LeaveLedgerEntry.js';
 import LeaveType from '../models/LeaveType.js';
 import { daysToCentidays } from '../utils/leaveDays.js';
-import { ServiceError } from './serviceError.js';
+import { assertCurrentVersion, saveVersioned, ServiceError } from './serviceError.js';
 
-const DUPLICATE_KEY_ERROR_CODE = 11000;
 /** Nested policy groups, merged field by field on update. */
 const POLICY_GROUPS = Object.freeze(['accrual', 'carryForward', 'encashment', 'usage']);
 
 export const leaveTypeNotFound = () =>
   new ServiceError(HTTP_STATUS.NOT_FOUND, 'LEAVE_TYPE_NOT_FOUND', LEAVE_MESSAGES.LEAVE_TYPE_NOT_FOUND);
+const codeTaken = () =>
+  new ServiceError(HTTP_STATUS.CONFLICT, 'LEAVE_TYPE_CODE_TAKEN', LEAVE_MESSAGES.LEAVE_TYPE_CODE_TAKEN);
 
 export function toLeaveTypeSummary(leaveType) {
   const plain = typeof leaveType.toObject === 'function' ? leaveType.toObject() : leaveType;
@@ -47,19 +48,7 @@ export function accrualPolicyOf(leaveType) {
   };
 }
 
-async function saveLeaveType(leaveType) {
-  try {
-    await leaveType.save();
-  } catch (saveError) {
-    if (saveError instanceof mongoose.Error.VersionError) {
-      throw new ServiceError(HTTP_STATUS.CONFLICT, 'STALE_VERSION', COMMON_MESSAGES.STALE_VERSION);
-    }
-    if (saveError?.code === DUPLICATE_KEY_ERROR_CODE) {
-      throw new ServiceError(HTTP_STATUS.CONFLICT, 'LEAVE_TYPE_CODE_TAKEN', LEAVE_MESSAGES.LEAVE_TYPE_CODE_TAKEN);
-    }
-    throw saveError;
-  }
-}
+const saveLeaveType = (leaveType) => saveVersioned(leaveType, { onDuplicateKey: codeTaken });
 
 /** Active types, ordered by code; HR may include retired ones. */
 export async function listLeaveTypes({ includeInactive = false } = {}) {
@@ -75,13 +64,18 @@ export async function createLeaveType({ fields, actorUserId }) {
 
 /**
  * Applies HR's changes; nested policy groups are merged field by field. Changes affect movements
- * from now on; entries already in the ledger keep the values they were posted with.
+ * from now on; entries already in the ledger keep the values they were posted with. Whether the
+ * type keeps a balance is fixed once leave has been recorded for it, since its ledger would no
+ * longer mean anything.
  */
 export async function updateLeaveType({ leaveTypeId, changes, version, actorUserId }) {
   const leaveType = await LeaveType.findById(leaveTypeId);
   if (!leaveType) throw leaveTypeNotFound();
-  if (leaveType.__v !== version)
-    throw new ServiceError(HTTP_STATUS.CONFLICT, 'STALE_VERSION', COMMON_MESSAGES.STALE_VERSION);
+  assertCurrentVersion(leaveType, version);
+  const changesTracking = changes.tracksBalance !== undefined && changes.tracksBalance !== leaveType.tracksBalance;
+  if (changesTracking && (await LeaveLedgerEntry.exists({ leaveTypeId: leaveType._id }))) {
+    throw new ServiceError(HTTP_STATUS.CONFLICT, 'TRACKS_BALANCE_LOCKED', LEAVE_MESSAGES.TRACKS_BALANCE_LOCKED);
+  }
   for (const [fieldName, value] of Object.entries(changes)) {
     if (POLICY_GROUPS.includes(fieldName)) {
       for (const [policyField, policyValue] of Object.entries(value))
