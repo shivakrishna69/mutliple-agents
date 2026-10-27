@@ -14,7 +14,7 @@
 
 import { REGULARIZATION_MESSAGES } from '../constants/messages.js';
 import { ATTENDANCE_FIELD_LIMITS, LOCAL_TIME_PATTERN } from '../constants/validation.js';
-import { isRealCalendarDate } from '../models/Attendance.js';
+import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { REVIEW_ROUTING_REASONS } from '../models/RegularizationReview.js';
 import { isValidObjectIdString } from './conversationValidators.js';
 
