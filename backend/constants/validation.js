@@ -119,6 +119,9 @@ export const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 /** Calendar date "YYYY-MM-DD" (shape only; real-date validity is checked separately). */
 export const CALENDAR_DATE_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 
+/** Calendar month "YYYY-MM" (accrual periods, payroll months). */
+export const CALENDAR_MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/;
+
 /**
  * Workforce risk bands for the 0-100 model scores (attritionRiskIndex, currentBurnoutScore).
  *   safe       score < ELEVATED_FROM

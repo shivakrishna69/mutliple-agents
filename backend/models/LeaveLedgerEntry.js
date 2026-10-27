@@ -25,7 +25,7 @@
  */
 
 import mongoose from 'mongoose';
-import { LEAVE_LIMITS } from '../constants/validation.js';
+import { CALENDAR_MONTH_PATTERN, LEAVE_LIMITS } from '../constants/validation.js';
 import { isRealCalendarDate } from '../utils/calendarDates.js';
 
 const { ObjectId } = mongoose.Schema.Types;
@@ -55,7 +55,16 @@ export const YEAR_END_KINDS = Object.freeze({
   ENCASHMENT: 'ENCASHMENT',
 });
 
-const MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/;
+/**
+ * The movements that close a leave year. CARRY_FORWARD_IN is not one of them: it is filed under the
+ * next leave year and is part of that year's balance.
+ */
+export const CLOSING_YEAR_END_KINDS = Object.freeze([
+  YEAR_END_KINDS.CARRY_FORWARD_OUT,
+  YEAR_END_KINDS.LAPSE,
+  YEAR_END_KINDS.ENCASHMENT,
+]);
+
 const isWholeNumber = (value) => Number.isInteger(value);
 
 const leaveLedgerEntrySchema = new mongoose.Schema(
@@ -70,19 +79,24 @@ const leaveLedgerEntrySchema = new mongoose.Schema(
       max: LEAVE_LIMITS.LATEST_LEAVE_YEAR,
     },
     entryType: { type: String, enum: Object.values(LEDGER_ENTRY_TYPES), required: true, immutable: true },
-    reasonCode: { type: String, enum: [...Object.values(ADJUSTMENT_REASON_CODES), null], default: null, immutable: true },
+    reasonCode: {
+      type: String,
+      enum: [...Object.values(ADJUSTMENT_REASON_CODES), null],
+      default: null,
+      immutable: true,
+    },
     balanceDeltaCentidays: { type: Number, required: true, immutable: true, validate: isWholeNumber },
     heldDeltaCentidays: { type: Number, default: 0, immutable: true, validate: isWholeNumber },
     // The day the movement takes effect (credit date, encashment date, year-end date).
     effectiveDate: { type: String, required: true, immutable: true, validate: isRealCalendarDate },
-    accrualPeriod: { type: String, default: null, immutable: true, match: MONTH_PATTERN },
+    accrualPeriod: { type: String, default: null, immutable: true, match: CALENDAR_MONTH_PATTERN },
     payrollReference: {
       type: String,
       default: null,
       immutable: true,
       match: LEAVE_LIMITS.PAYROLL_REFERENCE_PATTERN,
     },
-    payrollMonth: { type: String, default: null, immutable: true, match: MONTH_PATTERN },
+    payrollMonth: { type: String, default: null, immutable: true, match: CALENDAR_MONTH_PATTERN },
     yearEndKind: { type: String, enum: [...Object.values(YEAR_END_KINDS), null], default: null, immutable: true },
     note: { type: String, trim: true, maxlength: LEAVE_LIMITS.NOTE_MAX_LENGTH, default: null, immutable: true },
     // null = posted by the system (accrual job, year end).

@@ -111,5 +111,9 @@ export function validateCalendarRangeQuery(query) {
   if (officeLocationId !== null && !isValidObjectIdString(officeLocationId)) {
     validationErrors.push({ field: 'officeLocationId', message: 'must be an office id' });
   }
-  return validationResult(validationErrors, { firstDate, lastDate, officeLocationId: officeLocationId?.toLowerCase() ?? null });
+  return validationResult(validationErrors, {
+    firstDate,
+    lastDate,
+    officeLocationId: officeLocationId?.toLowerCase() ?? null,
+  });
 }

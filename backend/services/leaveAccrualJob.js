@@ -17,6 +17,7 @@
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import LeaveLedgerEntry, {
   ADJUSTMENT_REASON_CODES,
+  CLOSING_YEAR_END_KINDS,
   LEDGER_ENTRY_TYPES,
   YEAR_END_KINDS,
 } from '../models/LeaveLedgerEntry.js';
@@ -35,18 +36,14 @@ import { leaveYearRange } from './leaveYear.js';
 /** How often the job runs. Hourly keeps joiner credits within an hour of the joining date. */
 export const LEAVE_JOB_INTERVAL_MS = 60 * 60 * 1000;
 
-/**
- * The movements that close a leave year. CARRY_FORWARD_IN is not one of them: it is filed under the
- * next leave year and is part of that year's balance.
- */
-const CLOSING_YEAR_END_KINDS = Object.freeze([
-  YEAR_END_KINDS.CARRY_FORWARD_OUT,
-  YEAR_END_KINDS.LAPSE,
-  YEAR_END_KINDS.ENCASHMENT,
-]);
+const YEAR_END_PAYROLL_REFERENCE_PREFIX = 'YEAR-END-';
 
 /** Payroll reference of the encashment a year end posts for a leave year. */
-export const yearEndPayrollReference = (leaveYear) => `YEAR-END-${leaveYear}`;
+export const yearEndPayrollReference = (leaveYear) => `${YEAR_END_PAYROLL_REFERENCE_PREFIX}${leaveYear}`;
+
+/** True for references reserved for year-end encashments, which HR cannot use by hand. */
+export const isYearEndPayrollReference = (payrollReference) =>
+  payrollReference.toUpperCase().startsWith(YEAR_END_PAYROLL_REFERENCE_PREFIX);
 
 const toCalendarDate = (date) => date.toISOString().slice(0, 10);
 
