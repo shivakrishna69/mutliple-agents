@@ -159,11 +159,11 @@ export const payslipVerificationRateLimitByClientIp = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_VERIFICATIONS,
 });
 
-export const workCalendarWriteRateLimitByUser = createRateLimiter({
-  limiterName: 'work_calendar_writes_per_user',
-  ...RATE_LIMITS.WORK_CALENDAR_WRITES_PER_USER,
+export const workplaceSetupWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'workplace_setup_writes_per_user',
+  ...RATE_LIMITS.WORKPLACE_SETUP_WRITES_PER_USER,
   resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
-  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_WORK_CALENDAR_UPDATES,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_WORKPLACE_SETUP_UPDATES,
 });
 
 export const okrWriteRateLimitByUser = createRateLimiter({

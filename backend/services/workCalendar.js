@@ -1,43 +1,27 @@
 /**
  * The work calendar: loading an office's calendar (weekly offs + holidays) for the working-day
- * rules in services/workingDays.js, and HR's changes to weekly offs and holidays.
+ * rules in services/workingDays.js, and HR's changes to holidays. Offices and their weekly offs are
+ * managed in services/officeService.js.
  *
  * Permission checks are made by the controller; these functions assume the caller is allowed.
- * Errors the client can act on are thrown as WorkCalendarError with a stable `code`.
+ * Errors the client can act on are thrown as ServiceError with a stable `code`.
  */
 
 import mongoose from 'mongoose';
 import EmployeeProfile from '../models/EmployeeProfile.js';
 import Holiday from '../models/Holiday.js';
 import OfficeLocation from '../models/OfficeLocation.js';
-import { WORK_CALENDAR_MESSAGES } from '../constants/messages.js';
+import { HTTP_STATUS } from '../constants/httpStatus.js';
+import { COMMON_MESSAGES, WORK_CALENDAR_MESSAGES } from '../constants/messages.js';
+import { officeNotFound } from './officeService.js';
+import { ServiceError } from './serviceError.js';
 
-export class WorkCalendarError extends Error {
-  constructor(httpStatus, code, message) {
-    super(message);
-    this.name = 'WorkCalendarError';
-    this.httpStatus = httpStatus;
-    this.code = code;
-  }
-}
+const notFoundHoliday = () =>
+  new ServiceError(HTTP_STATUS.NOT_FOUND, 'HOLIDAY_NOT_FOUND', WORK_CALENDAR_MESSAGES.HOLIDAY_NOT_FOUND);
+const staleVersion = () => new ServiceError(HTTP_STATUS.CONFLICT, 'STALE_VERSION', COMMON_MESSAGES.STALE_VERSION);
 
-const notFoundOffice = () => new WorkCalendarError(404, 'OFFICE_NOT_FOUND', WORK_CALENDAR_MESSAGES.OFFICE_NOT_FOUND);
-const notFoundHoliday = () => new WorkCalendarError(404, 'HOLIDAY_NOT_FOUND', WORK_CALENDAR_MESSAGES.HOLIDAY_NOT_FOUND);
-const staleVersion = () => new WorkCalendarError(409, 'STALE_VERSION', WORK_CALENDAR_MESSAGES.STALE_VERSION);
-
-const toWeeklyOffRulesSummary = (rules) =>
+const toWeeklyOffRules = (rules) =>
   (rules ?? []).map((rule) => ({ weekday: rule.weekday, occurrencesInMonth: [...rule.occurrencesInMonth] }));
-
-export function toOfficeCalendarSummary(office) {
-  return {
-    id: office._id.toString(),
-    name: office.name,
-    code: office.code,
-    timeZone: office.timeZone,
-    weeklyOffRules: toWeeklyOffRulesSummary(office.workday?.weeklyOffRules),
-    version: office.__v,
-  };
-}
 
 export function toHolidaySummary(holiday) {
   return {
@@ -66,47 +50,28 @@ export async function loadOfficeCalendar(officeLocationId, firstDate, lastDate) 
   const office = await OfficeLocation.findById(officeLocationId)
     .select('name code timeZone workday.weeklyOffRules')
     .lean();
-  if (!office) throw notFoundOffice();
+  if (!office) throw officeNotFound();
   const holidays = await Holiday.find(holidaysForOfficeFilter(officeLocationId, firstDate, lastDate))
     .select('name date')
     .lean();
   return {
     office,
-    weeklyOffRules: toWeeklyOffRulesSummary(office.workday?.weeklyOffRules),
+    weeklyOffRules: toWeeklyOffRules(office.workday?.weeklyOffRules),
     holidaysByDate: new Map(holidays.map((holiday) => [holiday.date, holiday.name])),
   };
 }
 
-/** The signed-in user's base office id, or null (no profile, or HR has not assigned an office yet). */
-export async function findOwnOfficeLocationId(userId) {
+/**
+ * The signed-in user's base office.
+ * @returns {Promise<{ hasEmployeeProfile: boolean, officeLocationId: string|null }>} officeLocationId
+ *   is null when there is no profile or HR has not assigned an office yet.
+ */
+export async function findOwnOfficeAssignment(userId) {
   const ownProfile = await EmployeeProfile.findOne({ userId }).select('organizationData.officeLocationId').lean();
-  return ownProfile?.organizationData?.officeLocationId?.toString() ?? null;
-}
-
-// =================================================================================================
-// Offices: weekly offs
-// =================================================================================================
-
-export async function listOfficeCalendars() {
-  // __v is the version HR sends back with an edit (optimistic concurrency).
-  const offices = await OfficeLocation.find({})
-    .select('name code timeZone workday.weeklyOffRules __v')
-    .sort({ name: 1 });
-  return offices.map(toOfficeCalendarSummary);
-}
-
-export async function updateOfficeWeeklyOffs({ officeLocationId, weeklyOffRules, version }) {
-  const office = await OfficeLocation.findById(officeLocationId);
-  if (!office) throw notFoundOffice();
-  if (office.__v !== version) throw staleVersion();
-  office.workday.weeklyOffRules = weeklyOffRules;
-  try {
-    await office.save();
-  } catch (saveError) {
-    if (saveError instanceof mongoose.Error.VersionError) throw staleVersion();
-    throw saveError;
-  }
-  return toOfficeCalendarSummary(office);
+  return {
+    hasEmployeeProfile: Boolean(ownProfile),
+    officeLocationId: ownProfile?.organizationData?.officeLocationId?.toString() ?? null,
+  };
 }
 
 // =================================================================================================
@@ -125,7 +90,7 @@ export async function listHolidays({ firstDate, lastDate, officeLocationId = nul
 async function assertOfficesExist(officeLocationIds) {
   if (officeLocationIds.length === 0) return;
   const existingCount = await OfficeLocation.countDocuments({ _id: { $in: officeLocationIds } });
-  if (existingCount !== officeLocationIds.length) throw notFoundOffice();
+  if (existingCount !== officeLocationIds.length) throw officeNotFound();
 }
 
 /**
@@ -142,7 +107,7 @@ async function assertNoHolidayClash({ date, officeLocationIds, excludeHolidayId 
     ...(excludeHolidayId ? { _id: { $ne: excludeHolidayId } } : {}),
     ...scopeFilter,
   });
-  if (clash) throw new WorkCalendarError(409, 'HOLIDAY_CLASHES', WORK_CALENDAR_MESSAGES.HOLIDAY_CLASHES);
+  if (clash) throw new ServiceError(HTTP_STATUS.CONFLICT, 'HOLIDAY_CLASHES', WORK_CALENDAR_MESSAGES.HOLIDAY_CLASHES);
 }
 
 export async function createHoliday({ name, date, officeLocationIds, actorUserId }) {

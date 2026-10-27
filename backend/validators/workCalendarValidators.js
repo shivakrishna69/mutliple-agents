@@ -5,7 +5,6 @@
  */
 
 import { WORK_CALENDAR_LIMITS } from '../constants/validation.js';
-import { WEEKDAYS } from '../models/OfficeLocation.js';
 import { daysBetweenCalendarDates, isRealCalendarDate } from '../utils/calendarDates.js';
 import { isValidObjectIdString } from './conversationValidators.js';
 
@@ -64,46 +63,6 @@ function checkOfficeIds(rawOfficeIds, validationErrors) {
     return [];
   }
   return [...new Set(rawOfficeIds.map((officeId) => officeId.toLowerCase()))];
-}
-
-/** PATCH /api/work-calendar/offices/:officeLocationId/weekly-offs */
-export function validateWeeklyOffRulesInput(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
-  const validationErrors = [];
-  const rawRules = requestBody.weeklyOffRules;
-  const weeklyOffRules = [];
-  if (!Array.isArray(rawRules) || rawRules.length > Object.keys(WEEKDAYS).length) {
-    validationErrors.push({ field: 'weeklyOffRules', message: 'must be a list of at most one rule per weekday' });
-  } else {
-    rawRules.forEach((rawRule, ruleIndex) => {
-      const fieldPrefix = `weeklyOffRules[${ruleIndex}]`;
-      if (!isPlainObject(rawRule) || !isWholeNumberBetween(rawRule.weekday, WEEKDAYS.SUNDAY, WEEKDAYS.SATURDAY)) {
-        validationErrors.push({ field: `${fieldPrefix}.weekday`, message: 'must be 0 (Sunday) to 6 (Saturday)' });
-        return;
-      }
-      const rawOccurrences = rawRule.occurrencesInMonth ?? [];
-      const isValidOccurrences =
-        Array.isArray(rawOccurrences) &&
-        rawOccurrences.every((occurrence) => isWholeNumberBetween(occurrence, 1, LIMITS.MAX_WEEKDAY_OCCURRENCE)) &&
-        new Set(rawOccurrences).size === rawOccurrences.length;
-      if (!isValidOccurrences) {
-        validationErrors.push({
-          field: `${fieldPrefix}.occurrencesInMonth`,
-          message: `must be distinct numbers from 1 to ${LIMITS.MAX_WEEKDAY_OCCURRENCE} (empty for every week)`,
-        });
-        return;
-      }
-      weeklyOffRules.push({
-        weekday: rawRule.weekday,
-        occurrencesInMonth: [...rawOccurrences].sort((first, second) => first - second),
-      });
-    });
-    if (new Set(weeklyOffRules.map((rule) => rule.weekday)).size !== weeklyOffRules.length) {
-      validationErrors.push({ field: 'weeklyOffRules', message: 'each weekday may appear in only one rule' });
-    }
-  }
-  const version = checkVersion(requestBody.version, validationErrors);
-  return result(validationErrors, { weeklyOffRules, version });
 }
 
 /** POST /api/work-calendar/holidays */

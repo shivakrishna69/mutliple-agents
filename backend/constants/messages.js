@@ -41,7 +41,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
   TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
-  TOO_MANY_WORK_CALENDAR_UPDATES: 'Too many calendar changes in a short time. Please wait a moment and try again',
+  TOO_MANY_WORKPLACE_SETUP_UPDATES:
+    'Too many office or calendar changes in a short time. Please wait a moment and try again',
 });
 
 export const SUPPORT_MESSAGES = Object.freeze({
@@ -206,9 +207,27 @@ export const OKR_MESSAGES = Object.freeze({
   OKRS_EMPLOYEES_ONLY: 'OKRs are available to employees, HR and administrators',
 });
 
+/** Messages shared by several features. */
+export const COMMON_MESSAGES = Object.freeze({
+  STALE_VERSION: 'This was changed by someone else. Reload and try again',
+});
+
+export const OFFICE_MESSAGES = Object.freeze({
+  OFFICES_RETRIEVED: 'Offices retrieved',
+  OFFICE_RETRIEVED: 'Office retrieved',
+  OFFICE_CREATED: 'Office added',
+  OFFICE_UPDATED: 'Office updated',
+  OFFICE_DELETED: 'Office removed',
+  OFFICE_NOT_FOUND: 'Office not found',
+  OFFICE_CODE_TAKEN: 'Another office already uses this code',
+  OFFICE_IN_USE: 'This office still has employees, attendance records or holidays, so it cannot be removed',
+  INPUT_INVALID: 'The office details are invalid',
+  RESTRICTED: 'Only HR and administrators can manage offices',
+  EMPLOYEE_NOT_FOUND: 'Employee not found',
+  EMPLOYEE_OFFICE_ASSIGNED: 'Base office updated',
+});
+
 export const WORK_CALENDAR_MESSAGES = Object.freeze({
-  OFFICES_RETRIEVED: 'Office working days retrieved',
-  WEEKLY_OFFS_UPDATED: 'Weekly offs updated',
   HOLIDAYS_RETRIEVED: 'Holidays retrieved',
   HOLIDAY_CREATED: 'Holiday added',
   HOLIDAY_UPDATED: 'Holiday updated',
@@ -216,12 +235,10 @@ export const WORK_CALENDAR_MESSAGES = Object.freeze({
   DAYS_RETRIEVED: 'Calendar retrieved',
   INPUT_INVALID: 'The calendar details are invalid',
   RESTRICTED: 'Only HR and administrators can change the work calendar',
-  OFFICE_NOT_FOUND: 'Office not found',
   OFFICE_REQUIRED: 'Choose the office whose calendar you want to see',
   OFFICE_NOT_ASSIGNED: 'You have no base office yet, so there is no work calendar to show. Please ask HR',
   HOLIDAY_NOT_FOUND: 'Holiday not found',
   HOLIDAY_CLASHES: 'Another holiday already covers this date for one of these offices',
-  STALE_VERSION: 'This was changed by someone else. Reload and try again',
   EMPLOYEES_ONLY: 'The work calendar is available to employees, HR and administrators',
 });
 
