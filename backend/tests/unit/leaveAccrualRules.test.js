@@ -7,10 +7,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { EMPLOYMENT_STATUSES } from '../../models/EmployeeProfile.js';
+import { ACCRUAL_METHODS, ACCRUAL_TIMINGS, YEAR_END_EXCESS_ACTIONS } from '../../models/LeaveType.js';
 import {
-  ACCRUAL_METHODS,
-  ACCRUAL_TIMINGS,
-  YEAR_END_EXCESS_ACTIONS,
   dueAccrualCredits,
   isAccruingStatus,
   scheduledMonthlyCentidays,

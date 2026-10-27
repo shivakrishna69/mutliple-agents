@@ -22,13 +22,10 @@
  */
 
 import { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
+import { ACCRUAL_METHODS, ACCRUAL_TIMINGS, YEAR_END_EXCESS_ACTIONS } from '../models/LeaveType.js';
 import { daysBetweenCalendarDates } from '../utils/calendarDates.js';
 import { roundCentidaysToStep } from '../utils/leaveDays.js';
 import { leaveYearRange, monthRange, monthsOfLeaveYear } from './leaveYear.js';
-
-export const ACCRUAL_METHODS = Object.freeze({ MONTHLY: 'MONTHLY', UPFRONT_YEARLY: 'UPFRONT_YEARLY', NONE: 'NONE' });
-export const ACCRUAL_TIMINGS = Object.freeze({ START_OF_MONTH: 'START_OF_MONTH', END_OF_MONTH: 'END_OF_MONTH' });
-export const YEAR_END_EXCESS_ACTIONS = Object.freeze({ LAPSE: 'LAPSE', ENCASH: 'ENCASH' });
 
 const MONTHS_PER_YEAR = 12;
 
