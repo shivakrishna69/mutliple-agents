@@ -131,6 +131,18 @@ export const WORKFORCE_RISK_BANDS = Object.freeze({
   CRITICAL_FROM: 70,
 });
 
+/** Limits for the work calendar (models/Holiday.js, OfficeLocation weekly offs, services/workCalendar.js). */
+export const WORK_CALENDAR_LIMITS = Object.freeze({
+  HOLIDAY_NAME_MIN_LENGTH: 2,
+  HOLIDAY_NAME_MAX_LENGTH: 100,
+  // Offices one holiday can be limited to; more than this is better expressed as company-wide.
+  MAX_OFFICES_PER_HOLIDAY: 50,
+  // Longest date range one calendar request may cover (one leap year).
+  MAX_RANGE_DAYS: 366,
+  // A weekday occurs at most five times in a month.
+  MAX_WEEKDAY_OCCURRENCE: 5,
+});
+
 /** Limits for OKRs (models/Objective.js, models/KeyResult.js). */
 export const OKR_FIELD_LIMITS = Object.freeze({
   TITLE_MIN_LENGTH: 3,

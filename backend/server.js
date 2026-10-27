@@ -47,6 +47,7 @@ import { closePayslipServices, initPayslipServices } from './services/payslipSer
 import { closeMailService, initMailService } from './services/mailService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
+import { runStartupMigrations } from './migrations/index.js';
 import { loadConfig } from './config/environment.js';
 import { asyncHandler, createErrorHandler, notFoundHandler } from './middleware/errorHandling.js';
 import { requestLogger } from './middleware/requestLogger.js';
@@ -172,6 +173,7 @@ async function start() {
   try {
     config = loadConfig();
     await connectDatabase(config.mongoUri);
+    await runStartupMigrations();
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);
