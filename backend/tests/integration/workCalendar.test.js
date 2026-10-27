@@ -81,14 +81,12 @@ describe('work calendar', { skip: skipReason ?? false }, () => {
     const acceptResponse = await employeeClient.post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD });
     assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));
     // Assign the employee's base office (HR does this in the profile; there is no endpoint yet).
-    await testServer.database
-      .collection('employeeprofiles')
-      .updateOne(
-        { userId: new testServer.database.base.Types.ObjectId(acceptResponse.body.data.user.id) },
-        {
-          $set: { 'organizationData.officeLocationId': new testServer.database.base.Types.ObjectId(bengaluruOfficeId) },
-        },
-      );
+    await testServer.database.collection('employeeprofiles').updateOne(
+      { userId: new testServer.database.base.Types.ObjectId(acceptResponse.body.data.user.id) },
+      {
+        $set: { 'organizationData.officeLocationId': new testServer.database.base.Types.ObjectId(bengaluruOfficeId) },
+      },
+    );
   });
 
   after(async () => {
