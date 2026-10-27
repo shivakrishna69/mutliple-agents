@@ -244,6 +244,7 @@ export const LEAVE_MESSAGES = Object.freeze({
   LEAVE_YEAR_NOT_OPEN:
     'Adjustments can be made to the current leave year, or to the previous one until its year end is processed',
   PAYROLL_REFERENCE_RESERVED: 'References starting with YEAR-END- are reserved for year-end encashments',
+  OWN_BALANCE_RESTRICTED: 'Your own leave balance must be adjusted or encashed by another HR user or an administrator',
   INSUFFICIENT_BALANCE: 'The leave balance is not enough for this',
   NOT_ENCASHABLE: 'This leave type cannot be encashed',
   ENCASHMENT_EXCEEDS_LIMIT: 'Encashing this many days would leave less than the policy keeps',
