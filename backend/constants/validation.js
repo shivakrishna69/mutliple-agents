@@ -119,6 +119,9 @@ export const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 /** Calendar date "YYYY-MM-DD" (shape only; real-date validity is checked separately). */
 export const CALENDAR_DATE_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 
+/** Calendar month "YYYY-MM" (accrual periods, payroll months). */
+export const CALENDAR_MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/;
+
 /**
  * Workforce risk bands for the 0-100 model scores (attritionRiskIndex, currentBurnoutScore).
  *   safe       score < ELEVATED_FROM
@@ -129,6 +132,33 @@ export const CALENDAR_DATE_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|
 export const WORKFORCE_RISK_BANDS = Object.freeze({
   ELEVATED_FROM: 40,
   CRITICAL_FROM: 70,
+});
+
+/**
+ * Limits for leave (models/LeaveType.js, models/LeaveLedgerEntry.js, services/leave*). Day amounts
+ * are stored as whole hundredths of a day ("centidays"), so sums never drift.
+ */
+export const LEAVE_LIMITS = Object.freeze({
+  CENTIDAYS_PER_DAY: 100,
+  // Leave type codes: CL, SL, EL, LOP, MATERNITY...
+  TYPE_CODE_PATTERN: /^[A-Z][A-Z0-9_]{1,19}$/,
+  TYPE_NAME_MIN_LENGTH: 2,
+  TYPE_NAME_MAX_LENGTH: 60,
+  TYPE_DESCRIPTION_MAX_LENGTH: 500,
+  // Policy day values (quotas, caps, minimums) are set in steps of this many centidays (half a day).
+  POLICY_DAY_STEP_CENTIDAYS: 50,
+  MAX_ANNUAL_QUOTA_DAYS: 365,
+  MAX_POLICY_DAYS: 365,
+  // Steps a joiner's pro-rata credit can be rounded to: a quarter, a half or a whole day.
+  PRO_RATA_ROUNDING_STEP_CENTIDAYS: Object.freeze([25, 50, 100]),
+  // HR adjustments and encashments: at most this many days in one entry, in hundredths.
+  MAX_SINGLE_MOVEMENT_DAYS: 365,
+  NOTE_MIN_LENGTH: 3,
+  NOTE_MAX_LENGTH: 500,
+  PAYROLL_REFERENCE_PATTERN: /^[A-Za-z0-9][A-Za-z0-9._/-]{2,63}$/,
+  // Leave years are named by the calendar year they start in.
+  EARLIEST_LEAVE_YEAR: 2000,
+  LATEST_LEAVE_YEAR: 2100,
 });
 
 /** Limits for the work calendar (models/Holiday.js, OfficeLocation weekly offs, services/workCalendar.js). */

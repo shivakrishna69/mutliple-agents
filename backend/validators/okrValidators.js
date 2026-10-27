@@ -8,18 +8,7 @@ import { CALENDAR_DATE_PATTERN, OKR_FIELD_LIMITS } from '../constants/validation
 import { KEY_RESULT_UNITS, MILESTONE_STATUSES } from '../models/KeyResult.js';
 import { OBJECTIVE_LEVELS, OKR_STATUSES } from '../models/Objective.js';
 import { isValidObjectIdString } from './conversationValidators.js';
-
-function isPlainObject(candidateValue) {
-  return typeof candidateValue === 'object' && candidateValue !== null && !Array.isArray(candidateValue);
-}
-
-function result(validationErrors, sanitizedInput) {
-  return validationErrors.length ? { isValid: false, validationErrors } : { isValid: true, sanitizedInput };
-}
-
-function bodyError() {
-  return { isValid: false, validationErrors: [{ field: 'body', message: 'must be a JSON object' }] };
-}
+import { bodyNotObjectResult, isPlainObject, validationResult } from './requestShape.js';
 
 function checkTitle(rawTitle, fieldPath, validationErrors, { required = true } = {}) {
   if (rawTitle === undefined && !required) return undefined;
@@ -73,7 +62,7 @@ function checkDueDate(rawDate, fieldPath, validationErrors) {
 
 /** POST /api/okrs/objectives */
 export function validateObjectiveCreation(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   const { level, period, departmentId, parentObjectiveId } = requestBody;
   if (!Object.values(OBJECTIVE_LEVELS).includes(level))
@@ -106,12 +95,12 @@ export function validateObjectiveCreation(requestBody) {
     sanitizedInput.departmentId = checkId(departmentId, 'departmentId', validationErrors);
     sanitizedInput.parentObjectiveId = checkId(parentObjectiveId, 'parentObjectiveId', validationErrors);
   }
-  return result(validationErrors, sanitizedInput);
+  return validationResult(validationErrors, sanitizedInput);
 }
 
 /** PATCH /api/okrs/objectives/:objectiveId */
 export function validateObjectiveChanges(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   const sanitizedInput = {
     title: checkTitle(requestBody.title, 'title', validationErrors, { required: false }),
@@ -132,12 +121,12 @@ export function validateObjectiveChanges(requestBody) {
     validationErrors.push({ field: 'status', message: 'must be active or archived' });
   if (Object.entries(sanitizedInput).every(([fieldName, value]) => fieldName === 'version' || value === undefined))
     validationErrors.push({ field: 'body', message: 'nothing to change' });
-  return result(validationErrors, sanitizedInput);
+  return validationResult(validationErrors, sanitizedInput);
 }
 
 /** POST /api/okrs/objectives/:objectiveId/key-results */
 export function validateKeyResultCreation(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   if (!Object.values(KEY_RESULT_UNITS).includes(requestBody.unit))
     validationErrors.push({ field: 'unit', message: `must be one of ${Object.values(KEY_RESULT_UNITS).join(', ')}` });
@@ -161,7 +150,7 @@ export function validateKeyResultCreation(requestBody) {
   const targetValue = checkFiniteNumber(requestBody.targetValue, 'targetValue', validationErrors);
   if (typeof startValue === 'number' && startValue === targetValue)
     validationErrors.push({ field: 'targetValue', message: 'must differ from startValue' });
-  return result(validationErrors, {
+  return validationResult(validationErrors, {
     title: checkTitle(requestBody.title, 'title', validationErrors),
     ownerEmployeeId: checkId(requestBody.ownerEmployeeId, 'ownerEmployeeId', validationErrors),
     unit: requestBody.unit,
@@ -174,7 +163,7 @@ export function validateKeyResultCreation(requestBody) {
 
 /** PATCH /api/okrs/key-results/:keyResultId/progress: exactly one of currentValue / progressPercent. */
 export function validateProgressUpdate(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   const { currentValue, progressPercent } = requestBody;
   const hasValue = currentValue !== undefined;
@@ -191,7 +180,7 @@ export function validateProgressUpdate(requestBody) {
   ) {
     validationErrors.push({ field: 'progressPercent', message: 'must be a number from 0 to 100' });
   }
-  return result(validationErrors, {
+  return validationResult(validationErrors, {
     currentValue: hasValue ? currentValue : undefined,
     progressPercent: hasPercent ? progressPercent : undefined,
     note:
@@ -202,9 +191,9 @@ export function validateProgressUpdate(requestBody) {
 
 /** POST /api/okrs/key-results/:keyResultId/milestones */
 export function validateMilestoneCreation(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
-  return result(validationErrors, {
+  return validationResult(validationErrors, {
     title: checkTitle(requestBody.title, 'title', validationErrors),
     dueDate: checkDueDate(requestBody.dueDate, 'dueDate', validationErrors) ?? null,
     version: checkVersion(requestBody.version, validationErrors),
@@ -213,7 +202,7 @@ export function validateMilestoneCreation(requestBody) {
 
 /** PATCH /api/okrs/key-results/:keyResultId/milestones/:milestoneId */
 export function validateMilestoneChanges(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   if (requestBody.status !== undefined && !Object.values(MILESTONE_STATUSES).includes(requestBody.status))
     validationErrors.push({ field: 'status', message: 'must be pending or done' });
@@ -228,5 +217,5 @@ export function validateMilestoneChanges(requestBody) {
   };
   if (sanitizedInput.status === undefined && sanitizedInput.title === undefined && sanitizedInput.dueDate === undefined)
     validationErrors.push({ field: 'body', message: 'nothing to change' });
-  return result(validationErrors, sanitizedInput);
+  return validationResult(validationErrors, sanitizedInput);
 }

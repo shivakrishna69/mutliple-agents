@@ -11,7 +11,7 @@
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { ORG_MESSAGES } from '../constants/messages.js';
+import { COMMON_MESSAGES, ORG_MESSAGES } from '../constants/messages.js';
 import {
   buildHierarchyForest,
   buildReportsSubtree,
@@ -102,7 +102,7 @@ export async function getManagerReports(req, res, next) {
     if (!managerRow) {
       managerRow = await findEmployeeRowById(normalizedManagerId);
       if (!managerRow) {
-        return sendError(req, res, HTTP_STATUS.NOT_FOUND, ORG_MESSAGES.EMPLOYEE_NOT_FOUND);
+        return sendError(req, res, HTTP_STATUS.NOT_FOUND, COMMON_MESSAGES.EMPLOYEE_NOT_FOUND);
       }
     }
 

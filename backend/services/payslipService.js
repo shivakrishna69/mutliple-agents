@@ -55,8 +55,7 @@ import {
   isPayslipStorageConfigured,
   uploadPayslipPdf,
 } from './payslipStorage.js';
-
-const DUPLICATE_KEY_ERROR_CODE = 11000;
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 export const PAYSLIP_ERROR_CODES = Object.freeze({
   NOT_CONFIGURED: 'PAYSLIPS_NOT_CONFIGURED',
@@ -329,7 +328,7 @@ export async function generatePayslip({
       );
     }
     await deletePayslipObjectQuietly(objectKey, requestId);
-    if (writeError?.code === DUPLICATE_KEY_ERROR_CODE) {
+    if (isDuplicateKeyError(writeError)) {
       throw new PayslipGenerationError(
         409,
         PAYSLIP_ERROR_CODES.PAYSLIP_EXISTS,

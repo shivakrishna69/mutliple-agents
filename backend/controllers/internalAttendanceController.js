@@ -34,8 +34,7 @@ import {
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { validateAgentRegularization, validateAgentReviewSubmission } from '../validators/regularizationValidators.js';
-
-const DUPLICATE_KEY_ERROR_CODE = 11000;
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 function auditAgentAction(req, action, outcome, details) {
   recordAuditEvent(req, { category: 'attendance', action, outcome, actor: 'ai_service', ...details });
@@ -168,7 +167,7 @@ export async function fileAgentReview(req, res, next) {
         idempotencyKey: reviewInput.idempotencyKey,
       });
     } catch (writeError) {
-      if (writeError?.code !== DUPLICATE_KEY_ERROR_CODE) throw writeError;
+      if (!isDuplicateKeyError(writeError)) throw writeError;
       // A concurrent retry stored it first.
       const racedReview = await RegularizationReview.findOne({ idempotencyKey: reviewInput.idempotencyKey }).lean();
       return sendSuccess(res, HTTP_STATUS.OK, REGULARIZATION_MESSAGES.REVIEW_ALREADY_FILED, {

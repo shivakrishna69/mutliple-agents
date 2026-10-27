@@ -80,6 +80,7 @@ import {
   updateConversationWithRetry,
 } from '../services/conversationState.js';
 import { validateIncomingMessagePayload } from '../validators/webhookValidators.js';
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 export const WEBHOOK_OUTCOME = Object.freeze({
   AI_REPLIED: 'ai_replied',
@@ -97,8 +98,6 @@ const ACTIVE_CONVERSATION_STATUSES = Object.freeze(Object.values(CONVERSATION_ST
 
 /** Earlier messages sent to the AI as context. Bounds request size and LLM token usage. */
 const AI_HISTORY_MESSAGE_LIMIT = 50;
-
-const DUPLICATE_KEY_ERROR_CODE = 11000;
 
 /** Graph node name recorded in toolExecutionLogs when the backend, not the AI, produced a reply. */
 const FALLBACK_NODE_NAME = 'backend_gateway';
@@ -122,7 +121,7 @@ function toReplySummary(replyMessage) {
 }
 
 function isDuplicateExternalMessageIdError(error) {
-  return error?.code === DUPLICATE_KEY_ERROR_CODE && Boolean(error?.keyPattern?.externalMessageId);
+  return isDuplicateKeyError(error) && Boolean(error?.keyPattern?.externalMessageId);
 }
 
 /** Returns the customer's active conversation, creating a new `unassigned` one if there is none. */

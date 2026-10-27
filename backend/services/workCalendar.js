@@ -12,13 +12,12 @@ import EmployeeProfile from '../models/EmployeeProfile.js';
 import Holiday from '../models/Holiday.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { COMMON_MESSAGES, WORK_CALENDAR_MESSAGES } from '../constants/messages.js';
+import { WORK_CALENDAR_MESSAGES } from '../constants/messages.js';
 import { officeNotFound } from './officeService.js';
-import { ServiceError } from './serviceError.js';
+import { assertCurrentVersion, saveVersioned, ServiceError } from './serviceError.js';
 
 const notFoundHoliday = () =>
   new ServiceError(HTTP_STATUS.NOT_FOUND, 'HOLIDAY_NOT_FOUND', WORK_CALENDAR_MESSAGES.HOLIDAY_NOT_FOUND);
-const staleVersion = () => new ServiceError(HTTP_STATUS.CONFLICT, 'STALE_VERSION', COMMON_MESSAGES.STALE_VERSION);
 
 const toWeeklyOffRules = (rules) =>
   (rules ?? []).map((rule) => ({ weekday: rule.weekday, occurrencesInMonth: [...rule.occurrencesInMonth] }));
@@ -126,7 +125,7 @@ export async function createHoliday({ name, date, officeLocationIds, actorUserId
 export async function updateHoliday({ holidayId, changes, version, actorUserId }) {
   const holiday = await Holiday.findById(holidayId);
   if (!holiday) throw notFoundHoliday();
-  if (holiday.__v !== version) throw staleVersion();
+  assertCurrentVersion(holiday, version);
   const nextDate = changes.date ?? holiday.date;
   const nextOfficeIds = changes.officeLocationIds ?? holiday.officeLocationIds.map((officeId) => officeId.toString());
   if (changes.officeLocationIds) await assertOfficesExist(changes.officeLocationIds);
@@ -137,12 +136,7 @@ export async function updateHoliday({ holidayId, changes, version, actorUserId }
   holiday.updatedByUserId = actorUserId;
   // Bump the version on every edit, not only on array changes, so stale edits are always caught.
   holiday.increment();
-  try {
-    await holiday.save();
-  } catch (saveError) {
-    if (saveError instanceof mongoose.Error.VersionError) throw staleVersion();
-    throw saveError;
-  }
+  await saveVersioned(holiday);
   return toHolidaySummary(holiday);
 }
 

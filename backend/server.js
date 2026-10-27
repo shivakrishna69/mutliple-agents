@@ -45,10 +45,12 @@ import okrRoutes from './routes/okrRoutes.js';
 import workCalendarRoutes from './routes/workCalendarRoutes.js';
 import officeRoutes from './routes/officeRoutes.js';
 import employeeRoutes from './routes/employeeRoutes.js';
+import leaveRoutes from './routes/leaveRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
+import { startLeaveAccrualScheduler, stopLeaveAccrualScheduler } from './services/leaveAccrualJob.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
 import { runStartupMigrations } from './migrations/index.js';
 import { loadConfig } from './config/environment.js';
@@ -141,6 +143,8 @@ export function createApp(config) {
   // Offices (with their weekly offs) and employee records, managed by HR.
   app.use('/api/offices', officeRoutes);
   app.use('/api/employees', employeeRoutes);
+  // Leave settings, types, balances, ledger, HR movements and the leave job.
+  app.use('/api/leave', leaveRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -213,6 +217,8 @@ async function start() {
   });
   httpServer.listen(config.port, () => {
     logger.info('HTTP server listening', { port: config.port, env: config.env });
+    // Accruals and year ends, now and hourly (idempotent, so several instances may run it).
+    startLeaveAccrualScheduler();
   });
 
   /**
@@ -232,6 +238,7 @@ async function start() {
     forceExit.unref();
 
     try {
+      stopLeaveAccrualScheduler();
       await closeSocketServer();
       await closeCacheStore();
       closeVaultStorage();

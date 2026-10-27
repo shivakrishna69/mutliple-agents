@@ -26,8 +26,7 @@ import OfficeLocation from '../models/OfficeLocation.js';
 import { ATTENDANCE_FIELD_LIMITS } from '../constants/validation.js';
 import { classifyArrival, localTimeToMinutes, readOfficeLocalClock } from './attendancePolicy.js';
 import { daysBetweenCalendarDates, isRealCalendarDate } from '../utils/calendarDates.js';
-
-const DUPLICATE_KEY_ERROR_CODE = 11000;
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 export const REGULARIZATION_RULE_CODES = Object.freeze({
   EMPLOYEE_NOT_FOUND: 'EMPLOYEE_NOT_FOUND',
@@ -208,7 +207,7 @@ export async function recordRegularizedAttendance({
     });
     return { attendance: createdEntry.toObject(), newlyCreated: true };
   } catch (writeError) {
-    if (writeError?.code !== DUPLICATE_KEY_ERROR_CODE) throw writeError;
+    if (!isDuplicateKeyError(writeError)) throw writeError;
     // A concurrent request (or a device punch) won the unique { employeeId, date } index.
     const winningEntry = await Attendance.findOne({ employeeId, date }).lean();
     return { attendance: winningEntry, newlyCreated: false };

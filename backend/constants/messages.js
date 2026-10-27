@@ -41,6 +41,7 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
   TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
+  TOO_MANY_LEAVE_ADMIN_UPDATES: 'Too many leave changes in a short time. Please wait a moment and try again',
   TOO_MANY_WORKPLACE_SETUP_UPDATES:
     'Too many office or calendar changes in a short time. Please wait a moment and try again',
 });
@@ -89,7 +90,6 @@ export const ORG_MESSAGES = Object.freeze({
   HIERARCHY_RETRIEVED: 'Organisation hierarchy retrieved',
   REPORTS_RETRIEVED: 'Reports retrieved',
   INVALID_EMPLOYEE_ID: 'Employee id is not valid',
-  EMPLOYEE_NOT_FOUND: 'Employee not found',
 });
 
 export const VAULT_MESSAGES = Object.freeze({
@@ -106,7 +106,6 @@ export const VAULT_MESSAGES = Object.freeze({
   UNSUPPORTED_FILE_TYPE: 'Only PDF, JPEG and PNG files are accepted',
   MULTIPART_REQUIRED: 'Send the upload as multipart/form-data',
   MALFORMED_UPLOAD: 'The upload could not be read. Check the form fields and try again',
-  EMPLOYEE_NOT_FOUND: 'Employee not found',
   DOCUMENT_NOT_FOUND: 'Document not found',
   ACCESS_DENIED: 'You do not have access to this document',
   UPLOAD_NOT_ALLOWED: 'You are not allowed to upload this document',
@@ -210,6 +209,7 @@ export const OKR_MESSAGES = Object.freeze({
 /** Messages shared by several features. */
 export const COMMON_MESSAGES = Object.freeze({
   STALE_VERSION: 'This was changed by someone else. Reload and try again',
+  EMPLOYEE_NOT_FOUND: 'Employee not found',
 });
 
 export const OFFICE_MESSAGES = Object.freeze({
@@ -223,8 +223,38 @@ export const OFFICE_MESSAGES = Object.freeze({
   OFFICE_IN_USE: 'This office still has employees, attendance records or holidays, so it cannot be removed',
   INPUT_INVALID: 'The office details are invalid',
   RESTRICTED: 'Only HR and administrators can manage offices',
-  EMPLOYEE_NOT_FOUND: 'Employee not found',
   EMPLOYEE_OFFICE_ASSIGNED: 'Base office updated',
+});
+
+export const LEAVE_MESSAGES = Object.freeze({
+  SETTINGS_RETRIEVED: 'Leave settings retrieved',
+  SETTINGS_UPDATED: 'Leave settings updated',
+  LEAVE_YEAR_LOCKED: 'The leave year start cannot change once leave has been recorded',
+  TYPES_RETRIEVED: 'Leave types retrieved',
+  TYPE_CREATED: 'Leave type added',
+  TYPE_UPDATED: 'Leave type updated',
+  LEAVE_TYPE_NOT_FOUND: 'Leave type not found',
+  LEAVE_TYPE_CODE_TAKEN: 'Another leave type already uses this code',
+  BALANCE_NOT_TRACKED: 'This leave type does not keep a balance',
+  BALANCES_RETRIEVED: 'Leave balances retrieved',
+  LEDGER_RETRIEVED: 'Leave history retrieved',
+  ADJUSTMENT_POSTED: 'Leave balance adjusted',
+  ENCASHMENT_POSTED: 'Leave encashed',
+  TRACKS_BALANCE_LOCKED: 'Whether this leave type keeps a balance cannot change once leave has been recorded for it',
+  LEAVE_YEAR_NOT_OPEN:
+    'Adjustments can be made to the current leave year, or to the previous one until its year end is processed',
+  PAYROLL_REFERENCE_RESERVED: 'References starting with YEAR-END- are reserved for year-end encashments',
+  OWN_BALANCE_RESTRICTED: 'Your own leave balance must be adjusted or encashed by another HR user or an administrator',
+  INSUFFICIENT_BALANCE: 'The leave balance is not enough for this',
+  NOT_ENCASHABLE: 'This leave type cannot be encashed',
+  ENCASHMENT_EXCEEDS_LIMIT: 'Encashing this many days would leave less than the policy keeps',
+  DUPLICATE_ENCASHMENT: 'An encashment with this payroll reference is already recorded',
+  JOB_COMPLETED: 'Leave accruals and year-end movements are up to date',
+  RECONCILED: 'Leave balances checked against the ledger',
+  FUTURE_RUN_DATE: 'The leave job cannot run for a future date',
+  INPUT_INVALID: 'The leave details are invalid',
+  RESTRICTED: 'Only HR and administrators can manage leave',
+  EMPLOYEES_ONLY: 'Leave is available to employees, HR and administrators',
 });
 
 export const WORK_CALENDAR_MESSAGES = Object.freeze({

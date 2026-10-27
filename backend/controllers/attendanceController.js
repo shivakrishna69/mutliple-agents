@@ -43,8 +43,7 @@ import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { validatePunchInInput } from '../validators/attendanceValidators.js';
 import { validateRegularizeRequest } from '../validators/regularizationValidators.js';
 import { logger } from '../utils/logger.js';
-
-const DUPLICATE_KEY_ERROR_CODE = 11000;
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 /** Stable codes for clients; they branch on these, never on message text. */
 export const ATTENDANCE_ERROR_CODES = Object.freeze({
@@ -242,7 +241,7 @@ export async function punchIn(req, res, next) {
       });
     } catch (persistError) {
       // A concurrent punch-in for the same day won the unique index.
-      if (persistError?.code === DUPLICATE_KEY_ERROR_CODE) {
+      if (isDuplicateKeyError(persistError)) {
         return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
           code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN,
           message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN,

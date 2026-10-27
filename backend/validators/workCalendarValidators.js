@@ -7,29 +7,14 @@
 import { WORK_CALENDAR_LIMITS } from '../constants/validation.js';
 import { daysBetweenCalendarDates, isRealCalendarDate } from '../utils/calendarDates.js';
 import { isValidObjectIdString } from './conversationValidators.js';
+import { bodyNotObjectResult, checkVersion, isPlainObject, validationResult } from './requestShape.js';
 
 const LIMITS = WORK_CALENDAR_LIMITS;
 const EARLIEST_YEAR = 2000;
 const LATEST_YEAR = 2100;
 
-const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isWholeNumberBetween = (value, minimum, maximum) =>
   Number.isInteger(value) && value >= minimum && value <= maximum;
-
-function result(validationErrors, sanitizedInput) {
-  return validationErrors.length > 0 ? { isValid: false, validationErrors } : { isValid: true, sanitizedInput };
-}
-
-function bodyError() {
-  return { isValid: false, validationErrors: [{ field: 'body', message: 'must be a JSON object' }] };
-}
-
-function checkVersion(rawVersion, validationErrors) {
-  if (!Number.isInteger(rawVersion) || rawVersion < 0) {
-    validationErrors.push({ field: 'version', message: 'must be the version you loaded' });
-  }
-  return rawVersion;
-}
 
 function checkHolidayName(rawName, validationErrors) {
   const name = typeof rawName === 'string' ? rawName.trim() : '';
@@ -67,19 +52,19 @@ function checkOfficeIds(rawOfficeIds, validationErrors) {
 
 /** POST /api/work-calendar/holidays */
 export function validateHolidayCreation(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   const sanitizedInput = {
     name: checkHolidayName(requestBody.name, validationErrors),
     date: checkDate(requestBody.date, 'date', validationErrors),
     officeLocationIds: checkOfficeIds(requestBody.officeLocationIds, validationErrors),
   };
-  return result(validationErrors, sanitizedInput);
+  return validationResult(validationErrors, sanitizedInput);
 }
 
 /** PATCH /api/work-calendar/holidays/:holidayId */
 export function validateHolidayChanges(requestBody) {
-  if (!isPlainObject(requestBody)) return bodyError();
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   const changes = {};
   if (requestBody.name !== undefined) changes.name = checkHolidayName(requestBody.name, validationErrors);
@@ -89,7 +74,7 @@ export function validateHolidayChanges(requestBody) {
   }
   if (Object.keys(changes).length === 0) validationErrors.push({ field: 'body', message: 'nothing to change' });
   const version = checkVersion(requestBody.version, validationErrors);
-  return result(validationErrors, { changes, version });
+  return validationResult(validationErrors, { changes, version });
 }
 
 /** GET /api/work-calendar/holidays?year=YYYY[&officeLocationId=] */
@@ -103,7 +88,7 @@ export function validateHolidayListQuery(query) {
   if (officeLocationId !== null && !isValidObjectIdString(officeLocationId)) {
     validationErrors.push({ field: 'officeLocationId', message: 'must be an office id' });
   }
-  return result(validationErrors, {
+  return validationResult(validationErrors, {
     firstDate: `${year}-01-01`,
     lastDate: `${year}-12-31`,
     officeLocationId: officeLocationId?.toLowerCase() ?? null,
@@ -126,5 +111,9 @@ export function validateCalendarRangeQuery(query) {
   if (officeLocationId !== null && !isValidObjectIdString(officeLocationId)) {
     validationErrors.push({ field: 'officeLocationId', message: 'must be an office id' });
   }
-  return result(validationErrors, { firstDate, lastDate, officeLocationId: officeLocationId?.toLowerCase() ?? null });
+  return validationResult(validationErrors, {
+    firstDate,
+    lastDate,
+    officeLocationId: officeLocationId?.toLowerCase() ?? null,
+  });
 }

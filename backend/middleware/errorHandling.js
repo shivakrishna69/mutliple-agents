@@ -5,6 +5,7 @@
 
 import mongoose from 'mongoose';
 import { log } from '../utils/logger.js';
+import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 // ---------------------------------------------------------------------------
 // Error primitives
@@ -55,7 +56,7 @@ function normalizeError(err) {
   if (err instanceof mongoose.Error.CastError) {
     return new HttpError(400, `Invalid value for "${err.path}"`);
   }
-  if (err?.code === 11000) {
+  if (isDuplicateKeyError(err)) {
     return new HttpError(409, 'Duplicate value', { fields: Object.keys(err.keyValue ?? {}) });
   }
   if (err?.name === 'JsonWebTokenError' || err?.name === 'TokenExpiredError') {
