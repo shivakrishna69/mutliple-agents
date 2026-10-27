@@ -169,6 +169,9 @@ async function connectDatabase(uri) {
 
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 10_000 });
   logger.info('MongoDB connected', { host: mongoose.connection.host, db: mongoose.connection.name });
+  // Unique indexes enforce rules (one office per code, one request per half day of leave...), so
+  // they must exist before the first request is served, not be built in the background after it.
+  await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
 }
 
 // ---------------------------------------------------------------------------
