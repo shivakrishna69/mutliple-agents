@@ -57,7 +57,7 @@ scripts/         operational scripts
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
 | `/api/employees` | employee records (base office assignment) | HR, admin |
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
-| `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job | HR, admin manage / employees read their own |
+| `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export | HR, admin manage / employees their own / reporting managers decide their team's requests |
 | `/api/internal` | calls from the AI service | internal API key |
 
 ## Leave balances
@@ -74,3 +74,29 @@ with no leave types gets the India standard template (`data/leave-templates/`) o
 - The leave job (`services/leaveAccrualJob.js`) runs at startup and hourly: monthly or yearly
   accruals in each employee's office time zone, then each leave year's carry forward, lapse and
   encashment once the next year has started. HR can run it on demand.
+
+## Leave requests
+
+Employees price a leave before asking (`POST /api/leave/requests/preview`), then submit it. The
+request goes to their reporting manager, or to HR's queue when they have none; HR and admins can
+decide any request except their own.
+
+- Each leave type's policy is checked on submission: who may use it, notice, how far back a request
+  may start, minimum service, half days, the most days in one go, and when a supporting document
+  (from the employee's document vault) is needed.
+- Days are priced under the employee's office calendar (`services/workingDays.js`). With the
+  sandwich rule, the weekend between two approved leaves is charged to the one approved second,
+  and given back if the other is cancelled or shortened (`services/leaveRequestPricing.js`).
+- Submitting claims each half day (`models/LeaveDayClaim.js`, so overlapping requests are refused
+  even at the same moment) and holds the days on the balance. Approval charges today's price,
+  and is refused if the balance no longer covers it.
+- Before it starts, the employee can withdraw or cancel their leave. After that they ask for a
+  change (cancel it, or end it early), and the approver or HR decides.
+- Without database transactions, each change locks the request with what it will write, posts
+  the ledger movement under a key that can only be posted once, then commits
+  (`services/leaveRequestSettlement.js`). The hourly job and `POST /api/leave/jobs/reconcile`
+  finish anything a stopped server left part-way.
+- The approver is emailed about new requests and change requests, and the employee about each
+  decision, when SMTP is configured.
+- `GET /api/leave/payroll-export?month=YYYY-MM[&changedSince=]` gives payroll each employee's
+  unpaid (Loss of Pay) days in the month, and their encashments.
