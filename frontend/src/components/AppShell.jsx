@@ -39,7 +39,7 @@ import {
   UsersIcon,
 } from './Icons.jsx';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
-import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES } from '../constants/routes.js';
+import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
 
 /** Sidebar entries, grouped into sections. `isVisibleTo(role)` decides who sees each one. */
 const NAVIGATION_SECTIONS = Object.freeze([
@@ -77,7 +77,7 @@ const NAVIGATION_SECTIONS = Object.freeze([
         label: 'Onboarding',
         path: ROUTE_PATHS.ONBOARDING,
         Icon: UserPlusIcon,
-        isVisibleTo: (role) => role === USER_ROLES.ADMIN || role === USER_ROLES.HR,
+        isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
       },
     ],
   },

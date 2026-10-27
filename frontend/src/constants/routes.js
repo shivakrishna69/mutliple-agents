@@ -34,6 +34,12 @@ export const USER_ROLES = Object.freeze({ ADMIN: 'admin', AGENT: 'agent', HR: 'h
 export const STAFF_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.AGENT]);
 
 /**
+ * Roles with organisation-wide HR access (people, payroll, analytics, reviews); mirrors backend
+ * services/workforceAccess.js WORKFORCE_ADMIN_ROLES. Only decides what to show: the backend enforces it.
+ */
+export const WORKFORCE_ADMIN_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.HR]);
+
+/**
  * What each role can do, shown wherever a role is chosen or displayed. `pluralLabel` names a group
  * of users ("Agents", "HR"); `assignmentPhrase` completes "<name> is now …".
  */

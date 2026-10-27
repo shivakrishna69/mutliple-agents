@@ -8,7 +8,7 @@
 
 import { Navigate, Outlet } from 'react-router';
 import { AUTH_STATUS, useAuth } from '../auth/AuthContext.jsx';
-import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES } from '../constants/routes.js';
+import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
 import { SESSION_MESSAGES } from '../constants/messages.js';
 
 function SessionCheckSpinner() {
@@ -66,8 +66,7 @@ export function PeopleManagerRoute() {
   const { authStatus, currentUser } = useAuth();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (![USER_ROLES.ADMIN, USER_ROLES.HR].includes(currentUser?.role))
-    return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  if (!WORKFORCE_ADMIN_ROLES.includes(currentUser?.role)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
   return <Outlet />;
 }
 

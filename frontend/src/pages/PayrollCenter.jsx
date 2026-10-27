@@ -43,10 +43,8 @@ import {
   formatInr,
   openSignedUrl,
 } from '../components/ui.jsx';
-import { ROUTE_PATHS, USER_ROLES } from '../constants/routes.js';
+import { ROUTE_PATHS, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
-
-const PAYROLL_ADMIN_ROLES = [USER_ROLES.ADMIN, USER_ROLES.HR];
 
 const INITIAL_COMPENSATION = Object.freeze({
   annualGross: '1800000',
@@ -697,7 +695,7 @@ function IssuePayslip({ rules, employeeOptions }) {
 
 export default function PayrollCenter() {
   const { currentUser } = useAuth();
-  const isPayrollAdmin = PAYROLL_ADMIN_ROLES.includes(currentUser.role);
+  const isPayrollAdmin = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
   const [activeTabId, setActiveTabId] = useState('planner');
   const rulesResource = useApiResource((signal) => requestPayrollRules(signal), []);
   // HR and admins pick employees from the workforce roster (the risk report lists every current employee).
