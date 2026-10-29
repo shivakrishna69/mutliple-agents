@@ -1,7 +1,8 @@
 /**
  * Starts the real backend (backend/tests/integration/testServer.js) on a throwaway MongoDB
- * database, then creates the accounts and the department the tests use, and onboards one employee
- * (HR invites, the employee accepts) for the workplace and leave tests. Returns the teardown,
+ * database, then creates the accounts and the department the tests use, and onboards employees
+ * (HR invites, the employee accepts): one without an office for the workplace test, and a leave
+ * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave test. Returns the teardown,
  * which stops the backend and drops the database.
  *
  * Needs the backend's dependencies installed (cd backend && npm ci) and MongoDB reachable at
@@ -10,7 +11,17 @@
 
 import { onboardEmployee } from '../../backend/tests/integration/fixtures.js';
 import { startTestServer } from '../../backend/tests/integration/testServer.js';
-import { ACCOUNTS, BACKEND_PORT, DEPARTMENT_NAME, EMPLOYEE, FRONTEND_ORIGIN, PASSWORD } from './environment.js';
+import {
+  ACCOUNTS,
+  BACKEND_PORT,
+  DEPARTMENT_NAME,
+  EMPLOYEE,
+  FRONTEND_ORIGIN,
+  LEAVE_EMPLOYEE,
+  LEAVE_EMPLOYEE_CASUAL_DAYS,
+  LEAVE_MANAGER,
+  PASSWORD,
+} from './environment.js';
 
 async function signUp(testServer, { name, email }) {
   const client = testServer.createClient();
@@ -18,6 +29,54 @@ async function signUp(testServer, { name, email }) {
   if (response.status !== 201) {
     throw new Error(`Seeding ${email} failed: ${response.status} ${JSON.stringify(response.body)}`);
   }
+}
+
+async function expectCreated(responsePromise, what) {
+  const response = await responsePromise;
+  if (response.status >= 300)
+    throw new Error(`Seeding ${what} failed: ${response.status} ${JSON.stringify(response.body)}`);
+  return response.body.data;
+}
+
+/** The employee and manager for the leave test, with an office open every day and a CL balance. */
+async function seedLeaveScenario(testServer, adminClient, departmentId) {
+  const employee = await onboardEmployee({ testServer, hrClient: adminClient, departmentId, ...LEAVE_EMPLOYEE });
+  const manager = await onboardEmployee({ testServer, hrClient: adminClient, departmentId, ...LEAVE_MANAGER });
+  const { office } = await expectCreated(
+    adminClient.post('/api/offices', {
+      name: 'E2E Office',
+      code: 'E2E',
+      coordinates: { lat: 12.97, lng: 77.59 },
+      timeZone: 'Asia/Kolkata',
+      // No weekly offs, so today is always a working day whatever day the tests run.
+      workday: { shiftStartLocalTime: '09:30', shiftEndLocalTime: '18:30', weeklyOffRules: [] },
+    }),
+    'the leave office',
+  );
+  await expectCreated(
+    adminClient.request('PUT', `/api/employees/${employee.profileId}/office`, {
+      body: { officeLocationId: office.id },
+    }),
+    'the office assignment',
+  );
+  const objectId = (id) => new testServer.database.base.Types.ObjectId(id);
+  await testServer.database
+    .collection('employeeprofiles')
+    .updateOne(
+      { _id: objectId(employee.profileId) },
+      { $set: { 'organizationData.reportingManagerId': objectId(manager.profileId) } },
+    );
+  const { leaveTypes } = await expectCreated(adminClient.get('/api/leave/types'), 'the leave types');
+  await expectCreated(
+    adminClient.post('/api/leave/adjustments', {
+      employeeId: employee.profileId,
+      leaveTypeId: leaveTypes.find((type) => type.code === 'CL').id,
+      reasonCode: 'ENTITLEMENT_GRANT',
+      days: LEAVE_EMPLOYEE_CASUAL_DAYS,
+      note: 'Balance for the browser tests',
+    }),
+    'the leave balance',
+  );
 }
 
 export default async function globalSetup() {
@@ -39,6 +98,7 @@ export default async function globalSetup() {
     const adminClient = testServer.createClient();
     await adminClient.login(ACCOUNTS.admin.email, PASSWORD);
     await onboardEmployee({ testServer, hrClient: adminClient, departmentId: departmentId.toString(), ...EMPLOYEE });
+    await seedLeaveScenario(testServer, adminClient, departmentId.toString());
   } catch (seedingError) {
     await testServer.stop();
     throw seedingError;

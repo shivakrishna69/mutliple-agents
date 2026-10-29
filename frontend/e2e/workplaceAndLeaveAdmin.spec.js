@@ -8,7 +8,7 @@
 import { expect, test } from '@playwright/test';
 
 import { ACCOUNTS, EMPLOYEE } from './environment.js';
-import { signIn, watchForPageProblems } from './helpers.js';
+import { localToday, signIn, watchForPageProblems } from './helpers.js';
 
 const OFFICE = Object.freeze({ name: 'Bengaluru HQ', code: 'BLR-HQ' });
 
@@ -44,7 +44,9 @@ test('HR sets up an office, a holiday and leave, and manages an employee’s bal
   await page.getByRole('tab', { name: 'Holidays' }).click();
   await page.getByRole('button', { name: 'Add holiday' }).click();
   await page.getByLabel('Holiday name').fill('Founders Day');
-  await page.getByLabel('Date').fill(`${year}-08-14`);
+  // New Year's Day (or the 2nd, on New Year's Day itself): never today, which the leave test books.
+  const holidayDate = localToday() === `${year}-01-01` ? `${year}-01-02` : `${year}-01-01`;
+  await page.getByLabel('Date').fill(holidayDate);
   await page.getByRole('button', { name: 'Add holiday' }).last().click();
   const holidayRow = page.getByRole('listitem').filter({ hasText: 'Founders Day' });
   await expect(holidayRow.getByText('Every office')).toBeVisible();
@@ -59,8 +61,9 @@ test('HR sets up an office, a holiday and leave, and manages an employee’s bal
   await expect(page.getByLabel(`Base office for ${EMPLOYEE.name}`)).toHaveValue(/[0-9a-f]{24}/);
 
   // --- Leave administration: a type, an entitlement, a refused encashment -------------------------
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Leave admin' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Leave administration' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Leave' }).click();
+  await page.getByRole('tab', { name: 'Administration' }).click();
+  await expect(page).toHaveURL(/\/leave\/admin$/);
   await expect(page.getByRole('listitem').filter({ hasText: 'Earned Leave' })).toBeVisible();
   // The stored zone shows even though Chromium lists it only as Asia/Calcutta.
   await expect(page.getByLabel('Default time zone')).toHaveValue('Asia/Kolkata');

@@ -29,3 +29,9 @@ export function watchForPageProblems(page) {
   });
   return problems;
 }
+
+/** Today as "YYYY-MM-DD" in the browser test's own time zone. */
+export function localToday(now = new Date()) {
+  const pad2 = (value) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+}
