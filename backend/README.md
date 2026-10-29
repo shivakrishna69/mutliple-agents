@@ -55,7 +55,7 @@ scripts/         operational scripts
 | `/api/org` | org chart and reporting lines | staff |
 | `/api/people`, `/api/invitations` | onboarding by email invitation | HR, admin / public token |
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
-| `/api/employees` | employee records (base office assignment) | HR, admin |
+| `/api/employees` | current employees for pickers; base office assignment | HR, admin |
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
 | `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export | HR, admin manage / employees their own / reporting managers decide their team's requests |
 | `/api/internal` | calls from the AI service | internal API key |
@@ -83,7 +83,8 @@ decide any request except their own.
 
 - Each leave type's policy is checked on submission: who may use it, notice, how far back a request
   may start, minimum service, half days, the most days in one go, and when a supporting document
-  (from the employee's document vault) is needed.
+  (a Leave_Document the employee uploads to their own document vault, such as a medical
+  certificate) is needed.
 - Days are priced under the employee's office calendar (`services/workingDays.js`). With the
   sandwich rule, the weekend between two approved leaves is charged to the one approved second,
   and given back if the other is cancelled or shortened (`services/leaveRequestPricing.js`).

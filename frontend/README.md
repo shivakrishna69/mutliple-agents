@@ -27,7 +27,7 @@ API.
 
 Playwright drives Chromium through the real app: the Vite dev server (port 5174) in front of the
 real backend (port 5065), which `e2e/globalSetup.js` starts on a throwaway MongoDB database with
-seeded admin, HR and customer accounts. Your `backend/.env` is never used.
+seeded admin, HR and customer accounts and one onboarded employee. Your `backend/.env` is never used.
 
 ```bash
 cd backend && npm ci            # the tests start the backend, so it needs its dependencies
@@ -43,6 +43,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | `e2e/onboarding.spec.js` | HR invites a joiner, who activates the account from the link; the link works once |
 | `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
 | `e2e/pages.spec.js` | Every page of every role loads with no uncaught errors or 5xx responses; public payslip check |
+| `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
 
 On failure, `playwright-report/` and `test-results/` hold screenshots and traces
 (`npx playwright show-trace <trace.zip>`); CI uploads them as an artifact.
@@ -54,9 +55,11 @@ src/App.jsx           route table (workforce pages are lazy-loaded)
 src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors
 src/auth/             AuthContext: session state and CSRF token
 src/components/       AppShell (role-aware sidebar), RouteGuards, ui.jsx design primitives, feature panels
+                      (workplace/: offices, holidays, base offices; leave/: leave administration)
 src/hooks/            useApiResource (load/abort/error), useSocket, useAgentTelemetry
 src/pages/            one file per screen
-src/constants/        routes and roles, messages, socket event names
+src/constants/        routes and roles, messages, socket event names, workplace and leave labels
+src/utils/            dates in the browser's time zone, CSV downloads
 src/validation/       client-side form checks (the backend validates again)
 ```
 

@@ -109,7 +109,7 @@ by the backend; the frontend only hides what a role cannot use.
 | Attendance (geofence, AI regularization, manager reviews) | Done |
 | Payroll tax calculator, payslip PDFs + verification | Done; monthly payroll run not yet |
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
-| Leave management | In progress: offices, work calendar, policies and balances, and leave requests (approvals, cancellations, payroll export) done in the backend; screens next |
+| Leave management | In progress: backend done (offices, work calendar, policies and balances, requests and approvals, payroll export); HR screens for the workplace and leave administration done; employee leave screens next |
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
 | AI-service tests | Done (`python -m pytest` in `ai-service/`) |
