@@ -2,7 +2,8 @@
  * Starts the real backend (backend/tests/integration/testServer.js) on a throwaway MongoDB
  * database, then creates the accounts and the department the tests use, and onboards employees
  * (HR invites, the employee accepts): one without an office for the workplace test, and a leave
- * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave tests.
+ * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave tests,
+ * plus a second employee of that manager with Earned Leave that needs HR's approval too.
  * A stand-in AI service answers the leave assistant (e2e/standInAiService.js). Returns the teardown,
  * which stops the backend and drops the database.
  *
@@ -23,6 +24,8 @@ import {
   LEAVE_EMPLOYEE_CASUAL_DAYS,
   LEAVE_MANAGER,
   PASSWORD,
+  TWO_STEP_EARNED_DAYS,
+  TWO_STEP_EMPLOYEE,
 } from './environment.js';
 
 async function signUp(testServer, { name, email }) {
@@ -40,9 +43,18 @@ async function expectCreated(responsePromise, what) {
   return response.body.data;
 }
 
-/** The employee and manager for the leave test, with an office open every day and a CL balance. */
+/**
+ * The employees and manager for the leave tests, with an office open every day: a CL balance for
+ * one, and Earned Leave needing the manager's then HR's approval for the other.
+ */
 async function seedLeaveScenario(testServer, adminClient, departmentId) {
   const employee = await onboardEmployee({ testServer, hrClient: adminClient, departmentId, ...LEAVE_EMPLOYEE });
+  const twoStepEmployee = await onboardEmployee({
+    testServer,
+    hrClient: adminClient,
+    departmentId,
+    ...TWO_STEP_EMPLOYEE,
+  });
   const manager = await onboardEmployee({ testServer, hrClient: adminClient, departmentId, ...LEAVE_MANAGER });
   const { office } = await expectCreated(
     adminClient.post('/api/offices', {
@@ -55,19 +67,19 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
     }),
     'the leave office',
   );
-  await expectCreated(
-    adminClient.request('PUT', `/api/employees/${employee.profileId}/office`, {
-      body: { officeLocationId: office.id },
-    }),
-    'the office assignment',
-  );
   const objectId = (id) => new testServer.database.base.Types.ObjectId(id);
-  await testServer.database
-    .collection('employeeprofiles')
-    .updateOne(
-      { _id: objectId(employee.profileId) },
-      { $set: { 'organizationData.reportingManagerId': objectId(manager.profileId) } },
+  for (const { profileId } of [employee, twoStepEmployee]) {
+    await expectCreated(
+      adminClient.request('PUT', `/api/employees/${profileId}/office`, { body: { officeLocationId: office.id } }),
+      'the office assignment',
     );
+    await testServer.database
+      .collection('employeeprofiles')
+      .updateOne(
+        { _id: objectId(profileId) },
+        { $set: { 'organizationData.reportingManagerId': objectId(manager.profileId) } },
+      );
+  }
   const { leaveTypes } = await expectCreated(adminClient.get('/api/leave/types'), 'the leave types');
   // Sick Leave needs a supporting document from the first day, so the test reaches the upload.
   const sickLeave = leaveTypes.find((type) => type.code === 'SL');
@@ -87,6 +99,25 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
       note: 'Balance for the browser tests',
     }),
     'the leave balance',
+  );
+  // Earned Leave of any length needs HR's approval after the manager's.
+  const earnedLeave = leaveTypes.find((type) => type.code === 'EL');
+  await expectCreated(
+    adminClient.patch(`/api/leave/types/${earnedLeave.id}`, {
+      usage: { hrApprovalAfterDays: 0 },
+      version: earnedLeave.version,
+    }),
+    'the Earned Leave approval rule',
+  );
+  await expectCreated(
+    adminClient.post('/api/leave/adjustments', {
+      employeeId: twoStepEmployee.profileId,
+      leaveTypeId: earnedLeave.id,
+      reasonCode: 'ENTITLEMENT_GRANT',
+      days: TWO_STEP_EARNED_DAYS,
+      note: 'Balance for the two-step approval test',
+    }),
+    'the Earned Leave balance',
   );
 }
 

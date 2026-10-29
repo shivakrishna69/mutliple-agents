@@ -29,3 +29,10 @@ export const EMPLOYEE = Object.freeze({ name: 'Esha Iyer', email: 'esha.iyer@exa
 export const LEAVE_EMPLOYEE = Object.freeze({ name: 'Leela Nair', email: 'leela.nair@example.com' });
 export const LEAVE_MANAGER = Object.freeze({ name: 'Manav Shah', email: 'manav.shah@example.com' });
 export const LEAVE_EMPLOYEE_CASUAL_DAYS = 5;
+
+/**
+ * Another employee of the same manager and office, for the two-step approval test: Earned Leave
+ * needs HR's approval after the manager's for any length of leave, and she has some.
+ */
+export const TWO_STEP_EMPLOYEE = Object.freeze({ name: 'Tara Pillai', email: 'tara.pillai@example.com' });
+export const TWO_STEP_EARNED_DAYS = 3;
