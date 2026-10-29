@@ -74,11 +74,12 @@ export const ROLE_DISPLAY = Object.freeze({
     description: 'Manages employee records and documents',
     badgeClassName: 'bg-amber-50 text-amber-800 ring-amber-600/20',
   },
+  // The backend role stays 'customer'; people with it are the company's employees, so they see this.
   customer: {
-    label: 'Customer',
-    pluralLabel: 'Customers',
-    assignmentPhrase: 'a customer',
-    description: 'Chats with support',
+    label: 'Employee',
+    pluralLabel: 'Employees',
+    assignmentPhrase: 'an employee',
+    description: 'Uses their workspace: leave, attendance, payroll and the support chat',
     badgeClassName: 'bg-slate-100 text-slate-700 ring-slate-500/20',
   },
 });
