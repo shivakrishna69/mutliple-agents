@@ -57,7 +57,7 @@ function findFreePort() {
   });
 }
 
-function buildServerEnvironment({ port, mongoUri, appOrigin }) {
+function buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey }) {
   const inherited = Object.fromEntries(
     INHERITED_ENVIRONMENT_KEYS.filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]]),
   );
@@ -69,9 +69,8 @@ function buildServerEnvironment({ port, mongoUri, appOrigin }) {
     MONGO_URI: mongoUri,
     JWT_SECRET: randomBytes(32).toString('hex'),
     WEBHOOK_SIGNING_SECRET: randomBytes(32).toString('hex'),
-    AI_SERVICE_API_KEY: randomBytes(32).toString('hex'),
-    // Nothing listens here; tests never reach the AI service.
-    AI_SERVICE_URL: 'http://127.0.0.1:9',
+    AI_SERVICE_API_KEY: internalApiKey,
+    AI_SERVICE_URL: aiServiceUrl,
     CORS_ORIGINS: appOrigin,
     BOOTSTRAP_ADMIN_EMAIL: TEST_ADMIN_EMAIL,
     COMPANY_NAME: 'Test Company',
@@ -97,13 +96,23 @@ async function waitUntilHealthy(baseUrl, serverProcess, readOutput) {
 
 /**
  * Starts server.js on a fresh database.
- * @param {{ port?: number, appOrigin?: string, seedBeforeStart?: (database: mongoose.Connection) => Promise<void> }} [options]
+ * @param {{ port?: number, appOrigin?: string, aiServiceUrl?: string,
+ *   seedBeforeStart?: (database: mongoose.Connection) => Promise<void> }} [options]
  *   A fixed port and the browser origin to allow (the frontend's browser tests need both to be known
  *   in advance); by default a free port and TEST_APP_ORIGIN. `seedBeforeStart` writes data before the
  *   server starts, so its startup migrations see that data.
- * @returns {Promise<{ baseUrl: string, database: mongoose.Connection, createClient: () => TestClient, stop: () => Promise<void> }>}
+ * @returns {Promise<{ baseUrl: string, database: mongoose.Connection, internalApiKey: string,
+ *   createClient: () => TestClient, stop: () => Promise<void> }>}
  */
-export async function startTestServer({ port: requestedPort, appOrigin = TEST_APP_ORIGIN, seedBeforeStart } = {}) {
+export async function startTestServer({
+  port: requestedPort,
+  appOrigin = TEST_APP_ORIGIN,
+  // Nothing listens here by default; a test that needs the AI service passes its stand-in's URL.
+  aiServiceUrl = 'http://127.0.0.1:9',
+  seedBeforeStart,
+} = {}) {
+  // The key the backend and the AI service share; tests use it to call /api/internal like the AI service.
+  const internalApiKey = randomBytes(32).toString('hex');
   const port = requestedPort ?? (await findFreePort());
   const databaseName = `unitora_test_${process.pid}_${randomBytes(4).toString('hex')}`;
   const mongoUri = `${MONGO_BASE_URL}/${databaseName}`;
@@ -116,7 +125,7 @@ export async function startTestServer({ port: requestedPort, appOrigin = TEST_AP
   function spawnServer() {
     serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
       cwd: workingDirectory,
-      env: buildServerEnvironment({ port, mongoUri, appOrigin }),
+      env: buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const captureOutput = (chunk) => {
@@ -147,7 +156,7 @@ export async function startTestServer({ port: requestedPort, appOrigin = TEST_AP
     throw startupError;
   }
 
-  return { baseUrl, database, createClient: () => new TestClient(baseUrl), stop };
+  return { baseUrl, database, internalApiKey, createClient: () => new TestClient(baseUrl), stop };
 }
 
 /** A browser-like client: stores cookies from Set-Cookie and sends the CSRF token on writes. */

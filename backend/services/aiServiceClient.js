@@ -1,5 +1,11 @@
 /**
- * HTTP client for the Python ai-service: POST {AI_SERVICE_URL}/ai/process.
+ * HTTP client for the Python ai-service. Three calls share one transport (postToAiService: headers,
+ * hard deadline, size limits, failure classification), each with its own response check:
+ *   POST /ai/process               the support conversation (documented below)
+ *   POST /ai/attendance/regularize  the attendance regularization agent
+ *   POST /ai/leave/assistant        the leave assistant: { reply, draft, tools_used }
+ *
+ * POST {AI_SERVICE_URL}/ai/process:
  * The contract is defined by ai-service/app/schemas.py; this module is its backend counterpart.
  *
  * Request (ConversationInput), built by `buildConversationInput`:
@@ -51,6 +57,7 @@ import { MESSAGE_FIELD_LIMITS } from '../constants/validation.js';
 
 export const AI_PROCESS_PATH = '/ai/process';
 export const AI_REGULARIZE_PATH = '/ai/attendance/regularize';
+export const AI_LEAVE_ASSISTANT_PATH = '/ai/leave/assistant';
 
 export const AI_FAILURE_KIND = Object.freeze({
   TIMEOUT: 'timeout',
@@ -213,7 +220,21 @@ function parseAiServiceResponse(responseBody, expectedConversationId, requestSta
  *                     toolExecutionLogs: object[], durationMs: number }>}
  * @throws {AiServiceError}
  */
-export async function requestAiProcessing(aiProcessRequest, { config, requestId }) {
+export function requestAiProcessing(aiProcessRequest, { config, requestId }) {
+  return postToAiService(AI_PROCESS_PATH, aiProcessRequest, { config, requestId }, (responseBody, startedAt) =>
+    parseAiServiceResponse(responseBody, aiProcessRequest.conversation_id, startedAt),
+  );
+}
+
+/**
+ * POSTs `requestBody` to the ai-service and returns `parseResponse(body, startedAt)` with the
+ * duration added, classifying every failure as an AiServiceError (see the module comment).
+ * @param {string} path
+ * @param {object} requestBody
+ * @param {{ config: object, requestId: string }} callContext
+ * @param {(responseBody: unknown, startedAt: Date) => object} parseResponse  throws invalid_response
+ */
+async function postToAiService(path, requestBody, { config, requestId }, parseResponse) {
   const startedAtMs = Date.now();
   // AbortSignal.timeout is a hard deadline for the whole exchange; axios's own `timeout` only
   // measures socket inactivity in Node, which a slowly trickling response would never trip.
@@ -221,7 +242,7 @@ export async function requestAiProcessing(aiProcessRequest, { config, requestId 
 
   let aiServiceResponse;
   try {
-    aiServiceResponse = await axios.post(`${config.aiServiceUrl}${AI_PROCESS_PATH}`, aiProcessRequest, {
+    aiServiceResponse = await axios.post(`${config.aiServiceUrl}${path}`, requestBody, {
       timeout: config.aiServiceTimeoutMs,
       signal: deadlineSignal,
       headers: {
@@ -255,10 +276,7 @@ export async function requestAiProcessing(aiProcessRequest, { config, requestId 
 
   const durationMs = Date.now() - startedAtMs;
   try {
-    return {
-      ...parseAiServiceResponse(aiServiceResponse.data, aiProcessRequest.conversation_id, new Date(startedAtMs)),
-      durationMs,
-    };
+    return { ...parseResponse(aiServiceResponse.data, new Date(startedAtMs)), durationMs };
   } catch (parseError) {
     if (parseError instanceof AiServiceError) parseError.durationMs = durationMs;
     throw parseError;
@@ -337,46 +355,78 @@ function parseRegularizationResponse(responseBody, expectedThreadId) {
  * @returns {Promise<ReturnType<typeof parseRegularizationResponse> & { durationMs: number }>}
  * @throws {AiServiceError}
  */
-export async function requestAttendanceRegularization(regularizationRequest, { config, requestId }) {
-  const startedAtMs = Date.now();
-  const deadlineSignal = AbortSignal.timeout(config.aiServiceTimeoutMs);
-  let aiServiceResponse;
-  try {
-    aiServiceResponse = await axios.post(`${config.aiServiceUrl}${AI_REGULARIZE_PATH}`, regularizationRequest, {
-      timeout: config.aiServiceTimeoutMs,
-      signal: deadlineSignal,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Internal-Api-Key': config.aiServiceApiKey,
-        'X-Request-Id': requestId,
-      },
-      responseType: 'json',
-      maxContentLength: MAX_AI_RESPONSE_BYTES,
-      maxBodyLength: MAX_AI_RESPONSE_BYTES,
-      maxRedirects: 0,
-      transitional: { clarifyTimeoutError: true },
-    });
-  } catch (requestError) {
-    const durationMs = Date.now() - startedAtMs;
-    if (deadlineSignal.aborted || requestError.code === 'ETIMEDOUT' || requestError.code === 'ECONNABORTED') {
-      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, {
-        durationMs,
-      });
-    }
-    if (requestError.response) {
-      throw new AiServiceError(AI_FAILURE_KIND.ERROR_RESPONSE, `HTTP ${requestError.response.status}`, {
-        httpStatus: requestError.response.status,
-        durationMs,
-      });
-    }
-    throw new AiServiceError(AI_FAILURE_KIND.UNAVAILABLE, requestError.code ?? requestError.message, { durationMs });
+export function requestAttendanceRegularization(regularizationRequest, { config, requestId }) {
+  return postToAiService(AI_REGULARIZE_PATH, regularizationRequest, { config, requestId }, (responseBody) =>
+    parseRegularizationResponse(responseBody, regularizationRequest.thread_id),
+  );
+}
+
+// =================================================================================================
+// POST /ai/leave/assistant
+// =================================================================================================
+
+/** Bounds on what the leave assistant may return. */
+const LEAVE_ASSISTANT_LIMITS = Object.freeze({ MAX_TOOLS_USED: 20, MAX_TOOL_NAME_LENGTH: 64 });
+const LEAVE_DRAFT_FIELDS = Object.freeze([
+  'leave_type_id',
+  'start_date',
+  'start_day_portion',
+  'end_date',
+  'end_day_portion',
+  'reason',
+]);
+
+/**
+ * Checks a LeaveAssistantResponse { reply, draft, tools_used } and maps it to camelCase. The draft's
+ * values are checked again by the caller against the leave rules; here only its shape.
+ */
+function parseLeaveAssistantResponse(responseBody) {
+  const rejectResponse = (detail) => {
+    throw new AiServiceError(AI_FAILURE_KIND.INVALID_RESPONSE, detail);
+  };
+  if (!isPlainObject(responseBody)) rejectResponse('body is not a JSON object');
+  const { reply, draft, tools_used: toolsUsed } = responseBody;
+  if (typeof reply !== 'string' || reply.trim().length === 0) rejectResponse('reply is empty');
+  if (reply.length > MESSAGE_FIELD_LIMITS.TEXT_MAX_LENGTH) rejectResponse('reply is too long');
+  if (draft !== null && draft !== undefined) {
+    if (!isPlainObject(draft)) rejectResponse('draft is not an object');
+    const fieldsAreStrings = LEAVE_DRAFT_FIELDS.every(
+      (fieldName) =>
+        draft[fieldName] === null || draft[fieldName] === undefined || typeof draft[fieldName] === 'string',
+    );
+    if (!fieldsAreStrings) rejectResponse('draft has a field that is not text');
   }
-  const durationMs = Date.now() - startedAtMs;
-  try {
-    return { ...parseRegularizationResponse(aiServiceResponse.data, regularizationRequest.thread_id), durationMs };
-  } catch (parseError) {
-    if (parseError instanceof AiServiceError) parseError.durationMs = durationMs;
-    throw parseError;
-  }
+  const isToolList =
+    Array.isArray(toolsUsed) &&
+    toolsUsed.length <= LEAVE_ASSISTANT_LIMITS.MAX_TOOLS_USED &&
+    toolsUsed.every(
+      (toolName) => typeof toolName === 'string' && toolName.length <= LEAVE_ASSISTANT_LIMITS.MAX_TOOL_NAME_LENGTH,
+    );
+  if (!isToolList) rejectResponse('tools_used is not a short list of names');
+  return {
+    reply: reply.trim(),
+    draft: draft
+      ? {
+          leaveTypeId: draft.leave_type_id ?? null,
+          startDate: draft.start_date ?? null,
+          startDayPortion: draft.start_day_portion ?? null,
+          endDate: draft.end_date ?? null,
+          endDayPortion: draft.end_day_portion ?? null,
+          reason: draft.reason ?? null,
+        }
+      : null,
+    toolsUsed,
+  };
+}
+
+/**
+ * Sends one employee message to the leave assistant.
+ * @param {{ employee_id: string, employee_name: string, today: string, time_zone: string,
+ *   history: { role: 'user'|'assistant', content: string }[], message: string }} assistantRequest
+ * @param {{ config: object, requestId: string }} callContext
+ * @returns {Promise<{ reply: string, draft: object|null, toolsUsed: string[], durationMs: number }>}
+ * @throws {AiServiceError}
+ */
+export function requestLeaveAssistant(assistantRequest, { config, requestId }) {
+  return postToAiService(AI_LEAVE_ASSISTANT_PATH, assistantRequest, { config, requestId }, parseLeaveAssistantResponse);
 }

@@ -5,7 +5,7 @@
  */
 
 import { DAY_PORTIONS } from '../constants/calendarDays.js';
-import { CALENDAR_MONTH_PATTERN } from '../constants/validation.js';
+import { CALENDAR_MONTH_PATTERN, LEAVE_LIMITS } from '../constants/validation.js';
 import { APPROVAL_QUEUES, CHANGE_REQUEST_KINDS, LEAVE_REQUEST_STATUSES } from '../models/LeaveRequest.js';
 import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { checkId, checkNote, checkOptionalLeaveYear } from './leaveValidators.js';
@@ -151,4 +151,43 @@ export function validatePayrollExportQuery(query) {
     }
   }
   return validationResult(validationErrors, { month, changedSince });
+}
+
+const ASSISTANT_ROLES = Object.freeze(['user', 'assistant']);
+
+/**
+ * POST /api/leave/assistant { message, history? }: the question and the recent conversation, oldest
+ * first, as the browser keeps it. Nothing in the history is trusted: it only gives the model context,
+ * and the assistant can only read the asker's own leave.
+ */
+export function validateAssistantMessage(requestBody) {
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
+  const validationErrors = [];
+  const message = typeof requestBody.message === 'string' ? requestBody.message.trim() : '';
+  if (message.length === 0 || message.length > LEAVE_LIMITS.ASSISTANT_MESSAGE_MAX_LENGTH) {
+    validationErrors.push({
+      field: 'message',
+      message: `must be 1-${LEAVE_LIMITS.ASSISTANT_MESSAGE_MAX_LENGTH} characters`,
+    });
+  }
+  const rawHistory = requestBody.history ?? [];
+  const isValidHistory =
+    Array.isArray(rawHistory) &&
+    rawHistory.length <= LEAVE_LIMITS.ASSISTANT_HISTORY_MAX_MESSAGES &&
+    rawHistory.every(
+      (entry) =>
+        isPlainObject(entry) &&
+        ASSISTANT_ROLES.includes(entry.role) &&
+        typeof entry.content === 'string' &&
+        entry.content.trim().length > 0 &&
+        entry.content.length <= LEAVE_LIMITS.ASSISTANT_HISTORY_MESSAGE_MAX_LENGTH,
+    );
+  if (!isValidHistory) {
+    validationErrors.push({
+      field: 'history',
+      message: `must be up to ${LEAVE_LIMITS.ASSISTANT_HISTORY_MAX_MESSAGES} messages of role user or assistant`,
+    });
+  }
+  const history = isValidHistory ? rawHistory.map(({ role, content }) => ({ role, content: content.trim() })) : [];
+  return validationResult(validationErrors, { message, history });
 }

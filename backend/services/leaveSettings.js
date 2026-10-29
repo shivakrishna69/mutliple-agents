@@ -62,7 +62,8 @@ export function leaveYearForDate(calendarDate, settings) {
 }
 
 /**
- * One employee as leave sees them: their profile, the settings, their today and current leave year.
+ * One employee as leave sees them: their profile, the settings, their time zone (their office's, or
+ * the company default), their today and current leave year.
  * @throws {ServiceError} 404 EMPLOYEE_NOT_FOUND
  */
 export async function loadEmployeeLeaveContext(employeeId, { now = new Date() } = {}) {
@@ -76,6 +77,7 @@ export async function loadEmployeeLeaveContext(employeeId, { now = new Date() } 
   const settings = await getLeaveSettings();
   const { officeLocationId } = employee.organizationData;
   const office = officeLocationId ? await OfficeLocation.findById(officeLocationId).select('timeZone').lean() : null;
-  const today = employeeToday({ officeTimeZone: office?.timeZone, settings, now });
-  return { employee, settings, today, currentLeaveYear: leaveYearForDate(today, settings) };
+  const timeZone = office?.timeZone ?? settings.defaultTimeZone;
+  const today = employeeToday({ officeTimeZone: timeZone, settings, now });
+  return { employee, settings, timeZone, today, currentLeaveYear: leaveYearForDate(today, settings) };
 }

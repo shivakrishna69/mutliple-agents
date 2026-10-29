@@ -42,6 +42,7 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
   TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
   TOO_MANY_LEAVE_ADMIN_UPDATES: 'Too many leave changes in a short time. Please wait a moment and try again',
+  TOO_MANY_LEAVE_ASSISTANT_MESSAGES: 'Too many questions to the leave assistant in a short time. Please wait a moment',
   TOO_MANY_LEAVE_REQUEST_UPDATES:
     'Too many leave requests or decisions in a short time. Please wait a moment and try again',
   TOO_MANY_WORKPLACE_SETUP_UPDATES:
@@ -268,6 +269,8 @@ export const LEAVE_MESSAGES = Object.freeze({
   CHANGE_APPROVED: 'Change approved',
   CHANGE_REJECTED: 'Change rejected',
   PAYROLL_EXPORT_RETRIEVED: 'Leave payroll figures retrieved',
+  ASSISTANT_REPLIED: 'The leave assistant replied',
+  ASSISTANT_UNAVAILABLE: 'The leave assistant is not available right now. You can still ask for leave with the form',
   REQUEST_NOT_FOUND: 'Leave request not found',
   LEAVE_TYPE_INACTIVE: 'This leave type is no longer offered',
   NOT_ELIGIBLE: 'This leave type is not available to you at your current employment status',

@@ -42,6 +42,8 @@ export const RATE_LIMITS = Object.freeze({
   LEAVE_ADMIN_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Leave requests and decisions: a manager clearing a queue stays within this; a script does not.
   LEAVE_REQUEST_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // The leave assistant: each question costs model calls; a person asks a few a minute at most.
+  LEAVE_ASSISTANT_MESSAGES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
   // Invitations send email: generous for onboarding a batch, low enough to stop mail abuse.
   INVITATION_SENDS_PER_USER: Object.freeze({ windowMs: 10 * 60 * 1000, maxRequests: 60 }),
   // Public invite links: enough to open a link and set a password a few times, too few to scan tokens.
