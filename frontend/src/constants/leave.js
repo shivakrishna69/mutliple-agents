@@ -14,6 +14,10 @@ export const LEAVE_FIELD_LIMITS = Object.freeze({
   POLICY_DAY_STEP: 0.5,
   MAX_POLICY_DAYS: 365,
   TYPE_CODE_PATTERN: '^[A-Z][A-Z0-9_]{1,19}$',
+  // The leave assistant (backend LEAVE_LIMITS): one question, and how much of the conversation is
+  // sent with it.
+  ASSISTANT_MESSAGE_MAX_LENGTH: 1000,
+  ASSISTANT_HISTORY_MAX_MESSAGES: 12,
 });
 
 export const ACCRUAL_METHOD_OPTIONS = Object.freeze([
@@ -147,3 +151,7 @@ export function describeLeaveDates({ startDate, startDayPortion, endDate, endDay
 export const UPLOAD_UNAVAILABLE_MESSAGE =
   'Upload service unavailable. Please select an existing document from your vault.';
 export const UPLOAD_UNAVAILABLE_NO_DOCUMENTS_HINT = 'You have none yet, so ask HR to add one to your vault for you.';
+
+/** Shown when the leave assistant cannot answer (the AI or the leave data is unavailable). */
+export const ASSISTANT_UNAVAILABLE_MESSAGE =
+  'The leave assistant is not available right now. You can still ask for leave with the form.';

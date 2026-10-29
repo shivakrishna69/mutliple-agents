@@ -206,25 +206,27 @@ function AttachmentPicker({ employeeId, value, onChange, error }) {
 }
 
 /**
- * @param {{ leaveTypes: object[], employeeId: string, today: string,
- *   onSubmitted: (request: object) => void, onCancel: () => void }} props
+ * @param {{ leaveTypes: object[], employeeId: string, today: string, draft?: object|null,
+ *   onSubmitted: (request: object) => void, onCancel: () => void }} props  `draft` comes from the
+ *   leave assistant and fills the form; nothing is sent until the employee presses Send.
  */
-export default function LeaveRequestForm({ leaveTypes, employeeId, today, onSubmitted, onCancel }) {
+export default function LeaveRequestForm({ leaveTypes, employeeId, today, draft = null, onSubmitted, onCancel }) {
   const { csrfToken } = useAuth();
-  const [form, setForm] = useState({
-    leaveTypeId: leaveTypes[0]?.id ?? '',
-    startDate: today,
-    startDayPortion: DAY_PORTIONS.FULL,
-    endDate: today,
-    endDayPortion: DAY_PORTIONS.FULL,
-    reason: '',
+  // A draft from the leave assistant fills the form; the employee still reviews and sends it.
+  const [form, setForm] = useState(() => ({
+    leaveTypeId: draft?.leaveTypeId ?? leaveTypes[0]?.id ?? '',
+    startDate: draft?.startDate ?? today,
+    startDayPortion: draft?.startDayPortion ?? DAY_PORTIONS.FULL,
+    endDate: draft?.endDate ?? today,
+    endDayPortion: draft?.endDayPortion ?? DAY_PORTIONS.FULL,
+    reason: draft?.reason ?? '',
     attachmentDocumentId: null,
-  });
+  }));
   // The starting choice is priced as soon as the form opens, so it starts out busy.
   const [previewState, setPreviewState] = useState(() => ({
     preview: null,
     error: null,
-    isPreviewing: Boolean(leaveTypes[0]),
+    isPreviewing: Boolean(draft?.leaveTypeId ?? leaveTypes[0]),
   }));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -309,7 +311,14 @@ export default function LeaveRequestForm({ leaveTypes, employeeId, today, onSubm
 
   const { preview, error: previewError, isPreviewing } = previewState;
   return (
-    <Card title="Ask for leave" subtitle="See what it costs before you send it. Your manager, or HR, decides.">
+    <Card
+      title={draft ? 'Review the assistant’s draft' : 'Ask for leave'}
+      subtitle={
+        draft
+          ? 'Check the dates and the cost, then send it yourself. Your manager, or HR, decides.'
+          : 'See what it costs before you send it. Your manager, or HR, decides.'
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         {submitError && <Notice tone="error" title={submitError.message} />}
         <div className="grid gap-4 sm:grid-cols-3">

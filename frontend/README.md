@@ -28,7 +28,9 @@ API.
 Playwright drives Chromium through the real app: the Vite dev server (port 5174) in front of the
 real backend (port 5065), which `e2e/globalSetup.js` starts on a throwaway MongoDB database with
 seeded admin, HR and customer accounts, one onboarded employee without an office, and a leave
-scenario (an employee with an office, a manager and a Casual Leave balance). Your `backend/.env` is never used.
+scenario (an employee with an office, a manager and a Casual Leave balance). A stand-in AI service
+(`e2e/standInAiService.js`) answers the leave assistant, reading real data through the backend's
+internal API. Your `backend/.env` is never used.
 
 ```bash
 cd backend && npm ci            # the tests start the backend, so it needs its dependencies
@@ -44,6 +46,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | `e2e/onboarding.spec.js` | HR invites a joiner, who activates the account from the link; the link works once |
 | `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
 | `e2e/pages.spec.js` | Every page of every role loads with no uncaught errors or 5xx responses; public payslip check |
+| `e2e/leaveAssistant.spec.js` | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message |
 | `e2e/leaveRequests.spec.js` | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave |
 | `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
 

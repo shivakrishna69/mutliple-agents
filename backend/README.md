@@ -104,3 +104,7 @@ decide any request except their own.
   decision, when SMTP is configured.
 - `GET /api/leave/payroll-export?month=YYYY-MM[&changedSince=]` gives payroll each employee's
   unpaid (Loss of Pay) days in the month, and their encashments.
+- The leave assistant (`POST /api/leave/assistant`) answers an employee's questions about their own
+  leave through the ai-service, whose tools read `/api/internal/leave` for that employee only. It
+  can propose a draft, which is checked against the leave rules here and opens the normal apply
+  form; the employee sends it. The conversation stays in the browser; nothing is stored.
