@@ -45,10 +45,12 @@ class BackendUnavailableError(Exception):
 class BackendRejectedError(Exception):
     """The backend refused the request (4xx); retrying the same request cannot succeed."""
 
-    def __init__(self, http_status: int, message: str) -> None:
+    def __init__(self, http_status: int, message: str, code: str | None = None) -> None:
         super().__init__(f"HTTP {http_status}: {message}")
         self.http_status = http_status
         self.message = message
+        # The backend's stable error code (e.g. TOO_FAR_BACK), when it gave one.
+        self.code = code
 
 
 class BackendInternalClient:
@@ -68,18 +70,37 @@ class BackendInternalClient:
 
     async def post_json(self, path: str, payload: dict[str, Any], *, request_id: str | None = None) -> dict[str, Any]:
         """POSTs JSON and returns the response's `data` object. Retries once on unavailability."""
+        return await self._request_data("POST", path, json_payload=payload, request_id=request_id)
+
+    async def get_json(
+        self, path: str, params: dict[str, str] | None = None, *, request_id: str | None = None
+    ) -> dict[str, Any]:
+        """GETs and returns the response's `data` object. Retries once on unavailability."""
+        return await self._request_data("GET", path, params=params, request_id=request_id)
+
+    async def _request_data(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_payload: dict[str, Any] | None = None,
+        params: dict[str, str] | None = None,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
         headers = {"X-Request-Id": request_id} if request_id else {}
         last_failure: Exception | None = None
         for attempt_number in range(1, MAX_ATTEMPTS + 1):
             try:
-                response = await self._http_client.post(path, json=payload, headers=headers)
+                response = await self._http_client.request(
+                    method, path, json=json_payload, params=params, headers=headers
+                )
             except httpx.HTTPError as transport_error:
                 last_failure = BackendUnavailableError(f"{type(transport_error).__name__}: {transport_error}")
             else:
                 if response.status_code >= 500:
                     last_failure = BackendUnavailableError(f"HTTP {response.status_code}")
                 elif response.status_code >= 400:
-                    raise BackendRejectedError(response.status_code, _error_message(response))
+                    raise BackendRejectedError(response.status_code, *_error_message_and_code(response))
                 else:
                     response_body = _json_object(response)
                     response_data = response_body.get("data")
@@ -105,10 +126,13 @@ def _json_object(response: httpx.Response) -> dict[str, Any]:
     return decoded_body
 
 
-def _error_message(response: httpx.Response) -> str:
+def _error_message_and_code(response: httpx.Response) -> tuple[str, str | None]:
     try:
         error_body = response.json().get("error", {})
-        message = error_body.get("message") if isinstance(error_body, dict) else None
     except (ValueError, AttributeError):
-        message = None
-    return str(message or f"HTTP {response.status_code}")[:300]
+        error_body = {}
+    if not isinstance(error_body, dict):
+        error_body = {}
+    message = error_body.get("message")
+    code = error_body.get("code")
+    return str(message or f"HTTP {response.status_code}")[:300], code if isinstance(code, str) else None
