@@ -4,11 +4,15 @@
  * requests routed to them; HR and administrators see everyone's except their own.
  *
  *   GET /api/leave/approvals?queue=requests|changes
- *   POST …/:id/approve { note? } · …/:id/reject { note } · …/:id/change/decision { approve, note? }
+ *   POST …/:id/approve { note?, step } · …/:id/reject { note, step } · …/:id/change/decision { approve, note? }
  *
- * Approval charges the leave at today's price, so it can differ from the price when it was asked
- * for (a holiday added since, or approved leave next to it under the sandwich rule); if the
- * balance no longer covers it, the backend refuses and says so. Declining always needs a note.
+ * Long leave may need two approvals, the manager's then HR's; each item shows where it stands, and
+ * HR sees requests still waiting for the manager too. A decision names the step it is for, so if
+ * someone decided that step a moment earlier the backend refuses and the queue reloads.
+ *
+ * The last approval charges the leave at today's price, so it can differ from the price when it
+ * was asked for (a holiday added since, or approved leave next to it under the sandwich rule); if
+ * the balance no longer covers it, the backend refuses and says so. Declining always needs a note.
  */
 
 import { useState } from 'react';
@@ -18,6 +22,7 @@ import {
   requestLeaveChangeDecision,
   requestLeaveRejection,
 } from '../../api/leaveApi.js';
+import { ApiError } from '../../api/httpClient.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import {
   APPROVAL_QUEUES,
@@ -25,6 +30,8 @@ import {
   DAY_KIND_LABELS,
   DAY_PORTIONS,
   LEAVE_FIELD_LIMITS,
+  STEP_ALREADY_DECIDED_CODE,
+  describeApprovalProgress,
   describeLeaveDates,
   formatDays,
 } from '../../constants/leave.js';
@@ -63,26 +70,40 @@ function DayBreakdown({ request }) {
   );
 }
 
-function ApprovalItem({ request, queue, onDecided }) {
+/** The outcome to report: an approval before the last step leaves the request pending. */
+function outcomeOf(isApproved, decidedRequest) {
+  if (!isApproved) return 'declined';
+  return decidedRequest?.status === 'PENDING' ? 'approved; it now needs HR’s approval' : 'approved';
+}
+
+function ApprovalItem({ request, queue, onDecided, onOvertaken }) {
   const { csrfToken } = useAuth();
   const [note, setNote] = useState('');
   const [busyDecision, setBusyDecision] = useState(null);
   const [decisionError, setDecisionError] = useState(null);
   const [showsDays, setShowsDays] = useState(false);
   const isChange = queue === APPROVAL_QUEUES.CHANGES;
+  const approvalProgress = isChange ? null : describeApprovalProgress(request);
 
   async function decide(isApproved) {
     setBusyDecision(isApproved ? 'approve' : 'decline');
     setDecisionError(null);
     try {
       const trimmedNote = note.trim() || null;
+      const step = request.awaitingLevel;
+      let decided = null;
       if (isChange) await requestLeaveChangeDecision(request.id, { isApproved, note: trimmedNote }, csrfToken);
-      else if (isApproved) await requestLeaveApproval(request.id, trimmedNote, csrfToken);
-      else await requestLeaveRejection(request.id, trimmedNote ?? '', csrfToken);
-      onDecided(isApproved ? 'approved' : 'declined', request);
+      else if (isApproved) decided = await requestLeaveApproval(request.id, { note: trimmedNote, step }, csrfToken);
+      else decided = await requestLeaveRejection(request.id, { note: trimmedNote ?? '', step }, csrfToken);
+      onDecided(outcomeOf(isApproved, decided?.request), request);
     } catch (decideError) {
-      setDecisionError(toDisplayError(decideError));
       setBusyDecision(null);
+      // The item stays (with its new step) once the queue reloads, so it is left ready to decide.
+      if (decideError instanceof ApiError && decideError.code === STEP_ALREADY_DECIDED_CODE) {
+        onOvertaken(decideError.message);
+        return;
+      }
+      setDecisionError(toDisplayError(decideError));
     }
   }
 
@@ -101,6 +122,7 @@ function ApprovalItem({ request, queue, onDecided }) {
               ? `${describeChange(request.pendingChange)} · “${request.pendingChange.reason}” · asked ${formatDateTime(request.pendingChange.requestedAt)}`
               : `“${request.reason}” · asked ${formatDateTime(request.createdAt)}`}
           </p>
+          {approvalProgress && <p className="mt-1 text-xs font-medium text-indigo-700">{approvalProgress}</p>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {isChange && <Badge tone="violet">Change</Badge>}
@@ -159,25 +181,39 @@ export default function ApprovalsPanel() {
   const isWorkforceAdmin = WORKFORCE_ADMIN_ROLES.includes(currentUser?.role);
   const [queue, setQueue] = useState(APPROVAL_QUEUES.REQUESTS);
   const [lastDecision, setLastDecision] = useState(null);
+  const [overtakenMessage, setOvertakenMessage] = useState(null);
   const queueResource = useApiResource((signal) => requestApprovalQueue(queue, signal), [queue]);
   const requests = queueResource.data?.requests ?? [];
 
   function handleDecided(outcome, request) {
     const whose = request.employee.name ? `${request.employee.name}’s` : 'The';
+    setOvertakenMessage(null);
     setLastDecision(`${whose} ${queue === APPROVAL_QUEUES.CHANGES ? 'change' : 'request'} was ${outcome}`);
     queueResource.setData((data) => ({ ...data, requests: data.requests.filter((item) => item.id !== request.id) }));
+  }
+
+  // Someone decided the step first: show where the queue stands now.
+  function handleOvertaken(message) {
+    setLastDecision(null);
+    setOvertakenMessage(message);
+    queueResource.reload();
   }
 
   return (
     <Card
       title="Waiting for your decision"
-      subtitle="Approving charges the leave at today’s price; the employee is emailed either way."
+      subtitle="The last approval charges the leave at today’s price; the employee is emailed when it is decided."
       bodyClassName="p-0"
       actions={<Tabs tabs={QUEUE_TABS} activeTabId={queue} onChange={setQueue} label="Approval queue" />}
     >
       {lastDecision && (
         <div className="px-5 pt-4 sm:px-6">
           <Notice tone="success" title={lastDecision} onDismiss={() => setLastDecision(null)} />
+        </div>
+      )}
+      {overtakenMessage && (
+        <div className="px-5 pt-4 sm:px-6">
+          <Notice tone="info" title={overtakenMessage} onDismiss={() => setOvertakenMessage(null)} />
         </div>
       )}
       {queueResource.isLoading && !queueResource.data && <LoadingBlock label="Loading…" />}
@@ -203,7 +239,13 @@ export default function ApprovalsPanel() {
       )}
       <ul className="divide-y divide-slate-100">
         {requests.map((request) => (
-          <ApprovalItem key={request.id} request={request} queue={queue} onDecided={handleDecided} />
+          <ApprovalItem
+            key={request.id}
+            request={request}
+            queue={queue}
+            onDecided={handleDecided}
+            onOvertaken={handleOvertaken}
+          />
         ))}
       </ul>
     </Card>

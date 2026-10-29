@@ -1,7 +1,7 @@
 /**
  * The employee's own leave requests, newest first, and what they can do with each:
  *
- *   waiting for approval        withdraw it
+ *   waiting for approval        withdraw it (long leave shows its steps: the manager, then HR)
  *   approved, not started yet   cancel it (the days go straight back)
  *   approved, started           ask to cancel the rest or end it earlier; the approver decides
  *
@@ -20,6 +20,7 @@ import {
   END_PORTION_OPTIONS,
   LEAVE_FIELD_LIMITS,
   REQUEST_STATUS_DISPLAY,
+  describeApprovalProgress,
   describeLeaveDates,
   formatDays,
 } from '../../constants/leave.js';
@@ -123,6 +124,7 @@ function LeaveRequestRow({ request, today, onChanged }) {
   const isPending = request.status === 'PENDING';
   const isApproved = request.status === 'APPROVED';
   const hasStarted = request.startDate <= today;
+  const approvalProgress = describeApprovalProgress(request);
 
   async function cancelRequest() {
     const question = isPending ? 'Withdraw this request?' : 'Cancel this leave? The days go back to your balance.';
@@ -149,6 +151,7 @@ function LeaveRequestRow({ request, today, onChanged }) {
           <p className="mt-0.5 text-xs text-slate-500">
             {formatDays(request.totalDays)} · asked {formatDateTime(request.createdAt)} · “{request.reason}”
           </p>
+          {approvalProgress && <p className="mt-1 text-xs font-medium text-indigo-700">{approvalProgress}</p>}
           {request.decision?.note && (
             <p className="mt-1 text-xs text-slate-600">Approver’s note: “{request.decision.note}”</p>
           )}

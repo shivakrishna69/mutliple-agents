@@ -88,10 +88,16 @@ export const requestLeaveChange = (requestId, changeInput, csrfToken) =>
 // --- Decisions ------------------------------------------------------------------------------------
 export const requestApprovalQueue = (queue, callerSignal) =>
   getData(`/api/leave/approvals${toQueryString({ queue })}`, callerSignal);
-export const requestLeaveApproval = (requestId, note, csrfToken) =>
-  sendData('POST', requestPath(requestId, '/approve'), note ? { note } : {}, csrfToken);
-export const requestLeaveRejection = (requestId, note, csrfToken) =>
-  sendData('POST', requestPath(requestId, '/reject'), { note }, csrfToken);
+// `step` names the approval step being decided, so a step someone has just decided is refused.
+export const requestLeaveApproval = (requestId, { note, step }, csrfToken) =>
+  sendData(
+    'POST',
+    requestPath(requestId, '/approve'),
+    { ...(note ? { note } : {}), ...(step ? { step } : {}) },
+    csrfToken,
+  );
+export const requestLeaveRejection = (requestId, { note, step }, csrfToken) =>
+  sendData('POST', requestPath(requestId, '/reject'), { note, ...(step ? { step } : {}) }, csrfToken);
 export const requestLeaveChangeDecision = (requestId, { isApproved, note }, csrfToken) =>
   sendData(
     'POST',
