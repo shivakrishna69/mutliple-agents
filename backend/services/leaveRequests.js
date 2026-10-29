@@ -10,8 +10,8 @@
  *   after joining (BEFORE_JOINING), no further back than the type allows (TOO_FAR_BACK), with the
  *   notice it needs (NOTICE_TOO_SHORT), after the service it needs (SERVICE_TOO_SHORT); there is
  *   something to take (NOTHING_TO_TAKE), not too much at once (TOO_MANY_CONSECUTIVE_DAYS); a
- *   supporting document when the leave is long enough (ATTACHMENT_REQUIRED), from the employee's
- *   own vault (ATTACHMENT_NOT_FOUND); the days are free (OVERLAPPING_REQUEST) and the balance
+ *   supporting document when the leave is long enough (ATTACHMENT_REQUIRED), a Leave_Document in
+ *   the employee's own vault (ATTACHMENT_NOT_FOUND); the days are free (OVERLAPPING_REQUEST) and the balance
  *   covers them (INSUFFICIENT_BALANCE).
  *
  * Submission without transactions: the days are claimed first (a unique index refuses overlap),
@@ -29,7 +29,7 @@ import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { DAY_PORTIONS } from '../constants/calendarDays.js';
 import { LEAVE_MESSAGES } from '../constants/messages.js';
 import { LEAVE_LIMITS } from '../constants/validation.js';
-import DocumentVault from '../models/DocumentVault.js';
+import DocumentVault, { VAULT_DOCUMENT_TYPES } from '../models/DocumentVault.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import LeaveBalance from '../models/LeaveBalance.js';
 import LeaveDayClaim from '../models/LeaveDayClaim.js';
@@ -275,8 +275,12 @@ async function assertOwnAttachment({ attachmentDocumentId, employeeId, attachmen
     if (attachmentRequired) throw unprocessable('ATTACHMENT_REQUIRED');
     return;
   }
-  if (!(await DocumentVault.exists({ _id: attachmentDocumentId, employeeId })))
-    throw unprocessable('ATTACHMENT_NOT_FOUND');
+  const isOwnLeaveDocument = await DocumentVault.exists({
+    _id: attachmentDocumentId,
+    employeeId,
+    documentType: VAULT_DOCUMENT_TYPES.LEAVE_DOCUMENT,
+  });
+  if (!isOwnLeaveDocument) throw unprocessable('ATTACHMENT_NOT_FOUND');
 }
 
 /** Claims the request's half days; refused when another request already has any of them. */

@@ -241,6 +241,31 @@ describe('leave requests', { skip: skipReason ?? false }, () => {
       422,
       'ATTACHMENT_NOT_FOUND',
     );
+    // Only the employee's own leave document counts (the check reads only these fields; the key is unique).
+    const vault = testServer.database.collection('documentvaults');
+    const { insertedId: ownIdDocument } = await vault.insertOne({
+      employeeId: objectId(employee.profileId),
+      documentType: 'Gov_ID',
+      s3KeyPath: 'test/gov-id',
+    });
+    const { insertedId: ownLeaveDocument } = await vault.insertOne({
+      employeeId: objectId(employee.profileId),
+      documentType: 'Leave_Document',
+      s3KeyPath: 'test/leave-document',
+    });
+    await submit(
+      employee,
+      { startDate: monday, endDate: nextMonday, attachmentDocumentId: ownIdDocument.toString() },
+      422,
+      'ATTACHMENT_NOT_FOUND',
+    );
+    const withCertificate = await submit(employee, {
+      startDate: monday,
+      endDate: nextMonday,
+      attachmentDocumentId: ownLeaveDocument.toString(),
+    });
+    assert.equal(withCertificate.attachmentDocumentId, ownLeaveDocument.toString());
+    await expectStatus(employee.client.post(`/api/leave/requests/${withCertificate.id}/cancel`), 200);
     await submit(employee, { startDate: monday, endDate: monday, reason: 'no' }, 400);
 
     const homeless = await newEmployee({ hasOffice: false });

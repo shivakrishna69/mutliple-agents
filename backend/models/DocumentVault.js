@@ -66,6 +66,8 @@ export const VAULT_DOCUMENT_TYPES = Object.freeze({
   OFFER_LETTER: 'Offer_Letter',
   APPRAISAL_DOC: 'Appraisal_Doc',
   GOV_ID: 'Gov_ID',
+  // Supports a leave request (a medical certificate, for example); the employee uploads it.
+  LEAVE_DOCUMENT: 'Leave_Document',
 });
 
 /** Allowed values for `status`. */
