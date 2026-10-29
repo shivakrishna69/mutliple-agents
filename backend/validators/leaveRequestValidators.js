@@ -6,7 +6,12 @@
 
 import { DAY_PORTIONS } from '../constants/calendarDays.js';
 import { CALENDAR_MONTH_PATTERN, LEAVE_LIMITS } from '../constants/validation.js';
-import { APPROVAL_QUEUES, CHANGE_REQUEST_KINDS, LEAVE_REQUEST_STATUSES } from '../models/LeaveRequest.js';
+import {
+  APPROVAL_LEVELS,
+  APPROVAL_QUEUES,
+  CHANGE_REQUEST_KINDS,
+  LEAVE_REQUEST_STATUSES,
+} from '../models/LeaveRequest.js';
 import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { checkId, checkNote, checkOptionalLeaveYear } from './leaveValidators.js';
 import { bodyNotObjectResult, isPlainObject, validationResult } from './requestShape.js';
@@ -71,13 +76,18 @@ export function validateLeaveRequestInput(requestBody, { isPreview = false } = {
   return validationResult(validationErrors, sanitizedInput);
 }
 
-/** POST .../approve { note? } and .../reject { note } (a rejection says why). */
+/**
+ * POST .../approve { note?, step? } and .../reject { note, step? } (a rejection says why). `step` is the
+ * approval step the decider was shown (MANAGER or HR); if the request has moved past it meanwhile,
+ * the decision is refused instead of applying to the next step. Omitted: the current step.
+ */
 export function validateDecision(requestBody, { noteRequired }) {
   const body = requestBody ?? {};
   if (!isPlainObject(body)) return bodyNotObjectResult();
   const validationErrors = [];
   const note = checkNote(body.note, validationErrors, { required: noteRequired });
-  return validationResult(validationErrors, { note });
+  const step = checkChoice(body.step, 'step', Object.values(APPROVAL_LEVELS), validationErrors, null);
+  return validationResult(validationErrors, { note, step });
 }
 
 /** POST .../change { kind: CANCEL|SHORTEN, newEndDate (SHORTEN), newEndDayPortion?: FULL|FIRST_HALF, reason } */

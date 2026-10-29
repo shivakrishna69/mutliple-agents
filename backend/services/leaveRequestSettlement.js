@@ -38,6 +38,8 @@ import { borderingNeighbourIds, claimedHalvesOf } from './leaveRequestPricing.js
 
 export const REQUEST_OPERATIONS = Object.freeze({
   APPROVE: 'APPROVE',
+  // An approval step that is not the last: records the decision, posts nothing.
+  APPROVE_STEP: 'APPROVE_STEP',
   REJECT: 'REJECT',
   WITHDRAW: 'WITHDRAW',
   CANCEL: 'CANCEL',

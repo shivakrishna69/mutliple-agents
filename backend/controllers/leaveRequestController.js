@@ -13,6 +13,7 @@
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { LEAVE_MESSAGES } from '../constants/messages.js';
+import { LEAVE_REQUEST_STATUSES } from '../models/LeaveRequest.js';
 import { exportLeaveForPayroll } from '../services/leavePayrollExport.js';
 import { notifyApproverOfRequest, notifyEmployeeOfDecision } from '../services/leaveRequestEmails.js';
 import {
@@ -174,14 +175,23 @@ function decisionHandler(action, { decide, noteRequired, message, isApproved }) 
     withRequest(async (req, actor) => {
       const validation = validateDecision(req.body, { noteRequired });
       if (!validation.isValid) return validation;
-      const { note } = validation.sanitizedInput;
-      const request = await decide({ requestId: req.params.requestId, actor, note });
-      notifyEmployeeOfDecision(
-        request,
-        { isApproved, isChange: false, deciderName: req.user.name, note },
-        appContextOf(req),
-      );
-      return { message, data: { request }, auditDetails: requestAudit(request) };
+      const { note, step } = validation.sanitizedInput;
+      const request = await decide({ requestId: req.params.requestId, actor, note, step });
+      // An approval that only completes the manager's step leaves the request waiting for HR: the
+      // employee hears once, when the last step decides it.
+      const isWaitingForNextStep = request.status === LEAVE_REQUEST_STATUSES.PENDING;
+      if (!isWaitingForNextStep) {
+        notifyEmployeeOfDecision(
+          request,
+          { isApproved, isChange: false, deciderName: req.user.name, note },
+          appContextOf(req),
+        );
+      }
+      return {
+        message: isWaitingForNextStep ? LEAVE_MESSAGES.STEP_APPROVED : message,
+        data: { request },
+        auditDetails: requestAudit(request, { awaitingLevel: request.awaitingLevel }),
+      };
     }),
   );
 }

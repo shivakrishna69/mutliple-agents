@@ -22,8 +22,9 @@
  *   GET    /requests/:requestId               one request (its employee, approver, or HR)
  *   POST   /requests/:requestId/cancel        withdraw a pending request / cancel leave not yet started
  *   POST   /requests/:requestId/change        once leave has started: ask to cancel or end it early
- *   POST   /requests/:requestId/approve       approver or HR ({ note? })
- *   POST   /requests/:requestId/reject        approver or HR ({ note })
+ *   POST   /requests/:requestId/approve       approver or HR ({ note?, step? }); a step before the last
+ *                                             only records it, the last charges the leave
+ *   POST   /requests/:requestId/reject        approver or HR ({ note, step? })
  *   POST   /requests/:requestId/change/decision   approver or HR ({ approve, note? })
  *   GET    /approvals                         what the caller can decide (?queue=requests|changes)
  *   GET    /employees/:employeeId/requests    an employee's requests (HR)

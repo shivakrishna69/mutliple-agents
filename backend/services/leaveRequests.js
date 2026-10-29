@@ -21,7 +21,10 @@
  *
  * Who decides: the employee's reporting manager when submitted (an active one; otherwise the
  * request goes to HR's queue), or any HR user or administrator, never the employee themselves.
- * Only the employee withdraws, cancels or asks for a change to their own leave.
+ * Leave longer than the type's usage.hrApprovalAfterDays needs a second step after the manager's:
+ * HR's (any HR user or administrator, but not someone who approved the first step). Only the last
+ * step charges the leave; a rejection at any step frees the days. Changes to approved leave are
+ * decided in one step. Only the employee withdraws, cancels or asks for a change to their own leave.
  */
 
 import mongoose from 'mongoose';
@@ -34,7 +37,13 @@ import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.
 import LeaveBalance from '../models/LeaveBalance.js';
 import LeaveDayClaim from '../models/LeaveDayClaim.js';
 import { LEDGER_ENTRY_TYPES } from '../models/LeaveLedgerEntry.js';
-import LeaveRequest, { APPROVAL_QUEUES, CHANGE_REQUEST_KINDS, LEAVE_REQUEST_STATUSES } from '../models/LeaveRequest.js';
+import LeaveRequest, {
+  APPROVAL_LEVELS,
+  APPROVAL_QUEUES,
+  APPROVAL_STEP_STATUSES,
+  CHANGE_REQUEST_KINDS,
+  LEAVE_REQUEST_STATUSES,
+} from '../models/LeaveRequest.js';
 import LeaveType from '../models/LeaveType.js';
 import User from '../models/User.js';
 import { calendarDateOfUtcInstant, daysBetweenCalendarDates } from '../utils/calendarDates.js';
@@ -122,6 +131,12 @@ function toLeaveRequestSummary(request, { namesById, typesById }) {
     status: request.status,
     approverEmployeeId: request.approverEmployeeId?.toString() ?? null,
     decision: decisionSummary(request.decision),
+    approvalSteps: (request.approvalSteps ?? []).map((step) => ({
+      level: step.level,
+      status: step.status,
+      decision: decisionSummary(step.decision),
+    })),
+    awaitingLevel: request.awaitingLevel ?? null,
     cancellation: decisionSummary(request.cancellation),
     pendingChange: request.pendingChange
       ? {
@@ -263,6 +278,19 @@ export async function previewLeaveRequest({ employeeId, input, now }) {
   };
 }
 
+/**
+ * The steps a new request needs: the manager's, then HR's when the leave is longer than the type's
+ * usage.hrApprovalAfterDays; HR's alone for an employee without a manager.
+ */
+function approvalStepsFor({ approverEmployeeId, leaveType, daysCentidays }) {
+  if (!approverEmployeeId) return [{ level: APPROVAL_LEVELS.HR }];
+  const hrApprovalAfterDays = leaveType.usage.hrApprovalAfterDays ?? null;
+  const needsHr = hrApprovalAfterDays !== null && daysCentidays > daysToCentidays(hrApprovalAfterDays);
+  return needsHr
+    ? [{ level: APPROVAL_LEVELS.MANAGER }, { level: APPROVAL_LEVELS.HR }]
+    : [{ level: APPROVAL_LEVELS.MANAGER }];
+}
+
 /** The reporting manager while they are still employed; otherwise null (HR's queue). */
 async function approverOf(employee) {
   const managerId = employee.organizationData.reportingManagerId;
@@ -315,6 +343,7 @@ export async function submitLeaveRequest({ employeeId, actorUserId, input, now }
     attachmentRequired: evaluation.attachmentRequired,
   });
   const approverEmployeeId = await approverOf(employee);
+  const approvalSteps = approvalStepsFor({ approverEmployeeId, leaveType, daysCentidays: pricing.daysCentidays });
   const holdCentidays = leaveType.tracksBalance ? pricing.chargedCentidays : 0;
   const ledgerFields = {
     employeeId: employee._id,
@@ -360,6 +389,8 @@ export async function submitLeaveRequest({ employeeId, actorUserId, input, now }
       reason: input.reason,
       attachmentDocumentId: input.attachmentDocumentId ?? null,
       approverEmployeeId,
+      approvalSteps,
+      awaitingLevel: approvalSteps[0].level,
       submittedByUserId: actorUserId,
     });
   } catch (createError) {
@@ -413,6 +444,8 @@ export async function listApprovalQueue({ actor, queue }) {
     if (actor.employeeId) filter.employeeId = { $ne: new mongoose.Types.ObjectId(actor.employeeId) };
   } else if (actor.employeeId) {
     filter.approverEmployeeId = actor.employeeId;
+    // A manager sees requests waiting on their own step; once they approve, it waits on HR.
+    if (queue !== APPROVAL_QUEUES.CHANGES) filter.awaitingLevel = { $in: [APPROVAL_LEVELS.MANAGER, null] };
   } else {
     return [];
   }
@@ -441,9 +474,55 @@ async function loadRequest(requestId) {
   return request;
 }
 
+/** Who may decide a change to approved leave (a single step): the approver, or HR; never the employee. */
 function assertCanDecide(actor, request) {
   if (isOwnRequest(actor, request)) throw forbidden('SELF_DECISION');
   if (!isWorkforceAdmin(actor.role) && !isApproverOf(actor, request)) throw forbidden('NOT_APPROVER');
+}
+
+/** The index of the step a pending request waits on, or -1 for a request without steps. */
+const pendingStepIndex = (request) =>
+  (request.approvalSteps ?? []).findIndex((step) => step.status === APPROVAL_STEP_STATUSES.PENDING);
+
+/**
+ * Who may decide the step a pending request waits on: the manager's step, the reporting manager or
+ * HR; the HR step, HR only. Nobody decides their own leave, and nobody approves two steps of one
+ * request (a manager who is also HR leaves the HR step to someone else).
+ */
+function assertCanDecideStep(actor, request) {
+  if (isOwnRequest(actor, request)) throw forbidden('SELF_DECISION');
+  const step = request.approvalSteps?.[pendingStepIndex(request)];
+  if (!isWorkforceAdmin(actor.role)) {
+    if (!isApproverOf(actor, request)) throw forbidden('NOT_APPROVER');
+    // The request's own manager, at a step only HR may take.
+    if (step?.level === APPROVAL_LEVELS.HR) throw forbidden('HR_APPROVAL_NEEDED');
+  }
+  const approvedEarlierStep = (request.approvalSteps ?? []).some(
+    (earlierStep) =>
+      earlierStep.status === APPROVAL_STEP_STATUSES.APPROVED &&
+      earlierStep.decision?.byUserId.toString() === actor.userId,
+  );
+  if (approvedEarlierStep) throw forbidden('SAME_APPROVER_TWICE');
+}
+
+/**
+ * Refuses a decision meant for a step the request has already left (two people deciding at once:
+ * the manager's approval moved it on while HR was looking at the manager's step).
+ */
+function assertStepStillWaiting(request, expectedLevel) {
+  if (expectedLevel && request.status === PENDING && (request.awaitingLevel ?? null) !== expectedLevel) {
+    throw conflict('STEP_ALREADY_DECIDED');
+  }
+}
+
+/** The steps with the waiting one decided, and the level the request waits on next (null: none). */
+function decideStep(request, stepStatus, decision) {
+  const stepIndex = pendingStepIndex(request);
+  const approvalSteps = (request.approvalSteps ?? []).map((step, index) =>
+    index === stepIndex ? { level: step.level, status: stepStatus, decision } : step,
+  );
+  const nextStep = stepStatus === APPROVAL_STEP_STATUSES.APPROVED ? approvalSteps[stepIndex + 1] : undefined;
+  return { approvalSteps, awaitingLevel: nextStep?.level ?? null };
 }
 
 function assertOwnRequest(actor, request) {
@@ -488,10 +567,17 @@ export function approveLeaveRequest({ requestId, ...decision }) {
   return underEmployeeLease(requestId, (request) => approvePending(request, decision));
 }
 
-async function approvePending(request, { actor, note = null, now = new Date() }) {
-  assertCanDecide(actor, request);
+async function approvePending(request, { actor, note = null, step = null, now = new Date() }) {
+  assertStepStillWaiting(request, step);
+  assertCanDecideStep(actor, request);
   assertNotBusy(request);
   if (request.status !== PENDING) throw conflict('REQUEST_NOT_PENDING');
+  const decision = decisionBy(actor, note, now);
+  const steps = decideStep(request, APPROVAL_STEP_STATUSES.APPROVED, decision);
+  if (steps.awaitingLevel) {
+    // Not the last step: record it; the days stay held until the last step approves.
+    return runOperation(request, { operation: REQUEST_OPERATIONS.APPROVE_STEP, posting: null, result: { set: steps } });
+  }
   const leaveType = await LeaveType.findById(request.leaveTypeId).lean();
   const pricing = await priceLeaveRange({
     employeeId: request.employeeId,
@@ -521,7 +607,8 @@ async function approvePending(request, { actor, note = null, now = new Date() })
     result: {
       set: {
         status: APPROVED,
-        decision: decisionBy(actor, note, now),
+        decision,
+        ...steps,
         days: pricing.days,
         borderCharges: pricing.borderCharges,
         chargedCentidays: pricing.chargedCentidays,
@@ -531,17 +618,24 @@ async function approvePending(request, { actor, note = null, now = new Date() })
 }
 
 /** Rejects a pending request and frees its days and hold. */
-export async function rejectLeaveRequest({ requestId, actor, note, now = new Date() }) {
+export async function rejectLeaveRequest({ requestId, actor, note, step = null, now = new Date() }) {
   const request = await loadRequest(requestId);
-  assertCanDecide(actor, request);
+  assertStepStillWaiting(request, step);
+  assertCanDecideStep(actor, request);
   assertNotBusy(request);
   if (request.status !== PENDING) throw conflict('REQUEST_NOT_PENDING');
   const { today } = await loadEmployeeLeaveContext(request.employeeId, { now });
+  const decision = decisionBy(actor, note, now);
   return runOperation(request, {
     operation: REQUEST_OPERATIONS.REJECT,
     posting: releaseHoldPosting(request, { effectiveDate: today, createdByUserId: actor.userId }),
     result: {
-      set: { status: REJECTED, decision: decisionBy(actor, note, now), hasClaimsToRelease: true },
+      set: {
+        status: REJECTED,
+        decision,
+        ...decideStep(request, APPROVAL_STEP_STATUSES.REJECTED, decision),
+        hasClaimsToRelease: true,
+      },
       releasesClaims: true,
     },
   });

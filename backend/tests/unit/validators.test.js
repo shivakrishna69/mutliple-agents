@@ -179,6 +179,11 @@ describe('leave request validators', () => {
     assert.equal(validateDecision({}, { noteRequired: false }).isValid, true);
     assert.equal(validateDecision(undefined, { noteRequired: false }).isValid, true);
     assert.deepEqual(fieldsOf(validateDecision({ note: ' ' }, { noteRequired: true })), ['note']);
+    assert.deepEqual(validateDecision({ step: 'HR' }, { noteRequired: false }).sanitizedInput, {
+      note: null,
+      step: 'HR',
+    });
+    assert.deepEqual(fieldsOf(validateDecision({ step: 'CEO' }, { noteRequired: false })), ['step']);
     assert.deepEqual(fieldsOf(validateChangeDecision({ approve: false })), ['note']);
     assert.deepEqual(fieldsOf(validateChangeDecision({ approve: 'yes' })), ['approve']);
     assert.deepEqual(validateChangeDecision({ approve: true }).sanitizedInput, { isApproved: true, note: null });
