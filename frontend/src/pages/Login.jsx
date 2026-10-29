@@ -190,7 +190,7 @@ export default function Login() {
   return (
     <AuthLayout
       heading="Welcome back"
-      subheading="Sign in to continue to your support workspace."
+      subheading="Sign in to continue to your workspace."
       footer={
         <>
           Don&apos;t have an account?{' '}

@@ -8,6 +8,8 @@
  *   adjustments, encashments  HR and admins, never on their own balance
  *   jobs                      HR and admins: accruals and year ends now; reconciliation
  *   payroll export            HR and admins: unpaid and encashed days for a month
+ *   requests                  employees price, ask for, cancel and change their own leave; the
+ *                             reporting manager or HR decides (queues under /approvals)
  */
 
 import { sendApiRequest } from './httpClient.js';
@@ -57,3 +59,43 @@ export const requestLeaveJobRun = (asOfDate, csrfToken) =>
 export const requestLeaveReconciliation = (csrfToken) => sendData('POST', '/api/leave/jobs/reconcile', {}, csrfToken);
 export const requestLeavePayrollExport = ({ month, changedSince }, callerSignal) =>
   getData(`/api/leave/payroll-export${toQueryString({ month, changedSince })}`, callerSignal);
+
+// --- Own leave ------------------------------------------------------------------------------------
+const requestPath = (requestId, action = '') => `/api/leave/requests/${encode(requestId)}${action}`;
+
+export const requestOwnLeaveBalances = (leaveYear, callerSignal) =>
+  getData(`/api/leave/balances${toQueryString({ leaveYear })}`, callerSignal);
+export const requestOwnLeaveRequests = ({ leaveYear, status } = {}, callerSignal) =>
+  getData(`/api/leave/requests${toQueryString({ leaveYear, status })}`, callerSignal);
+/** Prices a leave without saving it; a POST, so it carries the CSRF token, and can be aborted. */
+export async function requestLeavePreview(requestInput, csrfToken, callerSignal) {
+  const { responseData } = await sendApiRequest({
+    method: 'POST',
+    endpointPath: '/api/leave/requests/preview',
+    requestPayload: requestInput,
+    csrfToken,
+    callerSignal,
+  });
+  return responseData;
+}
+export const requestLeaveSubmission = (requestInput, csrfToken) =>
+  sendData('POST', '/api/leave/requests', requestInput, csrfToken);
+export const requestLeaveCancellation = (requestId, csrfToken) =>
+  sendData('POST', requestPath(requestId, '/cancel'), {}, csrfToken);
+export const requestLeaveChange = (requestId, changeInput, csrfToken) =>
+  sendData('POST', requestPath(requestId, '/change'), changeInput, csrfToken);
+
+// --- Decisions ------------------------------------------------------------------------------------
+export const requestApprovalQueue = (queue, callerSignal) =>
+  getData(`/api/leave/approvals${toQueryString({ queue })}`, callerSignal);
+export const requestLeaveApproval = (requestId, note, csrfToken) =>
+  sendData('POST', requestPath(requestId, '/approve'), note ? { note } : {}, csrfToken);
+export const requestLeaveRejection = (requestId, note, csrfToken) =>
+  sendData('POST', requestPath(requestId, '/reject'), { note }, csrfToken);
+export const requestLeaveChangeDecision = (requestId, { isApproved, note }, csrfToken) =>
+  sendData(
+    'POST',
+    requestPath(requestId, '/change/decision'),
+    note ? { approve: isApproved, note } : { approve: isApproved },
+    csrfToken,
+  );

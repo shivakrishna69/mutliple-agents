@@ -465,7 +465,7 @@ export default function Dashboard() {
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-8 lg:py-10">
       <PageHeader
         title={`${greetingForHour(new Date().getHours())}, ${firstName}`}
-        description={isStaff ? 'Here’s what’s happening in support right now.' : 'Welcome to your support workspace.'}
+        description={isStaff ? 'Here’s what’s happening in support right now.' : 'Welcome to your workspace.'}
         actions={<RoleBadge role={currentUser.role} />}
       />
 

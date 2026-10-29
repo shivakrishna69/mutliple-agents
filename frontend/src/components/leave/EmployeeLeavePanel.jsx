@@ -21,17 +21,16 @@ import {
 import { requestEmployees } from '../../api/workplaceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import {
-  BALANCE_MOVEMENTS,
   HR_ADJUSTMENT_REASON_OPTIONS,
   LEAVE_FIELD_LIMITS,
   describeLedgerEntry,
-  formatDays,
   formatSignedDays,
 } from '../../constants/leave.js';
 import { currentLocalMonth, formatCalendarDate } from '../../utils/dates.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { UsersIcon } from '../Icons.jsx';
-import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, SelectInput, TextInput } from '../ui.jsx';
+import { Button, Card, EmptyState, LoadingBlock, Notice, SelectInput, TextInput } from '../ui.jsx';
+import LeaveBalanceCard from './LeaveBalanceCard.jsx';
 
 const MOVEMENT_FORMS = Object.freeze({ ADJUST: 'adjust', ENCASH: 'encash' });
 const movementDaysProps = {
@@ -40,33 +39,6 @@ const movementDaysProps = {
   max: String(LEAVE_FIELD_LIMITS.MAX_SINGLE_MOVEMENT_DAYS),
 };
 const noteProps = { minLength: LEAVE_FIELD_LIMITS.NOTE_MIN_LENGTH, maxLength: LEAVE_FIELD_LIMITS.NOTE_MAX_LENGTH };
-
-function BalanceCard({ balance }) {
-  const movements = BALANCE_MOVEMENTS.filter(({ key }) => balance.movements[key] !== 0);
-  return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{balance.leaveType.code}</p>
-          <p className="text-sm font-medium text-slate-800">{balance.leaveType.name}</p>
-        </div>
-        {balance.heldDays > 0 && <Badge tone="amber">{formatDays(balance.heldDays)} held</Badge>}
-      </div>
-      <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{formatDays(balance.availableDays)}</p>
-      <p className="text-xs text-slate-500">available of {formatDays(balance.balanceDays)}</p>
-      {movements.length > 0 && (
-        <dl className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-xs">
-          {movements.map(({ key, label }) => (
-            <div key={key} className="flex justify-between text-slate-600">
-              <dt>{label}</dt>
-              <dd className="font-medium tabular-nums">{formatSignedDays(balance.movements[key])}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
-  );
-}
 
 function MovementForm({
   kind,
@@ -331,7 +303,7 @@ function EmployeeLeave({ employeeId }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {balances.balances.map((balance) => (
-            <BalanceCard key={balance.leaveType.id} balance={balance} />
+            <LeaveBalanceCard key={balance.leaveType.id} balance={balance} />
           ))}
         </div>
       )}

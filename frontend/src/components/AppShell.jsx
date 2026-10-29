@@ -67,6 +67,7 @@ const NAVIGATION_SECTIONS = Object.freeze([
     sectionTitle: 'People',
     items: [
       { label: 'Attendance', path: ROUTE_PATHS.ATTENDANCE, Icon: MapPinIcon, isVisibleTo: () => true },
+      { label: 'Leave', path: ROUTE_PATHS.LEAVE, Icon: CalendarIcon, isVisibleTo: () => true },
       { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, isVisibleTo: () => true },
       { label: 'Analytics hub', path: ROUTE_PATHS.ANALYTICS, Icon: ChartIcon, isVisibleTo: () => true },
       {
@@ -85,12 +86,6 @@ const NAVIGATION_SECTIONS = Object.freeze([
         label: 'Workplace',
         path: ROUTE_PATHS.WORKPLACE,
         Icon: BuildingIcon,
-        isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
-      },
-      {
-        label: 'Leave admin',
-        path: ROUTE_PATHS.LEAVE_ADMIN,
-        Icon: CalendarIcon,
         isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
       },
     ],

@@ -11,10 +11,17 @@ import BrandMark from './BrandMark.jsx';
 import { APP_TAGLINE } from '../constants/app.js';
 
 const PRODUCT_HIGHLIGHTS = [
-  { title: 'Instant AI answers', description: 'Billing and technical specialists reply in seconds, day and night.' },
   {
-    title: 'Seamless human handoff',
-    description: 'Ask for a person any time and a support agent takes over the same chat.',
+    title: 'Leave that runs itself',
+    description: 'Accruals, approvals, holidays and the figures payroll needs, kept right automatically.',
+  },
+  {
+    title: 'Attendance and payroll',
+    description: 'Check-in at the office, payslips anyone can verify, and tax planning for every employee.',
+  },
+  {
+    title: 'AI support with a human handoff',
+    description: 'Answers in seconds, and a person takes over the same chat whenever it is needed.',
   },
   { title: 'Secure by design', description: 'Encrypted sessions, protected accounts, and your data never shared.' },
 ];
@@ -54,7 +61,7 @@ function BrandPanel() {
 
       <div className="relative max-w-md">
         <h2 className="text-4xl leading-tight font-bold tracking-tight text-white">
-          Support that answers before you finish your coffee.
+          Everything your people need, in one place.
         </h2>
         <p className="mt-4 text-lg text-indigo-100/90">{APP_TAGLINE}</p>
         <ul className="mt-10 space-y-5">
@@ -71,7 +78,7 @@ function BrandPanel() {
       </div>
 
       <p className="relative text-sm text-indigo-100/70">
-        © {new Date().getFullYear()} · Built for teams who care about every customer.
+        © {new Date().getFullYear()} · Built for teams who care about their people.
       </p>
     </aside>
   );

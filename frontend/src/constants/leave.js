@@ -4,6 +4,8 @@
  * change, so these only label things and shape the forms.
  */
 
+import { formatCalendarDate } from '../utils/dates.js';
+
 /** Mirrors LEAVE_LIMITS: notes, single movements, and policy days in half-day steps. */
 export const LEAVE_FIELD_LIMITS = Object.freeze({
   NOTE_MIN_LENGTH: 3,
@@ -94,3 +96,54 @@ export function formatSignedDays(days) {
   if (!days) return '0';
   return `${days > 0 ? '+' : ''}${DAYS_FORMATTER.format(days)}`;
 }
+
+/** Half-day edges of a leave (mirrors backend constants/calendarDays.js DAY_PORTIONS). */
+export const DAY_PORTIONS = Object.freeze({ FULL: 'full', FIRST_HALF: 'first_half', SECOND_HALF: 'second_half' });
+
+/** The first day may start in the afternoon; the last may end at lunch. */
+export const START_PORTION_OPTIONS = Object.freeze([
+  { value: DAY_PORTIONS.FULL, label: 'Full day' },
+  { value: DAY_PORTIONS.SECOND_HALF, label: 'Afternoon only (second half)' },
+]);
+export const END_PORTION_OPTIONS = Object.freeze([
+  { value: DAY_PORTIONS.FULL, label: 'Full day' },
+  { value: DAY_PORTIONS.FIRST_HALF, label: 'Morning only (first half)' },
+]);
+
+/** How a day of a leave is described (mirrors backend DAY_KINDS). */
+export const DAY_KIND_LABELS = Object.freeze({
+  working: 'Working day',
+  weekly_off: 'Weekly off',
+  holiday: 'Holiday',
+});
+
+/** Mirrors backend LEAVE_REQUEST_STATUSES. */
+export const REQUEST_STATUS_DISPLAY = Object.freeze({
+  PENDING: { label: 'Waiting for approval', tone: 'amber' },
+  APPROVED: { label: 'Approved', tone: 'emerald' },
+  REJECTED: { label: 'Declined', tone: 'rose' },
+  CANCELLED: { label: 'Cancelled', tone: 'slate' },
+});
+
+/** Mirrors backend CHANGE_REQUEST_KINDS. */
+export const CHANGE_KINDS = Object.freeze({ CANCEL: 'CANCEL', SHORTEN: 'SHORTEN' });
+
+/** Mirrors backend APPROVAL_QUEUES. */
+export const APPROVAL_QUEUES = Object.freeze({ REQUESTS: 'requests', CHANGES: 'changes' });
+
+/** The vault document type employees upload to support leave (mirrors backend VAULT_DOCUMENT_TYPES). */
+export const LEAVE_DOCUMENT_TYPE = 'Leave_Document';
+
+/** "Mon 3 Nov" or "Mon 3 Nov – Wed 5 Nov", with half days named. */
+export function describeLeaveDates({ startDate, startDayPortion, endDate, endDayPortion }) {
+  const day = (calendarDate) => formatCalendarDate(calendarDate, { weekday: 'short', day: 'numeric', month: 'short' });
+  const startNote = startDayPortion === DAY_PORTIONS.SECOND_HALF ? ' (afternoon)' : '';
+  const endNote = endDayPortion === DAY_PORTIONS.FIRST_HALF ? ' (morning)' : '';
+  if (startDate === endDate) return `${day(startDate)}${startNote}${endNote}`;
+  return `${day(startDate)}${startNote} – ${day(endDate)}${endNote}`;
+}
+
+/** Shown when the document vault cannot store files (storage not configured, or failing). */
+export const UPLOAD_UNAVAILABLE_MESSAGE =
+  'Upload service unavailable. Please select an existing document from your vault.';
+export const UPLOAD_UNAVAILABLE_NO_DOCUMENTS_HINT = 'You have none yet, so ask HR to add one to your vault for you.';
