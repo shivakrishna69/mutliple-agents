@@ -14,7 +14,20 @@
  *   POST   /adjustments                       add or remove days (MANUAL) or grant them (ENTITLEMENT_GRANT)
  *   POST   /encashments                       pay out days through payroll
  *   POST   /jobs/accrual                      post due accruals and year ends now ({ asOfDate? })
- *   POST   /jobs/reconcile                    bring balances back in line with the ledger
+ *   POST   /jobs/reconcile                    finish interrupted request changes; bring balances in line
+ *
+ *   POST   /requests/preview                  price a leave before asking (nothing is saved)
+ *   POST   /requests                          ask for leave
+ *   GET    /requests                          own requests (?leaveYear=&status=)
+ *   GET    /requests/:requestId               one request (its employee, approver, or HR)
+ *   POST   /requests/:requestId/cancel        withdraw a pending request / cancel leave not yet started
+ *   POST   /requests/:requestId/change        once leave has started: ask to cancel or end it early
+ *   POST   /requests/:requestId/approve       approver or HR ({ note? })
+ *   POST   /requests/:requestId/reject        approver or HR ({ note })
+ *   POST   /requests/:requestId/change/decision   approver or HR ({ approve, note? })
+ *   GET    /approvals                         what the caller can decide (?queue=requests|changes)
+ *   GET    /employees/:employeeId/requests    an employee's requests (HR)
+ *   GET    /payroll-export                    unpaid and encashed days for a month (HR; ?month=&changedSince=)
  */
 
 import { Router } from 'express';
@@ -33,8 +46,22 @@ import {
   postReconcileRun,
   postType,
 } from '../controllers/leaveController.js';
+import {
+  getApprovalQueue,
+  getOwnRequests,
+  getPayrollExport,
+  getRequest,
+  getRequestsOfEmployee,
+  postApprove,
+  postCancel,
+  postChange,
+  postChangeDecision,
+  postPreview,
+  postReject,
+  postRequest,
+} from '../controllers/leaveRequestController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { leaveAdminWriteRateLimitByUser } from '../middleware/rateLimiter.js';
+import { leaveAdminWriteRateLimitByUser, leaveRequestWriteRateLimitByUser } from '../middleware/rateLimiter.js';
 
 const leaveRouter = Router();
 
@@ -55,5 +82,17 @@ leaveRouter.post('/adjustments', leaveAdminWriteRateLimitByUser, postAdjustment)
 leaveRouter.post('/encashments', leaveAdminWriteRateLimitByUser, postEncashmentEntry);
 leaveRouter.post('/jobs/accrual', leaveAdminWriteRateLimitByUser, postAccrualJobRun);
 leaveRouter.post('/jobs/reconcile', leaveAdminWriteRateLimitByUser, postReconcileRun);
+leaveRouter.post('/requests/preview', leaveRequestWriteRateLimitByUser, postPreview);
+leaveRouter.post('/requests', leaveRequestWriteRateLimitByUser, postRequest);
+leaveRouter.get('/requests', getOwnRequests);
+leaveRouter.get('/requests/:requestId', getRequest);
+leaveRouter.post('/requests/:requestId/cancel', leaveRequestWriteRateLimitByUser, postCancel);
+leaveRouter.post('/requests/:requestId/change', leaveRequestWriteRateLimitByUser, postChange);
+leaveRouter.post('/requests/:requestId/approve', leaveRequestWriteRateLimitByUser, postApprove);
+leaveRouter.post('/requests/:requestId/reject', leaveRequestWriteRateLimitByUser, postReject);
+leaveRouter.post('/requests/:requestId/change/decision', leaveRequestWriteRateLimitByUser, postChangeDecision);
+leaveRouter.get('/approvals', getApprovalQueue);
+leaveRouter.get('/employees/:employeeId/requests', getRequestsOfEmployee);
+leaveRouter.get('/payroll-export', getPayrollExport);
 
 export default leaveRouter;

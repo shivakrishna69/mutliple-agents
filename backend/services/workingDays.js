@@ -23,6 +23,7 @@
  *   range never cost anything, so a Friday-only leave never charges the weekend after it.
  */
 
+import { DAY_KINDS, DAY_PORTIONS } from '../constants/calendarDays.js';
 import { WORK_CALENDAR_LIMITS } from '../constants/validation.js';
 import {
   daysBetweenCalendarDates,
@@ -31,10 +32,6 @@ import {
   weekdayOccurrenceInMonth,
   weekdayOfCalendarDate,
 } from '../utils/calendarDates.js';
-
-export const DAY_KINDS = Object.freeze({ WORKING: 'working', WEEKLY_OFF: 'weekly_off', HOLIDAY: 'holiday' });
-
-export const DAY_PORTIONS = Object.freeze({ FULL: 'full', FIRST_HALF: 'first_half', SECOND_HALF: 'second_half' });
 
 const FULL_DAY = 1;
 const HALF_DAY = 0.5;
@@ -73,7 +70,8 @@ export function classifyCalendarRange(firstDate, lastDate, calendar) {
   return listCalendarDates(firstDate, lastDate).map((calendarDate) => classifyCalendarDay(calendarDate, calendar));
 }
 
-function assertPricableRange({ startDate, endDate, startDayPortion, endDayPortion }) {
+/** @throws {LeaveRangeError} unless the range and its half-day edges can be priced */
+export function assertPricableRange({ startDate, endDate, startDayPortion, endDayPortion }) {
   if (!isRealCalendarDate(startDate) || !isRealCalendarDate(endDate)) {
     throw new LeaveRangeError('INVALID_DATE', 'Leave dates must be real calendar days as YYYY-MM-DD');
   }
@@ -114,7 +112,24 @@ export function calculateLeaveDays(
   calendar,
 ) {
   assertPricableRange({ startDate, endDate, startDayPortion, endDayPortion });
-  const classifiedDays = classifyCalendarRange(startDate, endDate, calendar);
+  return priceClassifiedDays(classifyCalendarRange(startDate, endDate, calendar), {
+    startDayPortion,
+    endDayPortion,
+    sandwich,
+  });
+}
+
+/**
+ * The pricing step of calculateLeaveDays for days already classified, such as the days stored on
+ * a request that is being shortened, so its price is recalculated from the calendar it was
+ * approved under. The range is assumed valid (assertPricableRange).
+ * @param {{ date: string, kind: string, holidayName: string|null }[]} classifiedDays  consecutive days
+ * @param {{ startDayPortion?: string, endDayPortion?: string, sandwich?: boolean }} rules
+ */
+export function priceClassifiedDays(
+  classifiedDays,
+  { startDayPortion = DAY_PORTIONS.FULL, endDayPortion = DAY_PORTIONS.FULL, sandwich = false } = {},
+) {
   const lastIndex = classifiedDays.length - 1;
 
   // Working days first: each costs a full day, less half a day at a half-day edge.
@@ -136,7 +151,8 @@ export function calculateLeaveDays(
     return -1;
   };
 
-  const days = classifiedDays.map((day, dayIndex) => {
+  const days = classifiedDays.map(({ date, kind, holidayName }, dayIndex) => {
+    const day = { date, kind, holidayName };
     if (workingDayCharges[dayIndex] !== null) return { ...day, chargedDays: workingDayCharges[dayIndex] };
     const isSandwiched =
       sandwich &&

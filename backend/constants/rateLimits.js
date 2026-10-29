@@ -40,6 +40,8 @@ export const RATE_LIMITS = Object.freeze({
   WORKPLACE_SETUP_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // HR leave changes (types, settings, adjustments, encashments, job runs).
   LEAVE_ADMIN_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // Leave requests and decisions: a manager clearing a queue stays within this; a script does not.
+  LEAVE_REQUEST_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Invitations send email: generous for onboarding a batch, low enough to stop mail abuse.
   INVITATION_SENDS_PER_USER: Object.freeze({ windowMs: 10 * 60 * 1000, maxRequests: 60 }),
   // Public invite links: enough to open a link and set a password a few times, too few to scan tokens.

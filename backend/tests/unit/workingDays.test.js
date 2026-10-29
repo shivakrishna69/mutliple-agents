@@ -7,14 +7,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { DAY_KINDS, DAY_PORTIONS } from '../../constants/calendarDays.js';
 import { WEEKDAYS, defaultWeeklyOffRules } from '../../models/OfficeLocation.js';
 import {
-  DAY_KINDS,
-  DAY_PORTIONS,
   LeaveRangeError,
   calculateLeaveDays,
   classifyCalendarDay,
   isWeeklyOff,
+  priceClassifiedDays,
 } from '../../services/workingDays.js';
 
 const SATURDAY_AND_SUNDAY_OFFICE = {
@@ -179,5 +179,26 @@ describe('calculateLeaveDays', () => {
       }),
       'INVALID_PORTION',
     );
+  });
+});
+
+describe('priceClassifiedDays', () => {
+  // Friday 2026-10-09 to Monday 2026-10-12, as stored on an approved request.
+  const storedDays = calculateLeaveDays(
+    { startDate: '2026-10-09', endDate: '2026-10-12', sandwich: true },
+    SATURDAY_AND_SUNDAY_OFFICE,
+  ).days;
+
+  it('reprices the days a shortened leave keeps, so a weekend left at the end is no longer sandwiched', () => {
+    assert.equal(priceClassifiedDays(storedDays, { sandwich: true }).totalDays, 4);
+    const keptToSunday = storedDays.filter((day) => day.date <= '2026-10-11');
+    assert.equal(priceClassifiedDays(keptToSunday, { sandwich: true }).totalDays, 1);
+  });
+
+  it('applies a half day at the new end', () => {
+    const fridayOnly = storedDays.filter((day) => day.date <= '2026-10-09');
+    const { totalDays, days } = priceClassifiedDays(fridayOnly, { endDayPortion: DAY_PORTIONS.FIRST_HALF });
+    assert.equal(totalDays, 0.5);
+    assert.deepEqual(Object.keys(days[0]).sort(), ['chargedDays', 'date', 'holidayName', 'kind']);
   });
 });

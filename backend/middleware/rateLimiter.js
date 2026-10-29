@@ -166,6 +166,13 @@ export const leaveAdminWriteRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_LEAVE_ADMIN_UPDATES,
 });
 
+export const leaveRequestWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'leave_request_writes_per_user',
+  ...RATE_LIMITS.LEAVE_REQUEST_WRITES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_LEAVE_REQUEST_UPDATES,
+});
+
 export const workplaceSetupWriteRateLimitByUser = createRateLimiter({
   limiterName: 'workplace_setup_writes_per_user',
   ...RATE_LIMITS.WORKPLACE_SETUP_WRITES_PER_USER,

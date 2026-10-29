@@ -14,10 +14,10 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 |---|---|
 | `payrollCalculator.test.js` | FY 2026-27 tax for both regimes, rebate and surcharge marginal relief, HRA, s.123 cap, EPF ceiling split, ESI, professional tax, input validation. Expected figures are worked out by hand from the statutory rules. |
 | `conversationAccess.test.js` | Who may see a support conversation |
-| `validators.test.js` | Signup, login, password and invitation input rules, including NoSQL-injection attempts |
+| `validators.test.js` | Signup, login, password, invitation and leave request input rules, including NoSQL-injection attempts |
 | `environment.test.js` | Startup configuration: required and weak secrets, production-only rules, CORS, Redis, payslip and SMTP settings |
 | `workforceAccess.test.js` | The organisation-wide HR access rule and its use by the document vault |
-| `emails.test.js` | HTML escaping, the shared email layout and the invitation email |
+| `emails.test.js` | HTML escaping, the shared email layout, the invitation email and the leave request emails |
 | `calendarDates.test.js` | Calendar-date helpers across month, year and leap-day boundaries; nth weekday of the month |
 | `workingDays.test.js` | Weekly offs (every week and 2nd/4th Saturday), holidays, half days and the sandwich rule, counted by hand on October 2026 |
 | `leaveAccrualRules.test.js` | Monthly and upfront accrual, start- and end-of-month credits, joiner pro-rata and rounding, accrual during notice, year-end carry forward, lapse and encashment, worked out by hand |
@@ -43,6 +43,8 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 | `offices.test.js` | The weekly-off startup migration, office CRUD with version checks and model validation, 2nd/4th Saturday rules, offices in use cannot be removed, base-office assignment |
 | `workCalendar.test.js` | HR-only holiday changes, holiday clashes and office scoping, employees limited to their own office, employees without an office told to ask HR |
 | `leave.test.js` | The leave-type template seeded at startup, settings and type changes with their locks, who may see and do what, adjustments and encashments with their limits, concurrent debits that never overdraw, reconciliation, and the leave job over two leave years (accruals, carry forward, year-end encashment, joiners, notice) |
+| `leaveMigrations.test.js` | Leave types created before a policy field existed get the template's value (or the default), keeping values HR set |
+| `leaveRequests.test.js` | Pricing with half days and the sandwich rule, every submission check, overlap and overdraft refused under concurrent submissions, routing to the manager or HR and who may decide, approval at today's price with weekend charges between two leaves and their credit on cancellation, withdrawal and cancellation, change requests once leave has started, the payroll export, and repair after a stopped server |
 
 MongoDB comes from `TEST_MONGO_URL` (default `mongodb://127.0.0.1:27017`, e.g. the
 `multiagent-mongo` container). If it is not reachable, the integration suites are skipped with a

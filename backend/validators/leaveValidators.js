@@ -44,6 +44,7 @@ const LEAVE_TYPE_GROUPS = Object.freeze({
     'allowHalfDay',
     'maxConsecutiveDays',
     'minNoticeDays',
+    'maxBackdatedDays',
     'eligibleEmploymentStatuses',
     'minServiceDays',
     'attachmentRequiredAfterDays',
@@ -57,7 +58,7 @@ export const HR_ADJUSTMENT_REASON_CODES = Object.freeze([
   ADJUSTMENT_REASON_CODES.ENTITLEMENT_GRANT,
 ]);
 
-function checkId(rawId, fieldName, validationErrors) {
+export function checkId(rawId, fieldName, validationErrors) {
   if (!isValidObjectIdString(rawId)) {
     validationErrors.push({ field: fieldName, message: 'must be a valid id' });
     return undefined;
@@ -66,7 +67,7 @@ function checkId(rawId, fieldName, validationErrors) {
 }
 
 /** A leave year (number in a body, string in a query); `undefined`/empty means the current one. */
-function checkOptionalLeaveYear(rawLeaveYear, validationErrors) {
+export function checkOptionalLeaveYear(rawLeaveYear, validationErrors) {
   if (rawLeaveYear === undefined || rawLeaveYear === null || rawLeaveYear === '') return null;
   const leaveYear = Number(rawLeaveYear);
   if (!Number.isInteger(leaveYear) || leaveYear < LIMITS.EARLIEST_LEAVE_YEAR || leaveYear > LIMITS.LATEST_LEAVE_YEAR) {
@@ -95,12 +96,13 @@ function checkMovementDays(rawDays, validationErrors, { mustBePositive }) {
   return rawDays;
 }
 
-function checkNote(rawNote, validationErrors, { required }) {
+/** Free text of NOTE_MIN_LENGTH to NOTE_MAX_LENGTH characters (a note, or a reason). */
+export function checkNote(rawNote, validationErrors, { required, fieldName = 'note' }) {
   if (!required && (rawNote === undefined || rawNote === null || rawNote === '')) return null;
   const note = typeof rawNote === 'string' ? rawNote.trim() : '';
   if (note.length < LIMITS.NOTE_MIN_LENGTH || note.length > LIMITS.NOTE_MAX_LENGTH) {
     validationErrors.push({
-      field: 'note',
+      field: fieldName,
       message: `must be ${LIMITS.NOTE_MIN_LENGTH}-${LIMITS.NOTE_MAX_LENGTH} characters`,
     });
   }

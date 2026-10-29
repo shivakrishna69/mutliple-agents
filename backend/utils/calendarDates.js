@@ -19,6 +19,11 @@ function fromUtcMs(utcMs) {
   return new Date(utcMs).toISOString().slice(0, 10);
 }
 
+/** The UTC calendar day of a stored date-only value, such as a date of joining saved as UTC midnight. */
+export function calendarDateOfUtcInstant(date) {
+  return fromUtcMs(date.getTime());
+}
+
 /** True when "YYYY-MM-DD" names a real calendar day (rejects 2026-02-30). */
 export function isRealCalendarDate(calendarDate) {
   if (typeof calendarDate !== 'string' || !CALENDAR_DATE_PATTERN.test(calendarDate)) return false;

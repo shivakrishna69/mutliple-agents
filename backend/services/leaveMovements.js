@@ -23,7 +23,7 @@ import { isYearEndPayrollReference } from './leaveAccrualJob.js';
 import { toBalanceFigures, toLedgerEntrySummary } from './leaveBalances.js';
 import { DuplicateLedgerEntryError, InsufficientLeaveBalanceError, postCredit, postDebit } from './leaveLedger.js';
 import { loadEmployeeLeaveContext } from './leaveSettings.js';
-import { leaveTypeNotFound } from './leaveTypes.js';
+import { leaveTypeNotFound, lowestAvailableCentidays } from './leaveTypes.js';
 import { leaveYearRange } from './leaveYear.js';
 import { ServiceError } from './serviceError.js';
 
@@ -35,10 +35,6 @@ async function loadBalanceKeepingType(leaveTypeId) {
   if (!leaveType.tracksBalance) throw unprocessable('BALANCE_NOT_TRACKED');
   return leaveType;
 }
-
-/** The lowest the available days may go: zero, or minus the type's negative limit. */
-const lowestAvailableCentidays = (leaveType) =>
-  leaveType.usage.allowNegativeBalance ? -daysToCentidays(leaveType.usage.maxNegativeDays) : 0;
 
 async function assertLeaveYearOpen({ employeeId, leaveTypeId, leaveYear, currentLeaveYear }) {
   if (leaveYear === currentLeaveYear) return;
