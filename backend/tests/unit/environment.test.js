@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { loadConfig } from '../../config/environment.js';
 
 const VALID_ENVIRONMENT = Object.freeze({
-  MONGO_URI: 'mongodb://127.0.0.1:27017/nova',
+  MONGO_URI: 'mongodb://127.0.0.1:27017/unitora',
   JWT_SECRET: 'j'.repeat(32),
   WEBHOOK_SIGNING_SECRET: 'w'.repeat(32),
   AI_SERVICE_API_KEY: 'a'.repeat(32),
@@ -104,7 +104,7 @@ describe('loadConfig', () => {
       () =>
         loadWith({
           ...payslipBucket,
-          COMPANY_LEGAL_NAME: 'Nova Labs Pvt Ltd',
+          COMPANY_LEGAL_NAME: 'Unitora Labs Pvt Ltd',
           COMPANY_REGISTERED_ADDRESS: '1 MG Road, Bengaluru',
           PAYSLIP_SIGNING_SECRET: 'j'.repeat(32),
         }),

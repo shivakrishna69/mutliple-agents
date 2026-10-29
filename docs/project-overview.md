@@ -1,4 +1,4 @@
-# Nova Support: Project Overview (context for an AI assistant)
+# Unitora: Project Overview (context for an AI assistant)
 
 > Purpose of this document: give an AI model complete, accurate context about this codebase so it can
 > answer questions, plan features, or write code that fits the existing design. It describes what
@@ -9,7 +9,7 @@
 
 ## 1. What the product is
 
-**Nova Support** is a single web platform that combines two products for small and mid-size Indian
+**Unitora** is a single web platform that combines two products for small and mid-size Indian
 companies (roughly 50–1,000 employees):
 
 1. **AI-first customer support desk.** Customers chat with the company. A multi-agent AI (LangGraph +

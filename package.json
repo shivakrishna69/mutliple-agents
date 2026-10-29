@@ -1,5 +1,5 @@
 {
-  "name": "nova-support",
+  "name": "unitora",
   "private": true,
   "description": "Workspace scripts that run the checks of every JavaScript service from the repository root.",
   "scripts": {

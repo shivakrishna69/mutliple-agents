@@ -3,8 +3,8 @@
 # Production image for the frontend: the Vite build served by unprivileged nginx on port 8080,
 # which also forwards /api and /socket.io to the backend (see nginx.conf).
 #
-# Build:  docker build -t nova-frontend ./frontend
-# Run:    docker run -p 8080:8080 -e BACKEND_UPSTREAM=backend:5000 nova-frontend
+# Build:  docker build -t unitora-frontend ./frontend
+# Run:    docker run -p 8080:8080 -e BACKEND_UPSTREAM=backend:5000 unitora-frontend
 
 ARG NODE_IMAGE=node:24-bookworm-slim
 
@@ -24,7 +24,7 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
 LABEL org.opencontainers.image.title="frontend" \
-      org.opencontainers.image.description="Nova Support web app served by nginx" \
+      org.opencontainers.image.description="Unitora web app served by nginx" \
       org.opencontainers.image.source="https://github.com/shivakrishna69/mutliple-agents"
 
 # The official image substitutes environment variables into templates at start-up; only
