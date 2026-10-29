@@ -17,6 +17,8 @@
  *   /organisation -> OrgDirectory     staff (admin or agent)
  *   /admin/telemetry -> AgentTelemetry admins
  *   /people/onboarding -> PeopleOnboarding HR and admins (invite new joiners)
+ *   /workplace    -> WorkplaceSetup   HR and admins (offices, holidays, employees' base offices)
+ *   /leave/admin  -> LeaveAdministration HR and admins (policies, balances, payroll export)
  *
  *   Public, signed in or not:
  *   /verify/payslip -> PayslipVerification
@@ -59,6 +61,8 @@ const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
 const PeopleOnboarding = lazy(() => import('./pages/PeopleOnboarding.jsx'));
 const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
+const LeaveAdministration = lazy(() => import('./pages/LeaveAdministration.jsx'));
+const WorkplaceSetup = lazy(() => import('./pages/WorkplaceSetup.jsx'));
 
 export default function App() {
   return (
@@ -92,6 +96,8 @@ export default function App() {
 
             <Route element={<PeopleManagerRoute />}>
               <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
+              <Route path={ROUTE_PATHS.WORKPLACE} element={<WorkplaceSetup />} />
+              <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministration />} />
             </Route>
 
             <Route element={<AdminRoute />}>

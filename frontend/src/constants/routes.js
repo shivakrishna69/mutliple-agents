@@ -23,6 +23,11 @@ export const ROUTE_PATHS = Object.freeze({
   VERIFY_PAYSLIP: '/verify/payslip',
   // Employee onboarding by invitation, HR and admins.
   ONBOARDING: '/people/onboarding',
+  // Offices, holidays and employees' base offices, HR and admins.
+  WORKPLACE: '/workplace',
+  // Leave administration (policies, balances, payroll export), HR and admins. The backend's emails
+  // link to /leave and /leave/approvals (backend/services/leaveRequestEmails.js).
+  LEAVE_ADMIN: '/leave/admin',
   // Public page behind the emailed invitation link.
   ACCEPT_INVITATION: '/invite/:token',
 });
