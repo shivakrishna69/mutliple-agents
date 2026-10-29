@@ -22,6 +22,8 @@ import {
   LEAVE_DOCUMENT_TYPE,
   LEAVE_FIELD_LIMITS,
   START_PORTION_OPTIONS,
+  UPLOAD_UNAVAILABLE_MESSAGE,
+  UPLOAD_UNAVAILABLE_NO_DOCUMENTS_HINT,
   formatDays,
 } from '../../constants/leave.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
@@ -29,6 +31,7 @@ import { formatCalendarDate } from '../../utils/dates.js';
 import { Badge, Button, Card, Notice, SelectInput, Spinner, TextInput } from '../ui.jsx';
 
 const PREVIEW_DELAY_MS = 400;
+const HTTP_SERVER_ERROR_FLOOR = 500;
 const SINGLE_DAY_PARTS = Object.freeze([
   { value: 'whole', label: 'Full day', startDayPortion: DAY_PORTIONS.FULL, endDayPortion: DAY_PORTIONS.FULL },
   {
@@ -146,7 +149,14 @@ function AttachmentPicker({ employeeId, value, onChange, error }) {
       documentsResource.setData((data) => ({ ...data, documents: [document, ...(data?.documents ?? [])] }));
       onChange(document.id);
     } catch (uploadFailure) {
-      setUploadError(toDisplayError(uploadFailure));
+      const displayError = toDisplayError(uploadFailure);
+      // A fault on the server side (storage not configured, or down) is not something the employee
+      // can fix; problems with the file itself (type, size) keep the backend's own message.
+      setUploadError(
+        displayError.status >= HTTP_SERVER_ERROR_FLOOR
+          ? { ...displayError, isServiceUnavailable: true, message: UPLOAD_UNAVAILABLE_MESSAGE }
+          : displayError,
+      );
     } finally {
       setIsUploading(false);
     }
@@ -179,7 +189,15 @@ function AttachmentPicker({ employeeId, value, onChange, error }) {
         </label>
       </div>
       {isUploading && <p className="text-xs text-slate-500">Uploading…</p>}
-      {uploadError && <Notice tone="error" title={uploadError.message} onDismiss={() => setUploadError(null)} />}
+      {uploadError && (
+        <Notice
+          tone={uploadError.isServiceUnavailable ? 'warning' : 'error'}
+          title={uploadError.message}
+          onDismiss={() => setUploadError(null)}
+        >
+          {uploadError.isServiceUnavailable && leaveDocuments.length === 0 && UPLOAD_UNAVAILABLE_NO_DOCUMENTS_HINT}
+        </Notice>
+      )}
       <p className="text-xs text-slate-500">
         PDF, JPG or PNG. It is kept in your document vault, where HR can verify it.
       </p>

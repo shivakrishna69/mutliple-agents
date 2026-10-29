@@ -24,7 +24,7 @@ export const EMPLOYEE = Object.freeze({ name: 'Esha Iyer', email: 'esha.iyer@exa
 
 /**
  * A leave scenario ready to use: an employee at an office where every day is a working day, with
- * 5 days of Casual Leave, who reports to the manager.
+ * 5 days of Casual Leave, who reports to the manager. Sick Leave needs a supporting document.
  */
 export const LEAVE_EMPLOYEE = Object.freeze({ name: 'Leela Nair', email: 'leela.nair@example.com' });
 export const LEAVE_MANAGER = Object.freeze({ name: 'Manav Shah', email: 'manav.shah@example.com' });

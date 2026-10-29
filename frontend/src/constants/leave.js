@@ -142,3 +142,8 @@ export function describeLeaveDates({ startDate, startDayPortion, endDate, endDay
   if (startDate === endDate) return `${day(startDate)}${startNote}${endNote}`;
   return `${day(startDate)}${startNote} – ${day(endDate)}${endNote}`;
 }
+
+/** Shown when the document vault cannot store files (storage not configured, or failing). */
+export const UPLOAD_UNAVAILABLE_MESSAGE =
+  'Upload service unavailable. Please select an existing document from your vault.';
+export const UPLOAD_UNAVAILABLE_NO_DOCUMENTS_HINT = 'You have none yet, so ask HR to add one to your vault for you.';

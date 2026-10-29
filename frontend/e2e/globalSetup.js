@@ -67,6 +67,15 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
       { $set: { 'organizationData.reportingManagerId': objectId(manager.profileId) } },
     );
   const { leaveTypes } = await expectCreated(adminClient.get('/api/leave/types'), 'the leave types');
+  // Sick Leave needs a supporting document from the first day, so the test reaches the upload.
+  const sickLeave = leaveTypes.find((type) => type.code === 'SL');
+  await expectCreated(
+    adminClient.patch(`/api/leave/types/${sickLeave.id}`, {
+      usage: { attachmentRequiredAfterDays: 0 },
+      version: sickLeave.version,
+    }),
+    'the Sick Leave document rule',
+  );
   await expectCreated(
     adminClient.post('/api/leave/adjustments', {
       employeeId: employee.profileId,

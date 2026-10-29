@@ -11,6 +11,7 @@
 import { expect, test } from '@playwright/test';
 
 import { LEAVE_EMPLOYEE, LEAVE_EMPLOYEE_CASUAL_DAYS, LEAVE_MANAGER } from './environment.js';
+import { UPLOAD_UNAVAILABLE_MESSAGE } from '../src/constants/leave.js';
 import { signIn, watchForPageProblems } from './helpers.js';
 
 // The browser keeps the office's time zone, so its month and today match the employee's.
@@ -18,16 +19,34 @@ test.use({ timezoneId: 'Asia/Kolkata' });
 
 test('an employee asks for leave, the manager approves it and declines a change', async ({ page, browser }) => {
   test.setTimeout(90_000);
-  const problems = watchForPageProblems(page);
+  // The upload below fails on purpose: the test server has no file storage.
+  const problems = watchForPageProblems(page, { expectedFailures: ['503 from POST /api/vault/documents'] });
 
   // --- The employee asks for a day of Casual Leave ------------------------------------------------
   await signIn(page, LEAVE_EMPLOYEE.email);
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Leave' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Leave' })).toBeVisible();
+  // Employees see their role as Employee, though the account role is still "customer".
+  await expect(page.getByText('Employee', { exact: true })).toBeVisible();
+  await expect(page.getByText('Customer', { exact: true })).toHaveCount(0);
   const casualCard = page.getByText('Casual Leave', { exact: true }).locator('xpath=../../..');
   await expect(casualCard.getByText(`${LEAVE_EMPLOYEE_CASUAL_DAYS} days`, { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Ask for leave' }).click();
+
+  // Sick Leave needs a document. The test server has no file storage, so an upload fails on the
+  // server side and the employee is told plainly what to do instead.
+  await page.getByLabel('Leave type').selectOption({ label: 'Sick Leave (SL)' });
+  await expect(page.getByText('A supporting document is needed for leave this long')).toBeVisible();
+  await page.getByLabel('Or upload one').setInputFiles({
+    name: 'certificate.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 test certificate'),
+  });
+  await expect(page.getByText(UPLOAD_UNAVAILABLE_MESSAGE)).toBeVisible();
+  await expect(page.getByText('ask HR to add one to your vault for you')).toBeVisible();
+  await expect(page.getByText('Something went wrong on our side')).toHaveCount(0);
+
   await page.getByLabel('Leave type').selectOption({ label: 'Casual Leave (CL)' });
   await expect(page.getByText('This leave costs 1 day')).toBeVisible();
   await expect(
