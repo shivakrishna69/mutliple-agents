@@ -105,9 +105,9 @@ async function waitUntilHealthy(baseUrl, serverProcess, readOutput) {
  */
 export async function startTestServer({ port: requestedPort, appOrigin = TEST_APP_ORIGIN, seedBeforeStart } = {}) {
   const port = requestedPort ?? (await findFreePort());
-  const databaseName = `nova_test_${process.pid}_${randomBytes(4).toString('hex')}`;
+  const databaseName = `unitora_test_${process.pid}_${randomBytes(4).toString('hex')}`;
   const mongoUri = `${MONGO_BASE_URL}/${databaseName}`;
-  const workingDirectory = await mkdtemp(path.join(tmpdir(), 'nova-backend-test-'));
+  const workingDirectory = await mkdtemp(path.join(tmpdir(), 'unitora-backend-test-'));
   const baseUrl = `http://127.0.0.1:${port}`;
   const database = mongoose.createConnection(mongoUri, { serverSelectionTimeoutMS: 5_000 });
   let serverProcess = null;

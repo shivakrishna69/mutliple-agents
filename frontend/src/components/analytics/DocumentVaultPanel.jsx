@@ -38,10 +38,12 @@ import {
   openSignedUrl,
 } from '../ui.jsx';
 
+/** Mirrors backend VAULT_DOCUMENT_TYPES; `isSelfUploadable` mirrors services/vaultAccess.js. */
 const DOCUMENT_TYPES = Object.freeze([
-  { value: 'Offer_Letter', label: 'Offer letter' },
-  { value: 'Appraisal_Doc', label: 'Appraisal document' },
-  { value: 'Gov_ID', label: 'Government ID' },
+  { value: 'Offer_Letter', label: 'Offer letter', isSelfUploadable: false },
+  { value: 'Appraisal_Doc', label: 'Appraisal document', isSelfUploadable: false },
+  { value: 'Gov_ID', label: 'Government ID', isSelfUploadable: true },
+  { value: 'Leave_Document', label: 'Leave document (e.g. medical certificate)', isSelfUploadable: true },
 ]);
 const DOCUMENT_TYPE_LABELS = Object.fromEntries(
   DOCUMENT_TYPES.map((documentType) => [documentType.value, documentType.label]),
@@ -53,7 +55,9 @@ function UploadDropzone({ employeeId, canChooseRoles, onUploaded }) {
   const { csrfToken } = useAuth();
   const fileInputRef = useRef(null);
   const [chosenFile, setChosenFile] = useState(null);
-  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0].value);
+  // HR and admins upload any type; employees only the types they may self-declare.
+  const uploadableTypes = canChooseRoles ? DOCUMENT_TYPES : DOCUMENT_TYPES.filter((type) => type.isSelfUploadable);
+  const [documentType, setDocumentType] = useState(uploadableTypes[0].value);
   const [accessibleRoles, setAccessibleRoles] = useState(['hr']);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -127,7 +131,7 @@ function UploadDropzone({ employeeId, canChooseRoles, onUploaded }) {
         label="Document type"
         value={documentType}
         onChange={(changeEvent) => setDocumentType(changeEvent.target.value)}
-        options={DOCUMENT_TYPES}
+        options={uploadableTypes}
       />
       {canChooseRoles && (
         <fieldset>

@@ -23,6 +23,8 @@ import BrandMark from './BrandMark.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import RoleBadge from './RoleBadge.jsx';
 import {
+  BuildingIcon,
+  CalendarIcon,
   ChartIcon,
   ChatIcon,
   CloseIcon,
@@ -77,6 +79,18 @@ const NAVIGATION_SECTIONS = Object.freeze([
         label: 'Onboarding',
         path: ROUTE_PATHS.ONBOARDING,
         Icon: UserPlusIcon,
+        isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
+      },
+      {
+        label: 'Workplace',
+        path: ROUTE_PATHS.WORKPLACE,
+        Icon: BuildingIcon,
+        isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
+      },
+      {
+        label: 'Leave admin',
+        path: ROUTE_PATHS.LEAVE_ADMIN,
+        Icon: CalendarIcon,
         isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
       },
     ],

@@ -42,6 +42,7 @@ import {
 } from '../components/ui.jsx';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 
+// Kept from before the rename to Unitora: a new key would make every registered device look new.
 const DEVICE_FINGERPRINT_STORAGE_KEY = 'nova.attendance.deviceFingerprint';
 const GEOLOCATION_TIMEOUT_MS = 20_000;
 

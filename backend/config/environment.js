@@ -180,10 +180,10 @@ function loadPayslipConfig(env) {
  *   SMTP_PORT (587), SMTP_SECURE ("true" for implicit TLS on 465), SMTP_USER, SMTP_PASSWORD
  *   SMTP_REQUIRE_TLS          default "true"; "false" only outside production, for local mail
  *                             catchers (Mailpit, MailHog) that do not offer STARTTLS
- *   MAIL_FROM                 required with SMTP_HOST, e.g. "Nova HR <hr@yourcompany.com>"
+ *   MAIL_FROM                 required with SMTP_HOST, e.g. "Unitora HR <hr@yourcompany.com>"
  *   APP_PUBLIC_URL            where people open the app (default: the first CORS origin);
  *                             must be https in production
- *   COMPANY_NAME              shown in invitation emails (default: COMPANY_LEGAL_NAME, else "Nova Support")
+ *   COMPANY_NAME              shown in invitation emails (default: COMPANY_LEGAL_NAME, else "Unitora")
  */
 function loadMailAndPublicConfig(env, corsOrigins) {
   const appPublicUrlSetting = (process.env.APP_PUBLIC_URL ?? corsOrigins[0] ?? '').trim().replace(/\/+$/, '');
@@ -198,8 +198,7 @@ function loadMailAndPublicConfig(env, corsOrigins) {
     throw new Error('APP_PUBLIC_URL must use https in production');
 
   const companyName =
-    (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? 'Nova Support').trim().slice(0, 120) ||
-    'Nova Support';
+    (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? 'Unitora').trim().slice(0, 120) || 'Unitora';
 
   const smtpHost = (process.env.SMTP_HOST ?? '').trim();
   if (!smtpHost) return { mail: null, appPublicUrl: parsedPublicUrl.origin, companyName };

@@ -2,9 +2,9 @@
 #
 # Production image for the backend (Node.js + Express + Socket.IO).
 #
-# Build:  docker build -t nova-backend ./backend
-#         docker build --build-arg WITH_PDF_BROWSER=true -t nova-backend ./backend   (payslip PDFs)
-# Run:    docker run -p 5000:5000 --env-file backend/.env --read-only --cap-drop ALL nova-backend
+# Build:  docker build -t unitora-backend ./backend
+#         docker build --build-arg WITH_PDF_BROWSER=true -t unitora-backend ./backend   (payslip PDFs)
+# Run:    docker run -p 5000:5000 --env-file backend/.env --read-only --cap-drop ALL unitora-backend
 #
 # Configuration comes only from the environment at run time; .dockerignore keeps .env files out of
 # the build context. NODE_ENV defaults to production, which requires secure cookies and https URLs.
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --no-audit --no-fund
 FROM ${NODE_IMAGE} AS runtime
 
 LABEL org.opencontainers.image.title="backend" \
-      org.opencontainers.image.description="Nova Support API: auth, HR and support business rules, real-time events" \
+      org.opencontainers.image.description="Unitora API: auth, HR and support business rules, real-time events" \
       org.opencontainers.image.source="https://github.com/shivakrishna69/mutliple-agents"
 
 # Payslip PDFs are rendered by a headless Chromium (services/pdfGenerationService.js). It adds a few

@@ -17,11 +17,22 @@ const PAGES_BY_ROLE = {
     '/console',
     '/organisation',
     '/people/onboarding',
+    '/workplace',
+    '/leave/admin',
     '/admin/users',
     '/admin/telemetry',
     '/account',
   ],
-  hr: ['/dashboard', '/attendance', '/payroll', '/analytics', '/people/onboarding', '/account'],
+  hr: [
+    '/dashboard',
+    '/attendance',
+    '/payroll',
+    '/analytics',
+    '/people/onboarding',
+    '/workplace',
+    '/leave/admin',
+    '/account',
+  ],
   customer: ['/dashboard', '/support', '/attendance', '/payroll', '/analytics', '/account'],
 };
 

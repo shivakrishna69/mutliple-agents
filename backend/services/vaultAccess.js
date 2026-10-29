@@ -6,8 +6,8 @@
  *     - a user whose role is listed in the document's accessibleRoles (admin and/or hr).
  *   Upload
  *     - admin or hr: any document type, for any employee, and may choose accessibleRoles;
- *     - the employee themselves: their own Gov_ID only (offer letters and appraisals are issued by
- *       HR, not self-declared), always with the default accessibleRoles.
+ *     - the employee themselves: their own Gov_ID or Leave_Document only (offer letters and
+ *       appraisals are issued by HR, not self-declared), always with the default accessibleRoles.
  *   Verify
  *     - a role listed in accessibleRoles, and never the owner (no self-verification, even for an
  *       HR user verifying their own ID).
@@ -23,7 +23,10 @@ import { isWorkforceAdmin } from './workforceAccess.js';
 export const DEFAULT_ACCESSIBLE_ROLES = Object.freeze([...VAULT_GRANTABLE_ROLES]);
 
 /** Document types an employee may upload about themselves. */
-const SELF_UPLOADABLE_DOCUMENT_TYPES = Object.freeze([VAULT_DOCUMENT_TYPES.GOV_ID]);
+const SELF_UPLOADABLE_DOCUMENT_TYPES = Object.freeze([
+  VAULT_DOCUMENT_TYPES.GOV_ID,
+  VAULT_DOCUMENT_TYPES.LEAVE_DOCUMENT,
+]);
 
 /** Reasons recorded in audit logs when access is refused. */
 export const VAULT_DENIAL_REASONS = Object.freeze({

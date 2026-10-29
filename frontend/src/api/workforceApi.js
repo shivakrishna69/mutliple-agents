@@ -13,6 +13,7 @@
  */
 
 import { sendApiRequest } from './httpClient.js';
+import { toQueryString } from './queryString.js';
 
 async function getData(endpointPath, callerSignal) {
   const { responseData } = await sendApiRequest({ method: 'GET', endpointPath, callerSignal });
@@ -22,16 +23,6 @@ async function getData(endpointPath, callerSignal) {
 async function sendData(method, endpointPath, requestPayload, csrfToken) {
   const { responseData } = await sendApiRequest({ method, endpointPath, requestPayload, csrfToken });
   return responseData;
-}
-
-function toQueryString(queryParameters) {
-  const searchParameters = new URLSearchParams();
-  for (const [parameterName, parameterValue] of Object.entries(queryParameters)) {
-    if (parameterValue !== undefined && parameterValue !== null && parameterValue !== '')
-      searchParameters.set(parameterName, String(parameterValue));
-  }
-  const queryString = searchParameters.toString();
-  return queryString ? `?${queryString}` : '';
 }
 
 const encode = encodeURIComponent;
