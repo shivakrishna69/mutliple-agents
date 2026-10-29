@@ -25,8 +25,12 @@ export const ROUTE_PATHS = Object.freeze({
   ONBOARDING: '/people/onboarding',
   // Offices, holidays and employees' base offices, HR and admins.
   WORKPLACE: '/workplace',
-  // Leave administration (policies, balances, payroll export), HR and admins. The backend's emails
-  // link to /leave and /leave/approvals (backend/services/leaveRequestEmails.js).
+  // Leave, with a tab per address. The backend's emails link to /leave and /leave/approvals
+  // (backend/services/leaveRequestEmails.js LEAVE_APP_PATHS), so those two must not move.
+  LEAVE: '/leave',
+  LEAVE_CALENDAR: '/leave/calendar',
+  LEAVE_APPROVALS: '/leave/approvals',
+  // Leave administration (policies, balances, payroll export), HR and admins.
   LEAVE_ADMIN: '/leave/admin',
   // Public page behind the emailed invitation link.
   ACCEPT_INVITATION: '/invite/:token',

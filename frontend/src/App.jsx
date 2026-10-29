@@ -18,7 +18,8 @@
  *   /admin/telemetry -> AgentTelemetry admins
  *   /people/onboarding -> PeopleOnboarding HR and admins (invite new joiners)
  *   /workplace    -> WorkplaceSetup   HR and admins (offices, holidays, employees' base offices)
- *   /leave/admin  -> LeaveAdministration HR and admins (policies, balances, payroll export)
+ *   /leave        -> LeaveCenter      every role: My leave (index), /leave/calendar, /leave/approvals,
+ *                                     and /leave/admin for HR and admins (policies, balances, payroll)
  *
  *   Public, signed in or not:
  *   /verify/payslip -> PayslipVerification
@@ -61,7 +62,11 @@ const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
 const PeopleOnboarding = lazy(() => import('./pages/PeopleOnboarding.jsx'));
 const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
-const LeaveAdministration = lazy(() => import('./pages/LeaveAdministration.jsx'));
+const LeaveCenter = lazy(() => import('./pages/LeaveCenter.jsx'));
+const MyLeavePanel = lazy(() => import('./components/leave/MyLeavePanel.jsx'));
+const LeaveCalendarPanel = lazy(() => import('./components/leave/LeaveCalendarPanel.jsx'));
+const ApprovalsPanel = lazy(() => import('./components/leave/ApprovalsPanel.jsx'));
+const LeaveAdministrationPanel = lazy(() => import('./components/leave/LeaveAdministrationPanel.jsx'));
 const WorkplaceSetup = lazy(() => import('./pages/WorkplaceSetup.jsx'));
 
 export default function App() {
@@ -84,6 +89,14 @@ export default function App() {
             <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
             <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />
             <Route path={ROUTE_PATHS.ANALYTICS} element={<AdvancedAnalyticsHub />} />
+            <Route path={ROUTE_PATHS.LEAVE} element={<LeaveCenter />}>
+              <Route index element={<MyLeavePanel />} />
+              <Route path={ROUTE_PATHS.LEAVE_CALENDAR} element={<LeaveCalendarPanel />} />
+              <Route path={ROUTE_PATHS.LEAVE_APPROVALS} element={<ApprovalsPanel />} />
+              <Route element={<PeopleManagerRoute />}>
+                <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministrationPanel />} />
+              </Route>
+            </Route>
 
             <Route element={<CustomerRoute />}>
               <Route path={ROUTE_PATHS.SUPPORT} element={<CustomerSupport />} />
@@ -97,7 +110,6 @@ export default function App() {
             <Route element={<PeopleManagerRoute />}>
               <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
               <Route path={ROUTE_PATHS.WORKPLACE} element={<WorkplaceSetup />} />
-              <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministration />} />
             </Route>
 
             <Route element={<AdminRoute />}>
