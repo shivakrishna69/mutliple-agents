@@ -226,6 +226,7 @@ export const OFFICE_MESSAGES = Object.freeze({
   INPUT_INVALID: 'The office details are invalid',
   RESTRICTED: 'Only HR and administrators can manage offices',
   EMPLOYEE_OFFICE_ASSIGNED: 'Base office updated',
+  EMPLOYEES_RETRIEVED: 'Employees retrieved',
 });
 
 export const LEAVE_MESSAGES = Object.freeze({

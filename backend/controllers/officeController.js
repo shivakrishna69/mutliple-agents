@@ -1,6 +1,6 @@
 /**
  * Office endpoints (routes/officeRoutes.js and routes/employeeRoutes.js): HR and admins manage
- * offices, including their weekly offs, and assign employees their base office. Every change is
+ * offices, including their weekly offs, list the current employees and assign them their base office. Every change is
  * audited with ids and outcomes.
  */
 
@@ -14,6 +14,7 @@ import {
   listOffices,
   updateOffice,
 } from '../services/officeService.js';
+import { listCurrentEmployees } from '../services/employeeDirectory.js';
 import {
   validateOfficeAssignment,
   validateOfficeChanges,
@@ -77,6 +78,12 @@ export const removeOffice = officeHandler('delete_office', ADMIN_WRITE, async (r
   const office = await deleteOffice(req.params.officeLocationId);
   return { message: OFFICE_MESSAGES.OFFICE_DELETED, data: { office }, auditDetails: { officeLocationId: office.id } };
 });
+
+/** GET /api/employees : current employees, for HR's pickers */
+export const getEmployees = officeHandler('list_employees', ADMIN_READ, async () => ({
+  message: OFFICE_MESSAGES.EMPLOYEES_RETRIEVED,
+  data: { employees: await listCurrentEmployees() },
+}));
 
 /** PUT /api/employees/:employeeId/office */
 export const putEmployeeOffice = officeHandler('assign_employee_office', ADMIN_WRITE, async (req) => {

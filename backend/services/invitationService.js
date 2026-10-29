@@ -33,6 +33,7 @@ import EmployeeInvitation, {
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import User, { ROLES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
+import { listCurrentEmployees } from './employeeDirectory.js';
 import { buildInvitationEmail } from './invitationEmail.js';
 import { MAIL_OUTCOMES, sendMail } from './mailService.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
@@ -100,32 +101,11 @@ export function toInvitationSummary(invitation, { departmentNames = new Map(), m
 // Form options and reference checks
 // =================================================================================================
 
-/** Current employees as { employeeId, name, designation, departmentId }, sorted by name. */
-async function loadCurrentEmployees() {
-  const profiles = await EmployeeProfile.find({
-    'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
-  })
-    .select('userId organizationData.designation organizationData.departmentId')
-    .lean();
-  const accounts = await User.find({ _id: { $in: profiles.map((profile) => profile.userId) } })
-    .select('name')
-    .lean();
-  const nameByUserId = new Map(accounts.map((account) => [account._id.toString(), account.name]));
-  return profiles
-    .map((profile) => ({
-      employeeId: profile._id.toString(),
-      name: nameByUserId.get(profile.userId.toString()) ?? 'Unnamed',
-      designation: profile.organizationData.designation,
-      departmentId: profile.organizationData.departmentId?.toString() ?? null,
-    }))
-    .sort((first, second) => first.name.localeCompare(second.name));
-}
-
 /** Dropdown data for the invite form. */
 export async function loadInvitationFormOptions(inviterRole) {
   const [departments, employees] = await Promise.all([
     Department.find().select('name code').sort({ name: 1 }).lean(),
-    loadCurrentEmployees(),
+    listCurrentEmployees(),
   ]);
   return {
     departments: departments.map((department) => ({

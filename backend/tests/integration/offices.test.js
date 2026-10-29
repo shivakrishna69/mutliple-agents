@@ -62,6 +62,7 @@ describe('office management', { skip: skipReason ?? false }, () => {
       body: { officeLocationId: legacyOfficeId },
     });
     assert.equal(selfAssignment.status, 403);
+    assert.equal((await employee.client.get('/api/employees')).status, 403);
   });
 
   it('creates an office with the default weekly offs and refuses a duplicate code', async () => {
@@ -128,6 +129,11 @@ describe('office management', { skip: skipReason ?? false }, () => {
       body: { officeLocationId: legacyOfficeId },
     });
     assert.equal(assign.status, 200, JSON.stringify(assign.body));
+    const { employees } = (await hrClient.get('/api/employees')).body.data;
+    const listed = employees.find((candidate) => candidate.employeeId === employee.profileId);
+    assert.equal(listed.officeLocationId, legacyOfficeId);
+    assert.equal(listed.employmentStatus, 'Active');
+    assert.ok(listed.name && listed.email && listed.designation);
     assert.equal((await employee.client.get('/api/work-calendar/days?from=2026-10-05&to=2026-10-05')).status, 200);
 
     const unknownOffice = await hrClient.request('PUT', `/api/employees/${employee.profileId}/office`, {
