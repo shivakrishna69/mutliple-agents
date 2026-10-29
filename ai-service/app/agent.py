@@ -70,11 +70,24 @@ from app.nodes.attendance_agent import (
     create_regularization_model,
 )
 from app.nodes.context import AgentContext
+from app.nodes.leave_assistant import (
+    BackendLeaveSystems,
+    LeaveAssistant,
+    LeaveAssistantInput,
+    LeaveAssistantResult,
+    LeaveDataUnavailableError,
+)
 from app.nodes.supervisor import create_supervisor_model
 from app.nodes.transcript import replies_given_this_turn
 from app.schemas import MESSAGE_CONTENT_MAX_LENGTH, EmployeeContext
 from app.services.backend_client import BackendInternalClient
-from app.telemetry import WORKFLOW_REGULARIZATION, WORKFLOW_SUPPORT, TelemetryPublisher, telemetry_turn
+from app.telemetry import (
+    WORKFLOW_LEAVE_ASSISTANT,
+    WORKFLOW_REGULARIZATION,
+    WORKFLOW_SUPPORT,
+    TelemetryPublisher,
+    telemetry_turn,
+)
 
 logger = logging.getLogger("ai_service.agent")
 
@@ -106,6 +119,10 @@ class AgentTimeoutError(AgentError):
 
 class RegularizationUnavailableError(AgentError):
     """BACKEND_INTERNAL_URL is not configured, so attendance cannot be read or written."""
+
+
+class LeaveAssistantUnavailableError(AgentError):
+    """The leave assistant cannot answer: BACKEND_INTERNAL_URL is not set, or the backend is down."""
 
 
 @dataclass(frozen=True)
@@ -233,6 +250,8 @@ class AgentRuntime:
         self._response_model: ChatGroq | None = None
         self._agent_context: AgentContext | None = None
         self.regularization_agent: RegularizationAgent | None = None
+        # The leave assistant reads leave through the backend's internal API; None without it.
+        self.leave_assistant: LeaveAssistant | None = None
         # One pooled client for the backend's internal API, shared by the regularization agent
         # and telemetry delivery.
         self._backend_client: BackendInternalClient | None = None
@@ -256,6 +275,7 @@ class AgentRuntime:
                     ),
                     idle_ttl_seconds=settings.thread_idle_ttl_seconds,
                 )
+                self.leave_assistant = LeaveAssistant(self._response_model, BackendLeaveSystems(self._backend_client))
             # Dependencies handed to nodes through LangGraph's runtime context on every run;
             # never written to the checkpointer.
             self._agent_context = AgentContext(
@@ -491,3 +511,32 @@ class AgentRuntime:
             raise AgentTimeoutError(
                 "turn_timeout", f"regularization exceeded {self._settings.process_timeout_seconds} s"
             ) from timeout_error
+
+    # ---------------------------------------------------------------------------------------------
+    # Leave assistant (POST /ai/leave/assistant)
+    # ---------------------------------------------------------------------------------------------
+
+    async def process_leave_question(self, turn_input: LeaveAssistantInput) -> LeaveAssistantResult:
+        """
+        One employee question to the leave assistant, bounded by AI_PROCESS_TIMEOUT_SECONDS. It only
+        reads, so a timeout or a retry is always safe.
+        """
+        if not self.is_llm_configured:
+            raise LLMNotConfiguredError("llm_not_configured", "GROQ_API_KEY is not set")
+        if self.leave_assistant is None:
+            raise LeaveAssistantUnavailableError("leave_assistant_not_configured", "BACKEND_INTERNAL_URL is not set")
+        try:
+            async with telemetry_turn(self.telemetry_publisher, workflow=WORKFLOW_LEAVE_ASSISTANT) as turn_telemetry:
+                async with asyncio.timeout(self._settings.process_timeout_seconds):
+                    result = await self.leave_assistant.answer(turn_input)
+                if turn_telemetry is not None:
+                    turn_telemetry.route_decision = "draft" if result.draft else "answer"
+                return result
+        except TimeoutError as timeout_error:
+            raise AgentTimeoutError(
+                "turn_timeout", f"leave assistant exceeded {self._settings.process_timeout_seconds} s"
+            ) from timeout_error
+        except LeaveDataUnavailableError as unavailable_error:
+            raise LeaveAssistantUnavailableError(
+                "leave_data_unavailable", str(unavailable_error)
+            ) from unavailable_error

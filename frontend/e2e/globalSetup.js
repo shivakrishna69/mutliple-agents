@@ -2,7 +2,8 @@
  * Starts the real backend (backend/tests/integration/testServer.js) on a throwaway MongoDB
  * database, then creates the accounts and the department the tests use, and onboards employees
  * (HR invites, the employee accepts): one without an office for the workplace test, and a leave
- * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave test. Returns the teardown,
+ * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave tests.
+ * A stand-in AI service answers the leave assistant (e2e/standInAiService.js). Returns the teardown,
  * which stops the backend and drops the database.
  *
  * Needs the backend's dependencies installed (cd backend && npm ci) and MongoDB reachable at
@@ -11,6 +12,7 @@
 
 import { onboardEmployee } from '../../backend/tests/integration/fixtures.js';
 import { startTestServer } from '../../backend/tests/integration/testServer.js';
+import { startStandInAiService } from './standInAiService.js';
 import {
   ACCOUNTS,
   BACKEND_PORT,
@@ -89,7 +91,18 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
 }
 
 export default async function globalSetup() {
-  const testServer = await startTestServer({ port: BACKEND_PORT, appOrigin: FRONTEND_ORIGIN });
+  // The stand-in starts first: the backend needs its address; it reads the backend's when asked.
+  let testServer;
+  const standIn = await startStandInAiService({
+    backendUrl: () => testServer.baseUrl,
+    internalApiKey: () => testServer.internalApiKey,
+  });
+  try {
+    testServer = await startTestServer({ port: BACKEND_PORT, appOrigin: FRONTEND_ORIGIN, aiServiceUrl: standIn.url });
+  } catch (startupError) {
+    await standIn.close();
+    throw startupError;
+  }
   try {
     for (const account of Object.values(ACCOUNTS)) await signUp(testServer, account);
     // The same change scripts/setUserRole.js makes; the API cannot create HR accounts directly.
@@ -110,7 +123,11 @@ export default async function globalSetup() {
     await seedLeaveScenario(testServer, adminClient, departmentId.toString());
   } catch (seedingError) {
     await testServer.stop();
+    await standIn.close();
     throw seedingError;
   }
-  return () => testServer.stop();
+  return async () => {
+    await testServer.stop();
+    await standIn.close();
+  };
 }

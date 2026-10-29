@@ -12,7 +12,9 @@
  *                balance cannot cover unlocks the request unchanged.
  *   3. commit    the fields are set and the lock cleared, matched on the lock's id.
  * Then the request's surplus day claims are deleted, and requests whose border charges depended on
- * it are given those days back.
+ * it are given those days back. Operations that price or give back border charges run under the
+ * employee's leave lease (services/leaveEmployeeLock.js), taken by their entry points; the functions
+ * here never take it themselves, so the work they do for such an operation stays inside its lease.
  *
  * If the server stops part-way, repairLeaveRequests (hourly, and on demand) completes the same
  * steps from what `processing` recorded, and cleans up after a submission that stopped before the
@@ -24,6 +26,7 @@ import mongoose from 'mongoose';
 import LeaveDayClaim from '../models/LeaveDayClaim.js';
 import LeaveLedgerEntry, { ADJUSTMENT_REASON_CODES, LEDGER_ENTRY_TYPES } from '../models/LeaveLedgerEntry.js';
 import LeaveRequest, { LEAVE_REQUEST_STATUSES } from '../models/LeaveRequest.js';
+import { withEmployeeLeaveLock } from './leaveEmployeeLock.js';
 import {
   ABANDONED_RESERVATION_AGE_MS,
   DuplicateLedgerEntryError,
@@ -250,9 +253,10 @@ export async function repairLeaveRequests({ now = new Date() } = {}) {
   };
   const abandonedBefore = new Date(now.getTime() - ABANDONED_RESERVATION_AGE_MS);
 
-  // Operations the server stopped in the middle of.
+  // Operations the server stopped in the middle of; finishing one may give neighbours their border
+  // days back, so it holds the employee's lease like the operation it completes.
   for (const lockedRequest of await LeaveRequest.find({ 'processing.startedAt': { $lt: abandonedBefore } }).lean()) {
-    const outcome = await completeOperation(lockedRequest);
+    const outcome = await withEmployeeLeaveLock(lockedRequest.employeeId, () => completeOperation(lockedRequest));
     if (outcome === OPERATION_OUTCOMES.COMPLETED) summary.operationsCompleted += 1;
     else summary.operationsUndone += 1;
   }
@@ -313,13 +317,15 @@ export async function repairLeaveRequests({ now = new Date() } = {}) {
   }).lean();
   for (const request of bordered) {
     const neighbourIds = [...new Set(request.borderCharges.map((charge) => charge.neighbourRequestId.toString()))];
-    for (const neighbourId of neighbourIds) {
-      // Re-read: settling the previous neighbour changed the request and its version.
-      const current = await LeaveRequest.findOne({ _id: request._id, processing: null }).lean();
-      if (current && (await settleBorderWith(current, new mongoose.Types.ObjectId(neighbourId)))) {
-        summary.borderChargesCredited += 1;
+    await withEmployeeLeaveLock(request.employeeId, async () => {
+      for (const neighbourId of neighbourIds) {
+        // Re-read: settling the previous neighbour changed the request and its version.
+        const current = await LeaveRequest.findOne({ _id: request._id, processing: null }).lean();
+        if (current && (await settleBorderWith(current, new mongoose.Types.ObjectId(neighbourId)))) {
+          summary.borderChargesCredited += 1;
+        }
       }
-    }
+    });
   }
   return summary;
 }

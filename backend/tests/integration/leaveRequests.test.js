@@ -438,6 +438,61 @@ describe('leave requests', { skip: skipReason ?? false }, () => {
     assert.deepEqual(ledger.map((entry) => entry.days).sort(), [1, 2]);
   });
 
+  it('charges the weekend once when two neighbouring leaves are approved at the same moment', async () => {
+    // Several employees, so a race that slips through only sometimes is still caught.
+    const scenarios = [];
+    for (const weeksAhead of [11, 12, 13, 14, 15]) {
+      const employee = await newEmployee();
+      await grant(employee, 4);
+      const { friday, monday } = futureWeekend(weeksAhead);
+      scenarios.push({
+        employee,
+        friday,
+        fridayLeave: await submit(employee, { startDate: friday, endDate: friday }),
+        mondayLeave: await submit(employee, { startDate: monday, endDate: monday }),
+      });
+    }
+
+    // Both leaves of each employee are approved at once, by two different approvers.
+    await Promise.all(
+      scenarios.flatMap(({ fridayLeave, mondayLeave }) => [
+        expectStatus(approve(hrClient, fridayLeave), 200),
+        expectStatus(approve(operationsClient, mondayLeave), 200),
+      ]),
+    );
+
+    for (const { employee, friday, fridayLeave, mondayLeave } of scenarios) {
+      const [fridayNow, mondayNow] = await Promise.all(
+        [fridayLeave, mondayLeave].map(
+          async (leave) =>
+            (await expectStatus(employee.client.get(`/api/leave/requests/${leave.id}`), 200)).data.request,
+        ),
+      );
+      const weekendDates = [addDaysToCalendarDate(friday, 1), addDaysToCalendarDate(friday, 2)];
+      const charged = [...fridayNow.borderCharges, ...mondayNow.borderCharges].map((charge) => charge.date).sort();
+      assert.deepEqual(charged, weekendDates, 'the weekend is charged once, to whichever was approved second');
+      assert.equal(fridayNow.totalDays + mondayNow.totalDays, 4);
+      assert.deepEqual(await plannedBalanceOf(employee), { balanceDays: 0, heldDays: 0, availableDays: 0, used: -4 });
+    }
+  });
+
+  it('does not let a lease left by a stopped server block the employee for good', async () => {
+    const employee = await newEmployee();
+    await grant(employee, 1);
+    const { monday } = futureWeekend(16);
+    const leave = await submit(employee, { startDate: monday, endDate: monday });
+    await testServer.database.collection('leaveemployeelocks').insertOne({
+      employeeId: objectId(employee.profileId),
+      holder: 'stopped-server',
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    await expectStatus(approve(hrClient, leave), 200);
+    const lease = await testServer.database
+      .collection('leaveemployeelocks')
+      .findOne({ employeeId: objectId(employee.profileId) });
+    assert.equal(lease.holder, null, 'the lease is released after the approval');
+  });
+
   it('lets the employee withdraw a pending request or cancel leave before it starts, but not after', async () => {
     const employee = await newEmployee({ reportsTo: manager.profileId });
     await grant(employee, 5);

@@ -40,6 +40,7 @@ import User from '../models/User.js';
 import { calendarDateOfUtcInstant, daysBetweenCalendarDates } from '../utils/calendarDates.js';
 import { centidaysToDays, daysToCentidays } from '../utils/leaveDays.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { withEmployeeLeaveLock } from './leaveEmployeeLock.js';
 import { InsufficientLeaveBalanceError, postCredit, postDebit } from './leaveLedger.js';
 import { claimedHalvesOf, priceLeaveRange, priceShortenedRequest } from './leaveRequestPricing.js';
 import {
@@ -453,6 +454,17 @@ function assertNotBusy(request) {
   if (request.processing) throw conflict('REQUEST_BUSY');
 }
 
+/**
+ * Reads the request and runs `operate` on it under its employee's leave lease, for operations
+ * that price or give back border (sandwich) charges, so they never overlap for one employee
+ * (services/leaveEmployeeLock.js). The request is read again inside the lease, so what is decided
+ * is based on the state no other such operation can change meanwhile.
+ */
+async function underEmployeeLease(requestId, operate) {
+  const { employeeId } = await loadRequest(requestId);
+  return withEmployeeLeaveLock(employeeId, async () => operate(await loadRequest(requestId)));
+}
+
 /** Locks, posts and commits; refuses if the request changed since it was read. */
 async function runOperation(request, operation) {
   const lockedRequest = await lockRequest(
@@ -472,8 +484,11 @@ const decisionBy = (actor, note, now) => ({ byUserId: actor.userId, note: note ?
  * Approves a pending request at its price today (holidays may have changed, and approved leave
  * next to it may add border charges), if the balance covers that price.
  */
-export async function approveLeaveRequest({ requestId, actor, note = null, now = new Date() }) {
-  const request = await loadRequest(requestId);
+export function approveLeaveRequest({ requestId, ...decision }) {
+  return underEmployeeLease(requestId, (request) => approvePending(request, decision));
+}
+
+async function approvePending(request, { actor, note = null, now = new Date() }) {
   assertCanDecide(actor, request);
   assertNotBusy(request);
   if (request.status !== PENDING) throw conflict('REQUEST_NOT_PENDING');
@@ -537,8 +552,11 @@ export async function rejectLeaveRequest({ requestId, actor, note, now = new Dat
  * not started is cancelled and its days given back. Once it has started, a change request is needed.
  * @returns {Promise<{ request: object, wasWithdrawn: boolean }>}
  */
-export async function cancelLeaveRequest({ requestId, actor, now = new Date() }) {
-  const request = await loadRequest(requestId);
+export function cancelLeaveRequest({ requestId, ...cancellationDetails }) {
+  return underEmployeeLease(requestId, (request) => cancelOwnRequest(request, cancellationDetails));
+}
+
+async function cancelOwnRequest(request, { actor, now = new Date() }) {
   assertOwnRequest(actor, request);
   assertNotBusy(request);
   const { today } = await loadEmployeeLeaveContext(request.employeeId, { now });
@@ -622,8 +640,11 @@ export async function requestLeaveChange({
  * Decides the waiting change. Approving a cancellation gives back what the leave cost; approving a
  * shortening reprices it from its approved days and gives back the difference.
  */
-export async function decideLeaveChange({ requestId, actor, isApproved, note = null, now = new Date() }) {
-  const request = await loadRequest(requestId);
+export function decideLeaveChange({ requestId, ...decision }) {
+  return underEmployeeLease(requestId, (request) => decideWaitingChange(request, decision));
+}
+
+async function decideWaitingChange(request, { actor, isApproved, note = null, now = new Date() }) {
   assertCanDecide(actor, request);
   assertNotBusy(request);
   if (request.status !== APPROVED || !request.pendingChange) throw conflict('NO_CHANGE_OPEN');

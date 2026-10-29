@@ -59,11 +59,13 @@ from app.agent import (
     AgentRuntime,
     AgentTimeoutError,
     InvalidModelOutputError,
+    LeaveAssistantUnavailableError,
     LLMNotConfiguredError,
     RegularizationUnavailableError,
 )
 from app.config import ConfigurationError, Settings
 from app.logging_config import configure_logging
+from app.nodes.leave_assistant import LeaveAssistantInput, LeaveAssistantResponse
 from app.schemas import (
     AIProcessResponse,
     ChatRole,
@@ -451,3 +453,45 @@ async def regularize_attendance(turn_input: RegularizationTurnInput, request: Re
         manager_review=review_summary,
         internal_logs=turn_result.internal_logs[-200:],
     )
+
+
+@app.post(
+    "/ai/leave/assistant",
+    response_model=LeaveAssistantResponse,
+    responses=ERROR_RESPONSES,
+    dependencies=[Depends(require_internal_api_key)],
+    tags=["agent"],
+)
+async def answer_leave_question(turn_input: LeaveAssistantInput, request: Request) -> LeaveAssistantResponse:
+    """Answers one employee question about their own leave; may return a draft, never sends one."""
+    agent_runtime: AgentRuntime = request.app.state.agent_runtime
+    log_context = {"requestId": getattr(request.state, "request_id", None)}
+    started_at = time.perf_counter()
+
+    try:
+        result = await agent_runtime.process_leave_question(turn_input)
+    except LLMNotConfiguredError as not_configured_error:
+        logger.error("Leave question rejected: LLM not configured", extra=log_context)
+        raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI model is not configured") from not_configured_error
+    except LeaveAssistantUnavailableError as unavailable_error:
+        logger.error(
+            "Leave question rejected: leave data unavailable",
+            extra={**log_context, "reason": unavailable_error.failure_kind},
+        )
+        raise ServiceError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "The leave assistant is unavailable"
+        ) from unavailable_error
+    except AgentTimeoutError as timeout_error:
+        logger.error("Leave question timed out", extra={**log_context, "detail": timeout_error.detail})
+        raise ServiceError(status.HTTP_504_GATEWAY_TIMEOUT, "AI processing timed out") from timeout_error
+
+    logger.info(
+        "Leave question answered",
+        extra={
+            **log_context,
+            "tools_used": result.tools_used,
+            "draft_proposed": result.draft is not None,
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 1),
+        },
+    )
+    return LeaveAssistantResponse(reply=result.reply, draft=result.draft, tools_used=result.tools_used)

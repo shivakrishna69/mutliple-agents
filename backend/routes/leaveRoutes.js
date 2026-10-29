@@ -28,6 +28,8 @@
  *   GET    /approvals                         what the caller can decide (?queue=requests|changes)
  *   GET    /employees/:employeeId/requests    an employee's requests (HR)
  *   GET    /payroll-export                    unpaid and encashed days for a month (HR; ?month=&changedSince=)
+ *   POST   /assistant                         ask the leave assistant about own leave ({ message, history? });
+ *                                             it answers and may propose a draft, never sends one
  */
 
 import { Router } from 'express';
@@ -61,7 +63,12 @@ import {
   postRequest,
 } from '../controllers/leaveRequestController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { leaveAdminWriteRateLimitByUser, leaveRequestWriteRateLimitByUser } from '../middleware/rateLimiter.js';
+import { postAssistantMessage } from '../controllers/leaveAssistantController.js';
+import {
+  leaveAdminWriteRateLimitByUser,
+  leaveAssistantRateLimitByUser,
+  leaveRequestWriteRateLimitByUser,
+} from '../middleware/rateLimiter.js';
 
 const leaveRouter = Router();
 
@@ -94,5 +101,6 @@ leaveRouter.post('/requests/:requestId/change/decision', leaveRequestWriteRateLi
 leaveRouter.get('/approvals', getApprovalQueue);
 leaveRouter.get('/employees/:employeeId/requests', getRequestsOfEmployee);
 leaveRouter.get('/payroll-export', getPayrollExport);
+leaveRouter.post('/assistant', leaveAssistantRateLimitByUser, postAssistantMessage);
 
 export default leaveRouter;

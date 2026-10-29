@@ -14,8 +14,9 @@ An HR portal and AI-first support desk in one platform, built for Indian compani
 
 - **HR portal (HRMS):** geofenced attendance with an AI agent that fixes missed punches, Indian
   payroll and tax (FY 2026-27), signed PDF payslips with public verification, OKRs, workforce
-  attrition/burnout analytics, an encrypted document vault, an org chart and email-invitation
-  onboarding.
+  attrition/burnout analytics, an encrypted document vault, an org chart, email-invitation
+  onboarding, and leave management with an AI leave assistant that answers questions and drafts
+  requests the employee sends.
 - **Support desk:** customers chat with a multi-agent AI (LangGraph + Groq); a supervisor routes each
   message to billing or technical specialists, and hands off to a human agent when needed.
 - **Admin tooling:** user and role management, an audit log, and a live agent-telemetry console.
@@ -39,7 +40,7 @@ calls the backend's internal API instead. Details: [docs/architecture.md](docs/a
 |---|---|---|
 | [`backend/`](backend) | REST API, auth, business rules, Socket.IO | [backend/README.md](backend/README.md) |
 | [`frontend/`](frontend) | React single-page app | [frontend/README.md](frontend/README.md) |
-| [`ai-service/`](ai-service) | AI agents (support routing, attendance regularization) | [ai-service/README.md](ai-service/README.md) |
+| [`ai-service/`](ai-service) | AI agents (support routing, attendance regularization, leave assistant) | [ai-service/README.md](ai-service/README.md) |
 | [`docs/`](docs) | Architecture and the full project overview | — |
 
 ## Quick start (local development)
@@ -116,7 +117,7 @@ by the backend; the frontend only hides what a role cannot use.
 | Attendance (geofence, AI regularization, manager reviews) | Done |
 | Payroll tax calculator, payslip PDFs + verification | Done; monthly payroll run not yet |
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
-| Leave management | Done: backend (offices, work calendar, policies and balances, requests and approvals, payroll export); screens done (workplace, leave administration, my leave, calendar, approvals); multi-level approvals and an AI leave assistant next |
+| Leave management | Done: backend (offices, work calendar, policies and balances, requests and approvals, payroll export); screens done (workplace, leave administration, my leave, calendar, approvals); AI leave assistant done; multi-level approvals next |
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
 | AI-service tests | Done (`python -m pytest` in `ai-service/`) |

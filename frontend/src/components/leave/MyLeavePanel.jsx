@@ -1,6 +1,7 @@
 /**
  * The employee's own leave: balances for the current leave year, asking for leave (with its price
- * shown as they choose), and their requests with what they can still do with each.
+ * shown as they choose), the leave assistant (whose drafts open the same form, filled in), and
+ * their requests with what they can still do with each.
  *
  *   GET /api/leave/balances · GET /api/leave/types · GET /api/leave/requests
  *
@@ -8,12 +9,13 @@
  * backend says so and the panel explains it instead of showing an error.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { requestLeaveTypes, requestOwnLeaveBalances, requestOwnLeaveRequests } from '../../api/leaveApi.js';
 import { useApiResource } from '../../hooks/useApiResource.js';
 import { formatCalendarDate } from '../../utils/dates.js';
 import { CalendarIcon, PlusIcon } from '../Icons.jsx';
 import { Button, Card, EmptyState, LoadingBlock, Notice } from '../ui.jsx';
+import LeaveAssistantPanel from './LeaveAssistantPanel.jsx';
 import LeaveBalanceCard from './LeaveBalanceCard.jsx';
 import LeaveRequestForm from './LeaveRequestForm.jsx';
 import MyLeaveRequests from './MyLeaveRequests.jsx';
@@ -21,12 +23,22 @@ import MyLeaveRequests from './MyLeaveRequests.jsx';
 const HTTP_FORBIDDEN = 403;
 
 export default function MyLeavePanel() {
-  const [isAsking, setIsAsking] = useState(false);
+  // The open apply form: null, or { draft, key } (draft from the assistant, or null for a blank form;
+  // a new key opens a fresh form for each draft).
+  const [openForm, setOpenForm] = useState(null);
+  const formAnchorRef = useRef(null);
   const [lastSent, setLastSent] = useState(null);
   const balancesResource = useApiResource((signal) => requestOwnLeaveBalances(undefined, signal), []);
   const typesResource = useApiResource((signal) => requestLeaveTypes({}, signal), []);
   const requestsResource = useApiResource((signal) => requestOwnLeaveRequests({}, signal), []);
   const balances = balancesResource.data;
+
+  /** Opens the apply form, blank or filled with an assistant's draft, and brings it into view. */
+  function openApplyForm(draft) {
+    setOpenForm({ draft, key: Date.now() });
+    setLastSent(null);
+    requestAnimationFrame(() => formAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 
   function refresh() {
     balancesResource.reload();
@@ -53,13 +65,8 @@ export default function MyLeavePanel() {
           Leave year {formatCalendarDate(balances.leaveYearRange.firstDate)} to{' '}
           {formatCalendarDate(balances.leaveYearRange.lastDate)}
         </p>
-        {!isAsking && (
-          <Button
-            onClick={() => {
-              setIsAsking(true);
-              setLastSent(null);
-            }}
-          >
+        {!openForm && (
+          <Button onClick={() => openApplyForm(null)}>
             <PlusIcon className="h-4 w-4" /> Ask for leave
           </Button>
         )}
@@ -72,17 +79,20 @@ export default function MyLeavePanel() {
             : 'HR will decide it, because you have no reporting manager.'}
         </Notice>
       )}
-      {isAsking && (
+      <div ref={formAnchorRef} className="scroll-mt-6" />
+      {openForm && (
         <LeaveRequestForm
+          key={openForm.key}
+          draft={openForm.draft}
           leaveTypes={leaveTypes}
           employeeId={balances.employeeId}
           today={balances.today}
           onSubmitted={(request) => {
-            setIsAsking(false);
+            setOpenForm(null);
             setLastSent(request);
             refresh();
           }}
-          onCancel={() => setIsAsking(false)}
+          onCancel={() => setOpenForm(null)}
         />
       )}
 
@@ -93,6 +103,8 @@ export default function MyLeavePanel() {
           ))}
         </div>
       )}
+
+      <LeaveAssistantPanel leaveTypes={leaveTypes} onReviewDraft={openApplyForm} />
 
       <Card title="My requests" subtitle="Newest first." bodyClassName="p-0">
         {requestsResource.error && (

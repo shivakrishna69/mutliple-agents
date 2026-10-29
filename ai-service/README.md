@@ -8,6 +8,11 @@ API for any change.
   technical worker (which may call tools), answers directly, or escalates to a human.
 - **Attendance regularization** (`POST /ai/attendance/regularize`): an agent checks evidence for a
   missed punch and either records it through the backend or files a review for the manager.
+- **Leave assistant** (`POST /ai/leave/assistant`): answers an employee's questions about their own
+  leave (balances, types and rules, requests, office holidays, what a leave costs) with read-only
+  tools over the backend's internal leave API, and may prepare a draft the employee reviews and
+  sends themselves. It never sends, approves or changes leave; the backend names the employee and
+  checks any draft again. Needs `BACKEND_INTERNAL_URL`.
 - **Agent telemetry**: node, model and tool timings are posted to the backend for the admin console;
   conversation content is never included.
 
@@ -47,6 +52,7 @@ docker run --rm -v "$PWD/app:/src/app:ro" -v "$PWD/tests:/src/tests:ro" -v "$PWD
 | `test_tools.py` | Simulated tools, and the customer id always coming from the server, never from the model |
 | `test_support_graph.py` | Whole support turns with scripted models: tool use, two-topic messages, guard escalation, fallbacks |
 | `test_attendance_agent.py` | The evidence rule, date resolution, and full regularization conversations, including prompt injection |
+| `test_leave_assistant.py` | Tools scoped to the backend's employee, pricing and drafting without sending, refusals and mistakes returned to the model, bounded rounds, guarded replies, the endpoint's statuses |
 | `test_api.py` | Internal API key, 422 shape, 503 without Groq, 504 on timeout |
 | `test_config.py` | Unsafe settings (simulated tools or plain HTTP in production, short keys) stop the service |
 
@@ -59,7 +65,7 @@ Groq and the backend.
 app/main.py              FastAPI app, endpoints, error mapping, lifespan
 app/agent.py             AgentRuntime: models, compiled graph, per-thread memory limits
 app/graph.py             LangGraph topology (supervisor ↔ workers loop)
-app/nodes/               supervisor, workers (+ tools), attendance agent
+app/nodes/               supervisor, workers (+ tools), attendance agent, leave assistant
 app/guards/              output guardrails
 app/services/            client for the backend internal API
 app/telemetry.py         LangChain callback → batched telemetry events

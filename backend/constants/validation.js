@@ -164,6 +164,10 @@ export const LEAVE_LIMITS = Object.freeze({
   MAX_SANDWICH_GAP_DAYS: 15,
   // Request lists (own requests, approval queues, payroll export) return at most this many rows.
   MAX_LIST_ROWS: 200,
+  // The leave assistant: one question, and the recent conversation the browser sends with it.
+  ASSISTANT_MESSAGE_MAX_LENGTH: 1000,
+  ASSISTANT_HISTORY_MAX_MESSAGES: 12,
+  ASSISTANT_HISTORY_MESSAGE_MAX_LENGTH: 4000,
 });
 
 /** Limits for the work calendar (models/Holiday.js, OfficeLocation weekly offs, services/workCalendar.js). */

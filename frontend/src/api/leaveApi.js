@@ -99,3 +99,8 @@ export const requestLeaveChangeDecision = (requestId, { isApproved, note }, csrf
     note ? { approve: isApproved, note } : { approve: isApproved },
     csrfToken,
   );
+
+// --- Leave assistant ------------------------------------------------------------------------------
+/** One question with the recent conversation; answers { reply, draft } (a draft is never sent). */
+export const requestLeaveAssistant = ({ message, history }, csrfToken) =>
+  sendData('POST', '/api/leave/assistant', { message, history }, csrfToken);

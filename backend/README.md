@@ -88,6 +88,9 @@ decide any request except their own.
 - Days are priced under the employee's office calendar (`services/workingDays.js`). With the
   sandwich rule, the weekend between two approved leaves is charged to the one approved second,
   and given back if the other is cancelled or shortened (`services/leaveRequestPricing.js`).
+  Operations that price or give back these charges (approving, cancelling, deciding a change)
+  run one at a time per employee under a short lease (`services/leaveEmployeeLock.js`), so two
+  neighbouring leaves approved at the same moment still charge the weekend exactly once.
 - Submitting claims each half day (`models/LeaveDayClaim.js`, so overlapping requests are refused
   even at the same moment) and holds the days on the balance. Approval charges today's price,
   and is refused if the balance no longer covers it.
@@ -101,3 +104,7 @@ decide any request except their own.
   decision, when SMTP is configured.
 - `GET /api/leave/payroll-export?month=YYYY-MM[&changedSince=]` gives payroll each employee's
   unpaid (Loss of Pay) days in the month, and their encashments.
+- The leave assistant (`POST /api/leave/assistant`) answers an employee's questions about their own
+  leave through the ai-service, whose tools read `/api/internal/leave` for that employee only. It
+  can propose a draft, which is checked against the leave rules here and opens the normal apply
+  form; the employee sends it. The conversation stays in the browser; nothing is stored.
