@@ -48,6 +48,7 @@ const LEAVE_TYPE_GROUPS = Object.freeze({
     'eligibleEmploymentStatuses',
     'minServiceDays',
     'attachmentRequiredAfterDays',
+    'hrApprovalAfterDays',
     'allowNegativeBalance',
     'maxNegativeDays',
   ]),

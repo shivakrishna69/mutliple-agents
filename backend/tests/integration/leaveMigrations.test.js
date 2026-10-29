@@ -67,7 +67,7 @@ describe('leave startup migrations', { skip: skipReason ?? false }, () => {
     await testServer?.stop();
   });
 
-  it('fills in back-dating from the template, keeping values HR set, without seeding again', async () => {
+  it('fills in back-dating and the HR approval setting, keeping values HR set, without seeding again', async () => {
     const response = await hrClient.get('/api/leave/types?includeInactive=true');
     assert.equal(response.status, 200, JSON.stringify(response.body));
     const backdatingByCode = Object.fromEntries(
@@ -76,5 +76,10 @@ describe('leave startup migrations', { skip: skipReason ?? false }, () => {
     assert.deepEqual(backdatingByCode, { CL: 3, SL: 2, STUDY: 0 });
     const stored = await testServer.database.collection('leavetypes').findOne({ code: 'STUDY' });
     assert.equal(stored.usage.maxBackdatedDays, 0, 'the default is written, not only applied on read');
+    // Multi-level approvals: existing types keep the manager's single step.
+    const hrApprovalSettings = (await testServer.database.collection('leavetypes').find({}).toArray()).map(
+      (type) => type.usage.hrApprovalAfterDays,
+    );
+    assert.deepEqual(hrApprovalSettings, [null, null, null]);
   });
 });
