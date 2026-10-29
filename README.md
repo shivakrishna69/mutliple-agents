@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/brand/unitora-logo-light.svg">
+    <img src="frontend/public/brand/unitora-logo-dark.svg" alt="Unitora HR" width="180">
+  </picture>
+</p>
+
 # Unitora
 
 [![CI](https://github.com/shivakrishna69/mutliple-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/shivakrishna69/mutliple-agents/actions/workflows/ci.yml)

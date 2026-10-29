@@ -1,23 +1,37 @@
-/** The product logo (gradient chat bubble) with optional name. `tone` adapts the text to dark or light backgrounds. */
+/**
+ * The product logo: the Unitora mark, optionally with the "UNITORA HR" wordmark. `tone` picks the
+ * logo's light colour (for the dark sidebar and panels) or its dark colour (for white pages). The
+ * shapes come from constants/brandArtwork.js and are drawn in currentColor.
+ */
 
 import { APP_NAME } from '../constants/app.js';
+import { BRAND_COLORS, LOGO_MARK, LOGO_WORDMARK } from '../constants/brandArtwork.js';
+
+const MARK_SIZES = Object.freeze({ md: 'h-8 w-8', lg: 'h-10 w-10' });
+const WORDMARK_HEIGHTS = Object.freeze({ md: 'h-3.5', lg: 'h-4' });
+
+function LogoArtwork({ artwork, className }) {
+  return (
+    <svg
+      viewBox={`0 0 ${artwork.width} ${artwork.height}`}
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <g transform={artwork.transform}>
+        <path d={artwork.d} />
+      </g>
+    </svg>
+  );
+}
 
 export default function BrandMark({ showName = true, tone = 'dark', size = 'md' }) {
-  const markSize = size === 'lg' ? 'h-10 w-10' : 'h-8 w-8';
+  const color = tone === 'light' ? BRAND_COLORS.LIGHT : BRAND_COLORS.DARK;
   return (
-    <span className="inline-flex items-center gap-2.5">
-      <span
-        className={`${markSize} inline-flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 shadow-lg shadow-indigo-500/30`}
-      >
-        <svg viewBox="0 0 24 24" className="h-1/2 w-1/2" fill="white" aria-hidden="true">
-          <path d="M5 17.5V8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H9.5L5 20.5z" />
-        </svg>
-      </span>
-      {showName && (
-        <span className={`text-base font-bold tracking-tight ${tone === 'light' ? 'text-white' : 'text-slate-900'}`}>
-          {APP_NAME}
-        </span>
-      )}
+    <span className="inline-flex items-center gap-3" style={{ color }} role="img" aria-label={APP_NAME}>
+      <LogoArtwork artwork={LOGO_MARK} className={`${MARK_SIZES[size]} shrink-0`} />
+      {showName && <LogoArtwork artwork={LOGO_WORDMARK} className={`${WORDMARK_HEIGHTS[size]} w-auto`} />}
     </span>
   );
 }
