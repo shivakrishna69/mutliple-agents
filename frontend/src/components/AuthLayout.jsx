@@ -43,15 +43,15 @@ function BrandPanel() {
     <aside className="relative hidden overflow-hidden bg-neutral-950 lg:flex lg:w-[46%] lg:flex-col lg:justify-between lg:p-12 xl:p-16">
       {/* Layered gradients for depth. */}
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-600 via-brand-800 to-neutral-950 opacity-90"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-900 via-neutral-950 to-brand-950 opacity-90"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-brand-400/30 blur-3xl"
+        className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-brand-500/20 blur-3xl"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -bottom-40 -left-20 h-[28rem] w-[28rem] rounded-full bg-brand-400/25 blur-3xl"
+        className="pointer-events-none absolute -bottom-40 -left-20 h-[28rem] w-[28rem] rounded-full bg-brand-600/15 blur-3xl"
         aria-hidden="true"
       />
 

@@ -216,7 +216,7 @@ function CustomerOverview({ latestConversation, isLoading }) {
 function TeamMemberOverview({ currentUser }) {
   return (
     <div className="grid gap-6 lg:grid-cols-5">
-      <section className="relative overflow-hidden rounded-3xl bg-slate-950 p-8 text-white shadow-xl lg:col-span-3">
+      <section className="relative overflow-hidden rounded-3xl bg-neutral-950 p-8 text-white shadow-xl lg:col-span-3">
         <div
           className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-amber-400/20 blur-2xl"
           aria-hidden="true"
@@ -370,7 +370,7 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
         </section>
 
         <section className="space-y-4">
-          <div className="rounded-2xl bg-slate-950 p-6 text-white shadow-sm">
+          <div className="rounded-2xl bg-neutral-950 p-6 text-white shadow-sm">
             <InboxIcon className="h-7 w-7 text-brand-300" />
             <h2 className="mt-3 text-base font-semibold">Support console</h2>
             <p className="mt-1 text-sm text-slate-400">
@@ -385,14 +385,14 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
           </div>
           {isAdmin && (
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-              <UsersIcon className="h-7 w-7 text-violet-500" />
+              <UsersIcon className="h-7 w-7 text-brand-500" />
               <h2 className="mt-3 text-base font-semibold text-slate-900">Team & roles</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Promote customers to agents or admins and manage who can work in the console.
               </p>
               <Link
                 to={ROUTE_PATHS.ADMIN_USERS}
-                className="mt-5 inline-flex items-center gap-1 rounded text-sm font-semibold text-violet-600 hover:text-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none"
+                className="mt-5 inline-flex items-center gap-1 rounded text-sm font-semibold text-brand-600 hover:text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
               >
                 Manage users <ArrowRightIcon className="h-4 w-4" />
               </Link>

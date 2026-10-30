@@ -246,7 +246,7 @@ export default function Account() {
           <div className="h-20 bg-gradient-to-r from-brand-500 via-brand-600 to-amber-500" aria-hidden="true" />
           <div className="px-6 pb-6">
             <span
-              className="-mt-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-xl font-bold text-white ring-4 ring-white"
+              className="-mt-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-950 text-xl font-bold text-white ring-4 ring-white"
               aria-hidden="true"
             >
               {currentUser.name.trim().charAt(0).toUpperCase()}
