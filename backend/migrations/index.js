@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import addOfficeWeeklyOffRules from './addOfficeWeeklyOffRules.js';
 import addLeaveTypeBackdating from './addLeaveTypeBackdating.js';
 import addLeaveTypeHrApproval from './addLeaveTypeHrApproval.js';
+import addDepartmentSlugs from './addDepartmentSlugs.js';
 import seedLeaveTypeTemplate from './seedLeaveTypeTemplate.js';
 
 /** In the order they must run. Add new migrations at the end. */
@@ -18,6 +19,7 @@ const MIGRATIONS = Object.freeze([
   seedLeaveTypeTemplate,
   addLeaveTypeBackdating,
   addLeaveTypeHrApproval,
+  addDepartmentSlugs,
 ]);
 
 export async function runStartupMigrations() {

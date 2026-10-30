@@ -27,7 +27,8 @@
  *   unique across the organisation and stored uppercase. `name` is the display label and only
  *   needs to be unique among siblings (two divisions may each have a "Platform" team).
  *   `budgetCode` is the finance cost centre the unit's spend is booked against; several units
- *   may share one, so it is not unique.
+ *   may share one, so it is not unique, and a unit may not have one yet. `slug` is the unit's
+ *   address in the app ("data-science"); unique, and kept when the unit is renamed so links last.
  *
  * Write rules
  * -----------
@@ -39,7 +40,12 @@
  */
 
 import mongoose from 'mongoose';
-import { BUDGET_CODE_PATTERN, DEPARTMENT_CODE_PATTERN, ORGANIZATION_FIELD_LIMITS } from '../constants/validation.js';
+import {
+  BUDGET_CODE_PATTERN,
+  DEPARTMENT_CODE_PATTERN,
+  DEPARTMENT_SLUG_PATTERN,
+  ORGANIZATION_FIELD_LIMITS,
+} from '../constants/validation.js';
 import {
   QUERY_UPDATE_OPERATIONS,
   assertParentKeepsTreeAcyclic,
@@ -66,18 +72,37 @@ const departmentSchema = new mongoose.Schema(
       uppercase: true,
       match: [DEPARTMENT_CODE_PATTERN, 'Department code "{VALUE}" must be 2–20 letters, digits, "-" or "_"'],
     },
+    // The department's address in the app (/departments/engineering); unique, generated from the name
+    // when the department is created (services/departmentService.js) and kept when it is renamed.
+    slug: {
+      type: String,
+      required: [true, 'Department slug is required'],
+      trim: true,
+      lowercase: true,
+      maxlength: ORGANIZATION_FIELD_LIMITS.DEPARTMENT_SLUG_MAX_LENGTH,
+      match: [
+        DEPARTMENT_SLUG_PATTERN,
+        'Slug "{VALUE}" may only have lowercase letters, digits and single "-" between them',
+      ],
+    },
+    // Inactive departments keep their history but take no new members.
+    isActive: { type: Boolean, default: true },
     // ──► EmployeeProfile._id. Optional: a newly created unit may not have a head yet.
     departmentHeadId: {
       type: ObjectId,
       ref: 'EmployeeProfile',
       default: null,
     },
+    // Optional: finance may not have given the unit a cost centre yet.
     budgetCode: {
       type: String,
-      required: [true, 'Budget code is required'],
+      default: null,
       trim: true,
       uppercase: true,
-      match: [BUDGET_CODE_PATTERN, 'Budget code "{VALUE}" is not valid'],
+      validate: {
+        validator: (budgetCode) => budgetCode === null || BUDGET_CODE_PATTERN.test(budgetCode),
+        message: 'Budget code "{VALUE}" is not valid',
+      },
     },
     // ──► Department._id (self). null marks a top-level unit.
     parentDepartmentId: {
@@ -94,6 +119,7 @@ const departmentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
     toJSON: {
       transform(doc, ret) {
         delete ret.__v;
@@ -108,6 +134,10 @@ const departmentSchema = new mongoose.Schema(
 // ---------------------------------------------------------------------------
 
 // `unique: true` on `code` creates the business-key index.
+
+// One department per slug. Partial, so departments from before slugs existed do not clash while the
+// startup migration (migrations/addDepartmentSlugs.js) gives them one.
+departmentSchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: 'string' } } });
 
 // Children of a department, sorted by name (org-chart rendering, downward $graphLookup with
 // connectToField "parentDepartmentId"). Unique so siblings cannot share a display name; root

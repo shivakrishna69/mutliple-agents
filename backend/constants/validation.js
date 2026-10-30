@@ -65,6 +65,7 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Limits for the HR models (Department, EmployeeProfile), shared with their request validators. */
 export const ORGANIZATION_FIELD_LIMITS = Object.freeze({
   DEPARTMENT_NAME_MAX_LENGTH: 120,
+  DEPARTMENT_SLUG_MAX_LENGTH: 60,
   DESIGNATION_MAX_LENGTH: 120,
   // Deepest reporting chain or department tree walked by the cycle check. Real organisations are
   // far shallower (a 100,000-person company is rarely more than 12 levels deep); the cap bounds
@@ -201,6 +202,9 @@ export const OKR_FIELD_LIMITS = Object.freeze({
  * Values are uppercased before this check runs.
  */
 export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,19}$/;
+
+/** A department's address in the app: lowercase words joined by single hyphens ("data-science"). */
+export const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * Finance budget / cost-centre code: 1–40 characters of uppercase letters, digits and the

@@ -138,20 +138,15 @@ export default async function globalSetup() {
     for (const account of Object.values(ACCOUNTS)) await signUp(testServer, account);
     // The same change scripts/setUserRole.js makes; the API cannot create HR accounts directly.
     await testServer.database.collection('users').updateOne({ email: ACCOUNTS.hr.email }, { $set: { role: 'hr' } });
-    const { insertedId: departmentId } = await testServer.database.collection('departments').insertOne({
-      name: DEPARTMENT_NAME,
-      code: 'ENG',
-      budgetCode: 'CC-100',
-      departmentHeadId: null,
-      parentDepartmentId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    // Onboarded by the admin: HR's own logins are kept for the tests (5 per account per 15 minutes).
+    // Set up by the admin: HR's own logins are kept for the tests (5 per account per 15 minutes).
     const adminClient = testServer.createClient();
     await adminClient.login(ACCOUNTS.admin.email, PASSWORD);
-    await onboardEmployee({ testServer, hrClient: adminClient, departmentId: departmentId.toString(), ...EMPLOYEE });
-    await seedLeaveScenario(testServer, adminClient, departmentId.toString());
+    const { department } = await expectCreated(
+      adminClient.post('/api/departments', { name: DEPARTMENT_NAME, code: 'ENG', budgetCode: 'CC-100' }),
+      'the department',
+    );
+    await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...EMPLOYEE });
+    await seedLeaveScenario(testServer, adminClient, department.id);
   } catch (seedingError) {
     await testServer.stop();
     await standIn.close();

@@ -232,6 +232,8 @@ export const DEPARTMENT_MESSAGES = Object.freeze({
   DEPARTMENT_DELETED: 'Department removed',
   DEPARTMENT_NOT_FOUND: 'Department not found',
   DEPARTMENT_CODE_TAKEN: 'Another department already uses this code',
+  DEPARTMENT_SLUG_TAKEN: 'Another department already uses this address',
+  DEPARTMENT_NAME_TAKEN: 'A department with this name already exists at this level',
   DEPARTMENT_IN_USE:
     'This department still has employees, sub-departments or invitations, so it cannot be removed; deactivate it instead',
   INPUT_INVALID: 'The department details are invalid',

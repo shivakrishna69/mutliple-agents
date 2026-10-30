@@ -47,6 +47,7 @@ import officeRoutes from './routes/officeRoutes.js';
 import employeeRoutes from './routes/employeeRoutes.js';
 import leaveRoutes from './routes/leaveRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
+import departmentRoutes from './routes/departmentRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
@@ -149,6 +150,8 @@ export function createApp(config) {
   app.use('/api/leave', leaveRoutes);
   // The company's name, branding, mail domain and employee ID format.
   app.use('/api/company', companyRoutes);
+  // Departments: HR adds, changes, deactivates and removes them.
+  app.use('/api/departments', departmentRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));

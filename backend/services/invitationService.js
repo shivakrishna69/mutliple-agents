@@ -104,7 +104,10 @@ export function toInvitationSummary(invitation, { departmentNames = new Map(), m
 /** Dropdown data for the invite form. */
 export async function loadInvitationFormOptions(inviterRole) {
   const [departments, employees] = await Promise.all([
-    Department.find().select('name code').sort({ name: 1 }).lean(),
+    Department.find({ isActive: { $ne: false } })
+      .select('name code')
+      .sort({ name: 1 })
+      .lean(),
     listCurrentEmployees(),
   ]);
   return {
@@ -122,8 +125,12 @@ export async function loadInvitationFormOptions(inviterRole) {
 }
 
 async function assertDraftReferences(profileDraft) {
-  if (!(await Department.exists({ _id: profileDraft.departmentId }))) {
+  const department = await Department.findById(profileDraft.departmentId).select('isActive').lean();
+  if (!department) {
     throw new InvitationError(400, 'DEPARTMENT_NOT_FOUND', 'The selected department no longer exists');
+  }
+  if (department.isActive === false) {
+    throw new InvitationError(400, 'DEPARTMENT_INACTIVE', 'The selected department is no longer active');
   }
   if (profileDraft.reportingManagerId) {
     const manager = await EmployeeProfile.findById(profileDraft.reportingManagerId)

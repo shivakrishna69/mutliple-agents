@@ -22,6 +22,8 @@ describe('OKR edits by several people at once', { skip: skipReason ?? false }, (
     const departmentInsert = await testServer.database.collection('departments').insertOne({
       name: 'Customer Success',
       code: 'CS',
+      slug: 'customer-success',
+      isActive: true,
       budgetCode: 'CC-200',
       departmentHeadId: null,
       parentDepartmentId: null,

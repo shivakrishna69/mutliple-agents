@@ -52,6 +52,8 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
     const insertResult = await testServer.database.collection('departments').insertOne({
       name: 'Engineering',
       code: 'ENG',
+      slug: 'engineering',
+      isActive: true,
       budgetCode: 'CC-100',
       departmentHeadId: null,
       parentDepartmentId: null,
