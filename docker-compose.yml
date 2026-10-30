@@ -10,9 +10,8 @@
 # cookies and https URLs are required in production). For a real deployment, put it behind TLS and
 # set NODE_ENV=production, COOKIE_SECURE=true and https URLs.
 
-# The product was renamed to Unitora; the project name stays, because it names the database
-# volume (nova-support_mongo-data) and changing it would start on an empty database.
-name: nova-support
+# The project name also names the database volume (nsk_mongo-data).
+name: nsk
 
 services:
   mongo:
@@ -45,8 +44,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: "5000"
-      # Database name kept from before the rename to Unitora, so existing data stays in place.
-      MONGO_URI: mongodb://mongo:27017/nova
+      MONGO_URI: mongodb://mongo:27017/nsk
       REDIS_URL: redis://redis:6379
       AI_SERVICE_URL: http://ai-service:8000
       CORS_ORIGINS: http://localhost:8080
