@@ -135,6 +135,35 @@ export const CHANGE_KINDS = Object.freeze({ CANCEL: 'CANCEL', SHORTEN: 'SHORTEN'
 /** Mirrors backend APPROVAL_QUEUES. */
 export const APPROVAL_QUEUES = Object.freeze({ REQUESTS: 'requests', CHANGES: 'changes' });
 
+/** Mirrors backend APPROVAL_LEVELS and APPROVAL_STEP_STATUSES. */
+export const APPROVAL_LEVELS = Object.freeze({ MANAGER: 'MANAGER', HR: 'HR' });
+const APPROVAL_STEP_STATUSES = Object.freeze({ PENDING: 'PENDING', APPROVED: 'APPROVED' });
+
+/** The backend's code for a decision on a step someone else has just decided. */
+export const STEP_ALREADY_DECIDED_CODE = 'STEP_ALREADY_DECIDED';
+
+const APPROVAL_STEP_WORDING = Object.freeze({
+  [APPROVAL_LEVELS.MANAGER]: { approved: 'Manager approved', waitingFor: 'the manager' },
+  [APPROVAL_LEVELS.HR]: { approved: 'HR approved', waitingFor: 'HR' },
+});
+
+/**
+ * Where a pending request with more than one approval step stands, e.g. "Manager approved ·
+ * waiting for HR"; null for a request decided in one step.
+ */
+export function describeApprovalProgress(request) {
+  const steps = request.approvalSteps ?? [];
+  if (request.status !== 'PENDING' || steps.length < 2) return null;
+  const approved = steps
+    .filter((step) => step.status === APPROVAL_STEP_STATUSES.APPROVED)
+    .map((step) => APPROVAL_STEP_WORDING[step.level].approved);
+  const waitingFor = steps
+    .filter((step) => step.status === APPROVAL_STEP_STATUSES.PENDING)
+    .map((step) => APPROVAL_STEP_WORDING[step.level].waitingFor);
+  const progress = [...approved, `waiting for ${waitingFor.join(', then ')}`].join(' · ');
+  return progress.charAt(0).toUpperCase() + progress.slice(1);
+}
+
 /** The vault document type employees upload to support leave (mirrors backend VAULT_DOCUMENT_TYPES). */
 export const LEAVE_DOCUMENT_TYPE = 'Leave_Document';
 

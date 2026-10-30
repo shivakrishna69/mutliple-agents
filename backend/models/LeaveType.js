@@ -15,8 +15,8 @@
  *   usage                    rules applied when employees apply (Phase 3): sandwich rule, half
  *                            days, longest single leave, notice, how many days back a request may
  *                            start (applying after the fact, e.g. sick leave), who may use it,
- *                            minimum service, when an attachment is needed, and whether the
- *                            balance may go negative.
+ *                            minimum service, when an attachment is needed, from how many days HR
+ *                            must also approve, and whether the balance may go negative.
  *
  * Day values are in days, in half-day steps; services convert them to centidays.
  */
@@ -111,6 +111,8 @@ const leaveTypeSchema = new mongoose.Schema(
       },
       minServiceDays: policyDaysField(),
       attachmentRequiredAfterDays: policyDaysField({ allowNull: true, defaultValue: null }),
+      // Leave longer than this also needs HR's approval after the manager's; null: the manager alone.
+      hrApprovalAfterDays: policyDaysField({ allowNull: true, defaultValue: null }),
       allowNegativeBalance: { type: Boolean, default: false },
       maxNegativeDays: policyDaysField(),
     },

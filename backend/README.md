@@ -94,6 +94,10 @@ decide any request except their own.
 - Submitting claims each half day (`models/LeaveDayClaim.js`, so overlapping requests are refused
   even at the same moment) and holds the days on the balance. Approval charges today's price,
   and is refused if the balance no longer covers it.
+- Long leave is approved in steps: when a leave type sets `usage.hrApprovalAfterDays`, leave
+  longer than that needs HR's approval after the manager's. Only the last step charges the leave;
+  a decline at any step frees the days. HR may decide any step, but not two on the same request.
+  A decision names its step, so one meant for a step someone has just decided is refused (409).
 - Before it starts, the employee can withdraw or cancel their leave. After that they ask for a
   change (cancel it, or end it early), and the approver or HR decides.
 - Without database transactions, each change locks the request with what it will write, posts

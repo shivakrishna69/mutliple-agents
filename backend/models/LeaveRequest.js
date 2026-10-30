@@ -9,6 +9,12 @@
  *      ├──reject───► REJECTED
  *      └──withdraw─► CANCELLED
  *
+ * Approval steps (approvalSteps), fixed when submitted: the reporting manager, then HR when the
+ * leave is longer than the type's usage.hrApprovalAfterDays; HR only for an employee without a
+ * manager. The request stays PENDING, its days held, until the last step approves; a rejection at
+ * any step ends it. `awaitingLevel` names the step it waits on, for the approval queues. Requests
+ * submitted before steps existed have none and are decided in one step, as they were.
+ *
  * Ledger (services/leaveLedger.js), for types that keep a balance:
  *   submit HOLD (+held) · approve CONFIRM_DEBIT (closes the hold) · reject / withdraw RELEASE_HOLD
  *   · cancel / shorten CANCELLATION_CREDIT. Loss of Pay keeps no balance and posts nothing.
@@ -40,6 +46,15 @@ export const CHANGE_REQUEST_KINDS = Object.freeze({ CANCEL: 'CANCEL', SHORTEN: '
 
 /** What an approver works through: pending requests, or approved leave with a change waiting. */
 export const APPROVAL_QUEUES = Object.freeze({ REQUESTS: 'requests', CHANGES: 'changes' });
+
+/** Who decides an approval step: the reporting manager, or HR (any HR user or administrator). */
+export const APPROVAL_LEVELS = Object.freeze({ MANAGER: 'MANAGER', HR: 'HR' });
+
+export const APPROVAL_STEP_STATUSES = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+});
 
 const calendarDateField = (required = true) => ({
   type: String,
@@ -98,6 +113,20 @@ const changeRequestSchema = new mongoose.Schema(
     reason: textField({ required: true }),
     requestedByUserId: { type: ObjectId, ref: 'User', required: true },
     requestedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
+/** One approval step and, once taken, its decision. */
+const approvalStepSchema = new mongoose.Schema(
+  {
+    level: { type: String, enum: Object.values(APPROVAL_LEVELS), required: true },
+    status: {
+      type: String,
+      enum: Object.values(APPROVAL_STEP_STATUSES),
+      default: APPROVAL_STEP_STATUSES.PENDING,
+    },
+    decision: { type: decisionSchema, default: null },
   },
   { _id: false },
 );
@@ -165,6 +194,9 @@ const leaveRequestSchema = new mongoose.Schema(
     approverEmployeeId: { type: ObjectId, ref: 'EmployeeProfile', default: null, immutable: true },
     submittedByUserId: { type: ObjectId, ref: 'User', required: true, immutable: true },
     decision: { type: decisionSchema, default: null },
+    approvalSteps: { type: [approvalStepSchema], default: [] },
+    // The level of the first step still pending while the request is PENDING; null otherwise.
+    awaitingLevel: { type: String, enum: [...Object.values(APPROVAL_LEVELS), null], default: null },
     cancellation: { type: decisionSchema, default: null },
     pendingChange: { type: changeRequestSchema, default: null },
     changeHistory: { type: [decidedChangeSchema], default: [] },

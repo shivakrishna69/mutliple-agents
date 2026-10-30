@@ -9,10 +9,16 @@
 import { logger } from '../utils/logger.js';
 import addOfficeWeeklyOffRules from './addOfficeWeeklyOffRules.js';
 import addLeaveTypeBackdating from './addLeaveTypeBackdating.js';
+import addLeaveTypeHrApproval from './addLeaveTypeHrApproval.js';
 import seedLeaveTypeTemplate from './seedLeaveTypeTemplate.js';
 
 /** In the order they must run. Add new migrations at the end. */
-const MIGRATIONS = Object.freeze([addOfficeWeeklyOffRules, seedLeaveTypeTemplate, addLeaveTypeBackdating]);
+const MIGRATIONS = Object.freeze([
+  addOfficeWeeklyOffRules,
+  seedLeaveTypeTemplate,
+  addLeaveTypeBackdating,
+  addLeaveTypeHrApproval,
+]);
 
 export async function runStartupMigrations() {
   for (const migration of MIGRATIONS) {

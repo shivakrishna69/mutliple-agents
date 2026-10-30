@@ -60,6 +60,7 @@ function formFromType(leaveType) {
     eligibleEmploymentStatuses: leaveType?.usage.eligibleEmploymentStatuses ?? [...ELIGIBLE_STATUS_OPTIONS],
     minServiceDays: toFormValue(leaveType?.usage.minServiceDays ?? 0),
     attachmentRequiredAfterDays: toFormValue(leaveType?.usage.attachmentRequiredAfterDays),
+    hrApprovalAfterDays: toFormValue(leaveType?.usage.hrApprovalAfterDays),
     allowNegativeBalance: leaveType?.usage.allowNegativeBalance ?? false,
     maxNegativeDays: toFormValue(leaveType?.usage.maxNegativeDays ?? 0),
   };
@@ -100,6 +101,7 @@ function typeInputFromForm(form, { includeCode }) {
       eligibleEmploymentStatuses: form.eligibleEmploymentStatuses,
       minServiceDays: toDaysOrZero(form.minServiceDays),
       attachmentRequiredAfterDays: toDaysOrNull(form.attachmentRequiredAfterDays),
+      hrApprovalAfterDays: toDaysOrNull(form.hrApprovalAfterDays),
       allowNegativeBalance: canGoNegative,
       maxNegativeDays: canGoNegative ? toDaysOrZero(form.maxNegativeDays) : 0,
     },
@@ -348,6 +350,14 @@ export default function LeaveTypeForm({ leaveType, onSaved, onCancel }) {
               onChange={text('attachmentRequiredAfterDays')}
               error={fieldErrors['usage.attachmentRequiredAfterDays']}
               hint="Empty: never needed"
+            />
+            <TextInput
+              label="HR also approves leave over (days)"
+              {...dayInputProps}
+              value={form.hrApprovalAfterDays}
+              onChange={text('hrApprovalAfterDays')}
+              error={fieldErrors['usage.hrApprovalAfterDays']}
+              hint="After the manager; empty: the manager alone decides"
             />
           </div>
           <div>
