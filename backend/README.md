@@ -53,12 +53,42 @@ scripts/         operational scripts
 | `/api/okrs` | objectives, key results, milestones | employees with a profile |
 | `/api/vault` | employee documents | owner / HR / admin |
 | `/api/org` | org chart and reporting lines | staff |
+| `/api/company` | company name, short code, mail domain, logo, colours, time zone, employee ID digits | public branding / HR read / admin change |
+| `/api/departments` | departments with head counts: add, change, deactivate, remove unused | HR, admin |
 | `/api/people`, `/api/invitations` | onboarding by email invitation | HR, admin / public token |
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
-| `/api/employees` | current employees for pickers; base office assignment | HR, admin |
+| `/api/employees` | current employees for pickers (invited people included); base office assignment; bulk CSV import | HR, admin |
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
 | `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export | HR, admin manage / employees their own / reporting managers decide their team's requests |
 | `/api/internal` | calls from the AI service | internal API key |
+
+## Onboarding: invitations and bulk import
+
+Inviting someone (one at a time, or by CSV) creates their account and profile at once
+(`services/employeeProvisioning.js`): the account is `invited` (no password, cannot sign in) and the
+profile gets an employee ID from the company's short code (`NSK0001`, never reused). The emailed
+link lets the person choose a password, which makes the account `active`. Each account keeps a
+personal email (where invitations go, and the sign-in email for now) and, when the company has a
+mail domain, a reserved company address (`firstname.lastname@domain`, numbered when taken).
+Revoking an invitation disables the account; inviting the person again reuses it and their ID.
+
+Bulk import (`/api/employees/bulk-upload`):
+
+1. Upload a CSV (template: [docs/employee-import-template.csv](../docs/employee-import-template.csv);
+   at most 2 MB and 5,000 rows). Every row is checked and nothing is created: emails, duplicates,
+   roles the uploader may give, joining dates (YYYY-MM-DD), departments (unknown codes are created
+   by the import), managers (a current employee, or a row in the same file), offices.
+2. Start it (`POST /:jobId/confirm`). It runs in the background, managers before their teams, through
+   the same path as a single invitation. With `REDIS_URL` it runs on a BullMQ queue (any instance's
+   worker); without, in the backend process. Its state is in MongoDB either way, so a restart
+   resumes it without creating anyone twice. Emails are paced by `IMPORT_EMAILS_PER_MINUTE`.
+3. Poll `GET /:jobId` for progress; `GET /:jobId/results` gives every row's outcome, with the
+   activation links that could not be emailed (stored encrypted until then, `utils/secretBox.js`).
+
+Columns (case, spaces and hyphens do not matter): `name`, `personal_email`, `department_code`,
+`designation`, `date_of_joining` are required; `company_email`, `department_name` (for a new
+department), `role` (employee, hr, agent), `manager_email`, `work_type` (Onsite, Hybrid, Remote),
+`employment_status` (Probation, Active) and `office_code` are optional.
 
 ## Leave balances
 

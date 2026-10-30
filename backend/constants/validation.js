@@ -238,3 +238,28 @@ export const COMPANY_LIMITS = Object.freeze({
   EMPLOYEE_ID_MIN_DIGITS: 3,
   EMPLOYEE_ID_MAX_DIGITS: 8,
 });
+
+/** Limits for employee CSV imports (services/employeeImport*.js). */
+export const EMPLOYEE_IMPORT_LIMITS = Object.freeze({
+  // 5,000 rows of a dozen short columns fit comfortably in 2 MB.
+  MAX_FILE_BYTES: 2 * 1024 * 1024,
+  MAX_ROWS: 5_000,
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 100,
+  DESIGNATION_MIN_LENGTH: 2,
+  DESIGNATION_MAX_LENGTH: 100,
+  // Joining dates: past ones for people who already work here, up to a year ahead for new joiners.
+  EARLIEST_JOINING_DATE: '1950-01-01',
+  MAX_JOINING_DAYS_AHEAD: 366,
+  // The validation issues a job summary carries; all of them are in the results.
+  ISSUES_IN_SUMMARY: 200,
+  RECENT_JOBS_LISTED: 20,
+  // A worker holds a job for this long and renews it after every row; a stopped worker's job is
+  // picked up again once its lease runs out.
+  LEASE_MS: 2 * 60 * 1000,
+  SWEEP_INTERVAL_MS: 30 * 1000,
+  // Finished jobs (with any activation links still sealed in them) are deleted after this.
+  RETENTION_DAYS: 30,
+  // Files checked but never started are deleted sooner.
+  UNCONFIRMED_RETENTION_DAYS: 7,
+});

@@ -17,7 +17,12 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 | `validators.test.js` | Signup, login, password, invitation and leave request input rules, including NoSQL-injection attempts |
 | `environment.test.js` | Startup configuration: required and weak secrets, production-only rules, CORS, Redis, payslip and SMTP settings |
 | `workforceAccess.test.js` | The organisation-wide HR access rule and its use by the document vault |
-| `emails.test.js` | HTML escaping, the shared email layout, the invitation email and the leave request emails |
+| `emails.test.js` | HTML escaping, the shared email layout, the invitation email (with employee ID and company email) and the leave request emails |
+| `companySettings.test.js` | Employee IDs from the short code and padding |
+| `companyEmail.test.js` | Company addresses from names: first.last, accents and symbols dropped |
+| `slugs.test.js` | Department slugs from names, and numbering taken ones |
+| `secretBox.test.js` | Sealing activation links: wrong secret, purpose or altered value refused |
+| `employeeImportParser.test.js` | Reading employee CSVs: Excel BOM, header names, quoted cells, line numbers, and the files refused |
 | `calendarDates.test.js` | Calendar-date helpers across month, year and leap-day boundaries; nth weekday of the month |
 | `workingDays.test.js` | Weekly offs (every week and 2nd/4th Saturday), holidays, half days and the sandwich rule, counted by hand on October 2026 |
 | `leaveAccrualRules.test.js` | Monthly and upfront accrual, start- and end-of-month credits, joiner pro-rata and rounding, accrual during notice, year-end carry forward, lapse and encashment, worked out by hand |
@@ -46,11 +51,19 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 | `leaveMigrations.test.js` | Leave types created before a policy field existed get the template's value (or the default), keeping values HR set |
 | `leaveAssistant.test.js` | The internal leave API (key only, one employee, read only, pricing saves nothing) and the assistant endpoint with a stand-in AI service: the asker is always the signed-in employee, drafts are checked against the leave rules, an unavailable assistant is a clear 503, input limits and the per-user rate limit |
 | `leaveApprovalSteps.test.js` | Approval in steps: short leave in one step, long leave held after the manager and charged by HR, a decline at either step freeing the days, no one approving twice, HR alone without a manager, two people deciding the same step at once, and requests from before steps existed |
+| `companySettings.test.js` | The settings a new installation starts with, public branding, HR reads and only admins change them, version checks, field rules |
+| `departments.test.js` | Slugs for departments from before slugs, slugs kept on rename, code/slug/name clashes, head counts, deactivation (invitations respect it), removal only when unused |
+| `accountLifecycle.test.js` | Accounts created with the invitation: invited accounts cannot sign in, company addresses, revoking and inviting again, disabled accounts losing their sessions, unique IDs under concurrent invitations, and migrating older accounts, profiles and invitations |
+| `employeeImport.test.js` | CSV imports: who may import, unusable files, every row check, the background run (departments, managers first, IDs, offices, sealed activation links that work), starting once, resuming after a restart, giving up, and the BullMQ queue when `TEST_REDIS_URL` is set |
 | `leaveRequests.test.js` | Pricing with half days and the sandwich rule, every submission check, overlap and overdraft refused under concurrent submissions, routing to the manager or HR and who may decide, approval at today's price with weekend charges between two leaves (charged once even when both are approved at the same moment) and their credit on cancellation, a lease left by a stopped server expiring, withdrawal and cancellation, change requests once leave has started, the payroll export, and repair after a stopped server |
 
 MongoDB comes from `TEST_MONGO_URL` (default `mongodb://127.0.0.1:27017`, e.g. the
 `multiagent-mongo` container). If it is not reachable, the integration suites are skipped with a
 message locally, and fail when `CI=true`.
+
+The BullMQ import test needs Redis at `TEST_REDIS_URL` (e.g.
+`docker run -d --rm -p 6390:6379 redis:7-alpine`, then `TEST_REDIS_URL=redis://127.0.0.1:6390`); without it
+that one test is skipped. CI runs it.
 
 ## Writing a new test
 

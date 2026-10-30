@@ -64,6 +64,8 @@ const invitationSchema = new mongoose.Schema(
       designation: { type: String, required: true, trim: true, maxlength: INVITATION_LIMITS.DESIGNATION_MAX_LENGTH },
       departmentId: { type: ObjectId, ref: 'Department', required: true },
       reportingManagerId: { type: ObjectId, ref: 'EmployeeProfile', default: null },
+      // Set by imports that name an office; the invite form assigns offices separately.
+      officeLocationId: { type: ObjectId, ref: 'OfficeLocation', default: null },
       workLocationType: { type: String, enum: Object.values(WORK_LOCATION_TYPES), required: true },
       dateOfJoining: { type: Date, required: true },
       employmentStatus: { type: String, enum: Object.values(EMPLOYMENT_STATUSES), required: true },

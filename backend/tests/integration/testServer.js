@@ -57,7 +57,7 @@ function findFreePort() {
   });
 }
 
-function buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey }) {
+function buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey, environment }) {
   const inherited = Object.fromEntries(
     INHERITED_ENVIRONMENT_KEYS.filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]]),
   );
@@ -74,6 +74,7 @@ function buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, inter
     CORS_ORIGINS: appOrigin,
     BOOTSTRAP_ADMIN_EMAIL: TEST_ADMIN_EMAIL,
     COMPANY_NAME: 'Test Company',
+    ...environment,
   };
 }
 
@@ -97,7 +98,7 @@ async function waitUntilHealthy(baseUrl, serverProcess, readOutput) {
 /**
  * Starts server.js on a fresh database.
  * @param {{ port?: number, appOrigin?: string, aiServiceUrl?: string,
- *   seedBeforeStart?: (database: mongoose.Connection) => Promise<void> }} [options]
+ *   seedBeforeStart?: (database: mongoose.Connection) => Promise<void>, environment?: Record<string, string> }} [options]
  *   A fixed port and the browser origin to allow (the frontend's browser tests need both to be known
  *   in advance); by default a free port and TEST_APP_ORIGIN. `seedBeforeStart` writes data before the
  *   server starts, so its startup migrations see that data.
@@ -110,6 +111,8 @@ export async function startTestServer({
   // Nothing listens here by default; a test that needs the AI service passes its stand-in's URL.
   aiServiceUrl = 'http://127.0.0.1:9',
   seedBeforeStart,
+  // Extra variables for this server, e.g. { REDIS_URL } to run imports on BullMQ.
+  environment = {},
 } = {}) {
   // The key the backend and the AI service share; tests use it to call /api/internal like the AI service.
   const internalApiKey = randomBytes(32).toString('hex');
@@ -125,7 +128,7 @@ export async function startTestServer({
   function spawnServer() {
     serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
       cwd: workingDirectory,
-      env: buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey }),
+      env: buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey, environment }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const captureOutput = (chunk) => {
@@ -191,19 +194,21 @@ export class TestClient {
   /**
    * @param {string} method
    * @param {string} requestPath
-   * @param {{ body?: unknown, sendCsrfToken?: boolean }} [options]
+   * @param {{ body?: unknown, sendCsrfToken?: boolean }} [options]  a FormData body is sent as multipart
    * @returns {Promise<{ status: number, body: any }>}
    */
   async request(method, requestPath, { body, sendCsrfToken = true } = {}) {
     const headers = { Origin: TEST_APP_ORIGIN, Accept: 'application/json' };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const isMultipart = body instanceof FormData;
+    // fetch sets the multipart Content-Type itself, with the boundary.
+    if (body !== undefined && !isMultipart) headers['Content-Type'] = 'application/json';
     if (this.cookies.size > 0) headers.Cookie = this.cookieHeader();
     if (sendCsrfToken && this.csrfToken) headers['X-CSRF-Token'] = this.csrfToken;
 
     const response = await fetch(`${this.baseUrl}${requestPath}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined || isMultipart ? body : JSON.stringify(body),
     });
     this.storeCookies(response);
     const responseBody = await response.json().catch(() => null);
@@ -221,6 +226,13 @@ export class TestClient {
 
   patch(requestPath, body, options) {
     return this.request('PATCH', requestPath, { ...options, body });
+  }
+
+  /** Uploads one file in the multipart field "file", as a browser form would. */
+  upload(requestPath, { fileName, content, contentType = 'text/csv' }) {
+    const form = new FormData();
+    form.append('file', new Blob([content], { type: contentType }), fileName);
+    return this.request('POST', requestPath, { body: form });
   }
 
   signup(name, email, password = STRONG_PASSWORD) {

@@ -2,6 +2,8 @@
 export const HTTP_STATUS = Object.freeze({
   OK: 200,
   CREATED: 201,
+  // Taken on, finished in the background (e.g. an employee import).
+  ACCEPTED: 202,
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,

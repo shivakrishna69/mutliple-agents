@@ -34,6 +34,7 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_SUPPORT_MESSAGES: 'You are sending messages too quickly. Please wait a moment and try again',
   TOO_MANY_VAULT_UPLOADS: 'Too many document uploads. Please wait a few minutes and try again',
   TOO_MANY_VAULT_DOWNLOADS: 'Too many download requests. Please wait a moment and try again',
+  TOO_MANY_EMPLOYEE_IMPORTS: 'Too many employee files uploaded. Please wait a few minutes and try again',
   TOO_MANY_PUNCH_ATTEMPTS: 'Too many punch attempts. Please wait a minute and try again',
   TOO_MANY_REGULARIZATION_MESSAGES: 'Too many attendance correction messages. Please wait a minute and try again',
   TOO_MANY_TAX_ESTIMATES: 'Too many tax estimates. Please wait a minute and try again',
@@ -239,6 +240,27 @@ export const DEPARTMENT_MESSAGES = Object.freeze({
     'This department still has employees, sub-departments or invitations, so it cannot be removed; deactivate it instead',
   INPUT_INVALID: 'The department details are invalid',
   RESTRICTED: 'Only HR and administrators can manage departments',
+});
+
+export const EMPLOYEE_IMPORT_MESSAGES = Object.freeze({
+  FILE_CHECKED: 'File checked. Review the rows, then start the import',
+  JOBS_RETRIEVED: 'Imports retrieved',
+  JOB_RETRIEVED: 'Import retrieved',
+  JOB_STARTED: 'Import started. Employees are being created in the background',
+  RESULTS_RETRIEVED: 'Import results retrieved',
+  JOB_NOT_FOUND: 'Import not found',
+  JOB_NOT_WAITING: 'This import has already been started',
+  NOTHING_TO_IMPORT: 'No row of this file can be imported. Fix the file and upload it again',
+  FILE_REQUIRED: 'Choose a CSV file to upload in the field "file"',
+  FILE_TOO_LARGE: 'The file is too large. Split it into smaller files',
+  MALFORMED_UPLOAD: 'The upload could not be read. Please try again',
+  MULTIPART_REQUIRED: 'Send the file as multipart/form-data',
+  FILE_NOT_CSV: 'The file could not be read as CSV. Save it from your spreadsheet as "CSV UTF-8"',
+  FILE_EMPTY: 'The file has no employee rows',
+  TOO_MANY_ROWS: 'The file has too many rows. Split it into smaller files',
+  COLUMNS_MISSING: 'The file is missing required columns',
+  RESTRICTED: 'Only HR and administrators can import employees',
+  INPUT_INVALID: 'The import request is invalid',
 });
 
 export const OFFICE_MESSAGES = Object.freeze({

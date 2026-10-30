@@ -201,6 +201,13 @@ export const invitationSendRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_INVITATIONS,
 });
 
+export const employeeImportUploadRateLimitByUser = createRateLimiter({
+  limiterName: 'employee_import_uploads_per_user',
+  ...RATE_LIMITS.EMPLOYEE_IMPORT_UPLOADS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_EMPLOYEE_IMPORTS,
+});
+
 export const invitationLookupRateLimitByClientIp = createRateLimiter({
   limiterName: 'invitation_lookups_per_ip',
   ...RATE_LIMITS.INVITATION_LOOKUPS_PER_CLIENT_IP,

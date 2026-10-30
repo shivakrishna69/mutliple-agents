@@ -17,6 +17,9 @@ import { EMAIL_PATTERN, HEX_COLOR_PATTERN } from '../constants/validation.js';
  */
 const MIN_SECRET_LENGTH = 32;
 
+/** Bounds for IMPORT_EMAILS_PER_MINUTE. */
+const IMPORT_EMAILS_PER_MINUTE_BOUNDS = Object.freeze({ MIN: 1, MAX: 600, DEFAULT: 30 });
+
 /** Bounds for AI_SERVICE_TIMEOUT_MS: long enough for an LLM round trip, short enough not to hang webhooks. */
 const AI_SERVICE_TIMEOUT_BOUNDS_MS = Object.freeze({ MIN: 1_000, MAX: 120_000, DEFAULT: 20_000 });
 
@@ -313,6 +316,19 @@ export function loadConfig() {
     }
   }
 
+  // Optional. How many invitation emails an employee import sends per minute: mail providers cap
+  // sending (often a few hundred an hour), and a steady pace keeps the import within it.
+  const importEmailsPerMinute = Number(process.env.IMPORT_EMAILS_PER_MINUTE ?? IMPORT_EMAILS_PER_MINUTE_BOUNDS.DEFAULT);
+  if (
+    !Number.isInteger(importEmailsPerMinute) ||
+    importEmailsPerMinute < IMPORT_EMAILS_PER_MINUTE_BOUNDS.MIN ||
+    importEmailsPerMinute > IMPORT_EMAILS_PER_MINUTE_BOUNDS.MAX
+  ) {
+    throw new Error(
+      `IMPORT_EMAILS_PER_MINUTE must be a whole number from ${IMPORT_EMAILS_PER_MINUTE_BOUNDS.MIN} to ${IMPORT_EMAILS_PER_MINUTE_BOUNDS.MAX}`,
+    );
+  }
+
   // Optional. Employee document vault storage; null disables the vault.
   const vaultStorage = loadS3StorageConfig(env, 'VAULT');
   // Optional. Payslip PDF generation and storage; null disables it.
@@ -329,6 +345,7 @@ export function loadConfig() {
     env,
     cookieSecure,
     redisUrl,
+    employeeImport: { emailsPerMinute: importEmailsPerMinute },
     vaultStorage,
     payslips,
     bootstrapAdminEmail,

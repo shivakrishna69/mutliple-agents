@@ -51,6 +51,7 @@ import departmentRoutes from './routes/departmentRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
+import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
@@ -232,6 +233,8 @@ async function start() {
     // Accruals, year ends and leave request repair, now and hourly (idempotent, so several
     // instances may run it).
     startLeaveScheduler();
+    // Employee imports: BullMQ on Redis when REDIS_URL is set, in this process otherwise.
+    initEmployeeImportQueue(config);
   });
 
   /**
@@ -252,6 +255,7 @@ async function start() {
 
     try {
       stopLeaveScheduler();
+      await closeEmployeeImportQueue();
       await closeSocketServer();
       await closeCacheStore();
       closeVaultStorage();

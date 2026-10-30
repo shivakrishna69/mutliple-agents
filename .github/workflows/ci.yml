@@ -47,10 +47,21 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      # For the employee import test that runs on the BullMQ queue.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     env:
       # Integration tests fail instead of skipping when MongoDB is unreachable in CI.
       CI: "true"
       TEST_MONGO_URL: mongodb://127.0.0.1:27017
+      TEST_REDIS_URL: redis://127.0.0.1:6379
     defaults:
       run:
         working-directory: backend
