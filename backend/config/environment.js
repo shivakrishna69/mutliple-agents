@@ -4,7 +4,7 @@
  * switched off when their variables are unset.
  */
 
-import { EMAIL_PATTERN } from '../constants/validation.js';
+import { EMAIL_PATTERN, HEX_COLOR_PATTERN } from '../constants/validation.js';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -16,8 +16,6 @@ import { EMAIL_PATTERN } from '../constants/validation.js';
  * brute-forced offline from a single signed value.
  */
 const MIN_SECRET_LENGTH = 32;
-// The name in emails when the deployment sets neither COMPANY_NAME nor COMPANY_LEGAL_NAME.
-const DEFAULT_COMPANY_NAME = 'NSK Software Technologies';
 
 /** Bounds for AI_SERVICE_TIMEOUT_MS: long enough for an LLM round trip, short enough not to hang webhooks. */
 const AI_SERVICE_TIMEOUT_BOUNDS_MS = Object.freeze({ MIN: 1_000, MAX: 120_000, DEFAULT: 20_000 });
@@ -106,7 +104,6 @@ function loadS3StorageConfig(env, envPrefix) {
   };
 }
 
-const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const PDF_BROWSER_CHANNELS = Object.freeze(['chrome', 'chrome-beta', 'msedge', 'msedge-beta', 'chromium']);
 
 /**
@@ -185,7 +182,8 @@ function loadPayslipConfig(env) {
  *   MAIL_FROM                 required with SMTP_HOST, e.g. "NSK HR <hr@yourcompany.com>"
  *   APP_PUBLIC_URL            where people open the app (default: the first CORS origin);
  *                             must be https in production
- *   COMPANY_NAME              shown in invitation emails (default: COMPANY_LEGAL_NAME, else "NSK Software Technologies")
+ *   COMPANY_NAME              the company name a new installation starts with (default: COMPANY_LEGAL_NAME, else
+ *                             the product's); administrators change it later in the company settings
  */
 function loadMailAndPublicConfig(env, corsOrigins) {
   const appPublicUrlSetting = (process.env.APP_PUBLIC_URL ?? corsOrigins[0] ?? '').trim().replace(/\/+$/, '');
@@ -199,9 +197,7 @@ function loadMailAndPublicConfig(env, corsOrigins) {
   if (env === 'production' && parsedPublicUrl.protocol !== 'https:')
     throw new Error('APP_PUBLIC_URL must use https in production');
 
-  const companyName =
-    (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? DEFAULT_COMPANY_NAME).trim().slice(0, 120) ||
-    DEFAULT_COMPANY_NAME;
+  const companyName = (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? '').trim().slice(0, 120) || null;
 
   const smtpHost = (process.env.SMTP_HOST ?? '').trim();
   if (!smtpHost) return { mail: null, appPublicUrl: parsedPublicUrl.origin, companyName };

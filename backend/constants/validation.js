@@ -214,3 +214,21 @@ export const BUDGET_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_./-]{0,39}$/;
  * form by the model's setter before the check runs.
  */
 export const MAC_ADDRESS_PATTERN = /^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$/;
+
+/** "#RRGGBB" colours: company brand colours and the payslip accent. */
+export const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+/** A mail domain such as example.com or mail.example.co.in: labels of letters, digits and "-". */
+export const EMAIL_DOMAIN_PATTERN = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/** Limits for models/CompanySettings.js, shared with its request validator. */
+export const COMPANY_LIMITS = Object.freeze({
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 120,
+  SHORT_CODE_MIN_LENGTH: 2,
+  SHORT_CODE_MAX_LENGTH: 6,
+  EMAIL_DOMAIN_MAX_LENGTH: 253,
+  LOGO_URL_MAX_LENGTH: 2048,
+  EMPLOYEE_ID_MIN_DIGITS: 3,
+  EMPLOYEE_ID_MAX_DIGITS: 8,
+});

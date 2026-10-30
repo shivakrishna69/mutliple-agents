@@ -50,10 +50,7 @@ async function leaveActorOf(req) {
   return { userId: req.user.id, role: req.user.role, employeeId };
 }
 
-const appContextOf = (req) => ({
-  companyName: req.app.locals.config.companyName,
-  appPublicUrl: req.app.locals.config.appPublicUrl,
-});
+const appContextOf = (req) => ({ appPublicUrl: req.app.locals.config.appPublicUrl });
 
 const requestAudit = (request, extra = {}) => ({
   leaveRequestId: request.id,

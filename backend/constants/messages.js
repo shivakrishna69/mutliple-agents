@@ -215,6 +215,29 @@ export const COMMON_MESSAGES = Object.freeze({
   EMPLOYEE_NOT_FOUND: 'Employee not found',
 });
 
+export const COMPANY_MESSAGES = Object.freeze({
+  BRANDING_RETRIEVED: 'Company branding retrieved',
+  SETTINGS_RETRIEVED: 'Company settings retrieved',
+  SETTINGS_UPDATED: 'Company settings updated',
+  INPUT_INVALID: 'The company settings are invalid',
+  RESTRICTED: 'Only HR and administrators can see the company settings',
+  ADMINS_ONLY: 'Only administrators can change the company settings',
+});
+
+export const DEPARTMENT_MESSAGES = Object.freeze({
+  DEPARTMENTS_RETRIEVED: 'Departments retrieved',
+  DEPARTMENT_RETRIEVED: 'Department retrieved',
+  DEPARTMENT_CREATED: 'Department added',
+  DEPARTMENT_UPDATED: 'Department updated',
+  DEPARTMENT_DELETED: 'Department removed',
+  DEPARTMENT_NOT_FOUND: 'Department not found',
+  DEPARTMENT_CODE_TAKEN: 'Another department already uses this code',
+  DEPARTMENT_IN_USE:
+    'This department still has employees, sub-departments or invitations, so it cannot be removed; deactivate it instead',
+  INPUT_INVALID: 'The department details are invalid',
+  RESTRICTED: 'Only HR and administrators can manage departments',
+});
+
 export const OFFICE_MESSAGES = Object.freeze({
   OFFICES_RETRIEVED: 'Offices retrieved',
   OFFICE_RETRIEVED: 'Office retrieved',

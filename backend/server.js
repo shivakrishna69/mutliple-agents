@@ -46,12 +46,14 @@ import workCalendarRoutes from './routes/workCalendarRoutes.js';
 import officeRoutes from './routes/officeRoutes.js';
 import employeeRoutes from './routes/employeeRoutes.js';
 import leaveRoutes from './routes/leaveRoutes.js';
+import companyRoutes from './routes/companyRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
+import { DEFAULT_COMPANY_NAME, ensureCompanySettings } from './services/companySettings.js';
 import { runStartupMigrations } from './migrations/index.js';
 import { loadConfig } from './config/environment.js';
 import { asyncHandler, createErrorHandler, notFoundHandler } from './middleware/errorHandling.js';
@@ -145,6 +147,8 @@ export function createApp(config) {
   app.use('/api/employees', employeeRoutes);
   // Leave settings, types, balances, ledger, HR movements and the leave job.
   app.use('/api/leave', leaveRoutes);
+  // The company's name, branding, mail domain and employee ID format.
+  app.use('/api/company', companyRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -189,6 +193,7 @@ async function start() {
     config = loadConfig();
     await connectDatabase(config.mongoUri);
     await runStartupMigrations();
+    await ensureCompanySettings({ initialName: config.companyName ?? DEFAULT_COMPANY_NAME });
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);

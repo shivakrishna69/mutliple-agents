@@ -28,6 +28,7 @@ import {
 } from '../services/invitationService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
+import { loadEmailContext } from '../services/companySettings.js';
 import { isWorkforceAdmin } from '../services/workforceAccess.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 import { validateInvitationInput } from '../validators/peopleValidators.js';
@@ -36,10 +37,7 @@ function audit(req, action, outcome, details = {}) {
   recordAuditEvent(req, { category: 'people', action, outcome, ...details });
 }
 
-function appContextOf(req) {
-  const { appPublicUrl, companyName } = req.app.locals.config;
-  return { appPublicUrl, companyName };
-}
+const appContextOf = (req) => loadEmailContext(req.app.locals.config);
 
 /** Wraps a handler with the HR/admin check and InvitationError mapping. */
 function peopleHandler(action, handler) {
@@ -93,7 +91,7 @@ export const postInvitation = peopleHandler('create_invitation', async (req, res
   const { invitation, delivery } = await createInvitation({
     inviter: { id: req.user.id, name: req.user.name, role: req.user.role },
     input: validation.sanitizedInput,
-    appContext: appContextOf(req),
+    appContext: await appContextOf(req),
   });
   audit(req, 'create_invitation', AUDIT_OUTCOMES.ALLOWED, {
     invitationId: invitation._id.toString(),
@@ -111,7 +109,7 @@ export const postResendInvitation = peopleHandler('resend_invitation', async (re
   const { invitation, delivery } = await resendInvitation({
     invitationId: req.params.invitationId,
     inviter: { id: req.user.id, name: req.user.name, role: req.user.role },
-    appContext: appContextOf(req),
+    appContext: await appContextOf(req),
   });
   audit(req, 'resend_invitation', AUDIT_OUTCOMES.ALLOWED, {
     invitationId: invitation._id.toString(),
