@@ -1,37 +1,22 @@
 /**
- * The product logo: the Unitora mark, optionally with the "UNITORA HR" wordmark. `tone` picks the
- * logo's light colour (for the dark sidebar and panels) or its dark colour (for white pages). The
- * shapes come from constants/brandArtwork.js and are drawn in currentColor.
+ * The company logo. `tone` picks the version for the background behind it: "light" (white
+ * letters) for the dark sidebar and panels, "dark" (charcoal letters) for white pages. The files
+ * live in public/brand/ (constants/app.js names them).
  */
 
-import { APP_NAME } from '../constants/app.js';
-import { BRAND_COLORS, LOGO_MARK, LOGO_WORDMARK } from '../constants/brandArtwork.js';
+import { APP_FULL_NAME, BRAND_LOGO_FILES } from '../constants/app.js';
 
-const MARK_SIZES = Object.freeze({ md: 'h-8 w-8', lg: 'h-10 w-10' });
-const WORDMARK_HEIGHTS = Object.freeze({ md: 'h-3.5', lg: 'h-4' });
+const LOGO_HEIGHTS = Object.freeze({ md: 'h-10', lg: 'h-14' });
 
-function LogoArtwork({ artwork, className }) {
+export default function BrandMark({ tone = 'dark', size = 'md' }) {
+  const logo = BRAND_LOGO_FILES[tone];
   return (
-    <svg
-      viewBox={`0 0 ${artwork.width} ${artwork.height}`}
-      className={className}
-      fill="currentColor"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <g transform={artwork.transform}>
-        <path d={artwork.d} />
-      </g>
-    </svg>
-  );
-}
-
-export default function BrandMark({ showName = true, tone = 'dark', size = 'md' }) {
-  const color = tone === 'light' ? BRAND_COLORS.LIGHT : BRAND_COLORS.DARK;
-  return (
-    <span className="inline-flex items-center gap-3" style={{ color }} role="img" aria-label={APP_NAME}>
-      <LogoArtwork artwork={LOGO_MARK} className={`${MARK_SIZES[size]} shrink-0`} />
-      {showName && <LogoArtwork artwork={LOGO_WORDMARK} className={`${WORDMARK_HEIGHTS[size]} w-auto`} />}
-    </span>
+    <img
+      src={logo.src}
+      width={logo.width}
+      height={logo.height}
+      alt={APP_FULL_NAME}
+      className={`${LOGO_HEIGHTS[size]} w-auto shrink-0`}
+    />
   );
 }

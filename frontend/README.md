@@ -67,7 +67,7 @@ src/hooks/            useApiResource (load/abort/error), useSocket, useAgentTele
 src/pages/            one file per screen
 src/constants/        routes and roles, messages, socket event names, workplace and leave labels
 src/utils/            dates in the browser's time zone, CSV downloads
-public/brand/         the Unitora logo (mark, wordmark, full logo; light and dark, SVG and PNG) and favicon
+public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
 src/validation/       client-side form checks (the backend validates again)
 ```
 

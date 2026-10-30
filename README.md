@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/brand/unitora-logo-light.svg">
-    <img src="frontend/public/brand/unitora-logo-dark.svg" alt="Unitora HR" width="180">
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/brand/nsk-logo-light.png">
+    <img src="frontend/public/brand/nsk-logo.png" alt="NSK Software Technologies" width="240">
   </picture>
 </p>
 
-# Unitora
+# NSK
 
 [![CI](https://github.com/shivakrishna69/mutliple-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/shivakrishna69/mutliple-agents/actions/workflows/ci.yml)
 
@@ -92,7 +92,7 @@ docker compose down              # stop (data is kept in the mongo-data volume)
 
 - Only port 8080 is published; nginx forwards `/api` and `/socket.io` to the backend, so the browser
   sees a single origin. It runs alongside the development setup without port clashes.
-- The compose stack has its own database volume (`nova-support_mongo-data`), separate from the
+- The compose stack has its own database volume (`nsk_mongo-data`), separate from the
   `multiagent-mongo` development database.
 - It serves plain HTTP on localhost, so the backend runs in development mode. A real deployment needs
   TLS in front, `NODE_ENV=production`, `COOKIE_SECURE=true` and https URLs (startup refuses insecure

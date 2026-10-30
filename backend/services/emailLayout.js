@@ -17,8 +17,8 @@ export const EMAIL_THEME = Object.freeze({
   MUTED_TEXT: '#64748b',
   FAINT_TEXT: '#94a3b8',
   DIVIDER: '#e2e8f0',
-  ACCENT: '#4f46e5',
-  ACCENT_GRADIENT_END: '#7c3aed',
+  ACCENT: '#c75000',
+  ACCENT_GRADIENT_END: '#a54200',
   ON_ACCENT: '#ffffff',
 });
 
