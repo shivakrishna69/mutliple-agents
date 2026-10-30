@@ -24,6 +24,7 @@ export const SESSION_MESSAGES = Object.freeze({
   SESSION_INVALID: 'Your session is invalid. Please sign in again',
   SESSION_REVOKED: 'Your session has ended. Please sign in again',
   ACCOUNT_NOT_FOUND: 'The account for this session no longer exists',
+  ACCOUNT_NOT_ACTIVE: 'This account is not active. Please contact your administrator',
   CSRF_TOKEN_INVALID: 'Missing or invalid CSRF token',
 });
 

@@ -66,6 +66,8 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const ORGANIZATION_FIELD_LIMITS = Object.freeze({
   DEPARTMENT_NAME_MAX_LENGTH: 120,
   DEPARTMENT_SLUG_MAX_LENGTH: 60,
+  // Short code (up to 6) plus up to 8 digits, with room for numbers past the padding.
+  EMPLOYEE_CODE_MAX_LENGTH: 20,
   DESIGNATION_MAX_LENGTH: 120,
   // Deepest reporting chain or department tree walked by the cycle check. Real organisations are
   // far shallower (a 100,000-person company is rarely more than 12 levels deep); the cap bounds

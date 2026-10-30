@@ -9,7 +9,9 @@ import { escapeHtml } from '../utils/html.js';
 
 /**
  * @param {{ inviteeName: string, inviterName: string, companyName: string, designation: string,
- *           departmentName: string|null, inviteUrl: string, expiresAt: Date }} details
+ *           departmentName: string|null, employeeCode?: string|null, companyEmail?: string|null,
+ *           inviteUrl: string, expiresAt: Date }} details
+ *   `employeeCode` and `companyEmail`, when known, are listed so the person knows them from day one.
  * @returns {{ subject: string, html: string, text: string }}
  */
 export function buildInvitationEmail({
@@ -18,6 +20,8 @@ export function buildInvitationEmail({
   companyName,
   designation,
   departmentName,
+  employeeCode = null,
+  companyEmail = null,
   inviteUrl,
   expiresAt,
 }) {
@@ -25,12 +29,24 @@ export function buildInvitationEmail({
   const roleLine = departmentName ? `${designation}, ${departmentName}` : designation;
   const subject = `${inviterName} invited you to join ${companyName}`;
   const footerText = "If you weren't expecting this invitation, you can ignore this email.";
+  const details = [
+    employeeCode && ['Employee ID', employeeCode],
+    companyEmail && ['Company email', companyEmail],
+  ].filter(Boolean);
+  const detailsHtml = details
+    .map(
+      ([label, value]) =>
+        `<p style="margin:0 0 8px;font-size:14px">${escapeHtml(label)}: <strong>${escapeHtml(value)}</strong></p>`,
+    )
+    .join('\n');
 
   const text = [
     `Hi ${inviteeName},`,
     '',
     `${inviterName} has invited you to join ${companyName} as ${roleLine}.`,
     '',
+    ...details.map(([label, value]) => `${label}: ${value}`),
+    ...(details.length > 0 ? [''] : []),
     'Set your password to activate your account:',
     inviteUrl,
     '',
@@ -42,7 +58,7 @@ export function buildInvitationEmail({
     companyName,
     heading: "You're invited to join the team",
     bodyHtml: `<p style="margin:0 0 12px;font-size:15px">Hi ${escapeHtml(inviteeName)},</p>
-<p style="margin:0 0 20px;font-size:15px;line-height:1.6"><strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(companyName)}</strong> as <strong>${escapeHtml(roleLine)}</strong>.</p>`,
+<p style="margin:0 0 20px;font-size:15px;line-height:1.6"><strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(companyName)}</strong> as <strong>${escapeHtml(roleLine)}</strong>.</p>${detailsHtml}`,
     action: {
       label: 'Activate my account',
       url: inviteUrl,

@@ -18,8 +18,10 @@
  *   so nothing has to run on a schedule.
  *
  * One open invitation per email: a partial unique index over pending/accepting invitations.
- * `profileDraft` is what the EmployeeProfile will be created with; it is re-validated on accept,
- * because a department or manager can change in the days between invite and acceptance.
+ * `profileDraft` records what the person was invited as. Since accounts are created with the
+ * invitation, the profile itself holds the live values; on older invitations without an account the
+ * draft is what accepting creates the profile from, re-validated then, because a department or
+ * manager can change in the days between invite and acceptance.
  */
 
 import mongoose from 'mongoose';
@@ -66,6 +68,10 @@ const invitationSchema = new mongoose.Schema(
       dateOfJoining: { type: Date, required: true },
       employmentStatus: { type: String, enum: Object.values(EMPLOYMENT_STATUSES), required: true },
     },
+    // The invited account and the employee ID it was given (services/employeeProvisioning.js). null on
+    // invitations sent before accounts were created with the invitation.
+    invitedUserId: { type: ObjectId, ref: 'User', default: null },
+    employeeCode: { type: String, default: null },
     tokenHash: { type: String, required: true, match: /^[0-9a-f]{64}$/, select: false },
     expiresAt: { type: Date, required: true },
     status: {

@@ -20,7 +20,7 @@
 
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import User, { BCRYPT_SALT_ROUNDS, ROLES } from '../models/User.js';
+import User, { ACCOUNT_STATUSES, BCRYPT_SALT_ROUNDS, ROLES } from '../models/User.js';
 import RevokedSession from '../models/RevokedSession.js';
 import { ACCOUNT_MESSAGES, AUTH_MESSAGES, SESSION_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
@@ -171,6 +171,18 @@ export async function loginUser(req, res, next) {
       // Spend the same bcrypt work as a real comparison before answering; the result is discarded.
       await bcrypt.compare(password, TIMING_EQUALIZATION_HASH);
       logger.warn('Login failed', { requestId: req.id, reason: 'unknown_email' });
+      return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, AUTH_MESSAGES.INVALID_CREDENTIALS);
+    }
+
+    // Invited (no password yet) and disabled accounts cannot sign in. Same answer and the same
+    // bcrypt work as a wrong password, so the response does not reveal that the account exists.
+    if ((userRecord.status ?? ACCOUNT_STATUSES.ACTIVE) !== ACCOUNT_STATUSES.ACTIVE) {
+      await bcrypt.compare(password, TIMING_EQUALIZATION_HASH);
+      logger.warn('Login failed', {
+        requestId: req.id,
+        reason: 'account_not_active',
+        userId: userRecord._id.toString(),
+      });
       return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, AUTH_MESSAGES.INVALID_CREDENTIALS);
     }
 

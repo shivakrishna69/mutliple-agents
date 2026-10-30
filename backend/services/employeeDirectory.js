@@ -4,12 +4,15 @@
  */
 
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
-import User from '../models/User.js';
+import User, { ACCOUNT_STATUSES } from '../models/User.js';
 
 const toIdString = (id) => id?.toString() ?? null;
 
 /**
- * @returns {Promise<{ employeeId: string, name: string, email: string|null, designation: string,
+ * Invited people are listed too (accountStatus "invited"): they can be chosen as managers before
+ * they sign in for the first time.
+ * @returns {Promise<{ employeeId: string, employeeCode: string|null, name: string, email: string|null,
+ *   companyEmail: string|null, accountStatus: string, designation: string,
  *   departmentId: string|null, officeLocationId: string|null, reportingManagerId: string|null,
  *   employmentStatus: string }[]>} sorted by name
  */
@@ -18,12 +21,12 @@ export async function listCurrentEmployees() {
     'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
   })
     .select(
-      'userId organizationData.designation organizationData.departmentId organizationData.officeLocationId ' +
+      'userId employeeCode organizationData.designation organizationData.departmentId organizationData.officeLocationId ' +
         'organizationData.reportingManagerId organizationData.employmentStatus',
     )
     .lean();
   const accounts = await User.find({ _id: { $in: profiles.map((profile) => profile.userId) } })
-    .select('name email')
+    .select('name email companyEmail status')
     .lean();
   const accountByUserId = new Map(accounts.map((account) => [account._id.toString(), account]));
   return profiles
@@ -32,8 +35,11 @@ export async function listCurrentEmployees() {
       const organization = profile.organizationData;
       return {
         employeeId: profile._id.toString(),
+        employeeCode: profile.employeeCode ?? null,
         name: account?.name ?? 'Unnamed',
         email: account?.email ?? null,
+        companyEmail: account?.companyEmail ?? null,
+        accountStatus: account?.status ?? ACCOUNT_STATUSES.ACTIVE,
         designation: organization.designation,
         departmentId: toIdString(organization.departmentId),
         officeLocationId: toIdString(organization.officeLocationId),

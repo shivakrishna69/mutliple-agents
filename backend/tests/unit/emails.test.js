@@ -73,6 +73,14 @@ describe('buildInvitationEmail', () => {
     assert.match(email.text, /expires on 3 November 2026/);
   });
 
+  it('lists the employee ID and company email when known, escaped, and nothing when not', () => {
+    const email = buildInvitationEmail({ ...details, employeeCode: 'NSK0042', companyEmail: 'kiran.<i>@nsk.in' });
+    assert.equal(email.text.includes('Employee ID: NSK0042\nCompany email: kiran.<i>@nsk.in'), true);
+    assert.equal(email.html.includes('Employee ID: <strong>NSK0042</strong>'), true);
+    assert.equal(email.html.includes('kiran.&lt;i&gt;@nsk.in'), true);
+    assert.equal(buildInvitationEmail(details).text.includes('Employee ID'), false);
+  });
+
   it('omits the department when there is none', () => {
     const email = buildInvitationEmail({ ...details, departmentName: null });
     assert.match(email.text, /join NSK Software Technologies as Engineer\./);

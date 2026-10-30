@@ -195,8 +195,9 @@ async function start() {
   try {
     config = loadConfig();
     await connectDatabase(config.mongoUri);
-    await runStartupMigrations();
+    // Before the migrations: numbering existing employees uses the company's short code.
     await ensureCompanySettings({ initialName: config.companyName ?? DEFAULT_COMPANY_NAME });
+    await runStartupMigrations();
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);

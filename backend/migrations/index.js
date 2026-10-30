@@ -11,6 +11,8 @@ import addOfficeWeeklyOffRules from './addOfficeWeeklyOffRules.js';
 import addLeaveTypeBackdating from './addLeaveTypeBackdating.js';
 import addLeaveTypeHrApproval from './addLeaveTypeHrApproval.js';
 import addDepartmentSlugs from './addDepartmentSlugs.js';
+import addAccountStatuses from './addAccountStatuses.js';
+import addEmployeeCodes from './addEmployeeCodes.js';
 import seedLeaveTypeTemplate from './seedLeaveTypeTemplate.js';
 
 /** In the order they must run. Add new migrations at the end. */
@@ -20,6 +22,8 @@ const MIGRATIONS = Object.freeze([
   addLeaveTypeBackdating,
   addLeaveTypeHrApproval,
   addDepartmentSlugs,
+  addAccountStatuses,
+  addEmployeeCodes,
 ]);
 
 export async function runStartupMigrations() {
