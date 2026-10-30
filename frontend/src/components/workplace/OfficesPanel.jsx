@@ -241,7 +241,7 @@ function OfficeRow({ office, onEdit, onRemoved }) {
             <Badge tone="amber">No weekly offs</Badge>
           ) : (
             weeklyOffs.map((rule) => (
-              <Badge key={rule.weekday} tone="indigo">
+              <Badge key={rule.weekday} tone="brand">
                 {describeWeeklyOffRule(rule)}
               </Badge>
             ))

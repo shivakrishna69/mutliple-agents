@@ -134,20 +134,20 @@ function SkeletonRows({ rowCount = 3 }) {
 function CustomerOverview({ latestConversation, isLoading }) {
   return (
     <div className="grid gap-6 lg:grid-cols-5">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-8 text-white shadow-xl shadow-indigo-500/20 lg:col-span-3">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-amber-600 p-8 text-white shadow-xl shadow-brand-500/20 lg:col-span-3">
         <div
           className="pointer-events-none absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-2xl"
           aria-hidden="true"
         />
-        <SparklesIcon className="h-8 w-8 text-indigo-100" />
+        <SparklesIcon className="h-8 w-8 text-brand-100" />
         <h2 className="mt-4 text-2xl font-bold tracking-tight">Need a hand? We reply in seconds.</h2>
-        <p className="mt-2 max-w-md text-sm text-indigo-100">
+        <p className="mt-2 max-w-md text-sm text-brand-100">
           Describe your problem in plain words. Our AI assistant answers right away, and a support specialist can take
           over the same chat whenever you need a person.
         </p>
         <Link
           to={ROUTE_PATHS.SUPPORT}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-indigo-700 shadow-lg transition hover:bg-indigo-50 focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-brand-700 shadow-lg transition hover:bg-brand-50 focus-visible:ring-4 focus-visible:ring-white/40 focus-visible:outline-none"
         >
           {latestConversation ? 'Continue your conversation' : 'Start a conversation'}
           <ArrowRightIcon className="h-4 w-4" />
@@ -202,7 +202,7 @@ function CustomerOverview({ latestConversation, isLoading }) {
           },
         ].map(({ Icon, title, text }) => (
           <div key={title} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <Icon className="h-6 w-6 text-indigo-500" />
+            <Icon className="h-6 w-6 text-brand-500" />
             <p className="mt-3 text-sm font-semibold text-slate-900">{title}</p>
             <p className="mt-1 text-sm text-slate-500">{text}</p>
           </div>
@@ -238,9 +238,9 @@ function TeamMemberOverview({ currentUser }) {
           <Link
             key={title}
             to={ROUTE_PATHS.ACCOUNT}
-            className="flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-indigo-200 hover:shadow-md focus-visible:ring-4 focus-visible:ring-indigo-100 focus-visible:outline-none"
+            className="flex items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-brand-200 hover:shadow-md focus-visible:ring-4 focus-visible:ring-brand-100 focus-visible:outline-none"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
               <Icon className="h-5 w-5" />
             </span>
             <span>
@@ -289,7 +289,7 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
           value={isAdmin ? aiCount : conversations.length}
           hint={isAdmin ? 'Being answered by the assistant' : 'Your assignments plus the queue'}
           Icon={SparklesIcon}
-          accentClassName="bg-indigo-50 text-indigo-600"
+          accentClassName="bg-brand-50 text-brand-600"
           isLoading={isLoadingConversations}
         />
         {isAdmin && (
@@ -318,7 +318,7 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
             <h2 className="text-sm font-semibold text-slate-900">Recent conversations</h2>
             <Link
               to={ROUTE_PATHS.CONSOLE}
-              className="inline-flex items-center gap-1 rounded text-sm font-medium text-indigo-600 hover:text-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+              className="inline-flex items-center gap-1 rounded text-sm font-medium text-brand-600 hover:text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
             >
               Open console <ArrowRightIcon className="h-4 w-4" />
             </Link>
@@ -371,14 +371,14 @@ function StaffOverview({ currentUser, conversations, isLoadingConversations, use
 
         <section className="space-y-4">
           <div className="rounded-2xl bg-slate-950 p-6 text-white shadow-sm">
-            <InboxIcon className="h-7 w-7 text-indigo-300" />
+            <InboxIcon className="h-7 w-7 text-brand-300" />
             <h2 className="mt-3 text-base font-semibold">Support console</h2>
             <p className="mt-1 text-sm text-slate-400">
               Claim escalated chats, reply to customers live, and review the AI’s reasoning logs.
             </p>
             <Link
               to={ROUTE_PATHS.CONSOLE}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-50 focus-visible:ring-4 focus-visible:ring-white/30 focus-visible:outline-none"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-brand-50 focus-visible:ring-4 focus-visible:ring-white/30 focus-visible:outline-none"
             >
               Open console <ArrowRightIcon className="h-4 w-4" />
             </Link>

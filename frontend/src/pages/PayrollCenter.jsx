@@ -239,12 +239,12 @@ function CompensationForm({ compensation, onChange, rules, fieldErrors }) {
 function RegimeColumn({ regimeResult, isRecommended, isChosen }) {
   return (
     <div
-      className={`relative rounded-2xl p-5 ring-1 ${isRecommended ? 'bg-gradient-to-br from-indigo-50 to-violet-50 ring-indigo-300' : 'bg-white ring-slate-200'}`}
+      className={`relative rounded-2xl p-5 ring-1 ${isRecommended ? 'bg-gradient-to-br from-brand-50 to-brand-100 ring-brand-300' : 'bg-white ring-slate-200'}`}
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold tracking-wide text-slate-900 uppercase">{regimeResult.regime} regime</h3>
         <div className="flex gap-1.5">
-          {isRecommended && <Badge tone="indigo">Recommended</Badge>}
+          {isRecommended && <Badge tone="brand">Recommended</Badge>}
           {isChosen && <Badge tone="slate">Your choice</Badge>}
         </div>
       </div>
@@ -275,7 +275,7 @@ function RegimeColumn({ regimeResult, isRecommended, isChosen }) {
       </div>
       {regimeResult.slabs?.length > 0 && (
         <details className="mt-4 text-sm">
-          <summary className="cursor-pointer font-medium text-indigo-700">Slab breakdown</summary>
+          <summary className="cursor-pointer font-medium text-brand-700">Slab breakdown</summary>
           <table className="mt-2 w-full text-xs">
             <tbody>
               {regimeResult.slabs.map((slabLine) => (
@@ -356,13 +356,13 @@ function TaxPlanner({ rules }) {
         )}
         {estimate && (
           <>
-            <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 p-5 text-white shadow-lg shadow-indigo-600/20">
-              <p className="text-xs font-semibold tracking-wide text-indigo-100 uppercase">Recommendation</p>
+            <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-700 p-5 text-white shadow-lg shadow-brand-600/20">
+              <p className="text-xs font-semibold tracking-wide text-brand-100 uppercase">Recommendation</p>
               <p className="mt-2 text-xl font-bold">
                 {recommendedRegime === 'new' ? 'New' : 'Old'} regime saves{' '}
                 {formatInr(estimate.recommendation.annualSavingVersusOtherRegime)}
               </p>
-              <p className="mt-1 text-sm text-indigo-100">{estimate.recommendation.reason}</p>
+              <p className="mt-1 text-sm text-brand-100">{estimate.recommendation.reason}</p>
               {!estimate.chosenRegime.isMostTaxEfficient && (
                 <p className="mt-3 rounded-lg bg-white/15 px-3 py-2 text-sm">
                   Your opted regime costs {formatInr(estimate.chosenRegime.additionalTaxVersusRecommended)} more this
@@ -455,7 +455,7 @@ function PayslipRow({ payslip }) {
   return (
     <li className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
       <div className="flex flex-wrap items-center gap-4 p-4 sm:p-5">
-        <span className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white">
+        <span className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-white">
           <span className="text-[0.65rem] font-semibold uppercase">
             {MONTH_NAMES[payslip.period.month - 1].slice(0, 3)}
           </span>
@@ -725,7 +725,7 @@ export default function PayrollCenter() {
         title="Payroll"
         description="Plan your taxes, download payslips and verify their authenticity."
         actions={
-          <Link to={ROUTE_PATHS.VERIFY_PAYSLIP} className="text-sm font-semibold text-indigo-600 hover:text-indigo-500">
+          <Link to={ROUTE_PATHS.VERIFY_PAYSLIP} className="text-sm font-semibold text-brand-600 hover:text-brand-500">
             Verify a payslip →
           </Link>
         }
@@ -737,7 +737,7 @@ export default function PayrollCenter() {
             value={rulesResource.data.financialYear}
             hint="Income-tax Act 2025 rates"
             Icon={CurrencyIcon}
-            accent="indigo"
+            accent="brand"
           />
           <StatTile
             label="Regimes compared"

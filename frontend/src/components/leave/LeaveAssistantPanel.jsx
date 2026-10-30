@@ -29,8 +29,8 @@ const STARTER_QUESTIONS = Object.freeze([
 function DraftCard({ draft, leaveTypes, onReview }) {
   const leaveType = leaveTypes.find((type) => type.id === draft.leaveTypeId);
   return (
-    <div className="mt-2 rounded-xl bg-white p-3 ring-1 ring-indigo-200">
-      <p className="text-xs font-semibold tracking-wide text-indigo-700 uppercase">Draft, not sent</p>
+    <div className="mt-2 rounded-xl bg-white p-3 ring-1 ring-brand-200">
+      <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">Draft, not sent</p>
       <p className="mt-1 text-sm font-medium text-slate-900">
         {leaveType?.name ?? 'Leave'} · {describeLeaveDates(draft)}
       </p>
@@ -87,7 +87,7 @@ export default function LeaveAssistantPanel({ leaveTypes, onReviewDraft }) {
     <Card
       title={
         <span className="flex items-center gap-2">
-          <SparklesIcon className="h-5 w-5 text-indigo-500" /> Leave assistant
+          <SparklesIcon className="h-5 w-5 text-brand-500" /> Leave assistant
         </span>
       }
       subtitle="Ask about your balances, holidays or what a leave would cost. It can draft a request for you to send."
@@ -101,7 +101,7 @@ export default function LeaveAssistantPanel({ leaveTypes, onReviewDraft }) {
                 type="button"
                 onClick={() => ask(starter)}
                 disabled={isAsking}
-                className="rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100"
+                className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 hover:bg-brand-100"
               >
                 {starter}
               </button>
@@ -117,7 +117,7 @@ export default function LeaveAssistantPanel({ leaveTypes, onReviewDraft }) {
               <li key={entryIndex} className={entry.role === ROLES.USER ? 'flex justify-end' : 'flex justify-start'}>
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-line ${
-                    entry.role === ROLES.USER ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'
+                    entry.role === ROLES.USER ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-800'
                   }`}
                 >
                   {entry.content}
@@ -129,7 +129,7 @@ export default function LeaveAssistantPanel({ leaveTypes, onReviewDraft }) {
         )}
         {isAsking && (
           <p className="flex items-center gap-2 text-xs text-slate-500" role="status">
-            <Spinner className="h-4 w-4 text-indigo-500" /> Checking your leave…
+            <Spinner className="h-4 w-4 text-brand-500" /> Checking your leave…
           </p>
         )}
         {askError && <Notice tone="warning" title={askError.message} onDismiss={() => setAskError(null)} />}
@@ -149,7 +149,7 @@ export default function LeaveAssistantPanel({ leaveTypes, onReviewDraft }) {
             onChange={(changeEvent) => setQuestion(changeEvent.target.value)}
             maxLength={LEAVE_FIELD_LIMITS.ASSISTANT_MESSAGE_MAX_LENGTH}
             placeholder="e.g. Book next Friday afternoon off for a doctor's visit"
-            className="min-w-0 flex-1 rounded-xl border-0 px-3.5 py-2.5 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-indigo-500"
+            className="min-w-0 flex-1 rounded-xl border-0 px-3.5 py-2.5 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-brand-500"
           />
           <Button type="submit" isBusy={isAsking} disabled={!question.trim()}>
             Ask

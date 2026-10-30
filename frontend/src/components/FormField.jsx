@@ -55,7 +55,7 @@ export default function FormField({
             trailingControl ? 'pr-11' : '',
             errorMessage
               ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-              : 'border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-indigo-100',
+              : 'border-slate-200 hover:border-slate-300 focus:border-brand-500 focus:ring-brand-100',
           ].join(' ')}
         />
         {trailingControl && (

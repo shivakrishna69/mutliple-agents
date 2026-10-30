@@ -207,7 +207,7 @@ export default function AgentTelemetryConsole() {
               type="button"
               aria-pressed={enabledEventTypes.has(eventFilter.id)}
               onClick={() => toggleEventType(eventFilter.id)}
-              className={`rounded-lg px-2.5 py-1 font-mono text-xs transition ${enabledEventTypes.has(eventFilter.id) ? 'bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/40' : 'text-slate-500 ring-1 ring-white/10 hover:text-slate-300'}`}
+              className={`rounded-lg px-2.5 py-1 font-mono text-xs transition ${enabledEventTypes.has(eventFilter.id) ? 'bg-brand-500/20 text-brand-200 ring-1 ring-brand-400/40' : 'text-slate-500 ring-1 ring-white/10 hover:text-slate-300'}`}
             >
               {eventFilter.label}
             </button>
@@ -216,7 +216,7 @@ export default function AgentTelemetryConsole() {
             value={workflowFilter}
             onChange={(changeEvent) => setWorkflowFilter(changeEvent.target.value)}
             aria-label="Workflow"
-            className="rounded-lg border-0 bg-white/5 px-2 py-1 font-mono text-xs text-slate-300 ring-1 ring-white/10 focus:ring-indigo-400"
+            className="rounded-lg border-0 bg-white/5 px-2 py-1 font-mono text-xs text-slate-300 ring-1 ring-white/10 focus:ring-brand-400"
           >
             <option value="all">all workflows</option>
             <option value="support">support</option>
@@ -227,7 +227,7 @@ export default function AgentTelemetryConsole() {
             onChange={(changeEvent) => setSearchText(changeEvent.target.value)}
             placeholder="grep node, tool, turn…"
             aria-label="Filter events"
-            className="w-44 rounded-lg border-0 bg-white/5 px-2.5 py-1 font-mono text-xs text-slate-200 ring-1 ring-white/10 placeholder:text-slate-600 focus:ring-indigo-400"
+            className="w-44 rounded-lg border-0 bg-white/5 px-2.5 py-1 font-mono text-xs text-slate-200 ring-1 ring-white/10 placeholder:text-slate-600 focus:ring-brand-400"
           />
           <button
             type="button"
@@ -321,7 +321,7 @@ export default function AgentTelemetryConsole() {
                   {telemetryEvent.turnId.slice(0, 6)}#{String(telemetryEvent.sequence).padStart(2, '0')}
                 </span>
                 <span className={`w-16 shrink-0 ${kind.className}`}>{kind.tag}</span>
-                <span className="w-32 shrink-0 truncate text-indigo-300">
+                <span className="w-32 shrink-0 truncate text-brand-300">
                   {telemetryEvent.node ?? (telemetryEvent.workflow === 'support' ? 'gateway' : telemetryEvent.workflow)}
                 </span>
                 <span className="min-w-0 flex-1 text-slate-300">{describeDetail(telemetryEvent)}</span>
@@ -333,7 +333,7 @@ export default function AgentTelemetryConsole() {
           <button
             type="button"
             onClick={() => setIsFollowingTail(true)}
-            className="absolute right-6 bottom-4 rounded-full bg-indigo-600 px-3 py-1.5 font-mono text-xs text-white shadow-lg shadow-indigo-900/50 hover:bg-indigo-500"
+            className="absolute right-6 bottom-4 rounded-full bg-brand-600 px-3 py-1.5 font-mono text-xs text-white shadow-lg shadow-brand-900/50 hover:bg-brand-500"
           >
             ↓ jump to latest
           </button>

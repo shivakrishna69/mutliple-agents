@@ -83,7 +83,7 @@ export default function AcceptInvitation() {
         <Notice tone="error" title={error.message} />
         <p className="mt-6 text-sm text-slate-600">
           Already activated your account?{' '}
-          <Link to={ROUTE_PATHS.LOGIN} className="font-semibold text-indigo-600 hover:text-indigo-500">
+          <Link to={ROUTE_PATHS.LOGIN} className="font-semibold text-brand-600 hover:text-brand-500">
             Sign in
           </Link>
         </p>
@@ -99,16 +99,16 @@ export default function AcceptInvitation() {
       footer={
         <p className="text-sm text-slate-600">
           Already activated?{' '}
-          <Link to={ROUTE_PATHS.LOGIN} className="font-semibold text-indigo-600 hover:text-indigo-500">
+          <Link to={ROUTE_PATHS.LOGIN} className="font-semibold text-brand-600 hover:text-brand-500">
             Sign in
           </Link>
         </p>
       }
     >
-      <div className="mb-6 rounded-xl bg-indigo-50 px-4 py-3 text-sm ring-1 ring-indigo-100">
-        <p className="text-xs font-semibold tracking-wide text-indigo-500 uppercase">Your sign-in email</p>
-        <p className="mt-0.5 font-semibold text-indigo-950">{invitation.email}</p>
-        <p className="mt-1 text-xs text-indigo-700/80">This link is valid until {formatDate(invitation.expiresAt)}.</p>
+      <div className="mb-6 rounded-xl bg-brand-50 px-4 py-3 text-sm ring-1 ring-brand-100">
+        <p className="text-xs font-semibold tracking-wide text-brand-500 uppercase">Your sign-in email</p>
+        <p className="mt-0.5 font-semibold text-brand-950">{invitation.email}</p>
+        <p className="mt-1 text-xs text-brand-700/80">This link is valid until {formatDate(invitation.expiresAt)}.</p>
       </div>
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         <PasswordField

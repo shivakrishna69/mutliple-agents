@@ -280,7 +280,7 @@ function InvitationRow({ invitation, onChanged, onLinkIssued }) {
   return (
     <li className="p-4 sm:px-6">
       <div className="flex flex-wrap items-center gap-4">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-bold text-white">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-bold text-white">
           {invitation.name
             .split(/\s+/)
             .map((namePart) => namePart[0])
@@ -411,7 +411,7 @@ export default function PeopleOnboarding() {
           value={optionsResource.data?.managers.length ?? '—'}
           hint="Current team members"
           Icon={UsersIcon}
-          accent="indigo"
+          accent="brand"
         />
       </div>
 

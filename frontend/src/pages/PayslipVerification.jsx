@@ -78,9 +78,9 @@ export default function PayslipVerification() {
 
   const period = verification?.period;
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-slate-950 px-4 py-10 text-white sm:py-16">
+    <main className="relative min-h-dvh overflow-hidden bg-neutral-950 px-4 py-10 text-white sm:py-16">
       <div
-        className="pointer-events-none absolute -top-40 left-1/2 h-[30rem] w-[60rem] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-3xl"
+        className="pointer-events-none absolute -top-40 left-1/2 h-[30rem] w-[60rem] -translate-x-1/2 rounded-full bg-brand-600/25 blur-3xl"
         aria-hidden="true"
       />
       <div className="relative mx-auto max-w-2xl">
@@ -92,7 +92,7 @@ export default function PayslipVerification() {
         </div>
 
         <div className="mt-12 text-center">
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 shadow-lg shadow-indigo-500/30">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 shadow-lg shadow-brand-500/30">
             <ShieldIcon className="h-7 w-7" />
           </span>
           <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Verify a payslip</h1>
@@ -111,7 +111,7 @@ export default function PayslipVerification() {
             onChange={(changeEvent) => setVerificationId(changeEvent.target.value)}
             placeholder="PS-202610-XXXX-XXXX-XXXX-XXXX"
             aria-label="Verification ID"
-            className="flex-1 rounded-xl border-0 bg-white/10 px-4 py-3 font-mono text-sm tracking-wide text-white ring-1 ring-white/15 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+            className="flex-1 rounded-xl border-0 bg-white/10 px-4 py-3 font-mono text-sm tracking-wide text-white ring-1 ring-white/15 placeholder:text-slate-500 focus:ring-2 focus:ring-brand-400 focus:outline-none"
           />
           <Button type="submit" isBusy={isChecking} disabled={!verificationId.trim()}>
             Verify
@@ -178,7 +178,7 @@ export default function PayslipVerification() {
               <p className="mt-1 text-xs text-slate-500">
                 Its fingerprint is computed in your browser; the file is not uploaded.
               </p>
-              <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-5 text-sm font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-600">
+              <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-5 text-sm font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600">
                 <UploadIcon className="h-5 w-5" /> Choose payslip PDF
                 <input type="file" accept="application/pdf" className="sr-only" onChange={handleFileChosen} />
               </label>

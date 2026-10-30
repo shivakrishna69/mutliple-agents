@@ -102,7 +102,7 @@ function PreviewSummary({ preview, isPreviewing, previewError }) {
   if (!preview) {
     return (
       <p className="flex items-center gap-2 text-sm text-slate-500">
-        {isPreviewing && <Spinner className="h-4 w-4 text-indigo-500" />}
+        {isPreviewing && <Spinner className="h-4 w-4 text-brand-500" />}
         Choose a leave type and dates to see what the leave costs.
       </p>
     );
@@ -163,7 +163,7 @@ function AttachmentPicker({ employeeId, value, onChange, error }) {
   }
 
   return (
-    <fieldset className="space-y-3 rounded-xl bg-indigo-50/60 p-4 ring-1 ring-indigo-100">
+    <fieldset className="space-y-3 rounded-xl bg-brand-50/60 p-4 ring-1 ring-brand-100">
       <legend className="sr-only">Supporting document</legend>
       <p className="text-sm font-semibold text-slate-900">A supporting document is needed for leave this long</p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -184,7 +184,7 @@ function AttachmentPicker({ employeeId, value, onChange, error }) {
             accept="application/pdf,image/jpeg,image/png"
             disabled={isUploading}
             onChange={(changeEvent) => uploadFile(changeEvent.target.files?.[0])}
-            className="mt-1.5 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 file:ring-1 file:ring-indigo-200"
+            className="mt-1.5 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700 file:ring-1 file:ring-brand-200"
           />
         </label>
       </div>

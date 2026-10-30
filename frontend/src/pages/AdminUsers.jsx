@@ -88,7 +88,7 @@ function RoleEditor({ userSummary, isCurrentUser, isSaving, onSaveRole }) {
         value={selectedRole}
         disabled={isSaving}
         onChange={(changeEvent) => setSelectedRole(changeEvent.target.value)}
-        className="rounded-lg border border-slate-200 bg-white py-1.5 pr-8 pl-3 text-sm text-slate-800 shadow-sm transition hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 focus:outline-none disabled:opacity-60"
+        className="rounded-lg border border-slate-200 bg-white py-1.5 pr-8 pl-3 text-sm text-slate-800 shadow-sm transition hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 focus:outline-none disabled:opacity-60"
       >
         {ROLE_OPTIONS.map((roleOption) => (
           <option key={roleOption} value={roleOption}>
@@ -103,7 +103,7 @@ function RoleEditor({ userSummary, isCurrentUser, isSaving, onSaveRole }) {
             disabled={isSaving}
             aria-busy={isSaving}
             onClick={() => onSaveRole(userSummary, selectedRole)}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:ring-4 focus-visible:ring-indigo-200 focus-visible:outline-none disabled:opacity-60"
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-500 focus-visible:ring-4 focus-visible:ring-brand-200 focus-visible:outline-none disabled:opacity-60"
           >
             {isSaving ? 'Saving…' : 'Save'}
           </button>
@@ -111,7 +111,7 @@ function RoleEditor({ userSummary, isCurrentUser, isSaving, onSaveRole }) {
             type="button"
             disabled={isSaving}
             onClick={() => setSelectedRole(userSummary.role)}
-            className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none disabled:opacity-60"
+            className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none disabled:opacity-60"
           >
             Cancel
           </button>
@@ -262,13 +262,13 @@ export default function AdminUsers() {
                   role="tab"
                   aria-selected={isSelected}
                   onClick={() => setRoleFilter(filterTab.value)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none ${
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
                     isSelected ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   {filterTab.label}
                   {typeof tabCount === 'number' && (
-                    <span className={`ml-1.5 text-xs ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`}>
+                    <span className={`ml-1.5 text-xs ${isSelected ? 'text-brand-600' : 'text-slate-400'}`}>
                       {tabCount}
                     </span>
                   )}
@@ -288,7 +288,7 @@ export default function AdminUsers() {
               maxLength={SEARCH_MAX_LENGTH}
               onChange={(changeEvent) => setSearchText(changeEvent.target.value)}
               placeholder="Search name or email"
-              className="block w-full rounded-xl border border-slate-200 bg-white py-2 pr-3 pl-9 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 focus:outline-none"
+              className="block w-full rounded-xl border border-slate-200 bg-white py-2 pr-3 pl-9 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 focus:outline-none"
             />
           </div>
         </div>
@@ -339,7 +339,7 @@ export default function AdminUsers() {
                             <p className="flex items-center gap-2 truncate font-semibold text-slate-900">
                               {userSummary.name}
                               {isCurrentUser && (
-                                <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[0.65rem] font-semibold text-indigo-700">
+                                <span className="rounded-md bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold text-brand-700">
                                   You
                                 </span>
                               )}

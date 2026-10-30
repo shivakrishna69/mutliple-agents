@@ -151,7 +151,7 @@ function LeaveRequestRow({ request, today, onChanged }) {
           <p className="mt-0.5 text-xs text-slate-500">
             {formatDays(request.totalDays)} · asked {formatDateTime(request.createdAt)} · “{request.reason}”
           </p>
-          {approvalProgress && <p className="mt-1 text-xs font-medium text-indigo-700">{approvalProgress}</p>}
+          {approvalProgress && <p className="mt-1 text-xs font-medium text-brand-700">{approvalProgress}</p>}
           {request.decision?.note && (
             <p className="mt-1 text-xs text-slate-600">Approver’s note: “{request.decision.note}”</p>
           )}

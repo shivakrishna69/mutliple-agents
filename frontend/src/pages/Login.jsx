@@ -196,7 +196,7 @@ export default function Login() {
           Don&apos;t have an account?{' '}
           <Link
             to={ROUTE_PATHS.SIGNUP}
-            className="rounded font-semibold text-indigo-600 transition-colors hover:text-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="rounded font-semibold text-brand-600 transition-colors hover:text-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             Create one
           </Link>

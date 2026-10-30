@@ -4,6 +4,19 @@
 @theme {
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* NSK brand: orange #C75000 (the logo bar and tagline) at 600, and its tints and shades. */
+  --color-brand-50: #fff4ec;
+  --color-brand-100: #ffe5d1;
+  --color-brand-200: #ffc7a1;
+  --color-brand-300: #ffa066;
+  --color-brand-400: #f57a2e;
+  --color-brand-500: #e2620e;
+  --color-brand-600: #c75000;
+  --color-brand-700: #a54200;
+  --color-brand-800: #843604;
+  --color-brand-900: #6b2e08;
+  --color-brand-950: #3d1602;
 }
 
 html {

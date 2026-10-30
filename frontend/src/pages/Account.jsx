@@ -243,7 +243,7 @@ export default function Account() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:col-span-2">
-          <div className="h-20 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500" aria-hidden="true" />
+          <div className="h-20 bg-gradient-to-r from-brand-500 via-brand-600 to-amber-500" aria-hidden="true" />
           <div className="px-6 pb-6">
             <span
               className="-mt-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-xl font-bold text-white ring-4 ring-white"
@@ -267,7 +267,7 @@ export default function Account() {
 
         <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm lg:col-span-3 sm:p-8">
           <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
               <KeyIcon className="h-5 w-5" />
             </span>
             <div>

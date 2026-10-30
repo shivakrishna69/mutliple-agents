@@ -42,8 +42,7 @@ import {
 } from '../components/ui.jsx';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 
-// Kept from before the rename to Unitora: a new key would make every registered device look new.
-const DEVICE_FINGERPRINT_STORAGE_KEY = 'nova.attendance.deviceFingerprint';
+const DEVICE_FINGERPRINT_STORAGE_KEY = 'nsk.attendance.deviceFingerprint';
 const GEOLOCATION_TIMEOUT_MS = 20_000;
 
 /** Plain-language explanations for the punch-in error codes (backend ATTENDANCE_ERROR_CODES). */
@@ -141,16 +140,16 @@ function PunchInPanel() {
   return (
     <div className="grid gap-6 lg:grid-cols-5">
       <Card className="lg:col-span-3" bodyClassName="p-0">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 px-6 py-10 text-white sm:px-10">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-neutral-950 via-neutral-900 to-brand-950 px-6 py-10 text-white sm:px-10">
           <div
-            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-indigo-500/30 blur-3xl"
+            className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand-500/30 blur-3xl"
             aria-hidden="true"
           />
           <div
-            className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl"
+            className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl"
             aria-hidden="true"
           />
-          <p className="text-sm font-medium text-indigo-200">
+          <p className="text-sm font-medium text-brand-200">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight">
@@ -165,7 +164,7 @@ function PunchInPanel() {
               type="button"
               onClick={handlePunchIn}
               disabled={phase !== 'idle' || Boolean(attendance)}
-              className="group relative inline-flex h-16 items-center gap-3 rounded-2xl bg-white px-7 text-base font-semibold text-indigo-700 shadow-xl shadow-indigo-950/40 transition hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-indigo-300 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+              className="group relative inline-flex h-16 items-center gap-3 rounded-2xl bg-white px-7 text-base font-semibold text-brand-700 shadow-xl shadow-brand-950/40 transition hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-brand-300 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
             >
               <span className="relative flex h-3 w-3">
                 {phase === 'idle' && !attendance && (
@@ -321,7 +320,7 @@ function RegularizationChat() {
         {chatMessages.map((chatMessage) => (
           <div key={chatMessage.id} className={`flex ${chatMessage.author === 'me' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${chatMessage.author === 'me' ? 'rounded-br-md bg-gradient-to-br from-indigo-600 to-violet-600 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800'}`}
+              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${chatMessage.author === 'me' ? 'rounded-br-md bg-gradient-to-br from-brand-600 to-brand-700 text-white' : 'rounded-bl-md bg-slate-100 text-slate-800'}`}
             >
               <p className="whitespace-pre-wrap">{chatMessage.text}</p>
               {chatMessage.regularization && (
@@ -369,7 +368,7 @@ function RegularizationChat() {
           maxLength={2000}
           placeholder={startNext ? 'Describe the missed punch…' : 'Answer the assistant…'}
           aria-label="Message to the attendance assistant"
-          className="flex-1 rounded-xl border-0 bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          className="flex-1 rounded-xl border-0 bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-brand-500 focus:outline-none"
         />
         <Button type="submit" isBusy={isSending} disabled={!draft.trim()}>
           Send
@@ -568,7 +567,7 @@ export default function AttendanceCenter() {
           value="Geofenced"
           hint="GPS verified against your office"
           Icon={MapPinIcon}
-          accent="indigo"
+          accent="brand"
         />
         <StatTile
           label="Corrections"
