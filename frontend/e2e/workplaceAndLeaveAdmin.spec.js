@@ -1,5 +1,6 @@
 /**
- * HR sets up the workplace and leave: an office with 2nd and 4th Saturdays off, a holiday, the
+ * HR sets up the workplace and leave: a department (deactivated and reactivated), an office with
+ * 2nd and 4th Saturdays off, a holiday, the
  * employee's base office; then a leave type, an entitlement for the employee, a refused
  * encashment, the payroll export and the balance check. One sign-in, because HR's logins are
  * limited per account and the other suites use HR too.
@@ -21,6 +22,18 @@ test('HR sets up an office, a holiday and leave, and manages an employee’s bal
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Workplace' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Workplace' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Add department' }).click();
+  await page.getByLabel('Department name').fill('Finance');
+  await page.getByLabel('Code').fill('fin');
+  await page.getByRole('button', { name: 'Add department' }).last().click();
+  const departmentRow = page.getByRole('listitem').filter({ hasText: 'Finance · FIN' });
+  await expect(departmentRow.getByText('/finance')).toBeVisible();
+  await departmentRow.getByRole('button', { name: 'Deactivate' }).click();
+  await expect(departmentRow.getByText('Inactive')).toBeVisible();
+  await departmentRow.getByRole('button', { name: 'Reactivate' }).click();
+  await expect(departmentRow.getByText('Inactive')).toHaveCount(0);
+
+  await page.getByRole('tab', { name: 'Offices' }).click();
   await page.getByRole('button', { name: 'Add office' }).click();
   await page.getByLabel('Office name').fill(OFFICE.name);
   await page.getByLabel('Office code').fill(OFFICE.code);
