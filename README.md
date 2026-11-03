@@ -118,7 +118,7 @@ by the backend; the frontend only hides what a role cannot use.
 | Payroll tax calculator, payslip PDFs + verification | Done; monthly payroll run not yet |
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
 | Leave management | Done: backend (offices, work calendar, policies and balances, requests and approvals, payroll export); screens done (workplace, leave administration, my leave, calendar, approvals); AI leave assistant done; multi-level approvals (manager, then HR for long leave) done |
-| Company settings, departments, employee IDs, bulk employee import | Backend done (accounts created with the invitation, CSV import in the background); screens next |
+| Company settings, departments, employee IDs, bulk employee import | Done: backend (accounts created with the invitation, CSV import in the background); screens (Company for admins, Workplace → Departments, Onboarding → Import from CSV) |
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
 | AI-service tests | Done (`python -m pytest` in `ai-service/`) |
