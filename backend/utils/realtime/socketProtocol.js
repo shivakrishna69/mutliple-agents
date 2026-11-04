@@ -11,6 +11,8 @@ export const SOCKET_EVENTS = Object.freeze({
   CONVERSATION_STATUS_UPDATED: 'CONVERSATION_STATUS_UPDATED',
   CONVERSATION_ACCESS_REVOKED: 'CONVERSATION_ACCESS_REVOKED',
   SESSION_ENDED: 'SESSION_ENDED',
+  // Server -> client: someone's presence changed (to them, their manager, HR and administrators)
+  PRESENCE_UPDATED: 'PRESENCE_UPDATED',
   // Server -> client, agent telemetry channel (names are AGENT_TELEMETRY_EVENTS)
   AGENT_THINKING_EVENT: AGENT_TELEMETRY_EVENTS.AGENT_THINKING_EVENT,
   TOOL_EXECUTION_STARTED: AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_STARTED,
@@ -20,6 +22,9 @@ export const SOCKET_EVENTS = Object.freeze({
   LEAVE_CONVERSATION: 'LEAVE_CONVERSATION',
   SUBSCRIBE_AGENT_TELEMETRY: 'SUBSCRIBE_AGENT_TELEMETRY',
   UNSUBSCRIBE_AGENT_TELEMETRY: 'UNSUBSCRIBE_AGENT_TELEMETRY',
+  // Client -> server, presence (utils/realtime/presenceHandlers.js)
+  PRESENCE_REPORT: 'PRESENCE_REPORT',
+  SUBSCRIBE_PRESENCE: 'SUBSCRIBE_PRESENCE',
 });
 
 /** Machine-readable codes in connect_error data, acknowledgements, and server events. */
@@ -31,6 +36,8 @@ export const SOCKET_ERROR_CODES = Object.freeze({
   RATE_LIMITED: 'rate_limited',
   ACCESS_REVOKED: 'access_revoked',
   TELEMETRY_FORBIDDEN: 'telemetry_forbidden',
+  PRESENCE_NOT_RECORDED: 'presence_not_recorded',
+  PRESENCE_FORBIDDEN: 'presence_forbidden',
   SESSION_EXPIRED: 'session_expired',
   SESSION_LOGGED_OUT: 'session_logged_out',
   ROLE_CHANGED: 'role_changed',
@@ -52,6 +59,12 @@ export const SOCKET_SERVER_SETTINGS = Object.freeze({
   ROOM_EVENT_WINDOW_MS: 10_000,
   ROOM_EVENTS_PER_WINDOW: 30,
   TELEMETRY_INTERVAL_MS: 5 * 60_000,
+  // Presence reports: about one a minute plus each change; a budget well above that per socket.
+  PRESENCE_REPORT_WINDOW_MS: 60_000,
+  PRESENCE_REPORTS_PER_WINDOW: 10,
+  // Whether a person's presence is recorded is re-read after this long (a positive answer is kept
+  // that long, so switching presence off reaches open sockets within it).
+  PRESENCE_TRACKING_RECHECK_MS: 5 * 60_000,
   // Redis adapter: how long startup waits for both connections, the reconnect backoff cap, and
   // how long cross-instance requests (fetchSockets) wait for every instance to answer.
   REDIS_CONNECT_TIMEOUT_MS: 10_000,
@@ -74,4 +87,7 @@ export const ROOM_NAMES = Object.freeze({
   conversationStaff: (conversationId) => `${CONVERSATION_ROOM_PREFIX}${conversationId}:staff`,
   conversationCustomer: (conversationId) => `${CONVERSATION_ROOM_PREFIX}${conversationId}:customer`,
   agentTelemetry: () => 'agent-telemetry',
+  // Presence viewers: HR and administrators see everyone's; a manager their reports'.
+  presenceOrganisation: () => 'presence:organisation',
+  presenceTeam: (managerEmployeeId) => `presence:team:${managerEmployeeId}`,
 });

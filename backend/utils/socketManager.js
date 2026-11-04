@@ -25,6 +25,9 @@
  *   conversation:<id>:customer        the owning customer's sockets; customer-safe payloads.
  *   agent-telemetry                   admin sockets that asked for live agent telemetry (see
  *                                     "Agent telemetry channel" below).
+ *   presence:organisation             HR and administrator sockets following everyone's presence.
+ *   presence:team:<employeeId>        a manager's sockets following their reports' presence.
+ *                                     Presence events and rules: realtime/presenceHandlers.js.
  *
  * Splitting each conversation into a staff room and a customer room means one publish call can
  * send full payloads (AI tool logs, routing, agent ids) to staff and a reduced payload to the
@@ -156,6 +159,7 @@ import {
   countJoinedConversations,
   handleSocketConnection,
 } from './realtime/connectionHandlers.js';
+import { emitPresenceChange } from './realtime/presenceHandlers.js';
 import { connectRedisAdapterClients } from './realtime/redisAdapterClients.js';
 import { createHandshakeAuthenticator } from './realtime/handshake.js';
 import { logger } from './logger.js';
@@ -428,6 +432,25 @@ export function emitAgentTelemetryEvents(telemetryEvents) {
       error: { name: publishError.name, message: publishError.message, stack: publishError.stack },
     });
     return 0;
+  }
+}
+
+/**
+ * Publishes a presence change decided outside any socket (the sweep that closes stale presence,
+ * services/presenceJobs.js) to the person, their manager's and HR's subscribers. Never throws.
+ * @param {{ update: object, reportingManagerId: string|null }} change  services/presence.js describePresenceChange
+ */
+export function publishPresenceChange(change) {
+  if (!socketIoInstance) return false;
+  try {
+    emitPresenceChange(socketIoInstance, change);
+    return true;
+  } catch (publishError) {
+    logger.error('Failed to publish PRESENCE_UPDATED', {
+      userId: change.update.userId,
+      error: { name: publishError.name, message: publishError.message, stack: publishError.stack },
+    });
+    return false;
   }
 }
 

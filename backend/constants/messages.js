@@ -469,6 +469,8 @@ export const SOCKET_MESSAGES = Object.freeze({
   ACCESS_REVOKED: 'You no longer have access to this conversation',
   SESSION_ENDED: 'Your session has ended. Please sign in again',
   TELEMETRY_FORBIDDEN: 'Agent telemetry is available to administrators only',
+  PRESENCE_NOT_RECORDED: 'Your activity is not recorded: acknowledge the notice first, or presence is switched off',
+  PRESENCE_FORBIDDEN: 'Only HR, administrators and people with a team can follow presence',
   SERVER_ERROR: 'Something went wrong. Please try again',
 });
 
