@@ -1,12 +1,13 @@
 /**
  * Attendance punches against the real server (routes/attendanceRoutes.js): the office's punch-in
- * radius and an employee's own radius, and the work modes each work type may punch in with.
+ * radius and an employee's own radius, the work modes each work type may punch in with, punching
+ * out, and the automatic punch-out of forgotten punches (services/attendancePunchOut.js).
  */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { insertDepartment, officeFields, onboardEmployee } from './fixtures.js';
+import { insertDepartment, officeDocument, officeFields, onboardEmployee } from './fixtures.js';
 import { createSignedInClient, mongoUnavailableReason, startTestServer } from './testServer.js';
 
 const skipReason = await mongoUnavailableReason();
@@ -24,14 +25,63 @@ const punchAt = (point, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * A punch-in left open on a past Monday at 09:40 in Bengaluru (04:10 UTC). The office's shift ends at
+ * 18:30 (13:00 UTC), so it is closed then: 530 minutes worked.
+ */
+const FORGOTTEN_DATE = '2026-01-05';
+const FORGOTTEN_CHECK_IN = new Date('2026-01-05T04:10:00Z');
+const FORGOTTEN_SHIFT_END = new Date('2026-01-05T13:00:00Z');
+
+function openPunchDocument(database, { employeeId, officeLocationId, date, checkInTime }) {
+  const { ObjectId } = database.base.Types;
+  return {
+    entrySource: 'device_punch',
+    employeeId: new ObjectId(employeeId),
+    officeLocationId: new ObjectId(officeLocationId),
+    date,
+    timeZone: 'Asia/Kolkata',
+    checkInTime,
+    checkOutTime: null,
+    workMode: 'office',
+    onDutyReason: null,
+    checkInCoordinates: { ...OFFICE_CENTRE, accuracyMeters: 10 },
+    geofence: { enforced: true, distanceMeters: 5, allowedRadiusMeters: 200 },
+    deviceFingerprint: 'a'.repeat(64),
+    checkInMacAddress: null,
+    calculationStatus: 'Normal',
+    lateByMinutes: 10,
+    regularization: null,
+    createdAt: checkInTime,
+    updatedAt: checkInTime,
+  };
+}
+
 describe('attendance punches', { skip: skipReason ?? false }, () => {
   let testServer;
   let hrClient;
   let departmentId;
   let officeId;
+  let forgottenPunchId;
 
   before(async () => {
-    testServer = await startTestServer();
+    testServer = await startTestServer({
+      // A punch nobody closed, which the server's attendance job closes when it starts.
+      seedBeforeStart: async (database) => {
+        const { insertedId: seededOfficeId } = await database
+          .collection('officelocations')
+          .insertOne(officeDocument('SEEDED', { coordinates: OFFICE_CENTRE }));
+        const { insertedId } = await database.collection('attendances').insertOne(
+          openPunchDocument(database, {
+            employeeId: '64b0000000000000000000aa',
+            officeLocationId: seededOfficeId.toString(),
+            date: FORGOTTEN_DATE,
+            checkInTime: FORGOTTEN_CHECK_IN,
+          }),
+        );
+        forgottenPunchId = insertedId;
+      },
+    });
     hrClient = await createSignedInClient(testServer, { name: 'Hema HR', email: 'hema.hr@example.com', role: 'hr' });
     departmentId = await insertDepartment(testServer.database);
     const created = await hrClient.post('/api/offices', officeFields('BLR', { coordinates: OFFICE_CENTRE }));
@@ -156,5 +206,62 @@ describe('attendance punches', { skip: skipReason ?? false }, () => {
     );
     assert.equal(strayReason.status, 400);
     assert.equal(strayReason.body.error.details[0].field, 'onDutyReason');
+  });
+
+  it('punches out once, recording where and for how long, wherever the employee is', async () => {
+    const employee = await employeeAtOffice('out@example.com');
+    const beforePunchIn = await employee.client.post('/api/attendance/punch-out', punchAt(NEAR_OFFICE));
+    assert.equal(beforePunchIn.status, 409);
+    assert.equal(beforePunchIn.body.error.code, 'NOT_PUNCHED_IN');
+
+    const punchIn = await employee.client.post('/api/attendance/punch-in', punchAt(NEAR_OFFICE));
+    assert.equal(punchIn.status, 201, JSON.stringify(punchIn.body));
+    const punchOut = await employee.client.post('/api/attendance/punch-out', punchAt(FAR_FROM_OFFICE));
+    assert.equal(punchOut.status, 200, JSON.stringify(punchOut.body));
+    const { attendance } = punchOut.body.data;
+    assert.equal(attendance.id, punchIn.body.data.attendance.id);
+    assert.equal(attendance.checkOutSource, 'device');
+    assert.equal(attendance.workedMinutes, 0);
+    assert.ok(new Date(attendance.checkOutTime) > new Date(attendance.checkInTime));
+
+    const stored = await testServer.database
+      .collection('attendances')
+      .findOne({ _id: new testServer.database.base.Types.ObjectId(attendance.id) });
+    assert.ok(stored.checkOutDistanceMeters > 500, 'the distance at punch-out is recorded, not refused');
+    assert.equal(stored.checkOutCoordinates.lat, FAR_FROM_OFFICE.lat);
+
+    const again = await employee.client.post('/api/attendance/punch-out', punchAt(NEAR_OFFICE));
+    assert.equal(again.status, 409);
+    assert.equal(again.body.error.code, 'ALREADY_PUNCHED_OUT');
+  });
+
+  it('closes a forgotten punch-out at the shift end when the server starts', async () => {
+    const attendances = testServer.database.collection('attendances');
+    let closed = null;
+    for (let attempt = 0; attempt < 50 && !closed?.checkOutTime; attempt += 1) {
+      closed = await attendances.findOne({ _id: forgottenPunchId });
+      if (!closed.checkOutTime) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(closed.checkOutSource, 'auto_closed');
+    assert.equal(closed.checkOutTime.toISOString(), FORGOTTEN_SHIFT_END.toISOString());
+    assert.equal(closed.workedMinutes, 530);
+  });
+
+  it('refuses a punch-out after the automatic one’s deadline, closing the punch at the shift end', async () => {
+    const employee = await employeeAtOffice('late.out@example.com');
+    const { insertedId } = await testServer.database.collection('attendances').insertOne(
+      openPunchDocument(testServer.database, {
+        employeeId: employee.profileId,
+        officeLocationId: officeId,
+        date: FORGOTTEN_DATE,
+        checkInTime: FORGOTTEN_CHECK_IN,
+      }),
+    );
+    const tooLate = await employee.client.post('/api/attendance/punch-out', punchAt(NEAR_OFFICE));
+    assert.equal(tooLate.status, 409);
+    assert.equal(tooLate.body.error.code, 'PUNCH_OUT_TOO_LATE');
+    const stored = await testServer.database.collection('attendances').findOne({ _id: insertedId });
+    assert.equal(stored.checkOutSource, 'auto_closed');
+    assert.equal(stored.checkOutTime.toISOString(), FORGOTTEN_SHIFT_END.toISOString());
   });
 });

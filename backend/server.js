@@ -54,6 +54,7 @@ import { closeMailService, initMailService } from './services/mailService.js';
 import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
+import { startAttendanceScheduler, stopAttendanceScheduler } from './services/attendanceScheduler.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
 import { DEFAULT_COMPANY_NAME, ensureCompanySettings } from './services/companySettings.js';
 import { runStartupMigrations } from './migrations/index.js';
@@ -233,6 +234,8 @@ async function start() {
     // Accruals, year ends and leave request repair, now and hourly (idempotent, so several
     // instances may run it).
     startLeaveScheduler();
+    // Forgotten punch-outs, closed after the shift; now and every 15 minutes (idempotent).
+    startAttendanceScheduler();
     // Employee imports: BullMQ on Redis when REDIS_URL is set, in this process otherwise.
     initEmployeeImportQueue(config);
   });
@@ -255,6 +258,7 @@ async function start() {
 
     try {
       stopLeaveScheduler();
+      stopAttendanceScheduler();
       await closeEmployeeImportQueue();
       await closeSocketServer();
       await closeCacheStore();

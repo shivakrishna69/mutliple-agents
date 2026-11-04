@@ -16,6 +16,9 @@
  *                 shift when read from a server in another zone.
  *   checkInTime   server clock at punch-in (an instant, stored in UTC). Never taken from the client.
  *   checkOutTime  server clock at punch-out; null until then; must be after checkInTime.
+ *                 A punch-in still open long after the shift ends is closed automatically at the
+ *                 shift end (checkOutSource "auto_closed"): the time is then an estimate.
+ *   workedMinutes whole minutes from checkInTime to checkOutTime, set with it.
  *
  * Work mode
  * ---------
@@ -90,6 +93,12 @@ export const ATTENDANCE_WORK_MODES = Object.freeze({
   OFFICE: 'office',
   HOME: 'home',
   ON_DUTY: 'on_duty',
+});
+
+/** How a punch was closed: by the employee's punch-out, or automatically after the shift. */
+export const ATTENDANCE_CHECK_OUT_SOURCES = Object.freeze({
+  DEVICE: 'device',
+  AUTO_CLOSED: 'auto_closed',
 });
 
 /** How the entry was created; see "Entry sources" above. */
@@ -220,6 +229,17 @@ const attendanceSchema = new mongoose.Schema(
     // Device punches only (required for them by enforceEntrySourceConsistency below).
     checkInCoordinates: { type: coordinatesSchema, default: null, immutable: true },
     checkOutCoordinates: { type: coordinatesSchema, default: null },
+    // Set with checkOutTime (services/attendancePunchOut.js).
+    checkOutSource: {
+      type: String,
+      enum: {
+        values: [...Object.values(ATTENDANCE_CHECK_OUT_SOURCES), null],
+        message: 'checkOutSource "{VALUE}" is not valid',
+      },
+      default: null,
+    },
+    checkOutDistanceMeters: { type: Number, min: 0, default: null },
+    workedMinutes: { type: Number, min: 0, default: null },
     geofence: { type: geofenceEvidenceSchema, default: null, immutable: true },
     deviceFingerprint: {
       type: String,
@@ -302,6 +322,8 @@ attendanceSchema.pre('validate', function enforceEntrySourceConsistency() {
 attendanceSchema.index({ employeeId: 1, date: -1 }, { unique: true });
 // Daily reports: everyone's status for one date ("who was late today").
 attendanceSchema.index({ date: 1, calculationStatus: 1 });
+// The automatic punch-out finds the punches still open (checkOutTime null).
+attendanceSchema.index({ checkOutTime: 1 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 

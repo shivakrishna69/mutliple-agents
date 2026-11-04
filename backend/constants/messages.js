@@ -142,6 +142,12 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   DEVICE_NOT_RECOGNISED: 'This device is not registered for your attendance. Use your registered device or contact HR',
   UNAUTHORIZED_SPATIAL_LOCATION: 'Unauthorized Spatial Location: you are outside the area allowed for punching in',
   ALREADY_PUNCHED_IN: 'You have already punched in today',
+  PUNCHED_OUT: 'Punched out',
+  NOT_PUNCHED_IN: 'You have not punched in, so there is nothing to punch out of',
+  ALREADY_PUNCHED_OUT: 'You have already punched out today',
+  PUNCH_OUT_TOO_LATE:
+    'Your punch-in was closed automatically at the end of the shift, because the punch-out came too late. ' +
+    'Ask your manager if the hours need correcting',
   WORK_MODE_INVALID: 'workMode must be "office", "home" or "on_duty"',
   WORK_MODE_NOT_ALLOWED: 'Your work type does not allow punching in this way. Choose another option or contact HR',
   ON_DUTY_REASON_INVALID: 'Say why you are on duty (where you are working), in 3 to 300 characters',

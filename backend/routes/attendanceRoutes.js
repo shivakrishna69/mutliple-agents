@@ -1,7 +1,8 @@
 /**
  * Attendance routes, mounted in server.js under `/api/attendance`.
  *
- *   POST /punch-in                                       record today's arrival (geofenced)
+ *   POST /punch-in                                       record today's arrival (office punches geofenced)
+ *   POST /punch-out                                      close it (forgotten ones close automatically)
  *   POST /regularize                                     talk to the attendance regularization agent
  *   GET  /regularization-reviews                         escalated requests to review (managers, HR, admins)
  *   POST /regularization-reviews/:reviewId/decision      approve or reject one
@@ -12,7 +13,7 @@
  */
 
 import { Router } from 'express';
-import { punchIn, regularizeAttendance } from '../controllers/attendanceController.js';
+import { punchIn, punchOut, regularizeAttendance } from '../controllers/attendanceController.js';
 import {
   decideRegularizationReview,
   listRegularizationReviews,
@@ -28,6 +29,7 @@ attendanceRouter.use(protect, (req, res, next) => {
   next();
 });
 attendanceRouter.post('/punch-in', attendancePunchRateLimitByUser, punchIn);
+attendanceRouter.post('/punch-out', attendancePunchRateLimitByUser, punchOut);
 attendanceRouter.post('/regularize', regularizationRateLimitByUser, regularizeAttendance);
 attendanceRouter.get('/regularization-reviews', listRegularizationReviews);
 attendanceRouter.post('/regularization-reviews/:reviewId/decision', decideRegularizationReview);

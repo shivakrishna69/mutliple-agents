@@ -107,6 +107,32 @@ export function evaluateGeofence(punchPoint, officeCoordinates, allowedRadiusMet
   return { distanceMeters, isInsideGeofence: distanceMeters <= allowedRadiusMeters };
 }
 
+const MINUTE_MS = 60_000;
+
+/**
+ * When an open punch is closed automatically, and the check-out time it gets then.
+ *   Punched in before the shift ended: closed at the shift end of its day, once the office's
+ *   autoPunchOutAfterMinutes have passed after it (until then the employee may punch out).
+ *   Punched in after the shift ended: closed after that delay (at least a minute), at that moment.
+ * @param {{ date: string, checkInTime: Date }} punch
+ * @param {{ timeZone: string, workday: { shiftEndLocalTime: string, autoPunchOutAfterMinutes?: number } }} office
+ * @returns {{ closeAt: Date, deadline: Date }}  deadline: from then on the punch is closed at closeAt
+ */
+export function automaticPunchOut({ date, checkInTime }, office) {
+  const delayMinutes = office.workday.autoPunchOutAfterMinutes ?? ATTENDANCE_DEFAULTS.AUTO_PUNCH_OUT_AFTER_MINUTES;
+  const shiftEnd = zonedLocalTimeToInstant(date, office.workday.shiftEndLocalTime, office.timeZone);
+  if (shiftEnd && shiftEnd > checkInTime) {
+    return { closeAt: shiftEnd, deadline: new Date(shiftEnd.getTime() + delayMinutes * MINUTE_MS) };
+  }
+  const closeAt = new Date(checkInTime.getTime() + Math.max(delayMinutes, 1) * MINUTE_MS);
+  return { closeAt, deadline: closeAt };
+}
+
+/** Whole minutes worked between a check-in and a check-out. */
+export function workedMinutesBetween(checkInTime, checkOutTime) {
+  return Math.floor((checkOutTime.getTime() - checkInTime.getTime()) / MINUTE_MS);
+}
+
 /** "HH:MM" -> minutes since midnight. */
 export function localTimeToMinutes(localTime) {
   const [hours, minutes] = localTime.split(':').map(Number);
