@@ -4,6 +4,7 @@
  *
  *   GET  /                      current employees (not terminated, invited included) with their office and manager
  *   PUT  /:employeeId/office    set the employee's base office ({ officeLocationId }, null clears it)
+ *   PUT  /:employeeId/geofence-radius  their own punch-in radius ({ geofenceRadiusMeters }, null: the office's)
  *
  * Bulk import (controllers/employeeImportController.js):
  *   POST /bulk-upload                 a CSV in the multipart field "file": checked, nothing created yet
@@ -21,7 +22,7 @@ import {
   postConfirmEmployeeImport,
   postEmployeeImport,
 } from '../controllers/employeeImportController.js';
-import { getEmployees, putEmployeeOffice } from '../controllers/officeController.js';
+import { getEmployees, putEmployeeGeofenceRadius, putEmployeeOffice } from '../controllers/officeController.js';
 import { EMPLOYEE_IMPORT_MESSAGES } from '../constants/messages.js';
 import { EMPLOYEE_IMPORT_LIMITS } from '../constants/validation.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -47,6 +48,7 @@ employeeRouter.use(protect, (req, res, next) => {
 });
 employeeRouter.get('/', getEmployees);
 employeeRouter.put('/:employeeId/office', workplaceSetupWriteRateLimitByUser, putEmployeeOffice);
+employeeRouter.put('/:employeeId/geofence-radius', workplaceSetupWriteRateLimitByUser, putEmployeeGeofenceRadius);
 employeeRouter.post('/bulk-upload', employeeImportUploadRateLimitByUser, receiveEmployeeFile, postEmployeeImport);
 employeeRouter.get('/bulk-upload', getEmployeeImports);
 employeeRouter.get('/bulk-upload/:jobId', getEmployeeImport);

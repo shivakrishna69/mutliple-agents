@@ -12,10 +12,12 @@ import {
   deleteOffice,
   getOffice,
   listOffices,
+  setEmployeeGeofenceRadius,
   updateOffice,
 } from '../services/officeService.js';
 import { listCurrentEmployees } from '../services/employeeDirectory.js';
 import {
+  validateEmployeeGeofenceRadius,
   validateOfficeAssignment,
   validateOfficeChanges,
   validateOfficeCreation,
@@ -96,4 +98,17 @@ export const putEmployeeOffice = officeHandler('assign_employee_office', ADMIN_W
     officeLocationId: validation.sanitizedInput.officeLocationId,
   });
   return { message: OFFICE_MESSAGES.EMPLOYEE_OFFICE_ASSIGNED, data: { assignment }, auditDetails: assignment };
+});
+
+/** PUT /api/employees/:employeeId/geofence-radius */
+export const putEmployeeGeofenceRadius = officeHandler('set_employee_geofence_radius', ADMIN_WRITE, async (req) => {
+  const invalidParams = idParamErrors(req.params, 'employeeId');
+  if (invalidParams) return { validationErrors: invalidParams };
+  const validation = validateEmployeeGeofenceRadius(req.body);
+  if (!validation.isValid) return validation;
+  const setting = await setEmployeeGeofenceRadius({
+    employeeId: req.params.employeeId,
+    geofenceRadiusMeters: validation.sanitizedInput.geofenceRadiusMeters,
+  });
+  return { message: OFFICE_MESSAGES.EMPLOYEE_GEOFENCE_RADIUS_SET, data: { setting }, auditDetails: setting };
 });

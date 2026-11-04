@@ -1,12 +1,14 @@
 /**
  * Office management (routes/officeRoutes.js, routes/employeeRoutes.js) against the real server:
- * the weekly-off startup migration, office CRUD with version checks and model validation, weekly
- * offs including 2nd/4th Saturdays, removal rules, and assigning employees their base office.
+ * the weekly-off and attendance-settings startup migrations, office CRUD with version checks and
+ * model validation, weekly offs including 2nd/4th Saturdays, punch-in radii (per office and per
+ * employee), removal rules, and assigning employees their base office.
  */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ATTENDANCE_DEFAULTS } from '../../constants/validation.js';
 import { WEEKDAYS } from '../../models/OfficeLocation.js';
 import { insertDepartment, officeDocument, officeFields, onboardEmployee } from './fixtures.js';
 import { createSignedInClient, mongoUnavailableReason, startTestServer } from './testServer.js';
@@ -53,6 +55,76 @@ describe('office management', { skip: skipReason ?? false }, () => {
       [WEEKDAYS.SUNDAY, WEEKDAYS.SATURDAY].sort(),
     );
     assert.deepEqual((await getOffice(customRulesOfficeId)).workday.weeklyOffRules, []);
+  });
+
+  it('gives existing offices the default punch-in radius and automatic punch-out at startup', async () => {
+    const stored = await testServer.database
+      .collection('officelocations')
+      .findOne({ _id: new testServer.database.base.Types.ObjectId(legacyOfficeId) });
+    assert.equal(stored.geofenceRadiusMeters, ATTENDANCE_DEFAULTS.OFFICE_GEOFENCE_RADIUS_METRES);
+    assert.equal(stored.workday.autoPunchOutAfterMinutes, ATTENDANCE_DEFAULTS.AUTO_PUNCH_OUT_AFTER_MINUTES);
+    const legacyOffice = await getOffice(legacyOfficeId);
+    assert.equal(legacyOffice.geofenceRadiusMeters, ATTENDANCE_DEFAULTS.OFFICE_GEOFENCE_RADIUS_METRES);
+    assert.equal(legacyOffice.workday.autoPunchOutAfterMinutes, ATTENDANCE_DEFAULTS.AUTO_PUNCH_OUT_AFTER_MINUTES);
+  });
+
+  it('sets an office’s punch-in radius and automatic punch-out within their limits', async () => {
+    const created = await hrClient.post(
+      '/api/offices',
+      officeFields('HYD', { geofenceRadiusMeters: 350, workday: { autoPunchOutAfterMinutes: 60 } }),
+    );
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const office = created.body.data.office;
+    assert.equal(office.geofenceRadiusMeters, 350);
+    assert.equal(office.workday.autoPunchOutAfterMinutes, 60);
+
+    const tooSmall = await hrClient.patch(`/api/offices/${office.id}`, {
+      geofenceRadiusMeters: 10,
+      workday: { autoPunchOutAfterMinutes: -5 },
+      version: office.version,
+    });
+    assert.equal(tooSmall.status, 400);
+    assert.deepEqual(tooSmall.body.error.details.map((detail) => detail.field).sort(), [
+      'geofenceRadiusMeters',
+      'workday.autoPunchOutAfterMinutes',
+    ]);
+    const changed = await hrClient.patch(`/api/offices/${office.id}`, {
+      geofenceRadiusMeters: 500,
+      version: office.version,
+    });
+    assert.equal(changed.status, 200, JSON.stringify(changed.body));
+    assert.equal(changed.body.data.office.geofenceRadiusMeters, 500);
+    assert.equal(changed.body.data.office.workday.autoPunchOutAfterMinutes, 60, 'the other setting is kept');
+  });
+
+  it('gives one employee their own punch-in radius, and back to the office’s', async () => {
+    const radiusPath = `/api/employees/${employee.profileId}/geofence-radius`;
+    const listed = async () =>
+      (await hrClient.get('/api/employees')).body.data.employees.find(
+        (candidate) => candidate.employeeId === employee.profileId,
+      );
+    assert.equal((await listed()).geofenceRadiusMeters, null);
+    assert.equal((await listed()).workLocationType, 'Onsite');
+
+    const set = await hrClient.request('PUT', radiusPath, { body: { geofenceRadiusMeters: 750 } });
+    assert.equal(set.status, 200, JSON.stringify(set.body));
+    assert.equal((await listed()).geofenceRadiusMeters, 750);
+
+    for (const invalidRadius of [5, 20_000, 12.5, '300']) {
+      const refused = await hrClient.request('PUT', radiusPath, { body: { geofenceRadiusMeters: invalidRadius } });
+      assert.equal(refused.status, 400, `radius ${invalidRadius} should be refused`);
+    }
+    assert.equal(
+      (await employee.client.request('PUT', radiusPath, { body: { geofenceRadiusMeters: 9000 } })).status,
+      403,
+    );
+    const unknown = await hrClient.request('PUT', '/api/employees/64b000000000000000000098/geofence-radius', {
+      body: { geofenceRadiusMeters: 300 },
+    });
+    assert.equal(unknown.status, 404);
+
+    assert.equal((await hrClient.request('PUT', radiusPath, { body: { geofenceRadiusMeters: null } })).status, 200);
+    assert.equal((await listed()).geofenceRadiusMeters, null);
   });
 
   it('keeps office management to HR and admins', async () => {

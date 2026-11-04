@@ -15,7 +15,7 @@ import {
   validationResult,
 } from './requestShape.js';
 
-const OFFICE_FIELDS = Object.freeze(['name', 'code', 'coordinates', 'timeZone', 'workday']);
+const OFFICE_FIELDS = Object.freeze(['name', 'code', 'coordinates', 'timeZone', 'geofenceRadiusMeters', 'workday']);
 const OFFICE_GROUPS = Object.freeze({
   coordinates: Object.freeze(['lat', 'lng']),
   workday: Object.freeze([
@@ -23,6 +23,7 @@ const OFFICE_GROUPS = Object.freeze({
     'shiftEndLocalTime',
     'lateGraceMinutes',
     'halfDayAfterMinutes',
+    'autoPunchOutAfterMinutes',
     'weeklyOffRules',
   ]),
 });
@@ -55,4 +56,19 @@ export function validateOfficeAssignment(requestBody) {
     return validationResult([{ field: 'officeLocationId', message: 'must be an office id, or null to clear it' }]);
   }
   return validationResult([], { officeLocationId: officeLocationId?.toLowerCase() ?? null });
+}
+
+/**
+ * PUT /api/employees/:employeeId/geofence-radius : { geofenceRadiusMeters } (null: use the office's).
+ * The allowed range is the model's.
+ */
+export function validateEmployeeGeofenceRadius(requestBody) {
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
+  const { geofenceRadiusMeters } = requestBody;
+  if (geofenceRadiusMeters !== null && !Number.isInteger(geofenceRadiusMeters)) {
+    return validationResult([
+      { field: 'geofenceRadiusMeters', message: 'must be a whole number of metres, or null to use the office radius' },
+    ]);
+  }
+  return validationResult([], { geofenceRadiusMeters });
 }

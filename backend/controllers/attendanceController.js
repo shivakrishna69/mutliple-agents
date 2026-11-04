@@ -3,7 +3,8 @@
  *
  * POST /api/attendance/punch-in
  * -----------------------------
- * Body: { lat, lng, accuracyMeters, deviceFingerprint, macAddress? } (see validators/attendanceValidators.js)
+ * Body: { lat, lng, accuracyMeters, deviceFingerprint, macAddress?, workMode?, onDutyReason? }
+ * (see validators/attendanceValidators.js)
  *
  * The employee is always the signed-in user: their EmployeeProfile is found by the session's user
  * id. No employee id is accepted from the client, so nobody can punch in for someone else.
@@ -12,15 +13,18 @@
  *   1. Input        types and ranges of every field                          400
  *   2. Employee     a profile is linked to this account                       404
  *                   employment has not ended                                  403
+ *                   their work type allows the work mode (office, home or
+ *                   on duty; their usual one when none is sent)              403 WORK_MODE_NOT_ALLOWED
  *   3. Office       a base office is assigned and exists                      409
  *   4. Device       if a MAC address is registered, the request must send
  *                   that same address                                         403 DEVICE_NOT_RECOGNISED
- *   5. Precision    the location fix is within MAX_LOCATION_ACCURACY_METRES   422
+ *   5. Precision    office punches: the location fix is within
+ *                   MAX_LOCATION_ACCURACY_METRES                               422
  *   6. Day          today's date in the office time zone, from the server
  *                   clock; one punch-in per day                               409
- *   7. Geofence     on-site and hybrid employees: a radius is configured      409
- *                   and the Haversine distance to the office is within it     403 UNAUTHORIZED_SPATIAL_LOCATION
- *                   remote employees: the distance is recorded, not enforced
+ *   7. Geofence     office punches: the Haversine distance to the office is within the employee's
+ *                   own radius, or else the office's                          403 UNAUTHORIZED_SPATIAL_LOCATION
+ *                   home and on-duty punches: the distance is recorded, not enforced
  *   8. Status       Normal / Late / Half_Day from the arrival time against the office shift
  *   9. Persist      the unique { employeeId, date } index makes a racing duplicate a 409
  *
@@ -32,16 +36,28 @@ import { createHash } from 'node:crypto';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ATTENDANCE_MESSAGES, REGULARIZATION_MESSAGES } from '../constants/messages.js';
 import { ATTENDANCE_FIELD_LIMITS } from '../constants/validation.js';
-import Attendance from '../models/Attendance.js';
-import EmployeeProfile, { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
+import Attendance, {
+  ATTENDANCE_CHECK_OUT_SOURCES,
+  ATTENDANCE_ENTRY_SOURCES,
+  ATTENDANCE_WORK_MODES,
+} from '../models/Attendance.js';
+import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { AI_FAILURE_KIND, AiServiceError, requestAttendanceRegularization } from '../services/aiServiceClient.js';
-import { classifyArrival, evaluateGeofence, readOfficeLocalClock } from '../services/attendancePolicy.js';
+import {
+  allowedWorkModes,
+  classifyArrival,
+  effectiveGeofenceRadiusMeters,
+  evaluateGeofence,
+  readOfficeLocalClock,
+} from '../services/attendancePolicy.js';
+import { closeIfOverdue, closePunch } from '../services/attendancePunchOut.js';
 import { EMPLOYEE_CONTEXT_UNAVAILABLE, loadEmployeeAgentContext } from '../services/employeeContext.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
-import { validatePunchInInput } from '../validators/attendanceValidators.js';
+import { validatePunchInInput, validatePunchOutInput } from '../validators/attendanceValidators.js';
 import { validateRegularizeRequest } from '../validators/regularizationValidators.js';
+import { haversineDistanceMetres } from '../utils/geoDistance.js';
 import { logger } from '../utils/logger.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
@@ -50,15 +66,62 @@ export const ATTENDANCE_ERROR_CODES = Object.freeze({
   PROFILE_NOT_FOUND: 'PROFILE_NOT_FOUND',
   EMPLOYMENT_ENDED: 'EMPLOYMENT_ENDED',
   OFFICE_NOT_CONFIGURED: 'OFFICE_NOT_CONFIGURED',
-  GEOFENCE_NOT_CONFIGURED: 'GEOFENCE_NOT_CONFIGURED',
   DEVICE_NOT_RECOGNISED: 'DEVICE_NOT_RECOGNISED',
   LOCATION_TOO_IMPRECISE: 'LOCATION_TOO_IMPRECISE',
   UNAUTHORIZED_SPATIAL_LOCATION: 'UNAUTHORIZED_SPATIAL_LOCATION',
   ALREADY_PUNCHED_IN: 'ALREADY_PUNCHED_IN',
+  WORK_MODE_NOT_ALLOWED: 'WORK_MODE_NOT_ALLOWED',
+  NOT_PUNCHED_IN: 'NOT_PUNCHED_IN',
+  ALREADY_PUNCHED_OUT: 'ALREADY_PUNCHED_OUT',
+  PUNCH_OUT_TOO_LATE: 'PUNCH_OUT_TOO_LATE',
 });
 
 function auditPunchIn(req, outcome, details) {
   recordAuditEvent(req, { category: 'attendance', action: 'punch_in', outcome, ...details });
+}
+
+/**
+ * A registered MAC address binds attendance to that device; without one, any device may punch and
+ * the reported address (if any) is only recorded. Returns why the device is refused, or null.
+ */
+function unregisteredDeviceReason(employeeProfile, macAddress) {
+  const registeredMacAddress = employeeProfile.biometricMetadata?.registeredDeviceMacAddress ?? null;
+  if (!registeredMacAddress || macAddress === registeredMacAddress) return null;
+  return macAddress ? 'device_mac_mismatch' : 'device_mac_missing';
+}
+
+/**
+ * The signed-in user's employee profile, when they may record attendance. Otherwise the refusal is
+ * audited (with `audit`) and sent, and null is returned. No employee id is taken from the client.
+ */
+async function findPunchingEmployee(req, res, audit) {
+  const employeeProfile = await EmployeeProfile.findOne({ userId: req.user.id })
+    .select('organizationData biometricMetadata.allowedGeofenceRadius biometricMetadata.registeredDeviceMacAddress')
+    .lean();
+  if (!employeeProfile) {
+    audit(req, AUDIT_OUTCOMES.REJECTED, { reason: 'profile_not_found' });
+    sendCodedError(req, res, HTTP_STATUS.NOT_FOUND, {
+      code: ATTENDANCE_ERROR_CODES.PROFILE_NOT_FOUND,
+      message: ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND,
+    });
+    return null;
+  }
+  if (employeeProfile.organizationData.employmentStatus === EMPLOYMENT_STATUSES.TERMINATED) {
+    audit(req, AUDIT_OUTCOMES.DENIED, { employeeId: employeeProfile._id.toString(), reason: 'employment_ended' });
+    sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
+      code: ATTENDANCE_ERROR_CODES.EMPLOYMENT_ENDED,
+      message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED,
+    });
+    return null;
+  }
+  return employeeProfile;
+}
+
+function sendDeviceNotRecognised(req, res) {
+  return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
+    code: ATTENDANCE_ERROR_CODES.DEVICE_NOT_RECOGNISED,
+    message: ATTENDANCE_MESSAGES.DEVICE_NOT_RECOGNISED,
+  });
 }
 
 /** Metres rounded to one decimal place, for storage and responses. */
@@ -75,6 +138,10 @@ function toAttendanceSummary(attendanceRecord) {
     timeZone: attendanceRecord.timeZone,
     checkInTime: attendanceRecord.checkInTime.toISOString(),
     checkOutTime: attendanceRecord.checkOutTime ? attendanceRecord.checkOutTime.toISOString() : null,
+    checkOutSource: attendanceRecord.checkOutSource ?? null,
+    workedMinutes: attendanceRecord.workedMinutes ?? null,
+    workMode: attendanceRecord.workMode ?? null,
+    onDutyReason: attendanceRecord.onDutyReason ?? null,
     checkInCoordinates: {
       lat: attendanceRecord.checkInCoordinates.lat,
       lng: attendanceRecord.checkInCoordinates.lng,
@@ -96,9 +163,10 @@ function toAttendanceSummary(attendanceRecord) {
  *   201 { message, data: { attendance } }
  *   400 invalid input (details per field)
  *   401 no session / 403 bad CSRF   (protect)
- *   403 { error: { code: EMPLOYMENT_ENDED | DEVICE_NOT_RECOGNISED | UNAUTHORIZED_SPATIAL_LOCATION, context? } }
+ *   403 { error: { code: EMPLOYMENT_ENDED | WORK_MODE_NOT_ALLOWED | DEVICE_NOT_RECOGNISED
+ *                       | UNAUTHORIZED_SPATIAL_LOCATION, context? } }
  *   404 { error: { code: PROFILE_NOT_FOUND } }
- *   409 { error: { code: OFFICE_NOT_CONFIGURED | GEOFENCE_NOT_CONFIGURED | ALREADY_PUNCHED_IN } }
+ *   409 { error: { code: OFFICE_NOT_CONFIGURED | ALREADY_PUNCHED_IN } }
  *   422 { error: { code: LOCATION_TOO_IMPRECISE, context } }
  *   429 too many attempts (rate limiter) / 500 unexpected (central error handler)
  */
@@ -115,29 +183,26 @@ export async function punchIn(req, res, next) {
         inputValidation.validationErrors,
       );
     }
-    const { lat, lng, accuracyMeters, deviceFingerprint, macAddress } = inputValidation.sanitizedInput;
+    const { lat, lng, accuracyMeters, deviceFingerprint, macAddress, onDutyReason } = inputValidation.sanitizedInput;
     const punchPoint = { lat, lng };
 
     // ---- 2. Employee --------------------------------------------------------------------------
-    const employeeProfile = await EmployeeProfile.findOne({ userId: req.user.id })
-      .select('organizationData biometricMetadata.allowedGeofenceRadius biometricMetadata.registeredDeviceMacAddress')
-      .lean();
-    if (!employeeProfile) {
-      auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { reason: 'profile_not_found' });
-      return sendCodedError(req, res, HTTP_STATUS.NOT_FOUND, {
-        code: ATTENDANCE_ERROR_CODES.PROFILE_NOT_FOUND,
-        message: ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND,
-      });
-    }
+    const employeeProfile = await findPunchingEmployee(req, res, auditPunchIn);
+    if (!employeeProfile) return undefined;
     const employeeId = employeeProfile._id.toString();
-    const { workLocationType, employmentStatus, officeLocationId } = employeeProfile.organizationData;
-    if (employmentStatus === EMPLOYMENT_STATUSES.TERMINATED) {
-      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: 'employment_ended' });
+    const { workLocationType, officeLocationId } = employeeProfile.organizationData;
+    // Where they are working today: their work type decides which modes they may choose.
+    const permittedWorkModes = allowedWorkModes(workLocationType);
+    const workMode = inputValidation.sanitizedInput.workMode ?? permittedWorkModes[0];
+    if (!permittedWorkModes.includes(workMode)) {
+      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: 'work_mode_not_allowed', workMode });
       return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
-        code: ATTENDANCE_ERROR_CODES.EMPLOYMENT_ENDED,
-        message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED,
+        code: ATTENDANCE_ERROR_CODES.WORK_MODE_NOT_ALLOWED,
+        message: ATTENDANCE_MESSAGES.WORK_MODE_NOT_ALLOWED,
+        context: { workMode, allowedWorkModes: permittedWorkModes },
       });
     }
+    const isGeofenceEnforced = workMode === ATTENDANCE_WORK_MODES.OFFICE;
 
     // ---- 3. Office ----------------------------------------------------------------------------
     const office = officeLocationId ? await OfficeLocation.findById(officeLocationId).lean() : null;
@@ -150,22 +215,16 @@ export async function punchIn(req, res, next) {
     }
 
     // ---- 4. Device ----------------------------------------------------------------------------
-    // A registered address binds attendance to that device; without one, any device may punch and
-    // the reported address (if any) is only recorded.
-    const registeredMacAddress = employeeProfile.biometricMetadata?.registeredDeviceMacAddress ?? null;
-    if (registeredMacAddress && macAddress !== registeredMacAddress) {
-      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, {
-        employeeId,
-        reason: macAddress ? 'device_mac_mismatch' : 'device_mac_missing',
-      });
-      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
-        code: ATTENDANCE_ERROR_CODES.DEVICE_NOT_RECOGNISED,
-        message: ATTENDANCE_MESSAGES.DEVICE_NOT_RECOGNISED,
-      });
+    const deviceProblem = unregisteredDeviceReason(employeeProfile, macAddress);
+    if (deviceProblem) {
+      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: deviceProblem });
+      return sendDeviceNotRecognised(req, res);
     }
+    const registeredMacAddress = employeeProfile.biometricMetadata?.registeredDeviceMacAddress ?? null;
 
     // ---- 5. Precision -------------------------------------------------------------------------
-    if (accuracyMeters > ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES) {
+    // Only an office punch is placed against a radius; elsewhere the reading is recorded as it is.
+    if (isGeofenceEnforced && accuracyMeters > ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES) {
       auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'location_too_imprecise', accuracyMeters });
       return sendCodedError(req, res, HTTP_STATUS.UNPROCESSABLE_CONTENT, {
         code: ATTENDANCE_ERROR_CODES.LOCATION_TOO_IMPRECISE,
@@ -186,18 +245,11 @@ export async function punchIn(req, res, next) {
     }
 
     // ---- 7. Geofence --------------------------------------------------------------------------
-    const isGeofenceEnforced = workLocationType !== WORK_LOCATION_TYPES.REMOTE;
     const allowedRadiusMeters = isGeofenceEnforced
-      ? (employeeProfile.biometricMetadata?.allowedGeofenceRadius ?? null)
+      ? effectiveGeofenceRadiusMeters(office, employeeProfile.biometricMetadata?.allowedGeofenceRadius)
       : null;
-    if (isGeofenceEnforced && allowedRadiusMeters === null) {
-      auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'geofence_not_configured' });
-      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
-        code: ATTENDANCE_ERROR_CODES.GEOFENCE_NOT_CONFIGURED,
-        message: ATTENDANCE_MESSAGES.GEOFENCE_NOT_CONFIGURED,
-      });
-    }
-    // Remote employees are measured too (with an infinite radius), so the record shows where they punched from.
+    // Home and on-duty punches are measured too (with an infinite radius), so the record shows how
+    // far from the office they were made.
     const { distanceMeters, isInsideGeofence } = evaluateGeofence(
       punchPoint,
       office.coordinates,
@@ -232,6 +284,8 @@ export async function punchIn(req, res, next) {
         date: calendarDate,
         timeZone: office.timeZone,
         checkInTime: punchedAt,
+        workMode,
+        onDutyReason,
         checkInCoordinates: { lat, lng, accuracyMeters },
         geofence: { enforced: isGeofenceEnforced, distanceMeters: roundedDistanceMeters, allowedRadiusMeters },
         deviceFingerprint: createHash('sha256').update(deviceFingerprint, 'utf8').digest('hex'),
@@ -256,6 +310,7 @@ export async function punchIn(req, res, next) {
       date: calendarDate,
       calculationStatus,
       lateByMinutes,
+      workMode,
       geofenceEnforced: isGeofenceEnforced,
       distanceMeters: roundedDistanceMeters,
       allowedRadiusMeters,
@@ -264,6 +319,107 @@ export async function punchIn(req, res, next) {
     });
     return sendSuccess(res, HTTP_STATUS.CREATED, ATTENDANCE_MESSAGES.PUNCHED_IN, {
       attendance: toAttendanceSummary(attendanceRecord),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// =================================================================================================
+// POST /api/attendance/punch-out
+// =================================================================================================
+
+function auditPunchOut(req, outcome, details) {
+  recordAuditEvent(req, { category: 'attendance', action: 'punch_out', outcome, ...details });
+}
+
+/**
+ * POST /api/attendance/punch-out
+ * Body: { lat, lng, accuracyMeters, deviceFingerprint, macAddress? }
+ *
+ * Closes the signed-in employee's open punch-in at the server's clock. Where they punch out is
+ * recorded (and its distance from the office), never checked: leaving work is not refused for being
+ * elsewhere. A registered device is required as for punching in.
+ *
+ *   1. Input, 2. Employee, 3. Device      as for the punch-in
+ *   4. Open punch   their latest punch-in is still open      409 NOT_PUNCHED_IN | ALREADY_PUNCHED_OUT
+ *   5. Deadline     its automatic punch-out has not passed   409 PUNCH_OUT_TOO_LATE (it is closed at
+ *                   (services/attendancePolicy.js)              the shift end, as the job would)
+ *   6. Persist      closed only if still open (a racing punch-out or the job: 409 ALREADY_PUNCHED_OUT)
+ *
+ * Responses: 200 { message, data: { attendance } } with checkOutTime and workedMinutes; the errors
+ * above; 400/401/403/404/429 as for the punch-in.
+ */
+export async function punchOut(req, res, next) {
+  try {
+    const inputValidation = validatePunchOutInput(req.body);
+    if (!inputValidation.isValid) {
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        inputValidation.validationErrors[0].message,
+        inputValidation.validationErrors,
+      );
+    }
+    const { lat, lng, accuracyMeters, macAddress } = inputValidation.sanitizedInput;
+
+    const employeeProfile = await findPunchingEmployee(req, res, auditPunchOut);
+    if (!employeeProfile) return undefined;
+    const employeeId = employeeProfile._id.toString();
+
+    const deviceProblem = unregisteredDeviceReason(employeeProfile, macAddress);
+    if (deviceProblem) {
+      auditPunchOut(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: deviceProblem });
+      return sendDeviceNotRecognised(req, res);
+    }
+
+    const latestPunch = await Attendance.findOne({ employeeId, entrySource: ATTENDANCE_ENTRY_SOURCES.DEVICE_PUNCH })
+      .sort({ date: -1 })
+      .lean();
+    const now = new Date();
+    if (!latestPunch || latestPunch.checkOutTime) {
+      const isClosedToday =
+        latestPunch && latestPunch.date === readOfficeLocalClock(now, latestPunch.timeZone).calendarDate;
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: isClosedToday ? ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_OUT : ATTENDANCE_ERROR_CODES.NOT_PUNCHED_IN,
+        message: isClosedToday ? ATTENDANCE_MESSAGES.ALREADY_PUNCHED_OUT : ATTENDANCE_MESSAGES.NOT_PUNCHED_IN,
+      });
+    }
+
+    const office = await OfficeLocation.findById(latestPunch.officeLocationId).lean();
+    if (office && (await closeIfOverdue(latestPunch, office, now))) {
+      auditPunchOut(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'deadline_passed', date: latestPunch.date });
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: ATTENDANCE_ERROR_CODES.PUNCH_OUT_TOO_LATE,
+        message: ATTENDANCE_MESSAGES.PUNCH_OUT_TOO_LATE,
+      });
+    }
+
+    const distanceMeters = office ? roundMetres(haversineDistanceMetres({ lat, lng }, office.coordinates)) : null;
+    const closedPunch = await closePunch(latestPunch, {
+      checkOutTime: now,
+      source: ATTENDANCE_CHECK_OUT_SOURCES.DEVICE,
+      coordinates: { lat, lng, accuracyMeters },
+      distanceMeters,
+    });
+    if (!closedPunch) {
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_OUT,
+        message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_OUT,
+      });
+    }
+
+    auditPunchOut(req, AUDIT_OUTCOMES.ALLOWED, {
+      employeeId,
+      attendanceId: closedPunch._id.toString(),
+      date: closedPunch.date,
+      workedMinutes: closedPunch.workedMinutes,
+      distanceMeters,
+      accuracyMeters,
+    });
+    return sendSuccess(res, HTTP_STATUS.OK, ATTENDANCE_MESSAGES.PUNCHED_OUT, {
+      attendance: toAttendanceSummary(closedPunch),
     });
   } catch (error) {
     return next(error);

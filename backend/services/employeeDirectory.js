@@ -14,7 +14,9 @@ const toIdString = (id) => id?.toString() ?? null;
  * @returns {Promise<{ employeeId: string, employeeCode: string|null, name: string, email: string|null,
  *   companyEmail: string|null, accountStatus: string, designation: string,
  *   departmentId: string|null, officeLocationId: string|null, reportingManagerId: string|null,
- *   employmentStatus: string }[]>} sorted by name
+ *   employmentStatus: string, workLocationType: string, geofenceRadiusMeters: number|null }[]>}
+ *   sorted by name. geofenceRadiusMeters is the employee's own punch-in radius, null when they use
+ *   their office's.
  */
 export async function listCurrentEmployees() {
   const profiles = await EmployeeProfile.find({
@@ -22,7 +24,8 @@ export async function listCurrentEmployees() {
   })
     .select(
       'userId employeeCode organizationData.designation organizationData.departmentId organizationData.officeLocationId ' +
-        'organizationData.reportingManagerId organizationData.employmentStatus',
+        'organizationData.reportingManagerId organizationData.employmentStatus organizationData.workLocationType ' +
+        '+biometricMetadata.allowedGeofenceRadius',
     )
     .lean();
   const accounts = await User.find({ _id: { $in: profiles.map((profile) => profile.userId) } })
@@ -45,6 +48,8 @@ export async function listCurrentEmployees() {
         officeLocationId: toIdString(organization.officeLocationId),
         reportingManagerId: toIdString(organization.reportingManagerId),
         employmentStatus: organization.employmentStatus,
+        workLocationType: organization.workLocationType,
+        geofenceRadiusMeters: profile.biometricMetadata?.allowedGeofenceRadius ?? null,
       };
     })
     .sort((first, second) => first.name.localeCompare(second.name));

@@ -5,10 +5,10 @@
  * Relationship vectors
  * --------------------
  *   EmployeeProfile.organizationData.officeLocationId ──► OfficeLocation._id  (many-to-one)
- *       The employee's base office. On-site and hybrid employees must punch in within their
- *       geofence radius (EmployeeProfile.biometricMetadata.allowedGeofenceRadius) of
- *       `coordinates`. Remote employees still have a base office, because its `timeZone` and
- *       `workday` define their attendance date and lateness.
+ *       The employee's base office. A punch-in "at the office" must be within the office's
+ *       `geofenceRadiusMeters` of `coordinates`, or the employee's own radius when HR set one
+ *       (EmployeeProfile.biometricMetadata.allowedGeofenceRadius). Remote employees still have a base
+ *       office, because its `timeZone` and `workday` define their attendance date and lateness.
  *   Attendance.officeLocationId ──► OfficeLocation._id   (the office the punch was checked against)
  *
  * Time
@@ -25,6 +25,9 @@
  *   workday.lateGraceMinutes      arriving up to this many minutes after the start is still Normal
  *   workday.halfDayAfterMinutes   arriving more than this many minutes after the start is Half_Day;
  *                                 between the grace period and this, the punch is Late
+ *   workday.autoPunchOutAfterMinutes  a punch-in still open this long after the shift ends is closed
+ *                                 automatically (at the shift end), so a forgotten punch-out does not
+ *                                 leave the day open
  *   workday.weeklyOffRules        the office's days off each week, set by HR. Each rule names a
  *                                 weekday and, optionally, which of its occurrences in the month are
  *                                 off: { weekday: SATURDAY, occurrencesInMonth: [2, 4] } is "2nd and
@@ -34,9 +37,11 @@
 
 import mongoose from 'mongoose';
 import {
+  ATTENDANCE_DEFAULTS,
   ATTENDANCE_FIELD_LIMITS,
   DEPARTMENT_CODE_PATTERN,
   LOCAL_TIME_PATTERN,
+  ORGANIZATION_FIELD_LIMITS,
   WORK_CALENDAR_LIMITS,
 } from '../constants/validation.js';
 import { isNullIsland, isValidLatitude, isValidLongitude } from '../utils/geoDistance.js';
@@ -140,6 +145,20 @@ const officeLocationSchema = new mongoose.Schema(
       required: [true, 'Office time zone is required'],
       validate: { validator: isValidIanaTimeZone, message: 'Time zone "{VALUE}" is not a valid IANA time zone' },
     },
+    // How far from `coordinates` (metres) a punch-in at this office is accepted.
+    geofenceRadiusMeters: {
+      type: Number,
+      default: ATTENDANCE_DEFAULTS.OFFICE_GEOFENCE_RADIUS_METRES,
+      min: [
+        ORGANIZATION_FIELD_LIMITS.GEOFENCE_RADIUS_MIN_METRES,
+        `Punch-in radius must be at least ${ORGANIZATION_FIELD_LIMITS.GEOFENCE_RADIUS_MIN_METRES} m`,
+      ],
+      max: [
+        ORGANIZATION_FIELD_LIMITS.GEOFENCE_RADIUS_MAX_METRES,
+        `Punch-in radius cannot exceed ${ORGANIZATION_FIELD_LIMITS.GEOFENCE_RADIUS_MAX_METRES} m`,
+      ],
+      validate: { validator: Number.isInteger, message: 'Punch-in radius must be a whole number of metres' },
+    },
     workday: {
       shiftStartLocalTime: {
         type: String,
@@ -170,6 +189,19 @@ const officeLocationSchema = new mongoose.Schema(
           `Half-day threshold cannot exceed ${ATTENDANCE_FIELD_LIMITS.HALF_DAY_AFTER_MAX_MINUTES} minutes`,
         ],
         validate: { validator: Number.isInteger, message: 'Half-day threshold must be a whole number of minutes' },
+      },
+      autoPunchOutAfterMinutes: {
+        type: Number,
+        default: ATTENDANCE_DEFAULTS.AUTO_PUNCH_OUT_AFTER_MINUTES,
+        min: [0, 'Automatic punch-out delay cannot be negative'],
+        max: [
+          ATTENDANCE_FIELD_LIMITS.AUTO_PUNCH_OUT_AFTER_MAX_MINUTES,
+          `Automatic punch-out delay cannot exceed ${ATTENDANCE_FIELD_LIMITS.AUTO_PUNCH_OUT_AFTER_MAX_MINUTES} minutes`,
+        ],
+        validate: {
+          validator: Number.isInteger,
+          message: 'Automatic punch-out delay must be a whole number of minutes',
+        },
       },
       weeklyOffRules: {
         type: [weeklyOffRuleSchema],

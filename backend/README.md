@@ -47,7 +47,7 @@ scripts/         operational scripts
 | `/api/auth` | signup, login, logout, current user, password change | public / signed in |
 | `/api/support`, `/api/conversations`, `/api/webhooks` | support desk | customers / staff / signed webhooks |
 | `/api/admin` | users and roles | admin |
-| `/api/attendance` | punch-in, AI regularization, manager reviews | employees / managers / HR |
+| `/api/attendance` | punch-in (office, home or on duty), punch-out, today's board, AI regularization, manager reviews | employees / managers / HR |
 | `/api/payroll` | tax estimates, payslips, public payslip verification | employees / HR |
 | `/api/analytics` | workforce attrition and burnout | HR, admin |
 | `/api/okrs` | objectives, key results, milestones | employees with a profile |

@@ -137,12 +137,25 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   PROFILE_NOT_FOUND: 'No employee profile is linked to your account. Contact HR',
   EMPLOYMENT_ENDED: 'Your employment has ended, so attendance cannot be recorded',
   OFFICE_NOT_CONFIGURED: 'Your base office has not been set up yet. Contact HR before punching in',
-  GEOFENCE_NOT_CONFIGURED: 'Your attendance geofence has not been set up yet. Contact HR before punching in',
   LOCATION_TOO_IMPRECISE:
     'Your location is not precise enough to confirm you are at the office. Turn on GPS / precise location and try again',
   DEVICE_NOT_RECOGNISED: 'This device is not registered for your attendance. Use your registered device or contact HR',
   UNAUTHORIZED_SPATIAL_LOCATION: 'Unauthorized Spatial Location: you are outside the area allowed for punching in',
   ALREADY_PUNCHED_IN: 'You have already punched in today',
+  PUNCHED_OUT: 'Punched out',
+  NOT_PUNCHED_IN: 'You have not punched in, so there is nothing to punch out of',
+  ALREADY_PUNCHED_OUT: 'You have already punched out today',
+  PUNCH_OUT_TOO_LATE:
+    'Your punch-in was closed automatically at the end of the shift, because the punch-out came too late. ' +
+    'Ask your manager if the hours need correcting',
+  TODAY_RETRIEVED: 'Today’s attendance retrieved',
+  TODAY_FORBIDDEN: 'Only HR, administrators and people with a team can see who is working today',
+  TODAY_QUERY_INVALID: 'The date or department asked for is not valid',
+  MY_DAY_RETRIEVED: 'Your attendance today retrieved',
+  WORK_MODE_INVALID: 'workMode must be "office", "home" or "on_duty"',
+  WORK_MODE_NOT_ALLOWED: 'Your work type does not allow punching in this way. Choose another option or contact HR',
+  ON_DUTY_REASON_INVALID: 'Say why you are on duty (where you are working), in 3 to 300 characters',
+  ON_DUTY_REASON_UNEXPECTED: 'onDutyReason is only for on-duty punches',
 });
 
 export const REGULARIZATION_MESSAGES = Object.freeze({
@@ -275,6 +288,7 @@ export const OFFICE_MESSAGES = Object.freeze({
   INPUT_INVALID: 'The office details are invalid',
   RESTRICTED: 'Only HR and administrators can manage offices',
   EMPLOYEE_OFFICE_ASSIGNED: 'Base office updated',
+  EMPLOYEE_GEOFENCE_RADIUS_SET: 'Punch-in radius updated',
   EMPLOYEES_RETRIEVED: 'Employees retrieved',
 });
 
