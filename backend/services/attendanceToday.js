@@ -12,12 +12,10 @@
  *   not_in       a working day without a punch-in yet
  * Half-day leave with a punch-in shows as in/out with the leave alongside.
  *
- * Who appears: HR and administrators see everyone (optionally one department); anyone else sees the
- * people who report to them, and nobody when nobody does (403). Invited people who have not joined
- * yet, and people whose joining date is later, are left out.
+ * Who appears is decided by services/teamRoster.js: HR and administrators see everyone (optionally
+ * one department), team leads their reports, anyone else is refused (403 TODAY_FORBIDDEN).
  */
 
-import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ATTENDANCE_MESSAGES } from '../constants/messages.js';
 import { DAY_KINDS } from '../constants/calendarDays.js';
 import Attendance, {
@@ -25,12 +23,10 @@ import Attendance, {
   ATTENDANCE_STATUSES,
   ATTENDANCE_WORK_MODES,
 } from '../models/Attendance.js';
-import Department from '../models/Department.js';
-import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
+import EmployeeProfile from '../models/EmployeeProfile.js';
 import LeaveDayClaim, { DAY_HALVES } from '../models/LeaveDayClaim.js';
 import LeaveRequest, { LEAVE_REQUEST_STATUSES } from '../models/LeaveRequest.js';
 import OfficeLocation from '../models/OfficeLocation.js';
-import User, { ACCOUNT_STATUSES } from '../models/User.js';
 import {
   allowedWorkModes,
   automaticPunchOut,
@@ -38,9 +34,8 @@ import {
   readOfficeLocalClock,
 } from './attendancePolicy.js';
 import { getCompanySettings } from './companySettings.js';
-import { ServiceError } from './serviceError.js';
+import { loadTeamRoster, localDateOf, resolveTeamScope, toPersonView } from './teamRoster.js';
 import { loadOfficeCalendar } from './workCalendar.js';
-import { isWorkforceAdmin } from './workforceAccess.js';
 import { classifyCalendarDay } from './workingDays.js';
 
 export const TODAY_STATUSES = Object.freeze({
@@ -53,33 +48,11 @@ export const TODAY_STATUSES = Object.freeze({
   NOT_IN: 'not_in',
 });
 
-export const TODAY_SCOPES = Object.freeze({ ORGANISATION: 'organisation', DIRECT_REPORTS: 'direct_reports' });
-
 const LEAVE_HALVES = Object.freeze({ FULL: 'FULL', ...DAY_HALVES });
 
-const toIdString = (id) => id?.toString() ?? null;
 const isoOrNull = (date) => date?.toISOString() ?? null;
 
-/** The profiles the viewer may see, and how they were chosen. */
-async function resolveScope(viewer, departmentId) {
-  const currentEmployees = { 'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED } };
-  if (isWorkforceAdmin(viewer.role)) {
-    return {
-      scope: TODAY_SCOPES.ORGANISATION,
-      filter: departmentId ? { ...currentEmployees, 'organizationData.departmentId': departmentId } : currentEmployees,
-    };
-  }
-  const ownProfile = await EmployeeProfile.findOne({ userId: viewer.id }).select('_id').lean();
-  const hasReports =
-    ownProfile &&
-    (await EmployeeProfile.exists({ ...currentEmployees, 'organizationData.reportingManagerId': ownProfile._id }));
-  if (!hasReports)
-    throw new ServiceError(HTTP_STATUS.FORBIDDEN, 'TODAY_FORBIDDEN', ATTENDANCE_MESSAGES.TODAY_FORBIDDEN);
-  return {
-    scope: TODAY_SCOPES.DIRECT_REPORTS,
-    filter: { ...currentEmployees, 'organizationData.reportingManagerId': ownProfile._id },
-  };
-}
+const TODAY_FORBIDDEN = Object.freeze({ code: 'TODAY_FORBIDDEN', message: ATTENDANCE_MESSAGES.TODAY_FORBIDDEN });
 
 /** Each office's calendar day on `date`, by office id. */
 async function loadOfficeDays(officesById, dateByOfficeId) {
@@ -151,44 +124,20 @@ function toPunchView(punch) {
  *   `date` is the date asked for, or null when each person's own today was used.
  */
 export async function getTodayBoard({ viewer, date = null, departmentId = null, now = new Date() }) {
-  const { scope, filter } = await resolveScope(viewer, departmentId);
-  const profiles = await EmployeeProfile.find({ ...filter, 'organizationData.dateOfJoining': { $lte: now } })
-    .select(
-      'userId employeeCode organizationData.designation organizationData.departmentId organizationData.officeLocationId',
-    )
-    .lean();
-  const accounts = await User.find({
-    _id: { $in: profiles.map((profile) => profile.userId) },
-    status: ACCOUNT_STATUSES.ACTIVE,
-  })
-    .select('name')
-    .lean();
-  const nameByUserId = new Map(accounts.map((account) => [account._id.toString(), account.name]));
-  const people = profiles.filter((profile) => nameByUserId.has(profile.userId.toString()));
+  const { scope, filter } = await resolveTeamScope(viewer, { departmentId, forbidden: TODAY_FORBIDDEN });
+  const { people, officesById, companyTimeZone } = await loadTeamRoster({ filter, now });
 
-  const officeIds = [...new Set(people.map((profile) => toIdString(profile.organizationData.officeLocationId)))];
-  const departmentIds = [...new Set(people.map((profile) => toIdString(profile.organizationData.departmentId)))];
-  const [offices, departments, companySettings] = await Promise.all([
-    OfficeLocation.find({ _id: { $in: officeIds.filter(Boolean) } })
-      .select('name timeZone')
-      .lean(),
-    Department.find({ _id: { $in: departmentIds.filter(Boolean) } })
-      .select('name')
-      .lean(),
-    getCompanySettings(),
-  ]);
-  const officesById = new Map(offices.map((office) => [office._id.toString(), office]));
-  const departmentNameById = new Map(departments.map((department) => [department._id.toString(), department.name]));
-
-  // Each office's today (or the date asked for); people without an office use the company's zone.
+  // Each person's own today (or the date asked for); people without an office use the company's zone.
+  const dateOf = (person) => date ?? localDateOf(person, companyTimeZone, now);
   const dateByOfficeId = new Map(
-    offices.map((office) => [office._id.toString(), date ?? readOfficeLocalClock(now, office.timeZone).calendarDate]),
+    [...officesById.values()].map((office) => [
+      office._id.toString(),
+      date ?? readOfficeLocalClock(now, office.timeZone).calendarDate,
+    ]),
   );
-  const companyDate = date ?? readOfficeLocalClock(now, companySettings.timeZone).calendarDate;
-  const dateOf = (profile) => dateByOfficeId.get(toIdString(profile.organizationData.officeLocationId)) ?? companyDate;
-  const dates = [...new Set([...dateByOfficeId.values(), companyDate])];
+  const dates = [...new Set(people.map(dateOf))];
 
-  const employeeIds = people.map((profile) => profile._id);
+  const employeeIds = people.map((person) => person.employeeId);
   const [punches, leaveByKey, officeDays] = await Promise.all([
     Attendance.find({ employeeId: { $in: employeeIds }, date: { $in: dates } }).lean(),
     loadApprovedLeave(employeeIds, dates),
@@ -196,30 +145,21 @@ export async function getTodayBoard({ viewer, date = null, departmentId = null, 
   ]);
   const punchByKey = new Map(punches.map((punch) => [`${punch.employeeId}|${punch.date}`, punch]));
 
-  const rows = people.map((profile) => {
-    const officeId = toIdString(profile.organizationData.officeLocationId);
-    const office = officesById.get(officeId) ?? null;
-    const personDate = dateOf(profile);
-    const key = `${profile._id}|${personDate}`;
+  const rows = people.map((person) => {
+    const personDate = dateOf(person);
+    const key = `${person.employeeId}|${personDate}`;
     const punch = punchByKey.get(key) ?? null;
     const leaveHalf = leaveByKey.get(key) ?? null;
-    const officeDay = office ? officeDays.get(officeId) : null;
-    const departmentId = toIdString(profile.organizationData.departmentId);
+    const officeDay = person.office ? officeDays.get(person.officeId) : null;
     return {
-      employeeId: profile._id.toString(),
-      employeeCode: profile.employeeCode ?? null,
-      name: nameByUserId.get(profile.userId.toString()),
-      designation: profile.organizationData.designation,
-      department: departmentId ? { id: departmentId, name: departmentNameById.get(departmentId) ?? null } : null,
-      office: office ? { id: officeId, name: office.name } : null,
+      ...toPersonView(person),
       date: personDate,
-      status: statusOf({ punch, leaveHalf, office, officeDay }),
+      status: statusOf({ punch, leaveHalf, office: person.office, officeDay }),
       holidayName: officeDay?.holidayName ?? null,
       leave: leaveHalf ? { half: leaveHalf } : null,
       punch: toPunchView(punch),
     };
   });
-  rows.sort((first, second) => first.name.localeCompare(second.name));
 
   const counts = Object.fromEntries(Object.values(TODAY_STATUSES).map((status) => [status, 0]));
   for (const row of rows) counts[row.status] += 1;
