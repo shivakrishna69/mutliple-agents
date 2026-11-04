@@ -217,7 +217,14 @@ All responses use `{ message, data }` on success and `{ error: { message, code?,
 - Backend validates every event against a strict allowlist (**no message text, tool arguments or outputs**) and emits it to the admin-only Socket.IO room `agent-telemetry`: `AGENT_THINKING_EVENT`, `TOOL_EXECUTION_STARTED`, `TOOL_EXECUTION_COMPLETED`. Clients subscribe with `SUBSCRIBE_AGENT_TELEMETRY`.
 
 ### 7.11 Real-time (Socket.IO)
-Cookie-authenticated handshake with an Origin check. Rooms: `session:<id>`, `user:<id>`, `staff`, `conversation:<id>:staff|customer`, `agent-telemetry`. Server events: `NEW_MESSAGE`, `CONVERSATION_STATUS_UPDATED`, `CONVERSATION_ACCESS_REVOKED`, `SESSION_ENDED`, plus the telemetry events. Heartbeat 25 s / 20 s; sockets end at session expiry; role or password changes disconnect a user's sockets.
+Cookie-authenticated handshake with an Origin check. Rooms: `session:<id>`, `user:<id>`, `staff`, `conversation:<id>:staff|customer`, `agent-telemetry`, `presence:organisation`, `presence:team:<employeeId>`. Server events: `NEW_MESSAGE`, `CONVERSATION_STATUS_UPDATED`, `CONVERSATION_ACCESS_REVOKED`, `SESSION_ENDED`, `PRESENCE_UPDATED`, plus the telemetry events. Heartbeat 25 s / 20 s; sockets end at session expiry; role or password changes disconnect a user's sockets.
+
+### 7.12 Presence (available / away / offline)
+- Set automatically, never by the person. Each open app reports its device's activity over its socket with `PRESENCE_REPORT` { activity: active | idle } when it changes and about once a minute (idle = no keyboard or mouse use for the company's `presence.awayAfterMinutes`, default 5, or a locked screen). Nothing else is reported: no keys, screens, sites or programs.
+- A person is **available** if any device is active, **away** if all are idle, **offline** with no device connected (disconnects are noticed within ~45 s) or after 3 missed reports. Changes are stored as `PresenceInterval`s and published as `PRESENCE_UPDATED` to the person, HR/admins (`SUBSCRIBE_PRESENCE`) and the person's manager.
+- Recorded only while the company has presence on (`PATCH /api/company/settings` { presence: { enabled, awayAfterMinutes, detailRetentionDays (90), summaryRetentionDays (730) } }) and only after the person acknowledged the current notice (`GET /api/presence/me`, `POST /api/presence/notice` { version }).
+- `GET /api/presence/now`: available / away / offline / on leave / off work (punched out, day off or outside the shift). `GET /api/presence/daily?date=`: per person available, away, online and offline-during-shift minutes, first and last seen, punched minutes, and "online without punching in". HR/admins see everyone, managers their reports. `GET /api/presence/me/daily?from=&to=`: one's own days (up to 31).
+- Jobs: stale presence closed every minute; yesterday's totals written to `PresenceDaySummary` and expired detail/totals deleted hourly. Days older than the detail are read from the totals.
 
 ---
 
