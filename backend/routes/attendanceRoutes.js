@@ -3,6 +3,8 @@
  *
  *   POST /punch-in                                       record today's arrival (office punches geofenced)
  *   POST /punch-out                                      close it (forgotten ones close automatically)
+ *   GET  /me/today                                       my day: office, radius, modes I may use, my punch
+ *   GET  /today?date=&departmentId=                      who is working (team leads: their team; HR: everyone)
  *   POST /regularize                                     talk to the attendance regularization agent
  *   GET  /regularization-reviews                         escalated requests to review (managers, HR, admins)
  *   POST /regularization-reviews/:reviewId/decision      approve or reject one
@@ -14,6 +16,7 @@
 
 import { Router } from 'express';
 import { punchIn, punchOut, regularizeAttendance } from '../controllers/attendanceController.js';
+import { getMyToday, getToday } from '../controllers/attendanceTodayController.js';
 import {
   decideRegularizationReview,
   listRegularizationReviews,
@@ -30,6 +33,8 @@ attendanceRouter.use(protect, (req, res, next) => {
 });
 attendanceRouter.post('/punch-in', attendancePunchRateLimitByUser, punchIn);
 attendanceRouter.post('/punch-out', attendancePunchRateLimitByUser, punchOut);
+attendanceRouter.get('/me/today', getMyToday);
+attendanceRouter.get('/today', getToday);
 attendanceRouter.post('/regularize', regularizationRateLimitByUser, regularizeAttendance);
 attendanceRouter.get('/regularization-reviews', listRegularizationReviews);
 attendanceRouter.post('/regularization-reviews/:reviewId/decision', decideRegularizationReview);

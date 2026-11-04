@@ -148,6 +148,10 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   PUNCH_OUT_TOO_LATE:
     'Your punch-in was closed automatically at the end of the shift, because the punch-out came too late. ' +
     'Ask your manager if the hours need correcting',
+  TODAY_RETRIEVED: 'Today’s attendance retrieved',
+  TODAY_FORBIDDEN: 'Only HR, administrators and people with a team can see who is working today',
+  TODAY_QUERY_INVALID: 'The date or department asked for is not valid',
+  MY_DAY_RETRIEVED: 'Your attendance today retrieved',
   WORK_MODE_INVALID: 'workMode must be "office", "home" or "on_duty"',
   WORK_MODE_NOT_ALLOWED: 'Your work type does not allow punching in this way. Choose another option or contact HR',
   ON_DUTY_REASON_INVALID: 'Say why you are on duty (where you are working), in 3 to 300 characters',
