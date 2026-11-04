@@ -48,6 +48,7 @@ import employeeRoutes from './routes/employeeRoutes.js';
 import leaveRoutes from './routes/leaveRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import departmentRoutes from './routes/departmentRoutes.js';
+import presenceRoutes from './routes/presenceRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
@@ -55,6 +56,7 @@ import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/em
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { startAttendanceScheduler, stopAttendanceScheduler } from './services/attendanceScheduler.js';
+import { startPresenceJobs, stopPresenceJobs } from './services/presenceJobs.js';
 import { ensureBootstrapAdmin } from './services/bootstrapAdmin.js';
 import { DEFAULT_COMPANY_NAME, ensureCompanySettings } from './services/companySettings.js';
 import { runStartupMigrations } from './migrations/index.js';
@@ -154,6 +156,8 @@ export function createApp(config) {
   app.use('/api/company', companyRoutes);
   // Departments: HR adds, changes, deactivates and removes them.
   app.use('/api/departments', departmentRoutes);
+  // Presence: my setup and the notice; who is available, away or offline; daily activity.
+  app.use('/api/presence', presenceRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -236,6 +240,8 @@ async function start() {
     startLeaveScheduler();
     // Forgotten punch-outs, closed after the shift; now and every 15 minutes (idempotent).
     startAttendanceScheduler();
+    // Presence: stale presence every minute; daily totals and retention hourly (idempotent).
+    startPresenceJobs();
     // Employee imports: BullMQ on Redis when REDIS_URL is set, in this process otherwise.
     initEmployeeImportQueue(config);
   });
@@ -259,6 +265,7 @@ async function start() {
     try {
       stopLeaveScheduler();
       stopAttendanceScheduler();
+      stopPresenceJobs();
       await closeEmployeeImportQueue();
       await closeSocketServer();
       await closeCacheStore();

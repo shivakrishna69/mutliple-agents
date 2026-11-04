@@ -118,6 +118,12 @@ const userSchema = new mongoose.Schema(
     companyEmail: emailField(),
     // False until the person has filled in the details they keep themselves (photo, contact...).
     profileCompleted: { type: Boolean, default: false },
+    // Which version of the presence notice (constants/validation.js PRESENCE_NOTICE_VERSION) the
+    // person acknowledged, and when. Their activity is recorded only once the current one is.
+    presenceNotice: {
+      version: { type: Number, default: null },
+      acknowledgedAt: { type: Date, default: null },
+    },
   },
   {
     // Adds createdAt and updatedAt, maintained by Mongoose on save and update queries.

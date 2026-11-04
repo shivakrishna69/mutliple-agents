@@ -158,6 +158,18 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   ON_DUTY_REASON_UNEXPECTED: 'onDutyReason is only for on-duty punches',
 });
 
+export const PRESENCE_MESSAGES = Object.freeze({
+  SETUP_RETRIEVED: 'Presence settings retrieved',
+  NOTICE_ACKNOWLEDGED: 'Thank you. Your activity status is now shown to your team',
+  NOTICE_OUTDATED: 'The notice has changed since this page was opened. Reload it to read the current one',
+  NOTICE_VERSION_INVALID: 'version must be the notice version you read',
+  FORBIDDEN: 'Only HR, administrators and people with a team can see their activity',
+  QUERY_INVALID: 'The date or department asked for is not valid',
+  NOW_RETRIEVED: 'Presence retrieved',
+  DAILY_RETRIEVED: 'Daily activity retrieved',
+  PROFILE_NOT_FOUND: 'No employee profile is linked to your account, so there are no working days to show',
+});
+
 export const REGULARIZATION_MESSAGES = Object.freeze({
   AGENT_REPLIED: 'Regularization request processed',
   REGULARIZATION_RECORDED: 'Attendance regularized',
@@ -458,6 +470,8 @@ export const SOCKET_MESSAGES = Object.freeze({
   ACCESS_REVOKED: 'You no longer have access to this conversation',
   SESSION_ENDED: 'Your session has ended. Please sign in again',
   TELEMETRY_FORBIDDEN: 'Agent telemetry is available to administrators only',
+  PRESENCE_NOT_RECORDED: 'Your activity is not recorded: acknowledge the notice first, or presence is switched off',
+  PRESENCE_FORBIDDEN: 'Only HR, administrators and people with a team can follow presence',
   SERVER_ERROR: 'Something went wrong. Please try again',
 });
 

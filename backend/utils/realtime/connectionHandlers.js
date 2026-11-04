@@ -1,6 +1,7 @@
 /**
  * Per-connection behaviour: the registry of active connections, joining and leaving
- * conversation rooms, the agent telemetry subscription, per-socket limits and session expiry.
+ * conversation rooms, the agent telemetry subscription, presence (./presenceHandlers.js),
+ * per-socket limits and session expiry.
  */
 
 import Conversation from '../../models/Conversation.js';
@@ -10,6 +11,8 @@ import { SOCKET_MESSAGES } from '../../constants/messages.js';
 import { canUserAccessConversation, isStaffRole } from '../../services/conversationAccess.js';
 import { logger } from '../logger.js';
 import { toCustomerConversationStatusPayload, toStaffConversationStatusPayload } from '../realtimePayloads.js';
+import { consumeEventBudget, createEventWindow } from './eventBudget.js';
+import { registerPresenceHandlers } from './presenceHandlers.js';
 import {
   CONVERSATION_ROOM_PREFIX,
   MAX_TIMER_DELAY_MS,
@@ -56,14 +59,10 @@ function extractConversationId(eventPayload) {
 
 /** Fixed-window limit on join/leave events per socket. Returns false when the budget is spent. */
 function consumeRoomEventBudget(connectionRecord) {
-  const currentTimeMs = Date.now();
-  const { roomEventWindow } = connectionRecord;
-  if (currentTimeMs - roomEventWindow.windowStartedAtMs >= SOCKET_SERVER_SETTINGS.ROOM_EVENT_WINDOW_MS) {
-    roomEventWindow.windowStartedAtMs = currentTimeMs;
-    roomEventWindow.eventCount = 0;
-  }
-  roomEventWindow.eventCount += 1;
-  return roomEventWindow.eventCount <= SOCKET_SERVER_SETTINGS.ROOM_EVENTS_PER_WINDOW;
+  return consumeEventBudget(connectionRecord.roomEventWindow, {
+    windowMs: SOCKET_SERVER_SETTINGS.ROOM_EVENT_WINDOW_MS,
+    limit: SOCKET_SERVER_SETTINGS.ROOM_EVENTS_PER_WINDOW,
+  });
 }
 
 /** Tells the client why, then disconnects it. Used for session expiry and logout. */
@@ -245,7 +244,7 @@ export function handleSocketConnection(socket) {
     transport: socket.conn.transport.name,
     connectedAtMs: Date.now(),
     lastHeartbeatAtMs: Date.now(),
-    roomEventWindow: { eventCount: 0, windowStartedAtMs: Date.now() },
+    roomEventWindow: createEventWindow(),
     sessionExpiryTimer: null,
   };
   activeClientConnections.set(socket.id, connectionRecord);
@@ -275,6 +274,7 @@ export function handleSocketConnection(socket) {
   scheduleSessionExpiry(socket, connectionRecord, session.expiresAtMs);
   registerConversationHandlers(socket, connectionRecord);
   registerAgentTelemetryHandlers(socket, connectionRecord);
+  registerPresenceHandlers(socket, connectionRecord);
 
   socket.on('error', (socketError) => {
     logger.error('Socket error', {

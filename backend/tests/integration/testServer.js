@@ -102,8 +102,9 @@ async function waitUntilHealthy(baseUrl, serverProcess, readOutput) {
  *   A fixed port and the browser origin to allow (the frontend's browser tests need both to be known
  *   in advance); by default a free port and TEST_APP_ORIGIN. `seedBeforeStart` writes data before the
  *   server starts, so its startup migrations see that data.
- * @returns {Promise<{ baseUrl: string, database: mongoose.Connection, internalApiKey: string,
- *   createClient: () => TestClient, stop: () => Promise<void> }>}
+ * @returns {Promise<{ baseUrl: string, database: mongoose.Connection, mongoUri: string, internalApiKey: string,
+ *   createClient: () => TestClient, stop: () => Promise<void> }>}  `mongoUri` lets a test run a
+ *   service in its own process against the same database (background jobs, for instance).
  */
 export async function startTestServer({
   port: requestedPort,
@@ -159,7 +160,7 @@ export async function startTestServer({
     throw startupError;
   }
 
-  return { baseUrl, database, internalApiKey, createClient: () => new TestClient(baseUrl), stop };
+  return { baseUrl, database, mongoUri, internalApiKey, createClient: () => new TestClient(baseUrl), stop };
 }
 
 /** A browser-like client: stores cookies from Set-Cookie and sends the CSRF token on writes. */
