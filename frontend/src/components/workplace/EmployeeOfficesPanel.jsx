@@ -36,11 +36,17 @@ function EmployeeOfficeRow({ employee, offices, onAssigned }) {
     <li className="px-5 py-3 sm:px-6">
       <div className="flex flex-wrap items-center gap-4">
         <div className="min-w-48 flex-1">
-          <p className="text-sm font-semibold text-slate-900">{employee.name}</p>
+          <p className="text-sm font-semibold text-slate-900">
+            {employee.name}
+            {employee.employeeCode && (
+              <span className="ml-2 font-mono text-xs font-normal text-slate-500">{employee.employeeCode}</span>
+            )}
+          </p>
           <p className="truncate text-xs text-slate-500">
-            {employee.designation} · {employee.email}
+            {employee.designation} · {employee.companyEmail ?? employee.email}
           </p>
         </div>
+        {employee.accountStatus === 'invited' && <Badge tone="sky">Invited</Badge>}
         {!employee.officeLocationId && <Badge tone="amber">No office</Badge>}
         <div className="flex items-center gap-2">
           {isSaving && <Spinner className="h-4 w-4 text-brand-500" />}
@@ -79,7 +85,9 @@ export default function EmployeeOfficesPanel() {
   const query = searchText.trim().toLowerCase();
   const visibleEmployees = query
     ? employees.filter((employee) =>
-        [employee.name, employee.email, employee.designation].some((value) => value?.toLowerCase().includes(query)),
+        [employee.name, employee.employeeCode, employee.email, employee.companyEmail, employee.designation].some(
+          (value) => value?.toLowerCase().includes(query),
+        ),
       )
     : employees;
 
@@ -110,7 +118,7 @@ export default function EmployeeOfficesPanel() {
             type="search"
             value={searchText}
             onChange={(changeEvent) => setSearchText(changeEvent.target.value)}
-            placeholder="Search by name or email"
+            placeholder="Search by name, ID or email"
             className="rounded-xl border-0 py-2 pr-3 pl-9 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-brand-500"
           />
         </label>

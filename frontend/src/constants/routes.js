@@ -17,6 +17,8 @@ export const ROUTE_PATHS = Object.freeze({
   ANALYTICS: '/analytics',
   // Organisation directory, staff only (the backend restricts /api/org to admins and agents).
   ORGANISATION: '/organisation',
+  // Company name, employee ID format and email domain, admins only.
+  COMPANY: '/admin/company',
   // Live agent telemetry console, admins only.
   AGENT_TELEMETRY: '/admin/telemetry',
   // Public payslip verification (no sign-in).

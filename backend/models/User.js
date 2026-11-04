@@ -43,6 +43,23 @@ export const ROLES = Object.freeze({
  */
 export const BCRYPT_SALT_ROUNDS = 12;
 
+/**
+ * Account lifecycle:
+ *   invited   created by HR or a bulk import, no password yet; cannot sign in
+ *   active    the person chose a password through their activation link (or signed up)
+ *   disabled  the invitation was revoked or the account switched off; cannot sign in
+ */
+export const ACCOUNT_STATUSES = Object.freeze({ INVITED: 'invited', ACTIVE: 'active', DISABLED: 'disabled' });
+
+const emailField = () => ({
+  type: String,
+  lowercase: true,
+  trim: true,
+  default: null,
+  maxlength: USER_FIELD_LIMITS.EMAIL_MAX_LENGTH,
+  validate: { validator: (email) => email === null || EMAIL_PATTERN.test(email), message: 'Email is not valid' },
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -64,7 +81,13 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      // An invited account has none until the person opens their activation link and chooses one.
+      required: [
+        function passwordIsRequired() {
+          return this.status !== ACCOUNT_STATUSES.INVITED;
+        },
+        'Password is required',
+      ],
       // Length is validated on the plaintext: Mongoose runs validation before the pre('save') hash.
       // The 72-byte upper bound is enforced by the request validator, which can measure bytes.
       minlength: [USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH, 'Password is too short'],
@@ -82,6 +105,19 @@ const userSchema = new mongoose.Schema(
       default: ROLES.CUSTOMER,
       required: true,
     },
+    // Only active accounts can sign in (controllers/authController.js) or keep a session.
+    status: {
+      type: String,
+      enum: { values: Object.values(ACCOUNT_STATUSES), message: 'Account status "{VALUE}" is not valid' },
+      default: ACCOUNT_STATUSES.ACTIVE,
+      required: true,
+    },
+    // Where invitations go: the person's own address. The sign-in email starts as the same address.
+    personalEmail: emailField(),
+    // The address at the company's mail domain, once there is one (services/companyEmail.js).
+    companyEmail: emailField(),
+    // False until the person has filled in the details they keep themselves (photo, contact...).
+    profileCompleted: { type: Boolean, default: false },
   },
   {
     // Adds createdAt and updatedAt, maintained by Mongoose on save and update queries.
@@ -99,6 +135,8 @@ const userSchema = new mongoose.Schema(
 // `unique: true` on email creates the unique index used by login lookups.
 // This index serves the admin screen that lists users filtered by role, newest first.
 userSchema.index({ role: 1, createdAt: -1 });
+// One account per company address. Partial: most accounts have none (yet).
+userSchema.index({ companyEmail: 1 }, { unique: true, partialFilterExpression: { companyEmail: { $type: 'string' } } });
 
 /**
  * Hashes the password before it is written. The `isModified` check prevents re-hashing

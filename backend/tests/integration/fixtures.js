@@ -36,6 +36,8 @@ export async function insertDepartment(database, { name = 'Operations', code = '
   const { insertedId } = await database.collection('departments').insertOne({
     name,
     code,
+    slug: code.toLowerCase(),
+    isActive: true,
     budgetCode,
     departmentHeadId: null,
     parentDepartmentId: null,

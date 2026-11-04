@@ -24,6 +24,7 @@ const PAGES_BY_ROLE = {
     '/leave/admin',
     '/admin/users',
     '/admin/telemetry',
+    '/admin/company',
     '/account',
   ],
   hr: [

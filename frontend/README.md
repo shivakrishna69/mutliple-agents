@@ -42,14 +42,14 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | File | Covers |
 |---|---|
 | `e2e/auth.spec.js` | Sign-up, sign-out (and the session ending on the server), wrong password, redirect to sign-in |
-| `e2e/roles.spec.js` | What admin, HR and customers see; admin-only addresses redirect customers |
-| `e2e/onboarding.spec.js` | HR invites a joiner, who activates the account from the link; the link works once |
+| `e2e/roles.spec.js` | What admin, HR and customers see; the admin changes the employee ID format and email domain; admin-only addresses redirect customers |
+| `e2e/onboarding.spec.js` | HR invites a joiner (who gets an employee ID), who activates the account from the link; the link works once; HR imports a CSV with a new department, a manager, their report and a bad row, starts it, sees every row's outcome and downloads the results |
 | `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
 | `e2e/pages.spec.js` | Every page of every role loads with no uncaught errors or 5xx responses; public payslip check |
 | `e2e/leaveApprovalSteps.spec.js` | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved |
 | `e2e/leaveAssistant.spec.js` | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message |
 | `e2e/leaveRequests.spec.js` | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave |
-| `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
+| `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds a department, deactivates and reactivates it; adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
 
 On failure, `playwright-report/` and `test-results/` hold screenshots and traces
 (`npx playwright show-trace <trace.zip>`); CI uploads them as an artifact.
@@ -61,11 +61,12 @@ src/App.jsx           route table (workforce pages are lazy-loaded)
 src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors
 src/auth/             AuthContext: session state and CSRF token
 src/components/       AppShell (role-aware sidebar), RouteGuards, ui.jsx design primitives, feature panels
-                      (workplace/: offices, holidays, base offices; leave/: my leave, calendar, approvals and
-                      leave administration, the tabs of pages/LeaveCenter.jsx)
+                      (workplace/: departments, offices, holidays, base offices; people/: the CSV import;
+                      leave/: my leave, calendar, approvals and leave administration, the tabs of
+                      pages/LeaveCenter.jsx)
 src/hooks/            useApiResource (load/abort/error), useSocket, useAgentTelemetry
 src/pages/            one file per screen
-src/constants/        routes and roles, messages, socket event names, workplace and leave labels
+src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels
 src/utils/            dates in the browser's time zone, CSV downloads
 public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
 src/validation/       client-side form checks (the backend validates again)

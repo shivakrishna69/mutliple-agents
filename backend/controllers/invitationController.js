@@ -12,6 +12,7 @@
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { PEOPLE_MESSAGES } from '../constants/messages.js';
+import { loadEmailContext } from '../services/companySettings.js';
 import { InvitationError, acceptInvitation, previewInvitation } from '../services/invitationService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
@@ -28,7 +29,7 @@ function handleInvitationError(req, res, error, action) {
 
 export async function getInvitationPreview(req, res, next) {
   try {
-    const invitation = await previewInvitation(req.params.token, { companyName: req.app.locals.config.companyName });
+    const invitation = await previewInvitation(req.params.token, await loadEmailContext(req.app.locals.config));
     return sendSuccess(res, HTTP_STATUS.OK, PEOPLE_MESSAGES.INVITATION_RETRIEVED, { invitation });
   } catch (error) {
     if (error instanceof InvitationError) return handleInvitationError(req, res, error, 'view_invitation');

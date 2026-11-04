@@ -12,6 +12,7 @@ import EmployeeProfile from '../models/EmployeeProfile.js';
 import User from '../models/User.js';
 import { escapeHtml } from '../utils/html.js';
 import { logger } from '../utils/logger.js';
+import { getCompanySettings } from './companySettings.js';
 import { renderEmailLayout } from './emailLayout.js';
 import { sendMail } from './mailService.js';
 
@@ -163,11 +164,12 @@ async function safely(task) {
 /**
  * Tells the approver a request (or change request) is waiting.
  * @param {object} request  a request summary (services/leaveRequests.js)
- * @param {{ companyName: string, appPublicUrl: string }} appContext
+ * @param {{ appPublicUrl: string }} appContext
  */
 export function notifyApproverOfRequest(request, appContext) {
   return safely(async () => {
     const approver = await contactOfEmployee(request.approverEmployeeId);
+    const { name: companyName } = await getCompanySettings();
     await deliver(
       (recipient) =>
         buildApprovalNeededEmail({
@@ -180,7 +182,7 @@ export function notifyApproverOfRequest(request, appContext) {
           reason: request.pendingChange?.reason ?? request.reason,
           changeKind: request.pendingChange?.kind ?? null,
           newEndDate: request.pendingChange?.newEndDate ?? null,
-          companyName: appContext.companyName,
+          companyName,
           reviewUrl: `${appContext.appPublicUrl}${LEAVE_APP_PATHS.APPROVALS}`,
         }),
       approver,
@@ -192,11 +194,12 @@ export function notifyApproverOfRequest(request, appContext) {
  * Tells the employee their request (or change request) was decided.
  * @param {object} request  the request summary after the decision
  * @param {{ isApproved: boolean, isChange: boolean, deciderName: string, note: string|null }} decision
- * @param {{ companyName: string, appPublicUrl: string }} appContext
+ * @param {{ appPublicUrl: string }} appContext
  */
 export function notifyEmployeeOfDecision(request, { isApproved, isChange, deciderName, note }, appContext) {
   return safely(async () => {
     const employee = await contactOfEmployee(request.employee.id);
+    const { name: companyName } = await getCompanySettings();
     await deliver(
       (recipient) =>
         buildDecisionEmail({
@@ -209,7 +212,7 @@ export function notifyEmployeeOfDecision(request, { isApproved, isChange, decide
           isChange,
           deciderName,
           note,
-          companyName: appContext.companyName,
+          companyName,
           viewUrl: `${appContext.appPublicUrl}${LEAVE_APP_PATHS.MY_LEAVE}`,
         }),
       employee,

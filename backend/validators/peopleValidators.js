@@ -41,6 +41,10 @@ export function validateInvitationInput(requestBody) {
   const email = readTrimmedString(body.email).toLowerCase();
   if (!EMAIL_PATTERN.test(email) || email.length > 254)
     validationErrors.push({ field: 'email', message: 'must be a valid email address' });
+  // Optional: without it, an address in the company's mail domain is suggested (services/companyEmail.js).
+  const companyEmail = readTrimmedString(body.companyEmail).toLowerCase() || null;
+  if (companyEmail !== null && (!EMAIL_PATTERN.test(companyEmail) || companyEmail.length > 254))
+    validationErrors.push({ field: 'companyEmail', message: 'must be a valid email address, or left out' });
   if (!INVITABLE_ROLES.includes(body.role))
     validationErrors.push({ field: 'role', message: `must be one of ${INVITABLE_ROLES.join(', ')}` });
 
@@ -79,6 +83,7 @@ export function validateInvitationInput(requestBody) {
     sanitizedInput: {
       name,
       email,
+      companyEmail,
       role: body.role,
       profileDraft: {
         designation,

@@ -133,6 +133,17 @@ const employeeProfileSchema = new mongoose.Schema(
       immutable: true,
     },
 
+    // The company's ID for the person (NSK0042): issued once by services/companySettings.js, never
+    // changed and never reused. Profiles from before IDs existed get one from a startup migration.
+    employeeCode: {
+      type: String,
+      required: [true, 'Employee ID is required'],
+      trim: true,
+      uppercase: true,
+      immutable: true,
+      maxlength: LIMITS.EMPLOYEE_CODE_MAX_LENGTH,
+    },
+
     organizationData: {
       designation: {
         type: String,
@@ -260,6 +271,13 @@ const employeeProfileSchema = new mongoose.Schema(
 // ---------------------------------------------------------------------------
 
 // `unique: true` on userId creates the "profile for this account" index.
+
+// One profile per employee ID. Partial, so profiles from before IDs existed do not clash while the
+// startup migration (migrations/addEmployeeCodes.js) numbers them.
+employeeProfileSchema.index(
+  { employeeCode: 1 },
+  { unique: true, partialFilterExpression: { employeeCode: { $type: 'string' } } },
+);
 
 // Department roster by status, ordered by manager (see "Graph traversal patterns" above).
 employeeProfileSchema.index({

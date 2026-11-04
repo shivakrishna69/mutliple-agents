@@ -16,8 +16,9 @@
  *   /analytics    -> AdvancedAnalyticsHub every role (risk tab for HR/admin, OKRs, vault)
  *   /organisation -> OrgDirectory     staff (admin or agent)
  *   /admin/telemetry -> AgentTelemetry admins
- *   /people/onboarding -> PeopleOnboarding HR and admins (invite new joiners)
- *   /workplace    -> WorkplaceSetup   HR and admins (offices, holidays, employees' base offices)
+ *   /admin/company -> CompanySettings admins (name, employee ID format, email domain)
+ *   /people/onboarding -> PeopleOnboarding HR and admins (invite new joiners, import a CSV)
+ *   /workplace    -> WorkplaceSetup   HR and admins (departments, offices, holidays, base offices)
  *   /leave        -> LeaveCenter      every role: My leave (index), /leave/calendar, /leave/approvals,
  *                                     and /leave/admin for HR and admins (policies, balances, payroll)
  *
@@ -57,6 +58,7 @@ import { LoadingBlock } from './components/ui.jsx';
 const AdvancedAnalyticsHub = lazy(() => import('./pages/AdvancedAnalyticsHub.jsx'));
 const AgentTelemetry = lazy(() => import('./pages/AgentTelemetry.jsx'));
 const AttendanceCenter = lazy(() => import('./pages/AttendanceCenter.jsx'));
+const CompanySettings = lazy(() => import('./pages/CompanySettings.jsx'));
 const OrgDirectory = lazy(() => import('./pages/OrgDirectory.jsx'));
 const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
@@ -115,6 +117,7 @@ export default function App() {
             <Route element={<AdminRoute />}>
               <Route path={ROUTE_PATHS.ADMIN_USERS} element={<AdminUsers />} />
               <Route path={ROUTE_PATHS.AGENT_TELEMETRY} element={<AgentTelemetry />} />
+              <Route path={ROUTE_PATHS.COMPANY} element={<CompanySettings />} />
             </Route>
           </Route>
         </Route>

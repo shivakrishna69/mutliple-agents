@@ -94,6 +94,12 @@ const NAVIGATION_SECTIONS = Object.freeze([
     sectionTitle: 'Administration',
     items: [
       {
+        label: 'Company',
+        path: ROUTE_PATHS.COMPANY,
+        Icon: BuildingIcon,
+        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+      },
+      {
         label: 'Users & roles',
         path: ROUTE_PATHS.ADMIN_USERS,
         Icon: UsersIcon,

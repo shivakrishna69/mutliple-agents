@@ -1,6 +1,9 @@
 /**
- * Employee onboarding endpoints (backend routes/peopleRoutes.js and routes/invitationRoutes.js).
+ * Employee onboarding endpoints (backend routes/peopleRoutes.js, routes/invitationRoutes.js and the
+ * bulk import in routes/employeeRoutes.js).
  *   HR/admin (session): invitation form options, list, create, resend, revoke
+ *   HR/admin (session): employee CSV import: upload (checked, nothing created), list, follow, start,
+ *                       results (every row's outcome, with links that could not be emailed)
  *   Public (token):     preview an invitation, accept it (creates the account and signs in)
  */
 
@@ -27,6 +30,25 @@ export const requestInvitationResend = (invitationId, csrfToken) =>
   postData(`/api/people/invitations/${encode(invitationId)}/resend`, {}, csrfToken);
 export const requestInvitationRevoke = (invitationId, csrfToken) =>
   postData(`/api/people/invitations/${encode(invitationId)}/revoke`, {}, csrfToken);
+
+export async function requestEmployeeImportUpload(file, csrfToken) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const { responseData } = await sendApiRequest({
+    method: 'POST',
+    endpointPath: '/api/employees/bulk-upload',
+    formData,
+    csrfToken,
+  });
+  return responseData;
+}
+export const requestEmployeeImports = (callerSignal) => getData('/api/employees/bulk-upload', callerSignal);
+export const requestEmployeeImport = (importJobId, callerSignal) =>
+  getData(`/api/employees/bulk-upload/${encode(importJobId)}`, callerSignal);
+export const requestEmployeeImportStart = (importJobId, csrfToken) =>
+  postData(`/api/employees/bulk-upload/${encode(importJobId)}/confirm`, {}, csrfToken);
+export const requestEmployeeImportResults = (importJobId, callerSignal) =>
+  getData(`/api/employees/bulk-upload/${encode(importJobId)}/results`, callerSignal);
 
 export const requestInvitationPreview = (token, callerSignal) =>
   getData(`/api/invitations/${encode(token)}`, callerSignal);

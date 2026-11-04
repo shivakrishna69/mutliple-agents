@@ -1,9 +1,12 @@
 /**
- * Onboarding (HR and admins): invite people by email and track their invitations.
+ * Onboarding (HR and admins): invite people one by one or import them from a CSV, and track their
+ * invitations.
  *
- *   Invite form    name, email, role, job title, department, manager, work mode, joining date,
- *                  employment status -> POST /api/people/invitations. The person receives an email
- *                  with a one-time link (valid for the configured number of days).
+ *   Invite form    name, personal email, optional company email, role, job title, department,
+ *                  manager, work mode, joining date, employment status -> POST /api/people/invitations.
+ *                  The person gets an employee ID at once, and an email with a one-time link (valid
+ *                  for the configured number of days).
+ *   Import         many people from a CSV (components/people/EmployeeImportPanel.jsx).
  *   Invitations    list with status filter (pending / expired / accepted / revoked) and actions:
  *                  resend (new link, old one stops working) and revoke.
  *
@@ -21,8 +24,9 @@ import {
   requestInvitations,
 } from '../api/peopleApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { CheckBadgeIcon, ClockIcon, PlusIcon, UsersIcon } from '../components/Icons.jsx';
+import { CheckBadgeIcon, ClockIcon, DocumentIcon, PlusIcon, UserPlusIcon, UsersIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import EmployeeImportPanel from '../components/people/EmployeeImportPanel.jsx';
 import {
   Badge,
   Button,
@@ -101,6 +105,7 @@ function InviteForm({ options, onInvited, onCancel }) {
   const [form, setForm] = useState({
     name: '',
     email: '',
+    companyEmail: '',
     role: options.roles[0] ?? 'customer',
     designation: '',
     departmentId: options.departments[0]?.id ?? '',
@@ -134,7 +139,11 @@ function InviteForm({ options, onInvited, onCancel }) {
     setFormError(null);
     try {
       const result = await requestInvitationCreation(
-        { ...form, reportingManagerId: form.reportingManagerId || null },
+        {
+          ...form,
+          companyEmail: form.companyEmail.trim() || undefined,
+          reportingManagerId: form.reportingManagerId || null,
+        },
         csrfToken,
       );
       onInvited(result);
@@ -148,7 +157,8 @@ function InviteForm({ options, onInvited, onCancel }) {
   if (options.departments.length === 0) {
     return (
       <Notice tone="warning" title="Create a department first">
-        Invitations place people in a department; none exist yet.
+        Invitations place people in a department; none exist yet. Add one under Workplace → Departments, or import a
+        CSV, which creates its departments.
       </Notice>
     );
   }
@@ -171,13 +181,23 @@ function InviteForm({ options, onInvited, onCancel }) {
               required
             />
             <TextInput
-              label="Work email"
+              label="Personal email"
               type="email"
               value={form.email}
               onChange={update('email')}
               error={fieldErrors.email}
-              placeholder="ananya@company.com"
+              placeholder="ananya@gmail.com"
+              hint="The invitation goes here; they sign in with it"
               required
+            />
+            <TextInput
+              label="Company email"
+              type="email"
+              value={form.companyEmail}
+              onChange={update('companyEmail')}
+              error={fieldErrors.companyEmail}
+              placeholder="ananya.gupta@company.com"
+              hint="Optional: leave blank to use first.last@ your company domain"
             />
             <SelectInput
               label="Access"
@@ -290,7 +310,11 @@ function InvitationRow({ invitation, onChanged, onLinkIssued }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-slate-900">
-            {invitation.name} <span className="font-normal text-slate-500">· {invitation.email}</span>
+            {invitation.name}
+            {invitation.employeeCode && (
+              <span className="ml-2 font-mono text-xs font-normal text-slate-500">{invitation.employeeCode}</span>
+            )}{' '}
+            <span className="font-normal text-slate-500">· {invitation.email}</span>
           </p>
           <p className="text-xs text-slate-500">
             {invitation.designation} · {invitation.department.name ?? '—'}
@@ -344,6 +368,11 @@ function InvitationRow({ invitation, onChanged, onLinkIssued }) {
   );
 }
 
+const ONBOARDING_VIEWS = Object.freeze([
+  { id: 'invitations', label: 'Invitations', Icon: UserPlusIcon },
+  { id: 'import', label: 'Import from CSV', Icon: DocumentIcon },
+]);
+
 const STATUS_TABS = [
   { id: 'all', label: 'All' },
   { id: 'pending', label: 'Pending' },
@@ -353,6 +382,7 @@ const STATUS_TABS = [
 ];
 
 export default function PeopleOnboarding() {
+  const [view, setView] = useState(ONBOARDING_VIEWS[0].id);
   const [isComposing, setIsComposing] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [lastResult, setLastResult] = useState(null);
@@ -376,8 +406,9 @@ export default function PeopleOnboarding() {
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-8">
       <PageHeader
         title="Onboarding"
-        description="Invite new joiners by email. They set their own password and land straight in their workspace."
+        description="Invite new joiners one by one or from a CSV. Each gets an employee ID and sets their own password."
         actions={
+          view === 'invitations' &&
           !isComposing && (
             <Button
               onClick={() => {
@@ -415,66 +446,73 @@ export default function PeopleOnboarding() {
         />
       </div>
 
-      {lastResult && <InviteLinkNotice result={lastResult} onDismiss={() => setLastResult(null)} />}
-      {optionsResource.error && <Notice tone="error" title={optionsResource.error.message} />}
-      {isComposing && optionsResource.data && (
-        <InviteForm
-          options={optionsResource.data}
-          onCancel={() => setIsComposing(false)}
-          onInvited={(result) => {
-            setIsComposing(false);
-            handleLinkIssued(result);
-          }}
-        />
-      )}
+      <Tabs tabs={ONBOARDING_VIEWS} activeTabId={view} onChange={setView} label="Onboarding sections" />
 
-      <Card
-        title="Invitations"
-        bodyClassName="p-0"
-        actions={
-          <Tabs
-            tabs={STATUS_TABS.map((tab) => ({
-              ...tab,
-              badge: tab.id === 'all' ? null : countByStatus[tab.id] || null,
-            }))}
-            activeTabId={statusFilter}
-            onChange={setStatusFilter}
-            label="Invitation status"
-          />
-        }
-      >
-        {allInvitationsResource.isLoading && !allInvitationsResource.data && (
-          <LoadingBlock label="Loading invitations…" />
-        )}
-        {allInvitationsResource.error && (
-          <div className="p-6">
-            <Notice tone="error" title={allInvitationsResource.error.message} />
-          </div>
-        )}
-        {allInvitationsResource.data && visibleInvitations.length === 0 && (
-          <div className="p-6">
-            <EmptyState
-              Icon={UsersIcon}
-              title={
-                statusFilter === 'all'
-                  ? 'No invitations yet'
-                  : `No ${STATUS_DISPLAY[statusFilter].label.toLowerCase()} invitations`
-              }
-              description="Invite your first team member with the button above."
+      {view === 'import' && <EmployeeImportPanel onImported={() => handleLinkIssued(null)} />}
+      {view === 'invitations' && (
+        <>
+          {lastResult && <InviteLinkNotice result={lastResult} onDismiss={() => setLastResult(null)} />}
+          {optionsResource.error && <Notice tone="error" title={optionsResource.error.message} />}
+          {isComposing && optionsResource.data && (
+            <InviteForm
+              options={optionsResource.data}
+              onCancel={() => setIsComposing(false)}
+              onInvited={(result) => {
+                setIsComposing(false);
+                handleLinkIssued(result);
+              }}
             />
-          </div>
-        )}
-        <ul className="divide-y divide-slate-100">
-          {visibleInvitations.map((invitation) => (
-            <InvitationRow
-              key={invitation.id}
-              invitation={invitation}
-              onChanged={allInvitationsResource.reload}
-              onLinkIssued={setLastResult}
-            />
-          ))}
-        </ul>
-      </Card>
+          )}
+
+          <Card
+            title="Invitations"
+            bodyClassName="p-0"
+            actions={
+              <Tabs
+                tabs={STATUS_TABS.map((tab) => ({
+                  ...tab,
+                  badge: tab.id === 'all' ? null : countByStatus[tab.id] || null,
+                }))}
+                activeTabId={statusFilter}
+                onChange={setStatusFilter}
+                label="Invitation status"
+              />
+            }
+          >
+            {allInvitationsResource.isLoading && !allInvitationsResource.data && (
+              <LoadingBlock label="Loading invitations…" />
+            )}
+            {allInvitationsResource.error && (
+              <div className="p-6">
+                <Notice tone="error" title={allInvitationsResource.error.message} />
+              </div>
+            )}
+            {allInvitationsResource.data && visibleInvitations.length === 0 && (
+              <div className="p-6">
+                <EmptyState
+                  Icon={UsersIcon}
+                  title={
+                    statusFilter === 'all'
+                      ? 'No invitations yet'
+                      : `No ${STATUS_DISPLAY[statusFilter].label.toLowerCase()} invitations`
+                  }
+                  description="Invite your first team member with the button above."
+                />
+              </div>
+            )}
+            <ul className="divide-y divide-slate-100">
+              {visibleInvitations.map((invitation) => (
+                <InvitationRow
+                  key={invitation.id}
+                  invitation={invitation}
+                  onChanged={allInvitationsResource.reload}
+                  onLinkIssued={setLastResult}
+                />
+              ))}
+            </ul>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@
  *
  *   loadSessionUser(sessionClaims)    two MongoDB reads, in parallel
  *     5. the session was not revoked by logout
- *     6. the account still exists; returns its public profile
+ *     6. the account still exists and is active; returns its public profile
  *
  * Both return either `{ isValid: true, ... }` or a failure
  * `{ isValid: false, failureReason, clientMessage, shouldClearCookies }`:
@@ -26,7 +26,7 @@
 
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import User, { ACCOUNT_STATUSES } from '../models/User.js';
 import RevokedSession from '../models/RevokedSession.js';
 import { SESSION_MESSAGES } from '../constants/messages.js';
 import { isWellFormedCsrfHash, verifyAccessToken } from '../utils/authToken.js';
@@ -44,6 +44,7 @@ export const SESSION_FAILURE_REASON = Object.freeze({
   MISSING_CLAIMS: 'missing_claims',
   SESSION_REVOKED: 'session_revoked',
   ACCOUNT_NOT_FOUND: 'account_not_found',
+  ACCOUNT_NOT_ACTIVE: 'account_not_active',
 });
 
 function sessionFailure(failureReason, clientMessage, shouldClearCookies) {
@@ -119,7 +120,7 @@ export function verifySessionToken(accessToken, authConfig) {
  */
 export async function loadSessionUser({ userId, sessionId, issuedAtSeconds }) {
   const [userRecord, isSessionRevoked] = await Promise.all([
-    User.findById(userId).select(`${PUBLIC_USER_PROFILE_FIELDS} passwordChangedAt`).lean(),
+    User.findById(userId).select(`${PUBLIC_USER_PROFILE_FIELDS} passwordChangedAt status`).lean(),
     RevokedSession.exists({ sessionId }),
   ]);
 
@@ -128,6 +129,10 @@ export async function loadSessionUser({ userId, sessionId, issuedAtSeconds }) {
   }
   if (!userRecord) {
     return sessionFailure(SESSION_FAILURE_REASON.ACCOUNT_NOT_FOUND, SESSION_MESSAGES.ACCOUNT_NOT_FOUND, true);
+  }
+  // A disabled account loses its sessions at once. Accounts from before statuses existed are active.
+  if ((userRecord.status ?? ACCOUNT_STATUSES.ACTIVE) !== ACCOUNT_STATUSES.ACTIVE) {
+    return sessionFailure(SESSION_FAILURE_REASON.ACCOUNT_NOT_ACTIVE, SESSION_MESSAGES.ACCOUNT_NOT_ACTIVE, true);
   }
   const passwordChangedAtSeconds = userRecord.passwordChangedAt
     ? Math.floor(userRecord.passwordChangedAt.getTime() / 1000)

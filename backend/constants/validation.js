@@ -65,6 +65,9 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Limits for the HR models (Department, EmployeeProfile), shared with their request validators. */
 export const ORGANIZATION_FIELD_LIMITS = Object.freeze({
   DEPARTMENT_NAME_MAX_LENGTH: 120,
+  DEPARTMENT_SLUG_MAX_LENGTH: 60,
+  // Short code (up to 6) plus up to 8 digits, with room for numbers past the padding.
+  EMPLOYEE_CODE_MAX_LENGTH: 20,
   DESIGNATION_MAX_LENGTH: 120,
   // Deepest reporting chain or department tree walked by the cycle check. Real organisations are
   // far shallower (a 100,000-person company is rarely more than 12 levels deep); the cap bounds
@@ -202,6 +205,9 @@ export const OKR_FIELD_LIMITS = Object.freeze({
  */
 export const DEPARTMENT_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,19}$/;
 
+/** A department's address in the app: lowercase words joined by single hyphens ("data-science"). */
+export const DEPARTMENT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 /**
  * Finance budget / cost-centre code: 1–40 characters of uppercase letters, digits and the
  * separators "-", "_", "/", "." (covers SAP-style "CC-1001" and ledger-style "4100/ENG.01").
@@ -214,3 +220,46 @@ export const BUDGET_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_./-]{0,39}$/;
  * form by the model's setter before the check runs.
  */
 export const MAC_ADDRESS_PATTERN = /^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$/;
+
+/** "#RRGGBB" colours: company brand colours and the payslip accent. */
+export const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+/** A mail domain such as example.com or mail.example.co.in: labels of letters, digits and "-". */
+export const EMAIL_DOMAIN_PATTERN = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/** Limits for models/CompanySettings.js, shared with its request validator. */
+export const COMPANY_LIMITS = Object.freeze({
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 120,
+  SHORT_CODE_MIN_LENGTH: 2,
+  SHORT_CODE_MAX_LENGTH: 6,
+  EMAIL_DOMAIN_MAX_LENGTH: 253,
+  LOGO_URL_MAX_LENGTH: 2048,
+  EMPLOYEE_ID_MIN_DIGITS: 3,
+  EMPLOYEE_ID_MAX_DIGITS: 8,
+});
+
+/** Limits for employee CSV imports (services/employeeImport*.js). */
+export const EMPLOYEE_IMPORT_LIMITS = Object.freeze({
+  // 5,000 rows of a dozen short columns fit comfortably in 2 MB.
+  MAX_FILE_BYTES: 2 * 1024 * 1024,
+  MAX_ROWS: 5_000,
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 100,
+  DESIGNATION_MIN_LENGTH: 2,
+  DESIGNATION_MAX_LENGTH: 100,
+  // Joining dates: past ones for people who already work here, up to a year ahead for new joiners.
+  EARLIEST_JOINING_DATE: '1950-01-01',
+  MAX_JOINING_DAYS_AHEAD: 366,
+  // The validation issues a job summary carries; all of them are in the results.
+  ISSUES_IN_SUMMARY: 200,
+  RECENT_JOBS_LISTED: 20,
+  // A worker holds a job for this long and renews it after every row; a stopped worker's job is
+  // picked up again once its lease runs out.
+  LEASE_MS: 2 * 60 * 1000,
+  SWEEP_INTERVAL_MS: 30 * 1000,
+  // Finished jobs (with any activation links still sealed in them) are deleted after this.
+  RETENTION_DAYS: 30,
+  // Files checked but never started are deleted sooner.
+  UNCONFIRMED_RETENTION_DAYS: 7,
+});
