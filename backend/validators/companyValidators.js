@@ -21,14 +21,22 @@ const SETTINGS_FIELDS = Object.freeze([
   'brandColors',
   'timeZone',
   'employeeIdDigits',
+  'presence',
 ]);
-const SETTINGS_GROUPS = Object.freeze({ brandColors: Object.freeze(['primary', 'accent']) });
+const SETTINGS_GROUPS = Object.freeze({
+  brandColors: Object.freeze(['primary', 'accent']),
+  presence: Object.freeze(['enabled', 'awayAfterMinutes', 'detailRetentionDays', 'summaryRetentionDays']),
+});
 
 /** PATCH /api/company/settings */
 export function validateCompanySettingsChanges(requestBody) {
   if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
   const changes = pickShapedFields(requestBody, SETTINGS_FIELDS, SETTINGS_GROUPS, validationErrors);
+  // The model would turn "yes" or 1 into true; a switch must be sent as a switch.
+  if (changes.presence?.enabled !== undefined && typeof changes.presence.enabled !== 'boolean') {
+    validationErrors.push({ field: 'presence.enabled', message: 'must be true or false' });
+  }
   if (!hasChanges(changes)) validationErrors.push({ field: 'body', message: 'nothing to change' });
   const version = checkVersion(requestBody.version, validationErrors);
   return validationResult(validationErrors, { changes, version });

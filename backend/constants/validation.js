@@ -137,6 +137,34 @@ export const ATTENDANCE_DEFAULTS = Object.freeze({
   AUTO_PUNCH_OUT_AFTER_MINUTES: 120,
 });
 
+/**
+ * Presence (services/presence.js): who is available, away or offline, set automatically from
+ * activity in the app. Each company's own values are in its settings (models/CompanySettings.js).
+ *   AWAY_AFTER_MINUTES       no keyboard or mouse use for this long (or a locked screen) shows Away
+ *   DETAIL_RETENTION_DAYS    how long each available/away period is kept
+ *   SUMMARY_RETENTION_DAYS   how long the daily totals are kept
+ */
+export const PRESENCE_DEFAULTS = Object.freeze({
+  AWAY_AFTER_MINUTES: 5,
+  DETAIL_RETENTION_DAYS: 90,
+  SUMMARY_RETENTION_DAYS: 730,
+});
+
+export const PRESENCE_LIMITS = Object.freeze({
+  AWAY_AFTER_MIN_MINUTES: 1,
+  AWAY_AFTER_MAX_MINUTES: 60,
+  DETAIL_RETENTION_MIN_DAYS: 7,
+  DETAIL_RETENTION_MAX_DAYS: 365,
+  SUMMARY_RETENTION_MIN_DAYS: 30,
+  SUMMARY_RETENTION_MAX_DAYS: 3650,
+});
+
+/**
+ * The version of the presence notice people acknowledge before their activity is recorded. Raise it
+ * when the notice (frontend constants/presence.js) changes what it says, so everyone sees it again.
+ */
+export const PRESENCE_NOTICE_VERSION = 1;
+
 /** "HH:MM" on a 24-hour clock, 00:00–23:59. */
 export const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 

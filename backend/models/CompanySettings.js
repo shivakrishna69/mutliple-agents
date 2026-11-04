@@ -10,13 +10,22 @@
  *   brandColors        primary and accent colours as #RRGGBB
  *   timeZone           the company's IANA time zone, for company-wide dates and new offices
  *   employeeIdDigits   how many digits employee IDs are padded to (NSK0001 is 4)
+ *   presence           automatic available/away/offline status (services/presence.js): whether it is
+ *                      recorded at all, after how many idle minutes someone shows Away, and how many
+ *                      days the detail and the daily totals are kept (PRESENCE_DEFAULTS, PRESENCE_LIMITS)
  *
  * Employee IDs are numbered by models/Counter.js and never reused; changing the short code or the
  * digits changes only the IDs issued afterwards.
  */
 
 import mongoose from 'mongoose';
-import { COMPANY_LIMITS, EMAIL_DOMAIN_PATTERN, HEX_COLOR_PATTERN } from '../constants/validation.js';
+import {
+  COMPANY_LIMITS,
+  EMAIL_DOMAIN_PATTERN,
+  HEX_COLOR_PATTERN,
+  PRESENCE_DEFAULTS,
+  PRESENCE_LIMITS,
+} from '../constants/validation.js';
 import { isValidIanaTimeZone } from './OfficeLocation.js';
 
 export const COMPANY_SETTINGS_KEY = 'company';
@@ -44,6 +53,16 @@ const isLogoUrl = (logoUrl) => {
     return false;
   }
 };
+
+/** A whole number of `unit` in [minimum, maximum], e.g. "Away after must be 1 to 60 minutes". */
+const wholeNumberField = (label, unit, defaultValue, [minimum, maximum]) => ({
+  type: Number,
+  default: defaultValue,
+  validate: {
+    validator: (value) => Number.isInteger(value) && value >= minimum && value <= maximum,
+    message: `${label} must be ${minimum} to ${maximum} ${unit}`,
+  },
+});
 
 const colorField = (defaultValue) => ({
   type: String,
@@ -110,6 +129,21 @@ const companySettingsSchema = new mongoose.Schema(
           digits <= COMPANY_LIMITS.EMPLOYEE_ID_MAX_DIGITS,
         message: `Employee ID digits must be ${COMPANY_LIMITS.EMPLOYEE_ID_MIN_DIGITS} to ${COMPANY_LIMITS.EMPLOYEE_ID_MAX_DIGITS}`,
       },
+    },
+    presence: {
+      enabled: { type: Boolean, default: true },
+      awayAfterMinutes: wholeNumberField('Away after', 'minutes', PRESENCE_DEFAULTS.AWAY_AFTER_MINUTES, [
+        PRESENCE_LIMITS.AWAY_AFTER_MIN_MINUTES,
+        PRESENCE_LIMITS.AWAY_AFTER_MAX_MINUTES,
+      ]),
+      detailRetentionDays: wholeNumberField('Detail kept', 'days', PRESENCE_DEFAULTS.DETAIL_RETENTION_DAYS, [
+        PRESENCE_LIMITS.DETAIL_RETENTION_MIN_DAYS,
+        PRESENCE_LIMITS.DETAIL_RETENTION_MAX_DAYS,
+      ]),
+      summaryRetentionDays: wholeNumberField('Daily totals kept', 'days', PRESENCE_DEFAULTS.SUMMARY_RETENTION_DAYS, [
+        PRESENCE_LIMITS.SUMMARY_RETENTION_MIN_DAYS,
+        PRESENCE_LIMITS.SUMMARY_RETENTION_MAX_DAYS,
+      ]),
     },
     updatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },

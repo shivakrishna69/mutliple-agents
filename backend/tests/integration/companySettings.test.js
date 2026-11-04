@@ -44,6 +44,7 @@ describe('company settings', { skip: skipReason ?? false }, () => {
       brandColors: { primary: '#c75000', accent: '#282828' },
       timeZone: 'Asia/Kolkata',
       employeeIdDigits: 4,
+      presence: { enabled: true, awayAfterMinutes: 5, detailRetentionDays: 90, summaryRetentionDays: 730 },
       version: 0,
     });
     const branding = await testServer.createClient().get('/api/company/branding');

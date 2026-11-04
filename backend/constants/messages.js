@@ -158,6 +158,17 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   ON_DUTY_REASON_UNEXPECTED: 'onDutyReason is only for on-duty punches',
 });
 
+export const PRESENCE_MESSAGES = Object.freeze({
+  SETUP_RETRIEVED: 'Presence settings retrieved',
+  NOTICE_ACKNOWLEDGED: 'Thank you. Your activity status is now shown to your team',
+  NOTICE_OUTDATED: 'The notice has changed since this page was opened. Reload it to read the current one',
+  NOTICE_VERSION_INVALID: 'version must be the notice version you read',
+  FORBIDDEN: 'Only HR, administrators and people with a team can see their activity',
+  QUERY_INVALID: 'The date or department asked for is not valid',
+  NOW_RETRIEVED: 'Presence retrieved',
+  DAILY_RETRIEVED: 'Daily activity retrieved',
+});
+
 export const REGULARIZATION_MESSAGES = Object.freeze({
   AGENT_REPLIED: 'Regularization request processed',
   REGULARIZATION_RECORDED: 'Attendance regularized',

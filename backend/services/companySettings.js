@@ -7,6 +7,7 @@
  * and new employee IDs read it from here.
  */
 
+import { PRESENCE_DEFAULTS } from '../constants/validation.js';
 import CompanySettings, { COMPANY_SETTINGS_KEY } from '../models/CompanySettings.js';
 import Counter, { COUNTER_NAMES } from '../models/Counter.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
@@ -24,7 +25,19 @@ export function toCompanySettingsSummary(settings) {
     brandColors: { primary: settings.brandColors.primary, accent: settings.brandColors.accent },
     timeZone: settings.timeZone,
     employeeIdDigits: settings.employeeIdDigits,
+    presence: toPresenceSettings(settings),
     version: settings.__v,
+  };
+}
+
+/** The presence settings; defaults fill in for a document saved before they existed. */
+export function toPresenceSettings(settings) {
+  const presence = settings.presence ?? {};
+  return {
+    enabled: presence.enabled ?? true,
+    awayAfterMinutes: presence.awayAfterMinutes ?? PRESENCE_DEFAULTS.AWAY_AFTER_MINUTES,
+    detailRetentionDays: presence.detailRetentionDays ?? PRESENCE_DEFAULTS.DETAIL_RETENTION_DAYS,
+    summaryRetentionDays: presence.summaryRetentionDays ?? PRESENCE_DEFAULTS.SUMMARY_RETENTION_DAYS,
   };
 }
 
@@ -61,10 +74,11 @@ export async function getCompanySettings() {
 export async function updateCompanySettings({ changes, version, actorUserId }) {
   const settings = await getCompanySettings();
   assertCurrentVersion(settings, version);
-  const { brandColors = {}, ...otherChanges } = changes;
+  const { brandColors = {}, presence = {}, ...otherChanges } = changes;
   settings.set({ ...otherChanges, updatedByUserId: actorUserId });
-  // One colour may change without the other.
+  // A grouped setting may change without the others in its group.
   for (const [colorName, color] of Object.entries(brandColors)) settings.set(`brandColors.${colorName}`, color);
+  for (const [settingName, value] of Object.entries(presence)) settings.set(`presence.${settingName}`, value);
   await saveVersioned(settings);
   return toCompanySettingsSummary(settings);
 }
