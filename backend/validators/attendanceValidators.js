@@ -7,6 +7,9 @@
  *   accuracyMeters     number, > 0                      the browser Geolocation `coords.accuracy`
  *   deviceFingerprint  string, 16–256 printable ASCII   a stable per-device identifier from the client
  *   macAddress         string, optional                 MAC-48 with ":" or "-" separators
+ *   workMode           "office" | "home" | "on_duty", optional (the employee's usual mode when absent;
+ *                      whether they may use it is decided by the punch-in, from their work type)
+ *   onDutyReason       string, required with "on_duty" and refused otherwise
  *
  * (0, 0) is refused: devices report "Null Island" when they have no fix. Range checks here reject
  * malformed input (400); whether an accurate-enough fix is inside the geofence is decided later.
@@ -14,13 +17,12 @@
 
 import { ATTENDANCE_MESSAGES } from '../constants/messages.js';
 import { ATTENDANCE_FIELD_LIMITS, MAC_ADDRESS_PATTERN } from '../constants/validation.js';
+import { ATTENDANCE_WORK_MODES } from '../models/Attendance.js';
 import { PLACEHOLDER_MAC_ADDRESS, normalizeMacAddress } from '../models/EmployeeProfile.js';
 import { isNullIsland, isValidLatitude, isValidLongitude } from '../utils/geoDistance.js';
 
 /** Printable ASCII without spaces, the safe alphabet for an opaque identifier. */
 const PRINTABLE_TOKEN_PATTERN = /^[\x21-\x7E]+$/;
-/** Sanity ceiling for a reported accuracy; anything larger is not a location at all. */
-const ACCURACY_SANITY_MAX_METRES = 100_000;
 
 function isPlainObject(candidateValue) {
   return typeof candidateValue === 'object' && candidateValue !== null && !Array.isArray(candidateValue);
@@ -47,7 +49,7 @@ export function validatePunchInInput(requestBody) {
     typeof accuracyMeters === 'number' &&
     Number.isFinite(accuracyMeters) &&
     accuracyMeters > 0 &&
-    accuracyMeters <= ACCURACY_SANITY_MAX_METRES;
+    accuracyMeters <= ATTENDANCE_FIELD_LIMITS.MAX_REPORTED_ACCURACY_METRES;
   if (!isValidAccuracy)
     validationErrors.push({ field: 'accuracyMeters', message: ATTENDANCE_MESSAGES.ACCURACY_INVALID });
 
@@ -69,9 +71,32 @@ export function validatePunchInInput(requestBody) {
     }
   }
 
+  const { workMode = null, onDutyReason } = requestBody;
+  if (workMode !== null && !Object.values(ATTENDANCE_WORK_MODES).includes(workMode)) {
+    validationErrors.push({ field: 'workMode', message: ATTENDANCE_MESSAGES.WORK_MODE_INVALID });
+  }
+  const reason = typeof onDutyReason === 'string' ? onDutyReason.trim() : '';
+  if (workMode === ATTENDANCE_WORK_MODES.ON_DUTY) {
+    const isValidReason =
+      reason.length >= ATTENDANCE_FIELD_LIMITS.ON_DUTY_REASON_MIN_LENGTH &&
+      reason.length <= ATTENDANCE_FIELD_LIMITS.ON_DUTY_REASON_MAX_LENGTH;
+    if (!isValidReason)
+      validationErrors.push({ field: 'onDutyReason', message: ATTENDANCE_MESSAGES.ON_DUTY_REASON_INVALID });
+  } else if (onDutyReason !== undefined && onDutyReason !== null) {
+    validationErrors.push({ field: 'onDutyReason', message: ATTENDANCE_MESSAGES.ON_DUTY_REASON_UNEXPECTED });
+  }
+
   if (validationErrors.length > 0) return { isValid: false, validationErrors };
   return {
     isValid: true,
-    sanitizedInput: { lat, lng, accuracyMeters, deviceFingerprint, macAddress: normalizedMacAddress },
+    sanitizedInput: {
+      lat,
+      lng,
+      accuracyMeters,
+      deviceFingerprint,
+      macAddress: normalizedMacAddress,
+      workMode,
+      onDutyReason: workMode === ATTENDANCE_WORK_MODES.ON_DUTY ? reason : null,
+    },
   };
 }

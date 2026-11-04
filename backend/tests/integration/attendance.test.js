@@ -1,6 +1,6 @@
 /**
  * Attendance punches against the real server (routes/attendanceRoutes.js): the office's punch-in
- * radius and an employee's own radius.
+ * radius and an employee's own radius, and the work modes each work type may punch in with.
  */
 
 import { after, before, describe, it } from 'node:test';
@@ -76,5 +76,85 @@ describe('attendance punches', { skip: skipReason ?? false }, () => {
     const accepted = await employee.client.post('/api/attendance/punch-in', punchAt(FAR_FROM_OFFICE));
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     assert.equal(accepted.body.data.attendance.geofence.allowedRadiusMeters, 1000);
+    assert.equal(accepted.body.data.attendance.workMode, 'office', 'an on-site employee’s usual mode');
+  });
+
+  it('keeps on-site staff from working from home, but lets them punch in on duty with a reason', async () => {
+    const employee = await employeeAtOffice('onsite.duty@example.com');
+    const fromHome = await employee.client.post(
+      '/api/attendance/punch-in',
+      punchAt(FAR_FROM_OFFICE, { workMode: 'home' }),
+    );
+    assert.equal(fromHome.status, 403);
+    assert.equal(fromHome.body.error.code, 'WORK_MODE_NOT_ALLOWED');
+    assert.deepEqual(fromHome.body.error.context.allowedWorkModes, ['office', 'on_duty']);
+
+    const noReason = await employee.client.post(
+      '/api/attendance/punch-in',
+      punchAt(FAR_FROM_OFFICE, { workMode: 'on_duty' }),
+    );
+    assert.equal(noReason.status, 400);
+    assert.equal(noReason.body.error.details[0].field, 'onDutyReason');
+
+    const onDuty = await employee.client.post(
+      '/api/attendance/punch-in',
+      punchAt(FAR_FROM_OFFICE, {
+        workMode: 'on_duty',
+        onDutyReason: '  Client visit, Infosys Pune  ',
+        accuracyMeters: 900,
+      }),
+    );
+    assert.equal(onDuty.status, 201, JSON.stringify(onDuty.body));
+    const { attendance } = onDuty.body.data;
+    assert.equal(attendance.workMode, 'on_duty');
+    assert.equal(attendance.onDutyReason, 'Client visit, Infosys Pune');
+    assert.equal(attendance.geofence.enforced, false, 'no radius away from the office');
+    assert.equal(attendance.geofence.allowedRadiusMeters, null);
+    assert.ok(attendance.geofence.distanceMeters > 500, 'the distance is still recorded');
+  });
+
+  it('lets hybrid staff work from home with an imprecise location, but checks precision at the office', async () => {
+    const employee = await employeeAtOffice('hybrid@example.com', { workLocationType: 'Hybrid' });
+    const imprecise = await employee.client.post(
+      '/api/attendance/punch-in',
+      punchAt(NEAR_OFFICE, { workMode: 'office', accuracyMeters: 1500 }),
+    );
+    assert.equal(imprecise.status, 422);
+    assert.equal(imprecise.body.error.code, 'LOCATION_TOO_IMPRECISE');
+
+    const fromHome = await employee.client.post(
+      '/api/attendance/punch-in',
+      punchAt(FAR_FROM_OFFICE, { workMode: 'home', accuracyMeters: 1500 }),
+    );
+    assert.equal(fromHome.status, 201, JSON.stringify(fromHome.body));
+    assert.equal(fromHome.body.data.attendance.workMode, 'home');
+    assert.equal(fromHome.body.data.attendance.geofence.enforced, false);
+  });
+
+  it('defaults remote staff to working from home, and checks the radius when they come to the office', async () => {
+    const remote = await employeeAtOffice('remote@example.com', { workLocationType: 'Remote' });
+    const atOffice = await remote.client.post(
+      '/api/attendance/punch-in',
+      punchAt(FAR_FROM_OFFICE, { workMode: 'office' }),
+    );
+    assert.equal(atOffice.status, 403);
+    assert.equal(atOffice.body.error.code, 'UNAUTHORIZED_SPATIAL_LOCATION');
+
+    const usual = await remote.client.post('/api/attendance/punch-in', punchAt(FAR_FROM_OFFICE));
+    assert.equal(usual.status, 201, JSON.stringify(usual.body));
+    assert.equal(usual.body.data.attendance.workMode, 'home');
+  });
+
+  it('refuses unknown work modes and a reason without being on duty', async () => {
+    const employee = await employeeAtOffice('shape@example.com');
+    const unknown = await employee.client.post('/api/attendance/punch-in', punchAt(NEAR_OFFICE, { workMode: 'beach' }));
+    assert.equal(unknown.status, 400);
+    assert.equal(unknown.body.error.details[0].field, 'workMode');
+    const strayReason = await employee.client.post(
+      '/api/attendance/punch-in',
+      punchAt(NEAR_OFFICE, { workMode: 'office', onDutyReason: 'not needed' }),
+    );
+    assert.equal(strayReason.status, 400);
+    assert.equal(strayReason.body.error.details[0].field, 'onDutyReason');
   });
 });

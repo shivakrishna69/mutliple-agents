@@ -3,7 +3,8 @@
  *
  * POST /api/attendance/punch-in
  * -----------------------------
- * Body: { lat, lng, accuracyMeters, deviceFingerprint, macAddress? } (see validators/attendanceValidators.js)
+ * Body: { lat, lng, accuracyMeters, deviceFingerprint, macAddress?, workMode?, onDutyReason? }
+ * (see validators/attendanceValidators.js)
  *
  * The employee is always the signed-in user: their EmployeeProfile is found by the session's user
  * id. No employee id is accepted from the client, so nobody can punch in for someone else.
@@ -12,15 +13,18 @@
  *   1. Input        types and ranges of every field                          400
  *   2. Employee     a profile is linked to this account                       404
  *                   employment has not ended                                  403
+ *                   their work type allows the work mode (office, home or
+ *                   on duty; their usual one when none is sent)              403 WORK_MODE_NOT_ALLOWED
  *   3. Office       a base office is assigned and exists                      409
  *   4. Device       if a MAC address is registered, the request must send
  *                   that same address                                         403 DEVICE_NOT_RECOGNISED
- *   5. Precision    the location fix is within MAX_LOCATION_ACCURACY_METRES   422
+ *   5. Precision    office punches: the location fix is within
+ *                   MAX_LOCATION_ACCURACY_METRES                               422
  *   6. Day          today's date in the office time zone, from the server
  *                   clock; one punch-in per day                               409
- *   7. Geofence     on-site and hybrid employees: the Haversine distance to the office is within
- *                   their own radius, or else the office's                    403 UNAUTHORIZED_SPATIAL_LOCATION
- *                   remote employees: the distance is recorded, not enforced
+ *   7. Geofence     office punches: the Haversine distance to the office is within the employee's
+ *                   own radius, or else the office's                          403 UNAUTHORIZED_SPATIAL_LOCATION
+ *                   home and on-duty punches: the distance is recorded, not enforced
  *   8. Status       Normal / Late / Half_Day from the arrival time against the office shift
  *   9. Persist      the unique { employeeId, date } index makes a racing duplicate a 409
  *
@@ -32,11 +36,12 @@ import { createHash } from 'node:crypto';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ATTENDANCE_MESSAGES, REGULARIZATION_MESSAGES } from '../constants/messages.js';
 import { ATTENDANCE_FIELD_LIMITS } from '../constants/validation.js';
-import Attendance from '../models/Attendance.js';
-import EmployeeProfile, { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
+import Attendance, { ATTENDANCE_WORK_MODES } from '../models/Attendance.js';
+import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { AI_FAILURE_KIND, AiServiceError, requestAttendanceRegularization } from '../services/aiServiceClient.js';
 import {
+  allowedWorkModes,
   classifyArrival,
   effectiveGeofenceRadiusMeters,
   evaluateGeofence,
@@ -59,6 +64,7 @@ export const ATTENDANCE_ERROR_CODES = Object.freeze({
   LOCATION_TOO_IMPRECISE: 'LOCATION_TOO_IMPRECISE',
   UNAUTHORIZED_SPATIAL_LOCATION: 'UNAUTHORIZED_SPATIAL_LOCATION',
   ALREADY_PUNCHED_IN: 'ALREADY_PUNCHED_IN',
+  WORK_MODE_NOT_ALLOWED: 'WORK_MODE_NOT_ALLOWED',
 });
 
 function auditPunchIn(req, outcome, details) {
@@ -79,6 +85,8 @@ function toAttendanceSummary(attendanceRecord) {
     timeZone: attendanceRecord.timeZone,
     checkInTime: attendanceRecord.checkInTime.toISOString(),
     checkOutTime: attendanceRecord.checkOutTime ? attendanceRecord.checkOutTime.toISOString() : null,
+    workMode: attendanceRecord.workMode ?? null,
+    onDutyReason: attendanceRecord.onDutyReason ?? null,
     checkInCoordinates: {
       lat: attendanceRecord.checkInCoordinates.lat,
       lng: attendanceRecord.checkInCoordinates.lng,
@@ -100,7 +108,8 @@ function toAttendanceSummary(attendanceRecord) {
  *   201 { message, data: { attendance } }
  *   400 invalid input (details per field)
  *   401 no session / 403 bad CSRF   (protect)
- *   403 { error: { code: EMPLOYMENT_ENDED | DEVICE_NOT_RECOGNISED | UNAUTHORIZED_SPATIAL_LOCATION, context? } }
+ *   403 { error: { code: EMPLOYMENT_ENDED | WORK_MODE_NOT_ALLOWED | DEVICE_NOT_RECOGNISED
+ *                       | UNAUTHORIZED_SPATIAL_LOCATION, context? } }
  *   404 { error: { code: PROFILE_NOT_FOUND } }
  *   409 { error: { code: OFFICE_NOT_CONFIGURED | ALREADY_PUNCHED_IN } }
  *   422 { error: { code: LOCATION_TOO_IMPRECISE, context } }
@@ -119,7 +128,7 @@ export async function punchIn(req, res, next) {
         inputValidation.validationErrors,
       );
     }
-    const { lat, lng, accuracyMeters, deviceFingerprint, macAddress } = inputValidation.sanitizedInput;
+    const { lat, lng, accuracyMeters, deviceFingerprint, macAddress, onDutyReason } = inputValidation.sanitizedInput;
     const punchPoint = { lat, lng };
 
     // ---- 2. Employee --------------------------------------------------------------------------
@@ -142,6 +151,18 @@ export async function punchIn(req, res, next) {
         message: ATTENDANCE_MESSAGES.EMPLOYMENT_ENDED,
       });
     }
+    // Where they are working today: their work type decides which modes they may choose.
+    const permittedWorkModes = allowedWorkModes(workLocationType);
+    const workMode = inputValidation.sanitizedInput.workMode ?? permittedWorkModes[0];
+    if (!permittedWorkModes.includes(workMode)) {
+      auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: 'work_mode_not_allowed', workMode });
+      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
+        code: ATTENDANCE_ERROR_CODES.WORK_MODE_NOT_ALLOWED,
+        message: ATTENDANCE_MESSAGES.WORK_MODE_NOT_ALLOWED,
+        context: { workMode, allowedWorkModes: permittedWorkModes },
+      });
+    }
+    const isGeofenceEnforced = workMode === ATTENDANCE_WORK_MODES.OFFICE;
 
     // ---- 3. Office ----------------------------------------------------------------------------
     const office = officeLocationId ? await OfficeLocation.findById(officeLocationId).lean() : null;
@@ -169,7 +190,8 @@ export async function punchIn(req, res, next) {
     }
 
     // ---- 5. Precision -------------------------------------------------------------------------
-    if (accuracyMeters > ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES) {
+    // Only an office punch is placed against a radius; elsewhere the reading is recorded as it is.
+    if (isGeofenceEnforced && accuracyMeters > ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES) {
       auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'location_too_imprecise', accuracyMeters });
       return sendCodedError(req, res, HTTP_STATUS.UNPROCESSABLE_CONTENT, {
         code: ATTENDANCE_ERROR_CODES.LOCATION_TOO_IMPRECISE,
@@ -190,11 +212,11 @@ export async function punchIn(req, res, next) {
     }
 
     // ---- 7. Geofence --------------------------------------------------------------------------
-    const isGeofenceEnforced = workLocationType !== WORK_LOCATION_TYPES.REMOTE;
     const allowedRadiusMeters = isGeofenceEnforced
       ? effectiveGeofenceRadiusMeters(office, employeeProfile.biometricMetadata?.allowedGeofenceRadius)
       : null;
-    // Remote employees are measured too (with an infinite radius), so the record shows where they punched from.
+    // Home and on-duty punches are measured too (with an infinite radius), so the record shows how
+    // far from the office they were made.
     const { distanceMeters, isInsideGeofence } = evaluateGeofence(
       punchPoint,
       office.coordinates,
@@ -229,6 +251,8 @@ export async function punchIn(req, res, next) {
         date: calendarDate,
         timeZone: office.timeZone,
         checkInTime: punchedAt,
+        workMode,
+        onDutyReason,
         checkInCoordinates: { lat, lng, accuracyMeters },
         geofence: { enforced: isGeofenceEnforced, distanceMeters: roundedDistanceMeters, allowedRadiusMeters },
         deviceFingerprint: createHash('sha256').update(deviceFingerprint, 'utf8').digest('hex'),
@@ -253,6 +277,7 @@ export async function punchIn(req, res, next) {
       date: calendarDate,
       calculationStatus,
       lateByMinutes,
+      workMode,
       geofenceEnforced: isGeofenceEnforced,
       distanceMeters: roundedDistanceMeters,
       allowedRadiusMeters,

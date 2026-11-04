@@ -17,6 +17,12 @@
  *   checkInTime   server clock at punch-in (an instant, stored in UTC). Never taken from the client.
  *   checkOutTime  server clock at punch-out; null until then; must be after checkInTime.
  *
+ * Work mode
+ * ---------
+ *   workMode      office | home | on_duty, chosen at punch-in (ATTENDANCE_WORK_MODES below); only an
+ *                 office punch has its radius checked (geofence.enforced)
+ *   onDutyReason  why the employee is on duty (on_duty only)
+ *
  * Location and device evidence
  * ----------------------------
  *   checkInCoordinates / checkOutCoordinates  { lat, lng, accuracyMeters } as reported by the device
@@ -73,6 +79,19 @@ export const ATTENDANCE_STATUSES = Object.freeze({
   ABSENT: 'Absent',
 });
 
+/**
+ * Where the employee said they were working when they punched in (device punches only):
+ *   office   at their base office; the office's punch-in radius is checked
+ *   home     working from home; the location is recorded, not checked
+ *   on_duty  at a client site or travelling, with a reason; recorded, not checked, shown to the manager
+ * Which modes someone may choose depends on their work type (services/attendancePolicy.js).
+ */
+export const ATTENDANCE_WORK_MODES = Object.freeze({
+  OFFICE: 'office',
+  HOME: 'home',
+  ON_DUTY: 'on_duty',
+});
+
 /** How the entry was created; see "Entry sources" above. */
 export const ATTENDANCE_ENTRY_SOURCES = Object.freeze({
   DEVICE_PUNCH: 'device_punch',
@@ -102,9 +121,11 @@ const coordinatesSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: [0, 'Accuracy cannot be negative'],
+      // Office punches need MAX_LOCATION_ACCURACY_METRES (checked by the punch-in); others keep what
+      // the device reported.
       max: [
-        ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES,
-        `Accuracy must be within ${ATTENDANCE_FIELD_LIMITS.MAX_LOCATION_ACCURACY_METRES} m`,
+        ATTENDANCE_FIELD_LIMITS.MAX_REPORTED_ACCURACY_METRES,
+        `Accuracy must be within ${ATTENDANCE_FIELD_LIMITS.MAX_REPORTED_ACCURACY_METRES} m`,
       ],
     },
   },
@@ -179,6 +200,23 @@ const attendanceSchema = new mongoose.Schema(
         message: 'checkOutTime must be after checkInTime',
       },
     },
+    // Device punches only (required for new ones by enforceEntrySourceConsistency below; punches
+    // made before work modes existed have none).
+    workMode: {
+      type: String,
+      enum: { values: [...Object.values(ATTENDANCE_WORK_MODES), null], message: 'workMode "{VALUE}" is not valid' },
+      default: null,
+      immutable: true,
+    },
+    // On-duty punches only.
+    onDutyReason: {
+      type: String,
+      trim: true,
+      minlength: ATTENDANCE_FIELD_LIMITS.ON_DUTY_REASON_MIN_LENGTH,
+      maxlength: ATTENDANCE_FIELD_LIMITS.ON_DUTY_REASON_MAX_LENGTH,
+      default: null,
+      immutable: true,
+    },
     // Device punches only (required for them by enforceEntrySourceConsistency below).
     checkInCoordinates: { type: coordinatesSchema, default: null, immutable: true },
     checkOutCoordinates: { type: coordinatesSchema, default: null },
@@ -232,7 +270,14 @@ attendanceSchema.pre('validate', function enforceEntrySourceConsistency() {
     if (!this.geofence) this.invalidate('geofence', 'A device punch requires its geofence evidence');
     if (!this.deviceFingerprint) this.invalidate('deviceFingerprint', 'A device punch requires a device fingerprint');
     if (this.regularization) this.invalidate('regularization', 'A device punch cannot carry a regularization record');
+    if (this.isNew && !this.workMode) this.invalidate('workMode', 'A device punch requires its work mode');
+    if ((this.workMode === ATTENDANCE_WORK_MODES.ON_DUTY) !== Boolean(this.onDutyReason)) {
+      this.invalidate('onDutyReason', 'An on-duty punch requires its reason, and only an on-duty punch has one');
+    }
     return;
+  }
+  if (this.workMode || this.onDutyReason) {
+    this.invalidate('workMode', 'A regularization entry has no work mode');
   }
   if (!this.regularization) {
     this.invalidate('regularization', 'A regularization entry requires its regularization record');

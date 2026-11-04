@@ -4,8 +4,27 @@
  */
 
 import { ATTENDANCE_DEFAULTS } from '../constants/validation.js';
-import { ATTENDANCE_STATUSES } from '../models/Attendance.js';
+import { ATTENDANCE_STATUSES, ATTENDANCE_WORK_MODES } from '../models/Attendance.js';
+import { WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
 import { haversineDistanceMetres } from '../utils/geoDistance.js';
+
+const { OFFICE, HOME, ON_DUTY } = ATTENDANCE_WORK_MODES;
+
+/**
+ * The work modes each work type may punch in with, the usual one first (the default when the
+ * client sends none). On-site staff never work from home but may be on duty at a client site;
+ * remote staff may still come to the office, where its radius is checked.
+ */
+const WORK_MODES_BY_LOCATION_TYPE = Object.freeze({
+  [WORK_LOCATION_TYPES.ONSITE]: Object.freeze([OFFICE, ON_DUTY]),
+  [WORK_LOCATION_TYPES.HYBRID]: Object.freeze([OFFICE, HOME, ON_DUTY]),
+  [WORK_LOCATION_TYPES.REMOTE]: Object.freeze([HOME, OFFICE, ON_DUTY]),
+});
+
+/** @param {string} workLocationType  EmployeeProfile.organizationData.workLocationType */
+export function allowedWorkModes(workLocationType) {
+  return WORK_MODES_BY_LOCATION_TYPE[workLocationType] ?? WORK_MODES_BY_LOCATION_TYPE[WORK_LOCATION_TYPES.ONSITE];
+}
 
 /**
  * The radius an office punch-in is checked against: the employee's own when HR set one, otherwise

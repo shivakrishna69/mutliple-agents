@@ -99,6 +99,10 @@ export const ATTENDANCE_FIELD_LIMITS = Object.freeze({
   // A browser Geolocation reading less precise than this cannot place someone inside a typical
   // office geofence, so the punch is refused and the user asked to retry (usually with GPS on).
   MAX_LOCATION_ACCURACY_METRES: 100,
+  // The least precise reading kept at all. Laptops at home often only know their place from Wi-Fi
+  // (a kilometre or more), which is fine where no office radius is checked; beyond this it is not a
+  // location at all.
+  MAX_REPORTED_ACCURACY_METRES: 100_000,
   DEVICE_FINGERPRINT_MIN_LENGTH: 16,
   DEVICE_FINGERPRINT_MAX_LENGTH: 256,
   OFFICE_NAME_MAX_LENGTH: 120,
