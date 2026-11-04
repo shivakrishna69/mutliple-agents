@@ -94,9 +94,9 @@ docker compose down              # stop (data is kept in the mongo-data volume)
   sees a single origin. It runs alongside the development setup without port clashes.
 - The compose stack has its own database volume (`nsk_mongo-data`), separate from the
   `multiagent-mongo` development database.
-- It serves plain HTTP on localhost, so the backend runs in development mode. A real deployment needs
-  TLS in front, `NODE_ENV=production`, `COOKIE_SECURE=true` and https URLs (startup refuses insecure
-  production settings).
+- It serves plain HTTP on localhost, so the backend runs in development mode. For a real server,
+  use `docker-compose.prod.yml` (HTTPS, production mode, database passwords): see
+  [docs/deployment.md](docs/deployment.md).
 - Payslip PDFs need Chromium in the backend image: build it with
   `docker compose build --build-arg WITH_PDF_BROWSER=true backend` and set
   `PDF_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium` (the image grows from about 430 MB to 1.4 GB).
@@ -125,6 +125,7 @@ by the backend; the frontend only hides what a role cannot use.
 | CI (GitHub Actions: lint, format, tests, builds) | Done |
 | Frontend browser tests (Playwright) | Done (`npm run test:e2e` in `frontend/`) |
 | Docker images and Compose stack | Done (`docker compose up --build`) |
+| Production deployment (one server, HTTPS, deploy on merge to main, nightly backups) | Done: [docs/deployment.md](docs/deployment.md) |
 
 ## Contributing
 
