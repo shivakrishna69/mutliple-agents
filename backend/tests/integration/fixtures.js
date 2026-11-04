@@ -49,16 +49,26 @@ export async function insertDepartment(database, { name = 'Operations', code = '
 
 /**
  * HR invites an employee, who accepts. Returns their signed-in client, user id and EmployeeProfile id.
- * @param {{ testServer: object, hrClient: object, email: string, departmentId: string, name?: string }} details
+ * @param {{ testServer: object, hrClient: object, email: string, departmentId: string, name?: string,
+ *   workLocationType?: string, reportingManagerId?: string|null }} details
  */
-export async function onboardEmployee({ testServer, hrClient, email, departmentId, name = 'Test Employee' }) {
+export async function onboardEmployee({
+  testServer,
+  hrClient,
+  email,
+  departmentId,
+  name = 'Test Employee',
+  workLocationType = WORK_LOCATION_TYPES.ONSITE,
+  reportingManagerId = null,
+}) {
   const invitationResponse = await hrClient.post('/api/people/invitations', {
     name,
     email,
     role: 'customer',
     designation: 'Analyst',
     departmentId,
-    workLocationType: WORK_LOCATION_TYPES.ONSITE,
+    reportingManagerId,
+    workLocationType,
     dateOfJoining: new Date().toISOString().slice(0, 10),
     employmentStatus: EMPLOYMENT_STATUSES.ACTIVE,
   });

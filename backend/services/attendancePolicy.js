@@ -3,8 +3,19 @@
  * geofence decision. No I/O, so each rule can be tested directly and reasoned about in isolation.
  */
 
+import { ATTENDANCE_DEFAULTS } from '../constants/validation.js';
 import { ATTENDANCE_STATUSES } from '../models/Attendance.js';
 import { haversineDistanceMetres } from '../utils/geoDistance.js';
+
+/**
+ * The radius an office punch-in is checked against: the employee's own when HR set one, otherwise
+ * the office's. The default covers offices saved before offices had a radius.
+ * @param {{ geofenceRadiusMeters?: number }} office
+ * @param {number|null|undefined} employeeRadiusMeters  EmployeeProfile.biometricMetadata.allowedGeofenceRadius
+ */
+export function effectiveGeofenceRadiusMeters(office, employeeRadiusMeters) {
+  return employeeRadiusMeters ?? office.geofenceRadiusMeters ?? ATTENDANCE_DEFAULTS.OFFICE_GEOFENCE_RADIUS_METRES;
+}
 
 /**
  * Reads the wall-clock date and time at `instant` in `timeZone`.

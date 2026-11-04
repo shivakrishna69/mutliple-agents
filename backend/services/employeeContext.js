@@ -13,6 +13,7 @@
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import User from '../models/User.js';
+import { effectiveGeofenceRadiusMeters } from './attendancePolicy.js';
 
 /** Why no context could be built. */
 export const EMPLOYEE_CONTEXT_UNAVAILABLE = Object.freeze({
@@ -56,7 +57,10 @@ export async function loadEmployeeAgentContext(userId) {
       shift_start_time: office.workday.shiftStartLocalTime,
       shift_end_time: office.workday.shiftEndLocalTime,
       manager_id: reportingManagerId ? reportingManagerId.toString() : null,
-      allowed_geofence_radius: employeeProfile.biometricMetadata?.allowedGeofenceRadius ?? null,
+      allowed_geofence_radius: effectiveGeofenceRadiusMeters(
+        office,
+        employeeProfile.biometricMetadata?.allowedGeofenceRadius,
+      ),
     },
   };
 }

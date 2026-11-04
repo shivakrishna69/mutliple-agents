@@ -13,6 +13,8 @@ import Holiday from '../models/Holiday.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { OFFICE_MESSAGES } from '../constants/messages.js';
+import { ATTENDANCE_DEFAULTS } from '../constants/validation.js';
+import { effectiveGeofenceRadiusMeters } from './attendancePolicy.js';
 import { assertCurrentVersion, employeeNotFound, saveVersioned, ServiceError } from './serviceError.js';
 
 export const officeNotFound = () =>
@@ -27,11 +29,13 @@ export function toOfficeSummary(office) {
     code: office.code,
     coordinates: { lat: office.coordinates.lat, lng: office.coordinates.lng },
     timeZone: office.timeZone,
+    geofenceRadiusMeters: effectiveGeofenceRadiusMeters(office, null),
     workday: {
       shiftStartLocalTime: workday.shiftStartLocalTime,
       shiftEndLocalTime: workday.shiftEndLocalTime,
       lateGraceMinutes: workday.lateGraceMinutes,
       halfDayAfterMinutes: workday.halfDayAfterMinutes,
+      autoPunchOutAfterMinutes: workday.autoPunchOutAfterMinutes ?? ATTENDANCE_DEFAULTS.AUTO_PUNCH_OUT_AFTER_MINUTES,
       weeklyOffRules: (workday.weeklyOffRules ?? []).map((rule) => ({
         weekday: rule.weekday,
         occurrencesInMonth: [...rule.occurrencesInMonth],
@@ -103,4 +107,17 @@ export async function assignEmployeeOffice({ employeeId, officeLocationId }) {
   profile.organizationData.officeLocationId = officeLocationId;
   await profile.save();
   return { employeeId: profile._id.toString(), officeLocationId };
+}
+
+/**
+ * Sets an employee's own punch-in radius, which replaces their office's (someone working from a
+ * large campus, or a site with poor GPS). null goes back to the office's radius. Range checks are
+ * the model's.
+ */
+export async function setEmployeeGeofenceRadius({ employeeId, geofenceRadiusMeters }) {
+  const profile = await EmployeeProfile.findById(employeeId).select('+biometricMetadata.allowedGeofenceRadius');
+  if (!profile) throw employeeNotFound();
+  profile.set('biometricMetadata.allowedGeofenceRadius', geofenceRadiusMeters);
+  await profile.save();
+  return { employeeId: profile._id.toString(), geofenceRadiusMeters };
 }

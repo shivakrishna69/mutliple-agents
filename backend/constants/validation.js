@@ -114,6 +114,23 @@ export const ATTENDANCE_FIELD_LIMITS = Object.freeze({
   // Longest employee message forwarded to the regularization agent (matches the ai-service schema).
   REGULARIZATION_MESSAGE_MAX_LENGTH: 2000,
   REVIEW_NOTE_MAX_LENGTH: 500,
+  // How long after the shift ends a forgotten punch-out is closed automatically, at most.
+  AUTO_PUNCH_OUT_AFTER_MAX_MINUTES: 720,
+  // Why someone punched in "on duty" (a client site, travel): enough for "Client visit, Infosys Pune".
+  ON_DUTY_REASON_MIN_LENGTH: 3,
+  ON_DUTY_REASON_MAX_LENGTH: 300,
+});
+
+/**
+ * Attendance settings a new office starts with (models/OfficeLocation.js); HR changes them per office.
+ *   OFFICE_GEOFENCE_RADIUS_METRES  how far from the office an office punch-in is accepted. 200 m covers
+ *                                  a large building and its car park with ordinary phone GPS error.
+ *   AUTO_PUNCH_OUT_AFTER_MINUTES   a punch-in still open this long after the shift ends is closed
+ *                                  at the shift end, marked as closed automatically.
+ */
+export const ATTENDANCE_DEFAULTS = Object.freeze({
+  OFFICE_GEOFENCE_RADIUS_METRES: 200,
+  AUTO_PUNCH_OUT_AFTER_MINUTES: 120,
 });
 
 /** "HH:MM" on a 24-hour clock, 00:00–23:59. */

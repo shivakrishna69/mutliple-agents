@@ -137,7 +137,6 @@ export const ATTENDANCE_MESSAGES = Object.freeze({
   PROFILE_NOT_FOUND: 'No employee profile is linked to your account. Contact HR',
   EMPLOYMENT_ENDED: 'Your employment has ended, so attendance cannot be recorded',
   OFFICE_NOT_CONFIGURED: 'Your base office has not been set up yet. Contact HR before punching in',
-  GEOFENCE_NOT_CONFIGURED: 'Your attendance geofence has not been set up yet. Contact HR before punching in',
   LOCATION_TOO_IMPRECISE:
     'Your location is not precise enough to confirm you are at the office. Turn on GPS / precise location and try again',
   DEVICE_NOT_RECOGNISED: 'This device is not registered for your attendance. Use your registered device or contact HR',
@@ -275,6 +274,7 @@ export const OFFICE_MESSAGES = Object.freeze({
   INPUT_INVALID: 'The office details are invalid',
   RESTRICTED: 'Only HR and administrators can manage offices',
   EMPLOYEE_OFFICE_ASSIGNED: 'Base office updated',
+  EMPLOYEE_GEOFENCE_RADIUS_SET: 'Punch-in radius updated',
   EMPLOYEES_RETRIEVED: 'Employees retrieved',
 });
 

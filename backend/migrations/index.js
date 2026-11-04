@@ -13,6 +13,7 @@ import addLeaveTypeHrApproval from './addLeaveTypeHrApproval.js';
 import addDepartmentSlugs from './addDepartmentSlugs.js';
 import addAccountStatuses from './addAccountStatuses.js';
 import addEmployeeCodes from './addEmployeeCodes.js';
+import addOfficeAttendanceSettings from './addOfficeAttendanceSettings.js';
 import seedLeaveTypeTemplate from './seedLeaveTypeTemplate.js';
 
 /** In the order they must run. Add new migrations at the end. */
@@ -24,6 +25,7 @@ const MIGRATIONS = Object.freeze([
   addDepartmentSlugs,
   addAccountStatuses,
   addEmployeeCodes,
+  addOfficeAttendanceSettings,
 ]);
 
 export async function runStartupMigrations() {

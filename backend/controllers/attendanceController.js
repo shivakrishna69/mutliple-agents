@@ -18,8 +18,8 @@
  *   5. Precision    the location fix is within MAX_LOCATION_ACCURACY_METRES   422
  *   6. Day          today's date in the office time zone, from the server
  *                   clock; one punch-in per day                               409
- *   7. Geofence     on-site and hybrid employees: a radius is configured      409
- *                   and the Haversine distance to the office is within it     403 UNAUTHORIZED_SPATIAL_LOCATION
+ *   7. Geofence     on-site and hybrid employees: the Haversine distance to the office is within
+ *                   their own radius, or else the office's                    403 UNAUTHORIZED_SPATIAL_LOCATION
  *                   remote employees: the distance is recorded, not enforced
  *   8. Status       Normal / Late / Half_Day from the arrival time against the office shift
  *   9. Persist      the unique { employeeId, date } index makes a racing duplicate a 409
@@ -36,7 +36,12 @@ import Attendance from '../models/Attendance.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { AI_FAILURE_KIND, AiServiceError, requestAttendanceRegularization } from '../services/aiServiceClient.js';
-import { classifyArrival, evaluateGeofence, readOfficeLocalClock } from '../services/attendancePolicy.js';
+import {
+  classifyArrival,
+  effectiveGeofenceRadiusMeters,
+  evaluateGeofence,
+  readOfficeLocalClock,
+} from '../services/attendancePolicy.js';
 import { EMPLOYEE_CONTEXT_UNAVAILABLE, loadEmployeeAgentContext } from '../services/employeeContext.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
@@ -50,7 +55,6 @@ export const ATTENDANCE_ERROR_CODES = Object.freeze({
   PROFILE_NOT_FOUND: 'PROFILE_NOT_FOUND',
   EMPLOYMENT_ENDED: 'EMPLOYMENT_ENDED',
   OFFICE_NOT_CONFIGURED: 'OFFICE_NOT_CONFIGURED',
-  GEOFENCE_NOT_CONFIGURED: 'GEOFENCE_NOT_CONFIGURED',
   DEVICE_NOT_RECOGNISED: 'DEVICE_NOT_RECOGNISED',
   LOCATION_TOO_IMPRECISE: 'LOCATION_TOO_IMPRECISE',
   UNAUTHORIZED_SPATIAL_LOCATION: 'UNAUTHORIZED_SPATIAL_LOCATION',
@@ -98,7 +102,7 @@ function toAttendanceSummary(attendanceRecord) {
  *   401 no session / 403 bad CSRF   (protect)
  *   403 { error: { code: EMPLOYMENT_ENDED | DEVICE_NOT_RECOGNISED | UNAUTHORIZED_SPATIAL_LOCATION, context? } }
  *   404 { error: { code: PROFILE_NOT_FOUND } }
- *   409 { error: { code: OFFICE_NOT_CONFIGURED | GEOFENCE_NOT_CONFIGURED | ALREADY_PUNCHED_IN } }
+ *   409 { error: { code: OFFICE_NOT_CONFIGURED | ALREADY_PUNCHED_IN } }
  *   422 { error: { code: LOCATION_TOO_IMPRECISE, context } }
  *   429 too many attempts (rate limiter) / 500 unexpected (central error handler)
  */
@@ -188,15 +192,8 @@ export async function punchIn(req, res, next) {
     // ---- 7. Geofence --------------------------------------------------------------------------
     const isGeofenceEnforced = workLocationType !== WORK_LOCATION_TYPES.REMOTE;
     const allowedRadiusMeters = isGeofenceEnforced
-      ? (employeeProfile.biometricMetadata?.allowedGeofenceRadius ?? null)
+      ? effectiveGeofenceRadiusMeters(office, employeeProfile.biometricMetadata?.allowedGeofenceRadius)
       : null;
-    if (isGeofenceEnforced && allowedRadiusMeters === null) {
-      auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'geofence_not_configured' });
-      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
-        code: ATTENDANCE_ERROR_CODES.GEOFENCE_NOT_CONFIGURED,
-        message: ATTENDANCE_MESSAGES.GEOFENCE_NOT_CONFIGURED,
-      });
-    }
     // Remote employees are measured too (with an infinite radius), so the record shows where they punched from.
     const { distanceMeters, isInsideGeofence } = evaluateGeofence(
       punchPoint,
