@@ -122,7 +122,7 @@ function ApprovalItem({ request, queue, onDecided, onOvertaken }) {
               ? `${describeChange(request.pendingChange)} · “${request.pendingChange.reason}” · asked ${formatDateTime(request.pendingChange.requestedAt)}`
               : `“${request.reason}” · asked ${formatDateTime(request.createdAt)}`}
           </p>
-          {approvalProgress && <p className="mt-1 text-xs font-medium text-indigo-700">{approvalProgress}</p>}
+          {approvalProgress && <p className="mt-1 text-xs font-medium text-brand-700">{approvalProgress}</p>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {isChange && <Badge tone="violet">Change</Badge>}
@@ -133,7 +133,7 @@ function ApprovalItem({ request, queue, onDecided, onOvertaken }) {
       <button
         type="button"
         onClick={() => setShowsDays(!showsDays)}
-        className="mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-500"
+        className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-500"
         aria-expanded={showsDays}
       >
         {showsDays ? 'Hide days' : 'Show each day'}

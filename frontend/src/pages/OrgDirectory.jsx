@@ -19,7 +19,7 @@ function initialsOf(fullName) {
 }
 
 const AVATAR_GRADIENTS = [
-  'from-indigo-500 to-violet-500',
+  'from-brand-500 to-brand-600',
   'from-sky-500 to-cyan-500',
   'from-emerald-500 to-teal-500',
   'from-amber-500 to-orange-500',
@@ -59,7 +59,7 @@ function TreeNode({ node, depth, selectedId, onSelect, forceExpanded }) {
   return (
     <li>
       <div
-        className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition ${isSelected ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'hover:bg-slate-50'}`}
+        className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition ${isSelected ? 'bg-brand-50 ring-1 ring-brand-200' : 'hover:bg-slate-50'}`}
       >
         <button
           type="button"
@@ -112,7 +112,7 @@ function ReportsPanel({ person }) {
   if (!data) return null;
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-4 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 p-5 text-white">
+      <div className="flex items-center gap-4 rounded-2xl bg-gradient-to-br from-neutral-950 via-neutral-900 to-brand-950 p-5 text-white">
         <Avatar person={data.manager} size="h-14 w-14 text-base" />
         <div>
           <p className="text-lg font-bold">{data.manager.name}</p>
@@ -125,7 +125,7 @@ function ReportsPanel({ person }) {
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <StatTile label="Direct" value={data.meta.directReportCount} accent="indigo" />
+        <StatTile label="Direct" value={data.meta.directReportCount} accent="brand" />
         <StatTile label="Total" value={data.meta.totalReportCount} accent="emerald" />
         <StatTile label="Depth" value={data.meta.maxDepth} accent="amber" />
       </div>
@@ -175,7 +175,7 @@ export default function OrgDirectory() {
       <PageHeader title="Organisation" description="Reporting lines across the company." />
       {data && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatTile label="Employees" value={data.meta.employeeCount} Icon={UsersIcon} accent="indigo" />
+          <StatTile label="Employees" value={data.meta.employeeCount} Icon={UsersIcon} accent="brand" />
           <StatTile
             label="Levels"
             value={data.meta.maxDepth}
@@ -204,7 +204,7 @@ export default function OrgDirectory() {
                 onChange={(changeEvent) => setSearchQuery(changeEvent.target.value)}
                 placeholder="Search people"
                 aria-label="Search people"
-                className="w-48 rounded-xl border-0 bg-slate-50 py-2 pr-3 pl-9 text-sm ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-48 rounded-xl border-0 bg-slate-50 py-2 pr-3 pl-9 text-sm ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-brand-500 focus:outline-none"
               />
             </label>
           }

@@ -17,8 +17,8 @@ export const CONVERSATION_STATUS_DISPLAY = Object.freeze({
   'processing-ai': {
     label: 'AI Processing',
     description: 'The AI assistant is handling this conversation',
-    chipClassName: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
-    dotClassName: 'bg-indigo-500',
+    chipClassName: 'bg-brand-50 text-brand-700 ring-brand-600/20',
+    dotClassName: 'bg-brand-500',
   },
   'escalated-to-human': {
     label: 'Escalated to Human',
@@ -55,8 +55,8 @@ export const SENDER_DISPLAY = Object.freeze({
   ai_supervisor: {
     label: 'AI Supervisor',
     alignment: 'end',
-    bubbleClassName: 'bg-indigo-600 text-white',
-    labelClassName: 'text-indigo-700',
+    bubbleClassName: 'bg-brand-600 text-white',
+    labelClassName: 'text-brand-700',
   },
   ai_worker: {
     label: 'AI Specialist',

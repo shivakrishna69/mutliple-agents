@@ -1,4 +1,4 @@
-# Unitora: Project Overview (context for an AI assistant)
+# NSK: Project Overview (context for an AI assistant)
 
 > Purpose of this document: give an AI model complete, accurate context about this codebase so it can
 > answer questions, plan features, or write code that fits the existing design. It describes what
@@ -9,7 +9,7 @@
 
 ## 1. What the product is
 
-**Unitora** is a single web platform that combines two products for small and mid-size Indian
+**NSK** (NSK Software Technologies, https://nsksofttech.in/) is a single web platform that combines two products for small and mid-size Indian
 companies (roughly 50–1,000 employees):
 
 1. **AI-first customer support desk.** Customers chat with the company. A multi-agent AI (LangGraph +
@@ -277,7 +277,7 @@ Data fetching goes through `hooks/useApiResource.js` (abort on unmount, 401 → 
 1. Start Docker Desktop; then `docker start multiagent-mongo` (the `multiagent-ai-service` container restarts on its own).
 2. Backend: `cd backend && npm run dev` (Node `--watch`, port 5000).
 3. Frontend: `cd frontend && npm run dev` (Vite, port 5173). Open http://localhost:5173.
-4. Demo data (local only): `node --env-file=.env scripts/seedDemoData.js [--link <email> ...]` creates a demo company (departments, hierarchy, risk scores, Q4 OKRs, pending attendance reviews); `--remove` deletes exactly what it created. Demo accounts use the domain `demo.novasupport.in`.
+4. Demo data (local only): `node --env-file=.env scripts/seedDemoData.js [--link <email> ...]` creates a demo company (departments, hierarchy, risk scores, Q4 OKRs, pending attendance reviews); `--remove` deletes exactly what it created. Demo accounts use the domain `demo.example.com`.
 
 Testing approach used so far: end-to-end scripts against an isolated backend and a throwaway database (HTTP + Socket.IO + Playwright with Microsoft Edge), local S3 (S3Mock) and SMTP (Mailpit) stand-ins, plus a real Groq-backed turn for telemetry.
 

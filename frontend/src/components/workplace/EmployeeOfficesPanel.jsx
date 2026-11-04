@@ -43,13 +43,13 @@ function EmployeeOfficeRow({ employee, offices, onAssigned }) {
         </div>
         {!employee.officeLocationId && <Badge tone="amber">No office</Badge>}
         <div className="flex items-center gap-2">
-          {isSaving && <Spinner className="h-4 w-4 text-indigo-500" />}
+          {isSaving && <Spinner className="h-4 w-4 text-brand-500" />}
           <select
             aria-label={`Base office for ${employee.name}`}
             value={employee.officeLocationId ?? NO_OFFICE}
             disabled={isSaving}
             onChange={(changeEvent) => assignOffice(changeEvent.target.value)}
-            className="rounded-lg border-0 py-1.5 pr-8 pl-3 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-indigo-500"
+            className="rounded-lg border-0 py-1.5 pr-8 pl-3 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-brand-500"
           >
             <option value={NO_OFFICE}>No office</option>
             {offices.map((office) => (
@@ -111,7 +111,7 @@ export default function EmployeeOfficesPanel() {
             value={searchText}
             onChange={(changeEvent) => setSearchText(changeEvent.target.value)}
             placeholder="Search by name or email"
-            className="rounded-xl border-0 py-2 pr-3 pl-9 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-indigo-500"
+            className="rounded-xl border-0 py-2 pr-3 pl-9 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-brand-500"
           />
         </label>
       }

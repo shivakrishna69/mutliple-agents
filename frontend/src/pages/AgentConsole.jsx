@@ -299,7 +299,7 @@ export default function AgentConsole() {
       type="button"
       onClick={() => performConversationAction(requestClaimConversation)}
       disabled={isPerformingAction}
-      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-indigo-300"
+      className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-brand-300"
     >
       {isPerformingAction ? 'Claiming…' : 'Claim'}
     </button>
@@ -308,7 +308,7 @@ export default function AgentConsole() {
       type="button"
       onClick={() => performConversationAction(requestReleaseConversation)}
       disabled={isPerformingAction}
-      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
     >
       {isPerformingAction ? 'Releasing…' : 'Return to queue'}
     </button>

@@ -114,9 +114,9 @@ export async function startTestServer({
   // The key the backend and the AI service share; tests use it to call /api/internal like the AI service.
   const internalApiKey = randomBytes(32).toString('hex');
   const port = requestedPort ?? (await findFreePort());
-  const databaseName = `unitora_test_${process.pid}_${randomBytes(4).toString('hex')}`;
+  const databaseName = `nsk_test_${process.pid}_${randomBytes(4).toString('hex')}`;
   const mongoUri = `${MONGO_BASE_URL}/${databaseName}`;
-  const workingDirectory = await mkdtemp(path.join(tmpdir(), 'unitora-backend-test-'));
+  const workingDirectory = await mkdtemp(path.join(tmpdir(), 'nsk-backend-test-'));
   const baseUrl = `http://127.0.0.1:${port}`;
   const database = mongoose.createConnection(mongoUri, { serverSelectionTimeoutMS: 5_000 });
   let serverProcess = null;

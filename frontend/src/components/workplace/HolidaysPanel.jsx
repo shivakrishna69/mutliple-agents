@@ -110,7 +110,7 @@ function HolidayForm({ holiday, offices, defaultYear, onSaved, onCancel }) {
                   <label key={office.id} className="flex items-center gap-1.5 text-sm text-slate-700">
                     <input
                       type="checkbox"
-                      className="rounded border-slate-300 text-indigo-600"
+                      className="rounded border-slate-300 text-brand-600"
                       checked={form.officeLocationIds.includes(office.id)}
                       onChange={() => toggleOffice(office.id)}
                     />
@@ -164,7 +164,7 @@ function HolidayRow({ holiday, officeNameById, onEdit, onRemoved }) {
         <p className="min-w-48 flex-1 text-sm font-semibold text-slate-900">{holiday.name}</p>
         <div className="flex flex-wrap gap-1.5">
           {holiday.appliesToAllOffices ? (
-            <Badge tone="indigo">Every office</Badge>
+            <Badge tone="brand">Every office</Badge>
           ) : (
             holiday.officeLocationIds.map((officeId) => (
               <Badge key={officeId}>{officeNameById.get(officeId) ?? 'Removed office'}</Badge>

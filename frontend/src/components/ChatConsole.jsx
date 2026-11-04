@@ -240,8 +240,8 @@ function ConversationListItem({ conversation, isSelected, onSelect }) {
         aria-current={isSelected ? 'true' : undefined}
         className={[
           'w-full rounded-lg px-3 py-2.5 text-left transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
-          isSelected ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'hover:bg-slate-50',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+          isSelected ? 'bg-brand-50 ring-1 ring-brand-200' : 'hover:bg-slate-50',
         ].join(' ')}
       >
         <div className="flex items-center justify-between gap-2">
@@ -382,13 +382,13 @@ export function MessageComposer({ canSendMessage, sendDisabledReason, onSendMess
           }
           aria-invalid={isOverLimit ? 'true' : 'false'}
           aria-describedby="chat-composer-hint"
-          className="block max-h-40 min-h-[2.75rem] flex-1 resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
+          className="block max-h-40 min-h-[2.75rem] flex-1 resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
         />
         <button
           type="submit"
           disabled={isSendBlocked}
           aria-busy={isSending}
-          className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-indigo-300"
+          className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-brand-300"
         >
           {isSending ? 'Sending…' : 'Send'}
         </button>

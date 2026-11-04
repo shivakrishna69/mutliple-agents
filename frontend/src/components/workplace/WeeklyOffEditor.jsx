@@ -59,7 +59,7 @@ export default function WeeklyOffEditor({ rules, onChange, error }) {
                 aria-label={`${dayName} schedule`}
                 value={mode}
                 onChange={(changeEvent) => changeMode(weekday, changeEvent.target.value)}
-                className="rounded-lg border-0 py-1.5 pr-8 pl-3 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-indigo-500"
+                className="rounded-lg border-0 py-1.5 pr-8 pl-3 text-sm ring-1 ring-slate-300 ring-inset focus:ring-2 focus:ring-brand-500"
               >
                 <option value={DAY_MODES.WORKING}>Working day</option>
                 <option value={DAY_MODES.EVERY_WEEK}>Off every week</option>
@@ -71,7 +71,7 @@ export default function WeeklyOffEditor({ rules, onChange, error }) {
                     <label key={value} className="flex items-center gap-1.5 text-sm text-slate-700">
                       <input
                         type="checkbox"
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                         checked={rule.occurrencesInMonth.includes(value)}
                         onChange={() => toggleOccurrence(weekday, value)}
                       />

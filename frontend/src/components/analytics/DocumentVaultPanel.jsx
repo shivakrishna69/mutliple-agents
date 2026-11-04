@@ -108,9 +108,9 @@ function UploadDropzone({ employeeId, canChooseRoles, onUploaded }) {
           setIsDragging(false);
           chooseFile(dropEvent.dataTransfer.files?.[0]);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-8 text-center transition ${isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-slate-50/60 hover:border-indigo-400'}`}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-8 text-center transition ${isDragging ? 'border-brand-500 bg-brand-50' : 'border-slate-300 bg-slate-50/60 hover:border-brand-400'}`}
       >
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-brand-600 shadow-sm ring-1 ring-slate-200">
           <UploadIcon className="h-6 w-6" />
         </span>
         <span className="mt-3 text-sm font-semibold text-slate-800">
@@ -152,7 +152,7 @@ function UploadDropzone({ employeeId, canChooseRoles, onUploaded }) {
                         : accessibleRoles.filter((existingRole) => existingRole !== roleName),
                     )
                   }
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600"
                 />
                 {roleName === 'hr' ? 'HR' : 'Admins'}
               </label>
@@ -361,7 +361,7 @@ export default function DocumentVaultPanel() {
           <p className="text-sm text-slate-600">Payslips are generated as signed PDFs with a public verification ID.</p>
           <Link
             to={ROUTE_PATHS.PAYROLL}
-            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-500"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-500"
           >
             {isRecordsAdmin ? 'Generate or view payslips' : 'View my payslips'} →
           </Link>

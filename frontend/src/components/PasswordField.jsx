@@ -51,7 +51,7 @@ export default function PasswordField(formFieldProps) {
           aria-label={toggleLabel}
           aria-pressed={isPasswordVisible}
           title={toggleLabel}
-          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
         >
           {isPasswordVisible ? <EyeSlashIcon /> : <EyeIcon />}
         </button>

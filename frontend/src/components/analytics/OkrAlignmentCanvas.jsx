@@ -175,7 +175,7 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
             checked={statusOf(milestone) === 'done'}
             disabled={!keyResult.canUpdate || busyMilestoneId !== null}
             onChange={() => toggleMilestone(milestone)}
-            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
           />
           <span className={statusOf(milestone) === 'done' ? 'text-slate-400 line-through' : 'text-slate-700'}>
             {milestone.title}
@@ -195,7 +195,7 @@ function MilestoneList({ keyResult, onChanged, reportError }) {
             placeholder="Add a milestone…"
             maxLength={200}
             aria-label="New milestone title"
-            className="min-w-0 flex-1 rounded-lg border-0 bg-slate-50 px-3 py-1.5 text-xs ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="min-w-0 flex-1 rounded-lg border-0 bg-slate-50 px-3 py-1.5 text-xs ring-1 ring-slate-200 ring-inset focus:ring-2 focus:ring-brand-500 focus:outline-none"
           />
           <input
             type="date"
@@ -303,7 +303,7 @@ function KeyResultRow({ keyResult, onChanged, reportError }) {
             }
             onBlur={commitProgress}
             aria-label={`Progress for ${keyResult.title}`}
-            className="h-2 w-full cursor-pointer accent-indigo-600"
+            className="h-2 w-full cursor-pointer accent-brand-600"
           />
         ) : (
           <ProgressBar
@@ -316,7 +316,7 @@ function KeyResultRow({ keyResult, onChanged, reportError }) {
       <button
         type="button"
         onClick={() => setIsExpanded((wasExpanded) => !wasExpanded)}
-        className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-500"
+        className="mt-2 text-xs font-medium text-brand-600 hover:text-brand-500"
         aria-expanded={isExpanded}
       >
         Milestones {keyResult.milestoneSummary.done}/{keyResult.milestoneSummary.total} {isExpanded ? '▴' : '▾'}
@@ -371,7 +371,7 @@ function AddKeyResultForm({ objective, ownerOptions, defaultOwnerId, onCreated, 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl bg-indigo-50/60 p-4 ring-1 ring-indigo-100">
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl bg-brand-50/60 p-4 ring-1 ring-brand-100">
       <TextInput
         label="Key result"
         value={form.title}
@@ -488,7 +488,7 @@ function CompanyObjectiveNode({
 }) {
   return (
     <article className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70">
-      <header className="relative bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 px-6 py-5 text-white">
+      <header className="relative bg-gradient-to-br from-neutral-950 via-neutral-900 to-brand-950 px-6 py-5 text-white">
         <div className="flex items-start gap-4">
           <ProgressRing value={objective.rollupProgress ?? objective.progress} size={64} onDark />
           <div className="min-w-0 flex-1">
@@ -533,10 +533,10 @@ function CompanyObjectiveNode({
             />
           ) : (
             // Connector: a rail on the left with a tick per team node.
-            <div className="relative space-y-4 border-l-2 border-dashed border-indigo-200 pl-5">
+            <div className="relative space-y-4 border-l-2 border-dashed border-brand-200 pl-5">
               {objective.teams.map((team) => (
                 <section key={team.department.departmentId} className="relative">
-                  <span className="absolute top-5 -left-[1.4rem] h-0.5 w-4 bg-indigo-200" aria-hidden="true" />
+                  <span className="absolute top-5 -left-[1.4rem] h-0.5 w-4 bg-brand-200" aria-hidden="true" />
                   <div className="rounded-2xl bg-slate-50/80 p-4 ring-1 ring-slate-200/70">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-semibold text-slate-900">

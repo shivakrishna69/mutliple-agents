@@ -367,7 +367,7 @@ export default function LeaveTypeForm({ leaveType, onSaved, onCancel }) {
                 <label key={status} className="flex items-center gap-1.5 text-sm text-slate-700">
                   <input
                     type="checkbox"
-                    className="rounded border-slate-300 text-indigo-600"
+                    className="rounded border-slate-300 text-brand-600"
                     checked={form.eligibleEmploymentStatuses.includes(status)}
                     onChange={() => toggleStatus(status)}
                   />

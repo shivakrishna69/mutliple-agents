@@ -1,10 +1,11 @@
 {
-  "name": "unitora",
+  "name": "nsk",
   "private": true,
   "description": "Workspace scripts that run the checks of every JavaScript service from the repository root.",
   "scripts": {
     "lint": "npm run lint --prefix backend && npm run lint --prefix frontend",
     "format": "npm run format --prefix backend && npm run format --prefix frontend",
-    "format:check": "npm run format:check --prefix backend && npm run format:check --prefix frontend"
+    "format:check": "npm run format:check --prefix backend && npm run format:check --prefix frontend",
+    "check:names": "node scripts/checkRetiredNames.mjs"
   }
 }

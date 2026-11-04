@@ -1,16 +1,16 @@
 /**
  * Shared presentation primitives for the workforce screens (payroll, attendance, analytics, OKRs,
  * vault, telemetry). Pure presentation: no data fetching. The visual language follows AppShell:
- * white cards on slate-50, indigo/violet accents, rounded-2xl surfaces, soft rings for depth.
+ * white cards on slate-50, NSK orange accents, rounded-2xl surfaces, soft rings for depth.
  */
 
 import { useId } from 'react';
 
 const BUTTON_VARIANTS = Object.freeze({
   primary:
-    'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-600/20 hover:from-indigo-500 hover:to-violet-500 focus-visible:ring-indigo-500',
-  secondary: 'bg-white text-slate-700 ring-1 ring-slate-200 ring-inset hover:bg-slate-50 focus-visible:ring-indigo-500',
-  ghost: 'text-slate-600 hover:bg-slate-100 focus-visible:ring-indigo-500',
+    'bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-sm shadow-brand-600/20 hover:from-brand-500 hover:to-brand-600 focus-visible:ring-brand-500',
+  secondary: 'bg-white text-slate-700 ring-1 ring-slate-200 ring-inset hover:bg-slate-50 focus-visible:ring-brand-500',
+  ghost: 'text-slate-600 hover:bg-slate-100 focus-visible:ring-brand-500',
   danger: 'bg-rose-600 text-white hover:bg-rose-500 focus-visible:ring-rose-500',
   success: 'bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500',
 });
@@ -52,7 +52,7 @@ export function Spinner({ className = 'h-6 w-6' }) {
 export function LoadingBlock({ label = 'Loading…' }) {
   return (
     <div className="flex items-center justify-center gap-3 py-16 text-sm text-slate-500" role="status">
-      <Spinner className="h-5 w-5 text-indigo-500" />
+      <Spinner className="h-5 w-5 text-brand-500" />
       {label}
     </div>
   );
@@ -76,7 +76,7 @@ export function Card({ title, subtitle, actions = null, className = '', bodyClas
 }
 
 const STAT_ACCENTS = Object.freeze({
-  indigo: 'from-indigo-500 to-violet-500',
+  brand: 'from-brand-500 to-brand-600',
   emerald: 'from-emerald-500 to-teal-500',
   amber: 'from-amber-500 to-orange-500',
   rose: 'from-rose-500 to-pink-500',
@@ -84,7 +84,7 @@ const STAT_ACCENTS = Object.freeze({
   slate: 'from-slate-500 to-slate-600',
 });
 
-export function StatTile({ label, value, hint, accent = 'indigo', Icon = null }) {
+export function StatTile({ label, value, hint, accent = 'brand', Icon = null }) {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
       <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${STAT_ACCENTS[accent]}`} aria-hidden="true" />
@@ -108,7 +108,7 @@ export function StatTile({ label, value, hint, accent = 'indigo', Icon = null })
 
 const BADGE_TONES = Object.freeze({
   slate: 'bg-slate-100 text-slate-700 ring-slate-500/20',
-  indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+  brand: 'bg-brand-50 text-brand-700 ring-brand-600/20',
   emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
   amber: 'bg-amber-50 text-amber-800 ring-amber-600/20',
   rose: 'bg-rose-50 text-rose-700 ring-rose-600/20',
@@ -143,16 +143,16 @@ export function Tabs({ tabs, activeTabId, onChange, label }) {
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(id)}
-            className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none ${
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
               isActive
                 ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            {Icon && <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-600' : ''}`} />}
+            {Icon && <Icon className={`h-4 w-4 ${isActive ? 'text-brand-600' : ''}`} />}
             {tabLabel}
             {badge !== undefined && badge !== null && (
-              <span className="rounded-full bg-indigo-600 px-1.5 text-[0.65rem] text-white">{badge}</span>
+              <span className="rounded-full bg-brand-600 px-1.5 text-[0.65rem] text-white">{badge}</span>
             )}
           </button>
         );
@@ -165,7 +165,7 @@ export function EmptyState({ title, description, Icon = null, action = null }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 px-6 py-14 text-center">
       {Icon && (
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-500 shadow-sm ring-1 ring-slate-200">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-brand-500 shadow-sm ring-1 ring-slate-200">
           <Icon className="h-6 w-6" />
         </span>
       )}
@@ -177,13 +177,13 @@ export function EmptyState({ title, description, Icon = null, action = null }) {
 }
 
 const PROGRESS_TONES = Object.freeze({
-  indigo: 'from-indigo-500 to-violet-500',
+  brand: 'from-brand-500 to-brand-600',
   emerald: 'from-emerald-500 to-teal-400',
   amber: 'from-amber-500 to-orange-400',
   rose: 'from-rose-500 to-pink-500',
 });
 
-export function ProgressBar({ value, tone = 'indigo', label }) {
+export function ProgressBar({ value, tone = 'brand', label }) {
   const clampedValue = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   return (
     <div
@@ -210,7 +210,7 @@ export function progressTone(progressValue) {
 }
 
 const INPUT_CLASS_NAME =
-  'block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm ring-1 ring-slate-300 ring-inset placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
+  'block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm ring-1 ring-slate-300 ring-inset placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
 
 /** Label + control + hint/error. `children` receives the generated control id. */
 export function Field({ label, hint, error, children, className = '' }) {
@@ -270,7 +270,7 @@ export function Toggle({ label, description, checked, onChange }) {
         onChange={(changeEvent) => onChange(changeEvent.target.checked)}
       />
       <span
-        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
+        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-slate-300 transition peer-checked:bg-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
         aria-hidden="true"
       />
     </label>
@@ -280,7 +280,7 @@ export function Toggle({ label, description, checked, onChange }) {
 /** Small inline notice. tone: info | success | warning | error. */
 export function Notice({ tone = 'info', title, children, onDismiss }) {
   const toneClassName = {
-    info: 'bg-indigo-50 text-indigo-900 ring-indigo-200',
+    info: 'bg-brand-50 text-brand-900 ring-brand-200',
     success: 'bg-emerald-50 text-emerald-900 ring-emerald-200',
     warning: 'bg-amber-50 text-amber-900 ring-amber-200',
     error: 'bg-rose-50 text-rose-900 ring-rose-200',

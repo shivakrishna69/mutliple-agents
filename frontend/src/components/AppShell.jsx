@@ -141,9 +141,9 @@ function SidebarNavigation({ userRole, onNavigate }) {
                     className={({ isActive }) =>
                       [
                         'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
-                        'focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:outline-none',
+                        'focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none',
                         isActive
-                          ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/10 text-white ring-1 ring-indigo-400/30 ring-inset'
+                          ? 'bg-gradient-to-r from-brand-500/20 to-brand-600/10 text-white ring-1 ring-brand-400/30 ring-inset'
                           : 'text-slate-400 hover:bg-white/5 hover:text-white',
                       ].join(' ')
                     }
@@ -151,7 +151,7 @@ function SidebarNavigation({ userRole, onNavigate }) {
                     {({ isActive }) => (
                       <>
                         <Icon
-                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-indigo-300' : 'text-slate-500 group-hover:text-slate-300'}`}
+                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300'}`}
                         />
                         {label}
                       </>
@@ -172,7 +172,7 @@ function UserCard({ currentUser, isSigningOut, onSignOut }) {
     <div className="border-t border-white/10 p-3">
       <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 text-sm font-bold text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white"
           aria-hidden="true"
         >
           {computeInitials(currentUser.name)}
@@ -190,7 +190,7 @@ function UserCard({ currentUser, isSigningOut, onSignOut }) {
           aria-busy={isSigningOut}
           aria-label={isSigningOut ? 'Signing out' : 'Sign out'}
           title="Sign out"
-          className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50"
+          className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50"
         >
           <SignOutIcon className="h-5 w-5" />
         </button>
@@ -204,7 +204,7 @@ function UserCard({ currentUser, isSigningOut, onSignOut }) {
 
 function SidebarContents({ currentUser, isSigningOut, onSignOut, onNavigate, closeButton = null }) {
   return (
-    <div className="flex h-full flex-col bg-slate-950">
+    <div className="flex h-full flex-col bg-neutral-950">
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5">
         <BrandMark tone="light" />
         {closeButton}
@@ -276,7 +276,7 @@ export default function AppShell() {
                   type="button"
                   onClick={closeMobileNav}
                   aria-label="Close navigation"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:outline-none"
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
                 >
                   <CloseIcon className="h-5 w-5" />
                 </button>
@@ -294,7 +294,7 @@ export default function AppShell() {
             onClick={() => setIsMobileNavOpen(true)}
             aria-label="Open navigation"
             aria-expanded={isMobileNavOpen}
-            className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+            className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
           >
             <MenuIcon className="h-6 w-6" />
           </button>

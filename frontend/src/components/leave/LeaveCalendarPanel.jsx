@@ -108,7 +108,7 @@ export default function LeaveCalendarPanel() {
                 <li
                   key={day.date}
                   className={`min-h-20 rounded-xl p-2 text-left ring-1 ring-slate-200/70 ${DAY_STYLES[day.kind]} ${
-                    isToday ? 'ring-2 ring-indigo-500' : ''
+                    isToday ? 'ring-2 ring-brand-500' : ''
                   }`}
                 >
                   <p className="text-sm font-semibold">{Number(day.date.slice(8))}</p>

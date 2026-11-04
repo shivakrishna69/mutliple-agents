@@ -16,6 +16,8 @@ import { EMAIL_PATTERN } from '../constants/validation.js';
  * brute-forced offline from a single signed value.
  */
 const MIN_SECRET_LENGTH = 32;
+// The name in emails when the deployment sets neither COMPANY_NAME nor COMPANY_LEGAL_NAME.
+const DEFAULT_COMPANY_NAME = 'NSK Software Technologies';
 
 /** Bounds for AI_SERVICE_TIMEOUT_MS: long enough for an LLM round trip, short enough not to hang webhooks. */
 const AI_SERVICE_TIMEOUT_BOUNDS_MS = Object.freeze({ MIN: 1_000, MAX: 120_000, DEFAULT: 20_000 });
@@ -111,7 +113,7 @@ const PDF_BROWSER_CHANNELS = Object.freeze(['chrome', 'chrome-beta', 'msedge', '
  * Payslip generation settings (services/payslipService.js). Disabled (null) unless
  * PAYSLIP_S3_BUCKET is set; when it is, everything a payslip needs must be configured:
  *   COMPANY_LEGAL_NAME, COMPANY_REGISTERED_ADDRESS   printed in the payslip header
- *   COMPANY_BRAND_COLOR                              optional "#RRGGBB" accent (default #4f46e5)
+ *   COMPANY_BRAND_COLOR                              optional "#RRGGBB" accent (default #c75000)
  *   PAYSLIP_SIGNING_SECRET                           HMAC key for verification IDs (≥ 32 chars)
  *   PAYSLIP_VERIFICATION_BASE_URL                    optional public URL printed next to the ID
  *   PDF_BROWSER_EXECUTABLE_PATH | PDF_BROWSER_CHANNEL  the Chromium build that renders PDFs
@@ -128,8 +130,8 @@ function loadPayslipConfig(env) {
   if (companyRegisteredAddress.length < 5 || companyRegisteredAddress.length > 400) {
     throw new Error('COMPANY_REGISTERED_ADDRESS (5-400 characters) is required when PAYSLIP_S3_BUCKET is set');
   }
-  const brandColor = (process.env.COMPANY_BRAND_COLOR ?? '#4f46e5').trim();
-  if (!HEX_COLOR_PATTERN.test(brandColor)) throw new Error('COMPANY_BRAND_COLOR must be a hex colour such as #4f46e5');
+  const brandColor = (process.env.COMPANY_BRAND_COLOR ?? '#c75000').trim();
+  if (!HEX_COLOR_PATTERN.test(brandColor)) throw new Error('COMPANY_BRAND_COLOR must be a hex colour such as #c75000');
 
   const signingSecret = process.env.PAYSLIP_SIGNING_SECRET ?? '';
   if (signingSecret.length < MIN_SECRET_LENGTH) {
@@ -180,10 +182,10 @@ function loadPayslipConfig(env) {
  *   SMTP_PORT (587), SMTP_SECURE ("true" for implicit TLS on 465), SMTP_USER, SMTP_PASSWORD
  *   SMTP_REQUIRE_TLS          default "true"; "false" only outside production, for local mail
  *                             catchers (Mailpit, MailHog) that do not offer STARTTLS
- *   MAIL_FROM                 required with SMTP_HOST, e.g. "Unitora HR <hr@yourcompany.com>"
+ *   MAIL_FROM                 required with SMTP_HOST, e.g. "NSK HR <hr@yourcompany.com>"
  *   APP_PUBLIC_URL            where people open the app (default: the first CORS origin);
  *                             must be https in production
- *   COMPANY_NAME              shown in invitation emails (default: COMPANY_LEGAL_NAME, else "Unitora")
+ *   COMPANY_NAME              shown in invitation emails (default: COMPANY_LEGAL_NAME, else "NSK Software Technologies")
  */
 function loadMailAndPublicConfig(env, corsOrigins) {
   const appPublicUrlSetting = (process.env.APP_PUBLIC_URL ?? corsOrigins[0] ?? '').trim().replace(/\/+$/, '');
@@ -198,7 +200,8 @@ function loadMailAndPublicConfig(env, corsOrigins) {
     throw new Error('APP_PUBLIC_URL must use https in production');
 
   const companyName =
-    (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? 'Unitora').trim().slice(0, 120) || 'Unitora';
+    (process.env.COMPANY_NAME ?? process.env.COMPANY_LEGAL_NAME ?? DEFAULT_COMPANY_NAME).trim().slice(0, 120) ||
+    DEFAULT_COMPANY_NAME;
 
   const smtpHost = (process.env.SMTP_HOST ?? '').trim();
   if (!smtpHost) return { mail: null, appPublicUrl: parsedPublicUrl.origin, companyName };

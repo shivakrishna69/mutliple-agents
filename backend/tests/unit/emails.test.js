@@ -40,7 +40,7 @@ describe('renderEmailLayout', () => {
 
   it('leaves out the button block when there is no action', () => {
     const html = renderEmailLayout({
-      companyName: 'Unitora',
+      companyName: 'NSK',
       heading: 'Hi',
       bodyHtml: '<p>Body</p>',
       footerText: 'Footer',
@@ -54,7 +54,7 @@ describe('buildInvitationEmail', () => {
   const details = {
     inviteeName: 'Kiran <b>Patel</b>',
     inviterName: 'Hema Rao',
-    companyName: 'Unitora Labs',
+    companyName: 'NSK Software Technologies',
     designation: 'Engineer',
     departmentName: 'Platform',
     inviteUrl: 'https://hr.example.com/invite/abc_DEF-123',
@@ -63,7 +63,7 @@ describe('buildInvitationEmail', () => {
 
   it('addresses the invitee and links to the invitation, in HTML and plain text', () => {
     const email = buildInvitationEmail(details);
-    assert.equal(email.subject, 'Hema Rao invited you to join Unitora Labs');
+    assert.equal(email.subject, 'Hema Rao invited you to join NSK Software Technologies');
     assert.equal(email.html.includes('Kiran &lt;b&gt;Patel&lt;/b&gt;'), true);
     assert.equal(email.html.includes('<b>Patel</b>'), false);
     assert.equal(email.html.split(details.inviteUrl).length - 1, 2, 'button and fallback link');
@@ -75,7 +75,7 @@ describe('buildInvitationEmail', () => {
 
   it('omits the department when there is none', () => {
     const email = buildInvitationEmail({ ...details, departmentName: null });
-    assert.match(email.text, /join Unitora Labs as Engineer\./);
+    assert.match(email.text, /join NSK Software Technologies as Engineer\./);
   });
 });
 
@@ -87,7 +87,7 @@ describe('leave request emails', () => {
     startDate: '2026-11-06',
     endDate: '2026-11-09',
     totalDays: 4,
-    companyName: 'Unitora Labs',
+    companyName: 'NSK Software Technologies',
   };
 
   it('asks the approver to review a request, escaping what the employee wrote', () => {

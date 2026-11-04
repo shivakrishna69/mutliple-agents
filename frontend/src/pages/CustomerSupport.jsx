@@ -31,8 +31,8 @@ const CUSTOMER_VIEW_SENDERS = Object.freeze({
   customer: {
     label: 'You',
     isOwn: true,
-    bubbleClassName: 'bg-indigo-600 text-white',
-    labelClassName: 'text-indigo-700',
+    bubbleClassName: 'bg-brand-600 text-white',
+    labelClassName: 'text-brand-700',
   },
   ai_supervisor: {
     label: 'Support Assistant (AI)',
@@ -56,10 +56,10 @@ const CUSTOMER_VIEW_SENDERS = Object.freeze({
 
 /** What the customer is told about who is handling their conversation. */
 const STATUS_NOTICES = Object.freeze({
-  unassigned: { text: "You're chatting with our AI support assistant.", className: 'bg-indigo-50 text-indigo-800' },
+  unassigned: { text: "You're chatting with our AI support assistant.", className: 'bg-brand-50 text-brand-800' },
   'processing-ai': {
     text: "You're chatting with our AI support assistant.",
-    className: 'bg-indigo-50 text-indigo-800',
+    className: 'bg-brand-50 text-brand-800',
   },
   'escalated-to-human': {
     text: 'A member of our support team will join this chat shortly.',
@@ -260,7 +260,7 @@ export default function CustomerSupport() {
     <div className="flex h-full flex-col bg-slate-50">
       <header className="shrink-0 border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-md shadow-indigo-500/30">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-md shadow-brand-500/30">
             <SparklesIcon className="h-5 w-5" />
             <span
               className={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full ring-2 ring-white ${connectionStatus === 'connected' || !conversationId ? 'bg-emerald-500' : 'bg-amber-500'}`}
