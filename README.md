@@ -114,7 +114,7 @@ by the backend; the frontend only hides what a role cannot use.
 |---|---|
 | Auth, roles, audit log, rate limits | Done |
 | Support desk (AI + human handoff) | Done |
-| Attendance (geofence, AI regularization, manager reviews) | Done |
+| Attendance (geofence, AI regularization, manager reviews) | Done; Step 2 backend done (office radius, work modes, punch-out with automatic close, Today board); screens and automatic presence next |
 | Payroll tax calculator, payslip PDFs + verification | Done; monthly payroll run not yet |
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
 | Leave management | Done: backend (offices, work calendar, policies and balances, requests and approvals, payroll export); screens done (workplace, leave administration, my leave, calendar, approvals); AI leave assistant done; multi-level approvals (manager, then HR for long leave) done |
