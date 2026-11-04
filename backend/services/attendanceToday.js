@@ -118,16 +118,15 @@ function toPunchView(punch) {
 }
 
 /**
- * The Today board.
- * @param {{ viewer: { id: string, role: string }, date?: string|null, departmentId?: string|null, now?: Date }} request
- * @returns {Promise<{ scope: string, date: string|null, people: object[], counts: Record<string, number> }>}
- *   `date` is the date asked for, or null when each person's own today was used.
+ * Each person's attendance on their day: their punch, approved leave, their office's day (working,
+ * holiday or weekly off), and the status that follows (TODAY_STATUSES).
+ * @param {{ people: object[], officesById: Map<string, object>, companyTimeZone: string,
+ *   date?: string|null, now?: Date }} request  people and offices from services/teamRoster.js;
+ *   without `date`, each person's own today (people without an office: the company's)
+ * @returns {Promise<Map<string, { date: string, status: string, punch: object|null,
+ *   leaveHalf: string|null, officeDay: object|null }>>} by employee id
  */
-export async function getTodayBoard({ viewer, date = null, departmentId = null, now = new Date() }) {
-  const { scope, filter } = await resolveTeamScope(viewer, { departmentId, forbidden: TODAY_FORBIDDEN });
-  const { people, officesById, companyTimeZone } = await loadTeamRoster({ filter, now });
-
-  // Each person's own today (or the date asked for); people without an office use the company's zone.
+export async function loadAttendanceDays({ people, officesById, companyTimeZone, date = null, now = new Date() }) {
   const dateOf = (person) => date ?? localDateOf(person, companyTimeZone, now);
   const dateByOfficeId = new Map(
     [...officesById.values()].map((office) => [
@@ -136,7 +135,6 @@ export async function getTodayBoard({ viewer, date = null, departmentId = null, 
     ]),
   );
   const dates = [...new Set(people.map(dateOf))];
-
   const employeeIds = people.map((person) => person.employeeId);
   const [punches, leaveByKey, officeDays] = await Promise.all([
     Attendance.find({ employeeId: { $in: employeeIds }, date: { $in: dates } }).lean(),
@@ -145,19 +143,47 @@ export async function getTodayBoard({ viewer, date = null, departmentId = null, 
   ]);
   const punchByKey = new Map(punches.map((punch) => [`${punch.employeeId}|${punch.date}`, punch]));
 
-  const rows = people.map((person) => {
-    const personDate = dateOf(person);
-    const key = `${person.employeeId}|${personDate}`;
-    const punch = punchByKey.get(key) ?? null;
-    const leaveHalf = leaveByKey.get(key) ?? null;
-    const officeDay = person.office ? officeDays.get(person.officeId) : null;
+  return new Map(
+    people.map((person) => {
+      const personDate = dateOf(person);
+      const key = `${person.employeeId}|${personDate}`;
+      const punch = punchByKey.get(key) ?? null;
+      const leaveHalf = leaveByKey.get(key) ?? null;
+      const officeDay = person.office ? officeDays.get(person.officeId) : null;
+      return [
+        person.employeeId,
+        {
+          date: personDate,
+          status: statusOf({ punch, leaveHalf, office: person.office, officeDay }),
+          punch,
+          leaveHalf,
+          officeDay,
+        },
+      ];
+    }),
+  );
+}
+
+/**
+ * The Today board.
+ * @param {{ viewer: { id: string, role: string }, date?: string|null, departmentId?: string|null, now?: Date }} request
+ * @returns {Promise<{ scope: string, date: string|null, people: object[], counts: Record<string, number> }>}
+ *   `date` is the date asked for, or null when each person's own today was used.
+ */
+export async function getTodayBoard({ viewer, date = null, departmentId = null, now = new Date() }) {
+  const { scope, filter } = await resolveTeamScope(viewer, { departmentId, forbidden: TODAY_FORBIDDEN });
+  const roster = await loadTeamRoster({ filter, now });
+  const attendanceDays = await loadAttendanceDays({ ...roster, date, now });
+
+  const rows = roster.people.map((person) => {
+    const day = attendanceDays.get(person.employeeId);
     return {
       ...toPersonView(person),
-      date: personDate,
-      status: statusOf({ punch, leaveHalf, office: person.office, officeDay }),
-      holidayName: officeDay?.holidayName ?? null,
-      leave: leaveHalf ? { half: leaveHalf } : null,
-      punch: toPunchView(punch),
+      date: day.date,
+      status: day.status,
+      holidayName: day.officeDay?.holidayName ?? null,
+      leave: day.leaveHalf ? { half: day.leaveHalf } : null,
+      punch: toPunchView(day.punch),
     };
   });
 

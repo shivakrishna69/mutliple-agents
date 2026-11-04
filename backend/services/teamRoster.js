@@ -19,7 +19,8 @@ import { isWorkforceAdmin } from './workforceAccess.js';
 
 export const TEAM_SCOPES = Object.freeze({ ORGANISATION: 'organisation', DIRECT_REPORTS: 'direct_reports' });
 
-const CURRENT_EMPLOYEES = Object.freeze({
+/** Everyone still employed: the roster filter for organisation-wide work such as nightly jobs. */
+export const CURRENT_EMPLOYEES = Object.freeze({
   'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
 });
 

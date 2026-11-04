@@ -167,6 +167,7 @@ export const PRESENCE_MESSAGES = Object.freeze({
   QUERY_INVALID: 'The date or department asked for is not valid',
   NOW_RETRIEVED: 'Presence retrieved',
   DAILY_RETRIEVED: 'Daily activity retrieved',
+  PROFILE_NOT_FOUND: 'No employee profile is linked to your account, so there are no working days to show',
 });
 
 export const REGULARIZATION_MESSAGES = Object.freeze({
