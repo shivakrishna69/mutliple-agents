@@ -1,0 +1,18 @@
+# Caddy in front of the stack (docker-compose.prod.yml): HTTPS for APP_DOMAIN with a certificate
+# from Let's Encrypt, renewed automatically; plain HTTP redirects to HTTPS. Everything is passed to
+# nginx in the frontend container, which serves the app and forwards /api and /socket.io.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	reverse_proxy frontend:8080
+}
