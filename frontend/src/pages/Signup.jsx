@@ -1,308 +1,183 @@
 /**
- * Signup page: creates an account through POST /api/auth/signup and signs the user in.
+ * Register: POST /api/auth/signup { firstName, lastName, email, phoneNumber, password,
+ * confirmPassword, acceptTerms }.
  *
- * Component lifecycle
- *   1. Mount: the form renders empty. PublicOnlyRoute (App.jsx) has already redirected
- *      signed-in users to /dashboard, so this page is only seen when signed out.
- *   2. Editing: each keystroke updates `formValues`; validation is recomputed from the
- *      values on every render (it is derived, never stored), so it cannot go stale.
- *      Errors for a field appear once that field has been blurred or a submit was attempted;
- *      the password checklist and the password-match check update live while typing.
- *   3. Submit: if any field is invalid, focus moves to the first invalid field and no request
- *      is sent. Otherwise the form is locked and the request is sent. On success the form is
- *      replaced by the backend's own message (check your email to confirm the address); no
- *      session starts until the emailed link is opened.
- *   4. Unmount: an in-flight request is aborted so its result cannot update a page that is gone.
+ *   202  the account waits for its email to be confirmed: on to "check your email" with the
+ *        server's message, the address, the code length and when another email may be asked for
+ *   400  the server's message for each field, under that field
+ *   429  (another email a moment ago, or too many signups from this network) the server's message
  *
- * State flow
- *   formValues ─┬─► clientFieldErrors (derived) ─┐
- *               └─► passwordRuleResults (derived)├─► visibleFieldErrors ─► inline messages
- *   touchedFields / hasAttemptedSubmit ──────────┤
- *   serverFieldErrors (from a 400 response) ─────┘
- *   isSubmitting ─► locked <fieldset> and spinner button
- *   submissionError ─► dismissible banner above the form
- *
- * Security considerations
- *   - Client-side validation is for fast feedback only; the backend re-validates everything.
- *   - The password is sent once and never logged or stored. The session JWT is set by the
- *     backend as an HttpOnly cookie, which this code cannot read; only the public profile and
- *     the CSRF token are kept, in memory (auth/AuthContext.jsx).
- *   - The same rules are enforced by the backend, which rejects a weak password whatever
- *     client sent it; the checks here exist to give instant feedback.
- *   - No `role` is sent: the backend creates every self-registered account as a customer.
- *   - Double submission is blocked twice: a ref guard (synchronous, so two clicks in the same
- *     tick cannot both pass) and the disabled fieldset (visual and keyboard lock).
+ * The page checks nothing itself: the strength meter and checklist come from the server's password
+ * policy, and only the server decides what is acceptable. The terms link to the company's own
+ * documents when it has set them (company branding).
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
-import { ApiError, requestSignup } from '../api/authApi.js';
-import AuthLayout from '../components/AuthLayout.jsx';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { requestSignup } from '../api/authApi.js';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import FormField from '../components/FormField.jsx';
-import PasswordChecklist from '../components/PasswordChecklist.jsx';
+import { LockIcon, MailIcon, PhoneIcon, UserCircleIcon } from '../components/Icons.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import SubmitButton from '../components/SubmitButton.jsx';
-import { API_MESSAGES, BANNER_TITLES, FORM_MESSAGES } from '../constants/messages.js';
+import AuthShell from '../components/auth/AuthShell.jsx';
+import { CheckboxField } from '../components/auth/AuthNotices.jsx';
+import PasswordStrength from '../components/auth/PasswordStrength.jsx';
+import TermsAgreement from '../components/auth/TermsAgreement.jsx';
+import { BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
-import { evaluatePasswordRules, validateSignupForm } from '../validation/authFormValidation.js';
+import { useAuthRequest } from '../hooks/useAuthRequest.js';
+import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 
-const INITIAL_FORM_VALUES = Object.freeze({ name: '', email: '', password: '', confirmPassword: '' });
+const PASSWORD_REQUIREMENTS_ID = 'signup-password-requirements';
 
-/** Order in which fields appear, used to focus the first invalid one on submit. */
-const SIGNUP_FIELD_ORDER = Object.freeze(['name', 'email', 'password', 'confirmPassword']);
-
-const PASSWORD_REQUIREMENTS_LIST_ID = 'password-requirements';
+const INITIAL_VALUES = Object.freeze({
+  firstName: '',
+  lastName: '',
+  email: '',
+  phoneNumber: '',
+  password: '',
+  confirmPassword: '',
+});
 
 export default function Signup() {
-  // ==========================================================================
-  // State & Hook Definitions
-  // ==========================================================================
+  const navigate = useNavigate();
+  const { branding, passwordPolicy } = usePublicAuthSettings();
+  const { run, isSubmitting, error, fieldErrors, clearError } = useAuthRequest();
+  const [values, setValues] = useState(INITIAL_VALUES);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
-  const [formValues, setFormValues] = useState(INITIAL_FORM_VALUES);
-  const [touchedFields, setTouchedFields] = useState({});
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-  const [serverFieldErrors, setServerFieldErrors] = useState({});
-  const [submissionError, setSubmissionError] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  // The backend's answer to a successful signup: { message, email }. Shown instead of the form.
-  const [signupConfirmation, setSignupConfirmation] = useState(null);
+  const updateField = (changeEvent) =>
+    setValues((previous) => ({ ...previous, [changeEvent.target.name]: changeEvent.target.value }));
 
-  // State updates are asynchronous, so `isSubmitting` alone cannot stop two clicks fired in
-  // the same tick. This ref flips synchronously and is the authoritative double-submit guard.
-  const isSubmittingRef = useRef(false);
-  const activeRequestControllerRef = useRef(null);
-
-  const nameInputRef = useRef(null);
-  const emailInputRef = useRef(null);
-  const passwordInputRef = useRef(null);
-  const confirmPasswordInputRef = useRef(null);
-  const inputRefsByField = {
-    name: nameInputRef,
-    email: emailInputRef,
-    password: passwordInputRef,
-    confirmPassword: confirmPasswordInputRef,
-  };
-
-  // Abort an in-flight signup if the user navigates away before it completes.
-  useEffect(() => () => activeRequestControllerRef.current?.abort(), []);
-
-  // ==========================================================================
-  // Validation & Regex Logic
-  // ==========================================================================
-  //
-  // Rules live in validation/authFormValidation.js and constants/validation.js, shared with
-  // the parity test against the backend validator. In brief:
-  //   name      1–100 characters after trimming
-  //   email     EMAIL_PATTERN /^[^\s@]+@[^\s@]+\.[^\s@]+$/ (one "@", a dotted domain, no
-  //             whitespace), at most 254 characters after lowercasing and trimming
-  //   password  8+ characters, at most 72 UTF-8 bytes, and at least one match each for
-  //             /[A-Z]/, /[a-z]/, /\d/ and /[^A-Za-z0-9\s]/ (a symbol)
-  //   confirm   exactly equal to password
-  // Both values below are derived from the current form values on every render, never stored,
-  // so they cannot go stale.
-  const clientFieldErrors = validateSignupForm(formValues);
-  const passwordRuleResults = evaluatePasswordRules(formValues.password);
-
-  // Shown as soon as the confirmation field has any input, so the user sees a mismatch
-  // while typing instead of only after leaving the field.
-  const passwordMatchError =
-    formValues.confirmPassword.length > 0 && formValues.confirmPassword !== formValues.password
-      ? FORM_MESSAGES.PASSWORDS_DO_NOT_MATCH
-      : null;
-
-  /** The message to display under a field: client errors once the field is touched, else server errors. */
-  function resolveVisibleFieldError(fieldName) {
-    const isFieldRevealed = hasAttemptedSubmit || touchedFields[fieldName];
-    if (isFieldRevealed && clientFieldErrors[fieldName]) return clientFieldErrors[fieldName];
-    if (fieldName === 'confirmPassword' && passwordMatchError) return passwordMatchError;
-    return serverFieldErrors[fieldName] ?? null;
-  }
-
-  // ==========================================================================
-  // Event Handlers
-  // ==========================================================================
-
-  /** Updates one field and clears any server error for it, since the value it described changed. */
-  function handleFieldChange(changeEvent) {
-    const { name: fieldName, value: fieldValue } = changeEvent.target;
-    setFormValues((previousValues) => ({ ...previousValues, [fieldName]: fieldValue }));
-    setServerFieldErrors((previousErrors) => {
-      if (!(fieldName in previousErrors)) return previousErrors;
-      const { [fieldName]: clearedError, ...remainingErrors } = previousErrors;
-      return remainingErrors;
+  async function handleSubmit(submitEvent) {
+    submitEvent.preventDefault();
+    const accepted = await run((signal) =>
+      requestSignup(
+        {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          phoneNumber: values.phoneNumber,
+          password: values.password,
+          confirmPassword: values.confirmPassword,
+          acceptTerms,
+        },
+        { signal },
+      ),
+    );
+    if (!accepted) return;
+    navigate(`${ROUTE_PATHS.CHECK_EMAIL}?email=${encodeURIComponent(accepted.email)}`, {
+      state: {
+        notice: accepted.message,
+        resendAfterSeconds: accepted.resendAfterSeconds,
+        codeDigits: accepted.codeDigits,
+      },
     });
   }
 
-  /** Marks a field as touched so its validation errors start showing. */
-  function handleFieldBlur(blurEvent) {
-    const fieldName = blurEvent.target.name;
-    setTouchedFields((previousTouched) =>
-      previousTouched[fieldName] ? previousTouched : { ...previousTouched, [fieldName]: true },
-    );
-  }
-
-  function handleBannerDismiss() {
-    setSubmissionError(null);
-  }
-
-  /**
-   * Validates, sends the signup request, stores the session, and redirects.
-   * Expected failures become a banner (and inline field errors when the server sent them);
-   * an aborted request (page unmounted) is ignored silently.
-   */
-  async function handleFormSubmit(submitEvent) {
-    submitEvent.preventDefault();
-    if (isSubmittingRef.current) return;
-
-    setHasAttemptedSubmit(true);
-    const firstInvalidField = SIGNUP_FIELD_ORDER.find((fieldName) => clientFieldErrors[fieldName]);
-    if (firstInvalidField) {
-      inputRefsByField[firstInvalidField].current?.focus();
-      return;
-    }
-
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
-    setSubmissionError(null);
-    setServerFieldErrors({});
-
-    const requestController = new AbortController();
-    activeRequestControllerRef.current = requestController;
-
-    try {
-      const signupResult = await requestSignup(
-        {
-          name: formValues.name.trim(),
-          email: formValues.email.trim(),
-          password: formValues.password,
-        },
-        { signal: requestController.signal },
-      );
-
-      // No session yet: the account waits for its email to be confirmed through the emailed link.
-      setSignupConfirmation(signupResult);
-    } catch (signupError) {
-      if (requestController.signal.aborted) return;
-
-      if (signupError instanceof ApiError) {
-        setSubmissionError({
-          message: signupError.message,
-          // Reference ids help support trace server faults; for 4xx the message says it all.
-          requestId: signupError.status >= 500 ? signupError.requestId : null,
-        });
-        setServerFieldErrors(signupError.fieldErrors);
-      } else {
-        setSubmissionError({ message: API_MESSAGES.UNEXPECTED_SERVER_ERROR, requestId: null });
-      }
-    } finally {
-      if (activeRequestControllerRef.current === requestController) {
-        activeRequestControllerRef.current = null;
-      }
-      if (!requestController.signal.aborted) {
-        isSubmittingRef.current = false;
-        setIsSubmitting(false);
-      }
-    }
-  }
-
-  // ==========================================================================
-  // JSX Render Blocks
-  // ==========================================================================
-
-  if (signupConfirmation) {
-    return (
-      <AuthLayout heading="Create your account" subheading={signupConfirmation.email}>
-        <p role="status" className="rounded-xl bg-brand-50 p-4 text-sm text-slate-700">
-          {signupConfirmation.message}
-        </p>
-      </AuthLayout>
-    );
-  }
+  const textField = (fieldId, label, props) => (
+    <FormField
+      fieldId={fieldId}
+      label={label}
+      fieldValue={values[fieldId]}
+      errorMessage={fieldErrors[fieldId]}
+      onFieldChange={updateField}
+      {...props}
+    />
+  );
 
   return (
-    <AuthLayout
-      heading="Create your account"
-      subheading="Get help from our support team and AI assistants."
+    <AuthShell
+      branding={branding}
+      activeLink="signup"
+      title="Create your account"
+      description="We will email you a code to confirm your address."
       footer={
         <>
           Already have an account?{' '}
           <Link
             to={ROUTE_PATHS.LOGIN}
-            className="rounded font-semibold text-brand-600 transition-colors hover:text-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="rounded font-semibold text-brand-600 hover:text-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             Sign in
           </Link>
         </>
       }
     >
-      <form onSubmit={handleFormSubmit} noValidate className="space-y-5">
-        {submissionError && (
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        {error && (
           <ErrorBanner
             title={BANNER_TITLES.SIGNUP_FAILED}
-            message={submissionError.message}
-            requestId={submissionError.requestId}
-            onDismiss={handleBannerDismiss}
+            message={error.message}
+            requestId={error.requestId}
+            onDismiss={clearError}
           />
         )}
-
-        {/* A disabled fieldset disables every input inside it, locking the form while submitting. */}
         <fieldset disabled={isSubmitting} className="space-y-5">
-          <FormField
-            fieldId="name"
-            label="Full name"
-            placeholder="Jane Cooper"
-            fieldValue={formValues.name}
-            errorMessage={resolveVisibleFieldError('name')}
-            autoCompleteHint="name"
-            inputRef={nameInputRef}
-            onFieldChange={handleFieldChange}
-            onFieldBlur={handleFieldBlur}
-          />
-
-          <FormField
-            fieldId="email"
-            label="Email address"
-            inputType="email"
-            placeholder="you@company.com"
-            fieldValue={formValues.email}
-            errorMessage={resolveVisibleFieldError('email')}
-            autoCompleteHint="email"
-            inputRef={emailInputRef}
-            onFieldChange={handleFieldChange}
-            onFieldBlur={handleFieldBlur}
-          />
-
-          <PasswordField
-            fieldId="password"
-            label="Password"
-            placeholder="Create a strong password"
-            fieldValue={formValues.password}
-            errorMessage={resolveVisibleFieldError('password')}
-            autoCompleteHint="new-password"
-            inputRef={passwordInputRef}
-            describedByIds={[PASSWORD_REQUIREMENTS_LIST_ID]}
-            onFieldChange={handleFieldChange}
-            onFieldBlur={handleFieldBlur}
-          >
-            <PasswordChecklist listId={PASSWORD_REQUIREMENTS_LIST_ID} ruleResults={passwordRuleResults} />
-          </PasswordField>
-
+          <div className="grid gap-5 sm:grid-cols-2">
+            {textField('firstName', 'First name', {
+              placeholder: 'Jane',
+              autoCompleteHint: 'given-name',
+              leadingIcon: <UserCircleIcon className="h-5 w-5" />,
+            })}
+            {textField('lastName', 'Last name', {
+              placeholder: 'Cooper',
+              autoCompleteHint: 'family-name',
+              leadingIcon: <UserCircleIcon className="h-5 w-5" />,
+            })}
+          </div>
+          {textField('email', 'Work email address', {
+            inputType: 'email',
+            placeholder: 'you@company.com',
+            autoCompleteHint: 'email',
+            leadingIcon: <MailIcon className="h-5 w-5" />,
+          })}
+          {textField('phoneNumber', 'Phone number', {
+            inputType: 'tel',
+            placeholder: '98765 43210',
+            autoCompleteHint: 'tel',
+            leadingIcon: <PhoneIcon className="h-5 w-5" />,
+          })}
+          <div>
+            <PasswordField
+              fieldId="password"
+              label="Password"
+              placeholder="Create a strong password"
+              fieldValue={values.password}
+              errorMessage={fieldErrors.password}
+              autoCompleteHint="new-password"
+              describedByIds={passwordPolicy ? [PASSWORD_REQUIREMENTS_ID] : []}
+              leadingIcon={<LockIcon className="h-5 w-5" />}
+              onFieldChange={updateField}
+            />
+            <PasswordStrength
+              password={values.password}
+              passwordPolicy={passwordPolicy}
+              listId={PASSWORD_REQUIREMENTS_ID}
+            />
+          </div>
           <PasswordField
             fieldId="confirmPassword"
             label="Confirm password"
             placeholder="Re-enter your password"
-            fieldValue={formValues.confirmPassword}
-            errorMessage={resolveVisibleFieldError('confirmPassword')}
+            fieldValue={values.confirmPassword}
+            errorMessage={fieldErrors.confirmPassword}
             autoCompleteHint="new-password"
-            inputRef={confirmPasswordInputRef}
-            onFieldChange={handleFieldChange}
-            onFieldBlur={handleFieldBlur}
+            leadingIcon={<LockIcon className="h-5 w-5" />}
+            onFieldChange={updateField}
           />
+          <CheckboxField
+            fieldId="acceptTerms"
+            checked={acceptTerms}
+            onChange={setAcceptTerms}
+            errorMessage={fieldErrors.acceptTerms}
+          >
+            <TermsAgreement branding={branding} />
+          </CheckboxField>
         </fieldset>
-
         <SubmitButton isSubmitting={isSubmitting} idleLabel="Create account" loadingLabel="Creating account…" />
       </form>
-    </AuthLayout>
+    </AuthShell>
   );
 }
