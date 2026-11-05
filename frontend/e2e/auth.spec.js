@@ -88,6 +88,9 @@ test('a forgotten password is reset from the emailed link, which then stops work
   await page.goto('/login');
   await page.getByRole('link', { name: 'Forgot password?' }).click();
   await expect(page).toHaveURL(/\/forgot-password$/);
+  // The address changes before the page does (the router keeps the sign-in page on screen while
+  // this one loads, and both have a "Work email address" field), so wait for this page's heading.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forgot your password?');
   const emailsBefore = await inboxCount(email);
   await page.getByLabel('Work email address').fill(email);
   await page.getByRole('button', { name: 'Send reset link' }).click();
