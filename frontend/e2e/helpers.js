@@ -5,33 +5,64 @@ import { MAIL_INBOX_URL, PASSWORD } from './environment.js';
 /** Signs in through the login form and waits for the dashboard. */
 export async function signIn(page, email, password = PASSWORD) {
   await page.goto('/login');
-  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Work email address').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+}
+
+/** Emails sent to `address` by the test backend, oldest first. */
+async function inboxOf(address) {
+  const response = await fetch(`${MAIL_INBOX_URL}/messages?to=${encodeURIComponent(address)}`);
+  return response.json();
+}
+
+/**
+ * The newest match of `pickFrom(message)` among the emails to `address`, waiting for one to arrive.
+ * `pickFrom` returns the candidates found in one message.
+ */
+async function newestFromInbox(address, pickFrom, description) {
+  let found = null;
+  await expect
+    .poll(
+      async () => {
+        found = (await inboxOf(address)).flatMap(pickFrom).at(-1) ?? null;
+        return found;
+      },
+      { message: `an email to ${address} with ${description}` },
+    )
+    .not.toBeNull();
+  return found;
+}
+
+/** The number of emails sent to `address` so far. */
+export async function inboxCount(address) {
+  return (await inboxOf(address)).length;
 }
 
 /**
  * The newest link starting with `pathPrefix` (e.g. '/invite') emailed to `address`, read from the
  * test backend's inbox; waits for the email to arrive.
  */
-export async function emailedLink(address, pathPrefix) {
-  let link = null;
-  await expect
-    .poll(
-      async () => {
-        const response = await fetch(`${MAIL_INBOX_URL}/messages?to=${encodeURIComponent(address)}`);
-        const messages = await response.json();
-        const links = messages
-          .flatMap((message) => message.text.match(/https?:\/\/\S+/g) ?? [])
-          .filter((url) => new URL(url).pathname.startsWith(`${pathPrefix}/`));
-        link = links.at(-1) ?? null;
-        return link;
-      },
-      { message: `an email to ${address} with a ${pathPrefix} link` },
-    )
-    .not.toBeNull();
-  return link;
+export function emailedLink(address, pathPrefix) {
+  return newestFromInbox(
+    address,
+    (message) =>
+      (message.text.match(/https?:\/\/\S+/g) ?? []).filter((url) => new URL(url).pathname.startsWith(`${pathPrefix}/`)),
+    `a ${pathPrefix} link`,
+  );
+}
+
+/** The newest confirmation code emailed to `address` (it leads the subject: "123456 is your …"). */
+export function emailedCode(address) {
+  return newestFromInbox(
+    address,
+    (message) => {
+      const match = message.subject.match(/^(\d+) /);
+      return match ? [match[1]] : [];
+    },
+    'a confirmation code',
+  );
 }
 
 export function mainNavigation(page) {

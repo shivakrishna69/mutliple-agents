@@ -20,6 +20,12 @@ export const ACCOUNTS = Object.freeze({
   customer: { name: 'Cyrus Mehta', email: 'cyrus@example.com' },
 });
 
+/**
+ * An account only the password-reset test uses, since that test changes its password. Its signup
+ * email's cooldown is ended at the end of global setup, so the test can ask for a reset at once.
+ */
+export const RESET_ACCOUNT = Object.freeze({ name: 'Rohan Desai', email: 'rohan.desai@example.com' });
+
 export const DEPARTMENT_NAME = 'Engineering';
 
 /** An employee (with a profile, unlike the accounts above), onboarded by global setup the way HR does it. */

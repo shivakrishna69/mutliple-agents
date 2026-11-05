@@ -12,7 +12,7 @@
  */
 
 import { onboardEmployee } from '../../backend/tests/integration/fixtures.js';
-import { signUpAndConfirm, startTestServer } from '../../backend/tests/integration/testServer.js';
+import { endEmailCooldowns, signUpAndConfirm, startTestServer } from '../../backend/tests/integration/testServer.js';
 import { startStandInAiService } from './standInAiService.js';
 import {
   ACCOUNTS,
@@ -25,6 +25,7 @@ import {
   LEAVE_EMPLOYEE_CASUAL_DAYS,
   LEAVE_MANAGER,
   PASSWORD,
+  RESET_ACCOUNT,
   TWO_STEP_EARNED_DAYS,
   TWO_STEP_EMPLOYEE,
 } from './environment.js';
@@ -139,7 +140,7 @@ export default async function globalSetup() {
     throw startupError;
   }
   try {
-    for (const account of Object.values(ACCOUNTS)) await signUp(testServer, account);
+    for (const account of [...Object.values(ACCOUNTS), RESET_ACCOUNT]) await signUp(testServer, account);
     // The same change scripts/setUserRole.js makes; the API cannot create HR accounts directly.
     await testServer.database.collection('users').updateOne({ email: ACCOUNTS.hr.email }, { $set: { role: 'hr' } });
     // Set up by the admin: HR's own logins are kept for the tests (5 per account per 15 minutes).
@@ -151,6 +152,8 @@ export default async function globalSetup() {
     );
     await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...EMPLOYEE });
     await seedLeaveScenario(testServer, adminClient, department.id);
+    // The tests read their own emails right away; a person would have waited the minute.
+    await endEmailCooldowns(testServer);
   } catch (seedingError) {
     await testServer.stop();
     await standIn.close();
