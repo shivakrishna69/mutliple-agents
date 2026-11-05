@@ -145,13 +145,22 @@ export async function loadSessionUser({ userId, sessionId, issuedAtSeconds, issu
   if ((userRecord.status ?? ACCOUNT_STATUSES.ACTIVE) !== ACCOUNT_STATUSES.ACTIVE) {
     return sessionFailure(SESSION_FAILURE_REASON.ACCOUNT_NOT_ACTIVE, SESSION_MESSAGES.ACCOUNT_NOT_ACTIVE, true);
   }
-  if (userRecord.passwordChangedAt) {
-    const passwordChangedAtMs = userRecord.passwordChangedAt.getTime();
-    const issuedBeforeChange =
-      issuedAtMs !== null ? issuedAtMs < passwordChangedAtMs : issuedAtSeconds < Math.floor(passwordChangedAtMs / 1000);
-    if (issuedBeforeChange) {
-      return sessionFailure(SESSION_FAILURE_REASON.SESSION_REVOKED, SESSION_MESSAGES.SESSION_REVOKED, true);
-    }
+  if (wasIssuedBeforePasswordChange({ issuedAtSeconds, issuedAtMs }, userRecord.passwordChangedAt)) {
+    return sessionFailure(SESSION_FAILURE_REASON.SESSION_REVOKED, SESSION_MESSAGES.SESSION_REVOKED, true);
   }
   return { isValid: true, user: toPublicUserProfile(userRecord) };
+}
+
+/**
+ * Whether a session started before the account's latest password change, so it must end. Compared
+ * in milliseconds when the token carries `iatms`, otherwise in whole seconds (older tokens).
+ * @param {{ issuedAtSeconds: number, issuedAtMs: number|null }} sessionTimes
+ * @param {Date|null} passwordChangedAt
+ */
+export function wasIssuedBeforePasswordChange({ issuedAtSeconds, issuedAtMs }, passwordChangedAt) {
+  if (!passwordChangedAt) return false;
+  const passwordChangedAtMs = passwordChangedAt.getTime();
+  return issuedAtMs !== null && issuedAtMs !== undefined
+    ? issuedAtMs < passwordChangedAtMs
+    : issuedAtSeconds < Math.floor(passwordChangedAtMs / 1000);
 }

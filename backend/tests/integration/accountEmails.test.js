@@ -297,6 +297,17 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     assert.equal((await testServer.createClient().get(`/api/auth/password/reset/${newerToken}`)).status, 200);
   });
 
+  it('lets a reset link work once even when it is used twice at the same moment', async () => {
+    // The newest link from the test above (5 emails so far: confirmation, reset, changed, two resets).
+    const token = await latestResetToken('priya@example.com', 5);
+    const useLink = (password) => testServer.createClient().post('/api/auth/password/reset', { token, password });
+    const outcomes = await Promise.all([useLink('First#Pass2027'), useLink('Second#Pass2027')]);
+    assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [200, 400]);
+    const winner =
+      outcomes.find((outcome) => outcome.status === 200) === outcomes[0] ? 'First#Pass2027' : 'Second#Pass2027';
+    assert.equal((await testServer.createClient().login('priya@example.com', winner)).status, 200);
+  });
+
   it('sends an unconfirmed account a confirmation link instead of a reset link', async () => {
     assert.equal((await testServer.createClient().signup('Noor Ali', 'noor@example.com')).status, 202);
     assert.equal((await forgot('noor@example.com')).status, 202);
