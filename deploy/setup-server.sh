@@ -74,6 +74,8 @@ random_hex() { openssl rand -hex "$1"; }
 
 # --- 1. Docker -----------------------------------------------------------------------------------
 say "Installing Docker"
+# No package asks questions: the script also runs without a terminal (e.g. over ssh with a command).
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl git openssl >/dev/null
 if ! docker compose version >/dev/null 2>&1; then
