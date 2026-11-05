@@ -31,19 +31,23 @@ function extractSessionPayload({ responseData, httpStatus }) {
 }
 
 /**
- * Creates an account and signs in. Resolves to `{ user, csrfToken }`; the session cookies are
- * set by the response.
+ * Creates an account that must confirm its email before signing in; the backend emails the link.
+ * Resolves to `{ message, email }`: the backend's text for the person ("check your email…") and
+ * the address it was sent to. No session is started.
  * @param {{ name: string, email: string, password: string }} signupDetails
  * @param {{ signal?: AbortSignal }} [requestOptions]
  */
 export async function requestSignup(signupDetails, { signal } = {}) {
-  const apiResponse = await sendApiRequest({
+  const { responseData, responseMessage, httpStatus } = await sendApiRequest({
     method: 'POST',
     endpointPath: AUTH_ENDPOINTS.SIGNUP,
     requestPayload: signupDetails,
     callerSignal: signal,
   });
-  return extractSessionPayload(apiResponse);
+  if (!responseMessage || typeof responseData?.email !== 'string') {
+    throw new ApiError({ message: API_MESSAGES.UNEXPECTED_RESPONSE, status: httpStatus });
+  }
+  return { message: responseMessage, email: responseData.email };
 }
 
 /**

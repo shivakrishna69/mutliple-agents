@@ -37,7 +37,8 @@ them. For the full feature and API inventory see [project-overview.md](project-o
    committed. A client that misses an event reloads over HTTP.
 3. **Optional infrastructure degrades, it doesn't crash.** Without Redis, Socket.IO and the cache run
    in memory (single instance). Without S3, vault and payslip endpoints answer "unavailable". Without
-   SMTP, HR gets the invitation link to share by hand.
+   SMTP, HR gets the invitation link to share by hand, and signup and password reset answer
+   "email unavailable" rather than create accounts nobody can confirm.
 4. **Configuration is validated at startup.** Missing or weak secrets, malformed URLs, or plain HTTP
    where HTTPS is required in production stop the process with a clear message.
 

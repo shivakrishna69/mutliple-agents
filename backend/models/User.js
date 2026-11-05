@@ -45,11 +45,20 @@ export const BCRYPT_SALT_ROUNDS = 12;
 
 /**
  * Account lifecycle:
- *   invited   created by HR or a bulk import, no password yet; cannot sign in
- *   active    the person chose a password through their activation link (or signed up)
- *   disabled  the invitation was revoked or the account switched off; cannot sign in
+ *   unverified  signed up, but has not opened the emailed confirmation link yet; cannot sign in.
+ *               A new signup with the same email replaces it (services/accountEmailFlows.js), so
+ *               whoever typed an address first cannot keep its real owner out.
+ *   invited     created by HR or a bulk import, no password yet; cannot sign in
+ *   active      the person chose a password through their activation link, or confirmed the email
+ *               they signed up with
+ *   disabled    the invitation was revoked or the account switched off; cannot sign in
  */
-export const ACCOUNT_STATUSES = Object.freeze({ INVITED: 'invited', ACTIVE: 'active', DISABLED: 'disabled' });
+export const ACCOUNT_STATUSES = Object.freeze({
+  UNVERIFIED: 'unverified',
+  INVITED: 'invited',
+  ACTIVE: 'active',
+  DISABLED: 'disabled',
+});
 
 const emailField = () => ({
   type: String,
@@ -111,6 +120,12 @@ const userSchema = new mongoose.Schema(
       enum: { values: Object.values(ACCOUNT_STATUSES), message: 'Account status "{VALUE}" is not valid' },
       default: ACCOUNT_STATUSES.ACTIVE,
       required: true,
+    },
+    // When the person proved they own `email`: the signup confirmation link, or the invitation link
+    // (which was sent to that address). Null until then.
+    emailVerifiedAt: {
+      type: Date,
+      default: null,
     },
     // Where invitations go: the person's own address. The sign-in email starts as the same address.
     personalEmail: emailField(),

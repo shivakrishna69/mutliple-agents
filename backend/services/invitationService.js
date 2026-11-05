@@ -29,7 +29,6 @@
  * another way; the invitation is still created.
  */
 
-import { createHash, randomBytes } from 'node:crypto';
 import Department from '../models/Department.js';
 import EmployeeInvitation, {
   INVITABLE_ROLES,
@@ -50,9 +49,11 @@ import {
   undoProvisioning,
   withdrawInvitedEmployee,
 } from './employeeProvisioning.js';
+import { discardUnverifiedAccount } from './accountEmailFlows.js';
 import { buildInvitationEmail } from './invitationEmail.js';
 import { MAIL_OUTCOMES, sendMail } from './mailService.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { createSecureToken, hashSecureToken, isWellFormedSecureToken } from '../utils/secureTokens.js';
 
 export class InvitationError extends Error {
   constructor(httpStatus, code, message) {
@@ -73,13 +74,6 @@ export function invitableRolesFor(inviterRole) {
   if (inviterRole === ROLES.ADMIN) return [...INVITABLE_ROLES];
   if (inviterRole === ROLES.HR) return INVITABLE_ROLES.filter((invitableRole) => invitableRole !== ROLES.HR);
   return [];
-}
-
-export const hashInvitationToken = (rawToken) => createHash('sha256').update(rawToken, 'utf8').digest('hex');
-
-function newInvitationToken() {
-  const rawToken = randomBytes(INVITATION_LIMITS.TOKEN_BYTES).toString('base64url');
-  return { rawToken, tokenHash: hashInvitationToken(rawToken) };
 }
 
 function displayStatusOf(invitation, now = new Date()) {
@@ -226,7 +220,7 @@ export async function createInvitation({ inviter, input, appContext }) {
         wasReopened: false,
       };
 
-  const { rawToken, tokenHash } = newInvitationToken();
+  const { rawToken, tokenHash } = createSecureToken();
   const now = new Date();
   let invitation;
   try {
@@ -291,7 +285,7 @@ export async function resendInvitation({ invitationId, inviter, appContext }) {
     throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot manage invitations for this role');
   await assertInviteeStillInvited(invitation);
 
-  const { rawToken, tokenHash } = newInvitationToken();
+  const { rawToken, tokenHash } = createSecureToken();
   const now = new Date();
   invitation.tokenHash = tokenHash;
   invitation.expiresAt = new Date(now.getTime() + INVITATION_LIMITS.VALIDITY_DAYS * DAY_MS);
@@ -369,8 +363,8 @@ export async function listInvitations({ status }) {
 // =================================================================================================
 
 async function findInvitationByToken(rawToken) {
-  if (typeof rawToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(rawToken)) return null;
-  return EmployeeInvitation.findOne({ tokenHash: hashInvitationToken(rawToken) });
+  if (!isWellFormedSecureToken(rawToken)) return null;
+  return EmployeeInvitation.findOne({ tokenHash: hashSecureToken(rawToken) });
 }
 
 function assertUsable(invitation) {
@@ -454,7 +448,8 @@ async function acceptLegacyInvitation(claimedInvitation, password) {
   let createdUser = null;
   let createdProfileId = null;
   try {
-    // Step 2: account, then profile.
+    // Step 2: account, then profile. An unconfirmed signup with this address gives way to the invitation.
+    await discardUnverifiedAccount(claimedInvitation.email);
     if (await User.exists({ email: claimedInvitation.email })) {
       throw new InvitationError(
         409,
@@ -467,6 +462,8 @@ async function acceptLegacyInvitation(claimedInvitation, password) {
       email: claimedInvitation.email,
       password,
       role: claimedInvitation.role,
+      // The invitation link was emailed to this address.
+      emailVerifiedAt: new Date(),
     });
     const draft = claimedInvitation.profileDraft;
     const createdProfile = await EmployeeProfile.create({

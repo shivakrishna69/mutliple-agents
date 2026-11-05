@@ -178,13 +178,29 @@ jobs:
             echo "JWT_SECRET=$(openssl rand -hex 32)"
             echo "WEBHOOK_SIGNING_SECRET=$(openssl rand -hex 32)"
             echo "AI_SERVICE_API_KEY=$(openssl rand -hex 32)"
+            # Signing up emails a confirmation link: send it to Mailpit (the compose "mail" profile).
+            echo "SMTP_HOST=mailpit"
+            echo "SMTP_PORT=1025"
+            echo "SMTP_REQUIRE_TLS=false"
+            echo "MAIL_FROM=CI <ci@example.com>"
           } > "$BACKEND_ENV_FILE"
           touch "$AI_SERVICE_ENV_FILE"
-      - run: docker compose config --quiet
+      - run: docker compose --profile mail config --quiet
       # The AI service is left out: without a Groq key it reports itself unhealthy by design, and
       # nothing the web stack needs depends on it.
       - name: Build and start the web stack
-        run: docker compose up --detach --build --wait frontend
+        run: docker compose --profile mail up --detach --build --wait frontend mailpit
+      - name: Check the backend image holds no test code
+        run: |
+          set -euo pipefail
+          # The build context is an allowlist (backend/.dockerignore) and dev dependencies are not
+          # installed; this proves it on the built image.
+          docker compose exec -T backend sh -c '
+            test ! -e /app/tests &&
+            test ! -e /app/node_modules/smtp-server &&
+            test ! -e /app/node_modules/mailparser &&
+            ! grep -rlE "mailCatcher|startTestServer" /app --include=*.js --exclude-dir=node_modules'
+          echo "no test code in the backend image"
       - name: Smoke-test through nginx
         run: |
           set -euo pipefail
@@ -193,20 +209,31 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/")" = 200
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/invite/any-client-route")" = 200
           curl -sf "$base/api/health"
-          signup_status=$(curl -s -c cookies.txt -H "$origin" -H 'Content-Type: application/json' \
+          signup_status=$(curl -s -H "$origin" -H 'Content-Type: application/json' \
             -d '{"name":"CI Check","email":"ci.check@example.com","password":"Valid#Pass2026"}' \
             -o /dev/null -w '%{http_code}' "$base/api/auth/signup")
-          test "$signup_status" = 201
+          test "$signup_status" = 202
+          # The confirmation link arrives by email (Mailpit); opening it signs the person in.
+          token=""
+          for attempt in $(seq 1 20); do
+            token=$(curl -s http://localhost:8025/api/v1/message/latest | grep -oE 'verify-email/[A-Za-z0-9_-]{43}' | head -1 | cut -d/ -f2 || true)
+            [ -n "$token" ] && break
+            sleep 1
+          done
+          test -n "$token"
+          verify_status=$(curl -s -c cookies.txt -H "$origin" -H 'Content-Type: application/json' \
+            -d "{\"token\":\"$token\"}" -o /dev/null -w '%{http_code}' "$base/api/auth/verify-email")
+          test "$verify_status" = 200
           curl -sf -b cookies.txt -H "$origin" "$base/api/auth/me" > /dev/null
           test "$(curl -s -b cookies.txt -H "$origin" -o /dev/null -w '%{http_code}' "$base/socket.io/?EIO=4&transport=polling")" = 200
           test "$(curl -s -H 'Origin: https://evil.example' -o /dev/null -w '%{http_code}' "$base/socket.io/?EIO=4&transport=polling")" = 403
           echo "stack answers correctly through nginx"
       - name: Show logs when something failed
         if: failure()
-        run: docker compose logs
+        run: docker compose --profile mail logs
       - name: Stop the stack
         if: always()
-        run: docker compose down --volumes
+        run: docker compose --profile mail down --volumes
 
   deployment-files:
     name: Deployment files

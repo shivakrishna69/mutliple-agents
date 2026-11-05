@@ -1,8 +1,9 @@
 /**
- * Authentication controllers: registration, login, current session, and logout.
+ * Authentication controllers: login, current session, logout and password change. Signup with
+ * email confirmation and password reset are in controllers/accountEmailController.js.
  *
  * Session model (see utils/authToken.js and utils/authCookies.js):
- *   - Signup and login put the session JWT and its CSRF token in HttpOnly, SameSite=Strict
+ *   - Login and email confirmation put the session JWT and its CSRF token in HttpOnly, SameSite=Strict
  *     cookies. The JWT itself is never returned in a response body, so frontend JavaScript
  *     (and therefore any XSS payload) never has access to it.
  *   - The CSRF token is also returned in the response body. The frontend keeps it in memory and
@@ -20,11 +21,17 @@
 
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import User, { ACCOUNT_STATUSES, BCRYPT_SALT_ROUNDS, ROLES } from '../models/User.js';
+import User, { ACCOUNT_STATUSES, BCRYPT_SALT_ROUNDS } from '../models/User.js';
 import RevokedSession from '../models/RevokedSession.js';
-import { ACCOUNT_MESSAGES, AUTH_MESSAGES, SESSION_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
+import {
+  ACCOUNT_EMAIL_MESSAGES,
+  ACCOUNT_MESSAGES,
+  AUTH_MESSAGES,
+  SESSION_MESSAGES,
+  VALIDATION_MESSAGES,
+} from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { sendError, sendSuccess } from '../utils/apiResponse.js';
+import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import {
   clearSessionCookies,
   readRequestCookie,
@@ -35,14 +42,12 @@ import { isCsrfTokenValid, issueSessionTokens } from '../utils/authToken.js';
 import { toPublicUserProfile } from '../utils/userProfile.js';
 import { SOCKET_ERROR_CODES, disconnectSessionSockets, disconnectUserSockets } from '../utils/socketManager.js';
 import { logger } from '../utils/logger.js';
-import {
-  validateChangePasswordInput,
-  validateLoginInput,
-  validateRegistrationInput,
-} from '../validators/authValidators.js';
+import { validateChangePasswordInput, validateLoginInput } from '../validators/authValidators.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
-/** MongoDB's error code for a unique-index violation. */
+/** Code of the 403 a correct password gets while the account's email is still unconfirmed. */
+export const EMAIL_NOT_VERIFIED_CODE = 'EMAIL_NOT_VERIFIED';
+
 /**
  * A bcrypt hash of a random value nobody knows, computed once at startup at the same cost
  * as real password hashes. When a login names an email that has no account, the password is
@@ -54,79 +59,12 @@ const TIMING_EQUALIZATION_HASH = bcrypt.hashSync(randomBytes(32).toString('hex')
 
 /**
  * Issues a new session for `userId`, writes the session cookies, and returns the CSRF token
- * that the response body hands to the frontend.
+ * that the response body hands to the frontend. Also used when an email is confirmed.
  */
-function startSession(res, authConfig, userId) {
+export function startSession(res, authConfig, userId) {
   const sessionTokens = issueSessionTokens(userId, authConfig);
   setSessionCookies(res, authConfig, sessionTokens);
   return sessionTokens.csrfToken;
-}
-
-/**
- * POST /api/auth/signup
- *
- * Request body: { name: string, email: string, password: string }
- * Responses:
- *   201 { message, data: { user, csrfToken } } + session cookies   Account created and signed in.
- *   400 { error: { message, requestId, details? } }  Invalid fields (including a weak password),
- *                                                     or the email is already registered.
- *   429                                               Signup rate limit reached (middleware).
- *   500                                               Unexpected failure, via the central error handler.
- *
- * Security decisions:
- *   - The role is always `customer`. Any `role` in the request body is ignored, because the
- *     validator only passes through name, email, and password; otherwise anyone could sign
- *     themselves up as an admin.
- *   - Password strength (length, upper, lower, digit, special) is enforced by the validator,
- *     independently of what the frontend checked.
- *   - The password is hashed by the User model's pre-save hook (bcrypt, BCRYPT_SALT_ROUNDS),
- *     the single place hashing happens. Hashing here as well would store a hash of a hash.
- */
-export async function registerUser(req, res, next) {
-  try {
-    const registrationValidation = validateRegistrationInput(req.body);
-    if (!registrationValidation.isValid) {
-      return sendError(
-        req,
-        res,
-        HTTP_STATUS.BAD_REQUEST,
-        VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED,
-        registrationValidation.validationErrors,
-      );
-    }
-
-    const { name, email, password } = registrationValidation.sanitizedInput;
-
-    // Fast path for the common duplicate case. It is not sufficient on its own: two concurrent
-    // signups with the same email can both pass this check, so the unique index on `email`
-    // is the real guarantee and its error is handled in the catch block below.
-    const existingAccount = await User.exists({ email });
-    if (existingAccount) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, AUTH_MESSAGES.EMAIL_ALREADY_REGISTERED);
-    }
-
-    // Every self-registered account is a customer, except the deployment's configured first admin
-    // (BOOTSTRAP_ADMIN_EMAIL), so a fresh deployment can be administered without database access.
-    const bootstrapAdminEmail = req.app.locals.config.bootstrapAdminEmail;
-    const assignedRole = bootstrapAdminEmail && email === bootstrapAdminEmail ? ROLES.ADMIN : ROLES.CUSTOMER;
-    const newUserRecord = new User({ name, email, password, role: assignedRole });
-    await newUserRecord.save();
-
-    const csrfToken = startSession(res, req.app.locals.config, newUserRecord._id);
-
-    logger.info('User registered', { requestId: req.id, userId: newUserRecord._id.toString() });
-
-    return sendSuccess(res, HTTP_STATUS.CREATED, AUTH_MESSAGES.REGISTRATION_SUCCESSFUL, {
-      user: toPublicUserProfile(newUserRecord),
-      csrfToken,
-    });
-  } catch (error) {
-    // The concurrent-signup race described above: the unique index rejected the second insert.
-    if (isDuplicateKeyError(error) && error?.keyPattern?.email) {
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, AUTH_MESSAGES.EMAIL_ALREADY_REGISTERED);
-    }
-    return next(error);
-  }
 }
 
 /**
@@ -137,6 +75,8 @@ export async function registerUser(req, res, next) {
  *   200 { message, data: { user, csrfToken } } + session cookies   Credentials are correct.
  *   400 { error: { message, requestId, details } }  Email or password missing or not a string.
  *   401 { error: { message, requestId } }         Unknown email or wrong password (same message for both).
+ *   403 { error: { message, code: EMAIL_NOT_VERIFIED, requestId } }
+ *                                                 Right password, but the email is not confirmed yet.
  *   429                                           Login rate limit reached (middleware).
  *   500                                           Unexpected failure, via the central error handler.
  *
@@ -172,6 +112,24 @@ export async function loginUser(req, res, next) {
       await bcrypt.compare(password, TIMING_EQUALIZATION_HASH);
       logger.warn('Login failed', { requestId: req.id, reason: 'unknown_email' });
       return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, AUTH_MESSAGES.INVALID_CREDENTIALS);
+    }
+
+    // A signup whose email is not confirmed yet: told so only with the right password (the same bcrypt
+    // work either way), so the answer reveals nothing to someone who does not know it.
+    if (userRecord.status === ACCOUNT_STATUSES.UNVERIFIED) {
+      if (!(await userRecord.comparePassword(password))) {
+        logger.warn('Login failed', { requestId: req.id, reason: 'wrong_password', userId: userRecord._id.toString() });
+        return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, AUTH_MESSAGES.INVALID_CREDENTIALS);
+      }
+      logger.warn('Login refused', {
+        requestId: req.id,
+        reason: 'email_not_verified',
+        userId: userRecord._id.toString(),
+      });
+      return sendCodedError(req, res, HTTP_STATUS.FORBIDDEN, {
+        code: EMAIL_NOT_VERIFIED_CODE,
+        message: ACCOUNT_EMAIL_MESSAGES.EMAIL_NOT_VERIFIED,
+      });
     }
 
     // Invited (no password yet) and disabled accounts cannot sign in. Same answer and the same

@@ -166,7 +166,7 @@ email), `pre('validate')` reference checks, and guards that block hierarchy chan
 All responses use `{ message, data }` on success and `{ error: { message, code?, details?, requestId, context? } }` on failure.
 
 ### 7.1 Authentication
-- `POST /api/auth/signup` (self-signup → role customer; `BOOTSTRAP_ADMIN_EMAIL` becomes admin), `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/password`.
+- `POST /api/auth/signup` (self-signup → role customer; `BOOTSTRAP_ADMIN_EMAIL` becomes admin; the account is unverified and a confirmation link is emailed), `POST /api/auth/verify-email` (confirms and signs in), `POST /api/auth/verify-email/resend`, `POST /api/auth/login` (403 `EMAIL_NOT_VERIFIED` until confirmed), `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/password`, `POST /api/auth/password/forgot`, `GET /api/auth/password/reset/:token`, `POST /api/auth/password/reset` (all sessions end). One account email per address per minute (429 with Retry-After); messages and error codes come from the server. Details: backend/README.md.
 - Session = JWT in an **HttpOnly cookie** plus a **CSRF token** returned in the body and sent as `X-CSRF-Token` on writes. Login rate-limited (30 / 15 min per IP; 5 / 15 min per IP+email). Timing-equalised responses hide which emails exist.
 
 ### 7.2 Customer support (AI multi-agent)
@@ -314,7 +314,7 @@ Testing approach used so far: end-to-end scripts against an isolated backend and
 - No admin screens for **office locations / geofences, device registration, or departments**.
 - No separate **employee** role (employees use `customer`).
 - Rate limiter and caches are **in-memory**: Redis is needed before running more than one backend instance.
-- Vault and payslip PDFs need **S3** configured; invitations need **SMTP** to send real email.
+- Vault and payslip PDFs need **S3** configured; signup and password reset need **SMTP** (without it they answer 503), and invitations need it to send real email.
 - No retrieval (vector) store yet; the telemetry console already displays retrieval confidence when one is added.
 
 ---

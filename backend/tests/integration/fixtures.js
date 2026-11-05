@@ -6,7 +6,21 @@
 import assert from 'node:assert/strict';
 
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../../models/EmployeeProfile.js';
+import { tokenFromEmail } from './mailCatcher.js';
 import { STRONG_PASSWORD } from './testServer.js';
+
+/**
+ * The token of an invitation just created: from the emailed link when the server sends email (the
+ * newest invitation email to `email`), otherwise from the link handed to HR in the response.
+ */
+export async function invitationTokenFrom(testServer, invitationResponse, email) {
+  const { delivery } = invitationResponse.body.data;
+  if (delivery.inviteUrl) return new URL(delivery.inviteUrl).pathname.split('/').pop();
+  const invitationEmails = (await testServer.mailbox.waitForMessages(email)).filter((message) =>
+    message.text.includes('/invite/'),
+  );
+  return tokenFromEmail(invitationEmails.at(-1), '/invite');
+}
 
 /** A valid office as the API accepts it; `overrides` replace top-level fields, `workday` fields merge. */
 export function officeFields(code, { workday = {}, ...overrides } = {}) {
@@ -73,7 +87,7 @@ export async function onboardEmployee({
     employmentStatus: EMPLOYMENT_STATUSES.ACTIVE,
   });
   assert.equal(invitationResponse.status, 201, JSON.stringify(invitationResponse.body));
-  const token = new URL(invitationResponse.body.data.delivery.inviteUrl).pathname.split('/').pop();
+  const token = await invitationTokenFrom(testServer, invitationResponse, email);
   const client = testServer.createClient();
   const acceptResponse = await client.post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD });
   assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));

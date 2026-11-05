@@ -70,13 +70,18 @@ cd frontend && npm install && npm run dev       # http://localhost:5173
 ```
 
 Open http://localhost:5173. To get the first administrator, set `BOOTSTRAP_ADMIN_EMAIL` in
-`backend/.env` and sign up with that email, or promote an existing account with
-`npm run set-role -- <email> admin` (from `backend/`).
+`backend/.env` and sign up with that email (then open the confirmation link that is emailed), or
+promote an existing account with `npm run set-role -- <email> admin` (from `backend/`).
+
+Signing up and resetting a password need email (SMTP): every new account confirms its address
+through an emailed link. Locally, `docker compose --profile mail up` adds Mailpit, which catches
+every email at http://localhost:8025 (settings in `docker-compose.yml`).
 
 Optional services switch features on when configured: S3 (document vault, payslip PDFs), SMTP
-(invitation emails), Redis (multi-instance real-time and caching). Without them the app still runs:
-vault and payslip endpoints answer "unavailable", HR gets invitation links to share by hand, and
-real-time runs in memory on one instance.
+(signup confirmation, password reset, invitation and leave emails), Redis (multi-instance real-time
+and caching). Without them the app still runs: vault and payslip endpoints answer "unavailable", HR
+gets invitation links to share by hand, real-time runs in memory on one instance, and signup and
+password reset answer "email unavailable" (503).
 
 ## Run the whole stack with Docker Compose
 

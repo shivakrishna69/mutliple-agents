@@ -36,6 +36,31 @@ function normalizeEmail(rawEmail) {
   return rawEmail.trim().toLowerCase();
 }
 
+/** An address someone gives to receive email: present, a string, not too long, well-formed. */
+function checkEmailAddress(rawEmail) {
+  const presenceError = checkRequiredString(
+    rawEmail,
+    VALIDATION_MESSAGES.EMAIL_REQUIRED,
+    VALIDATION_MESSAGES.EMAIL_MUST_BE_STRING,
+  );
+  if (presenceError) return presenceError;
+  const normalizedEmail = normalizeEmail(rawEmail);
+  if (normalizedEmail.length > USER_FIELD_LIMITS.EMAIL_MAX_LENGTH) return VALIDATION_MESSAGES.EMAIL_TOO_LONG;
+  if (!EMAIL_PATTERN.test(normalizedEmail)) return VALIDATION_MESSAGES.EMAIL_FORMAT_INVALID;
+  return null;
+}
+
+const notAnObject = () => ({
+  isValid: false,
+  validationErrors: [{ field: 'body', message: VALIDATION_MESSAGES.REQUEST_BODY_MUST_BE_OBJECT }],
+  sanitizedInput: null,
+});
+
+/** A link token from the request body: present and a string. Its shape is checked by the service. */
+function checkLinkToken(rawToken) {
+  return checkRequiredString(rawToken, VALIDATION_MESSAGES.TOKEN_REQUIRED, VALIDATION_MESSAGES.TOKEN_MUST_BE_STRING);
+}
+
 /**
  * Every rule a newly chosen password must meet (signup and password change): present, at least
  * PASSWORD_MIN_LENGTH characters, at most PASSWORD_MAX_BYTES UTF-8 bytes, and each strength rule.
@@ -134,21 +159,8 @@ export function validateRegistrationInput(requestBody) {
     }
   }
 
-  const emailError = checkRequiredString(
-    rawEmail,
-    VALIDATION_MESSAGES.EMAIL_REQUIRED,
-    VALIDATION_MESSAGES.EMAIL_MUST_BE_STRING,
-  );
-  if (emailError) {
-    validationErrors.push({ field: 'email', message: emailError });
-  } else {
-    const normalizedEmail = normalizeEmail(rawEmail);
-    if (normalizedEmail.length > USER_FIELD_LIMITS.EMAIL_MAX_LENGTH) {
-      validationErrors.push({ field: 'email', message: VALIDATION_MESSAGES.EMAIL_TOO_LONG });
-    } else if (!EMAIL_PATTERN.test(normalizedEmail)) {
-      validationErrors.push({ field: 'email', message: VALIDATION_MESSAGES.EMAIL_FORMAT_INVALID });
-    }
-  }
+  const emailError = checkEmailAddress(rawEmail);
+  if (emailError) validationErrors.push({ field: 'email', message: emailError });
 
   const passwordError = checkNewPassword(rawPassword);
   if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
@@ -208,5 +220,48 @@ export function validateLoginInput(requestBody) {
     isValid: true,
     validationErrors: [],
     sanitizedInput: { email: normalizeEmail(rawEmail), password: rawPassword },
+  };
+}
+
+/**
+ * Validates POST /verify-email/resend and POST /password/forgot: { email }. The address must be
+ * well-formed (the request asks for an email to be sent to it); whether it has an account is never
+ * part of the answer.
+ */
+export function validateEmailRequestInput(requestBody) {
+  if (!isPlainObject(requestBody)) return notAnObject();
+  const emailError = checkEmailAddress(requestBody.email);
+  if (emailError) {
+    return { isValid: false, validationErrors: [{ field: 'email', message: emailError }], sanitizedInput: null };
+  }
+  return { isValid: true, validationErrors: [], sanitizedInput: { email: normalizeEmail(requestBody.email) } };
+}
+
+/** Validates POST /verify-email: { token }. */
+export function validateVerifyEmailInput(requestBody) {
+  if (!isPlainObject(requestBody)) return notAnObject();
+  const tokenError = checkLinkToken(requestBody.token);
+  if (tokenError) {
+    return { isValid: false, validationErrors: [{ field: 'token', message: tokenError }], sanitizedInput: null };
+  }
+  return { isValid: true, validationErrors: [], sanitizedInput: { token: requestBody.token } };
+}
+
+/**
+ * Validates POST /password/reset: { token, password }. The new password must meet every signup
+ * rule; it is checked before the link is used up, so a weak password does not waste the link.
+ */
+export function validatePasswordResetInput(requestBody) {
+  if (!isPlainObject(requestBody)) return notAnObject();
+  const validationErrors = [];
+  const tokenError = checkLinkToken(requestBody.token);
+  if (tokenError) validationErrors.push({ field: 'token', message: tokenError });
+  const passwordError = checkNewPassword(requestBody.password);
+  if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
+  if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
+  return {
+    isValid: true,
+    validationErrors: [],
+    sanitizedInput: { token: requestBody.token, password: requestBody.password },
   };
 }

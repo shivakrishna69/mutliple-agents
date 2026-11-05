@@ -99,8 +99,9 @@ Once the DNS record points at the server:
 sudo -u ubuntu /opt/nsk/deploy/deploy.sh main
 ```
 
-The first build takes several minutes. Then open `https://<your domain>` and sign up with the
-administrator email: that account becomes the administrator.
+The first build takes several minutes. Set up email first (below): signing up sends a confirmation
+link. Then open `https://<your domain>`, sign up with the administrator email and open the link
+emailed to it: that account becomes the administrator.
 
 ## 6. Deploys on every merge to main
 
@@ -138,8 +139,9 @@ deploy/deploy.sh <commit>   # go back to an earlier commit of main
 `ai-service.env`), then `nsk up -d` to restart with them. `backend/.env.example` and
 `ai-service/.env.example` list every setting.
 
-**Email for invitations**: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and
-`MAIL_FROM` in `/etc/nsk/backend.env` (the file has them, commented out), then `nsk up -d`.
+**Email** (signup confirmation, password reset, invitations, leave notices): set `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM` in `/etc/nsk/backend.env` (the file has
+them, commented out), then `nsk up -d`. Without email, nobody can sign up or reset a password.
 
 ### Backups
 

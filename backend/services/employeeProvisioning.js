@@ -12,6 +12,7 @@ import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.
 import User, { ACCOUNT_STATUSES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { discardUnverifiedAccount } from './accountEmailFlows.js';
 import { suggestCompanyEmail } from './companyEmail.js';
 import { getCompanySettings, issueEmployeeCode } from './companySettings.js';
 
@@ -32,7 +33,8 @@ export const PROVISIONING_ERRORS = Object.freeze({
 /** How an existing account with this email affects inviting them. */
 export async function findInvitableAccount(email) {
   const existing = await User.findOne({ email }).select('+password').lean();
-  if (!existing) return null;
+  // An unconfirmed signup does not stand in the way: provisioning replaces it (createAccount).
+  if (!existing || existing.status === ACCOUNT_STATUSES.UNVERIFIED) return null;
   if (existing.status === ACCOUNT_STATUSES.INVITED)
     throw new ProvisioningError('INVITATION_EXISTS', PROVISIONING_ERRORS.INVITATION_EXISTS);
   // A revoked invitation that was never used can be invited again: same account, same employee ID.
@@ -41,6 +43,9 @@ export async function findInvitableAccount(email) {
 }
 
 async function createAccount({ name, email, role, companyEmail }) {
+  // Someone may have signed up with this address and never confirmed it; HR's invitation (which is
+  // sent to the address) takes its place. A confirmed account is kept and refused below.
+  await discardUnverifiedAccount(email);
   const { emailDomain } = await getCompanySettings();
   for (;;) {
     const address = companyEmail ?? (await suggestCompanyEmail(name, emailDomain));
@@ -125,11 +130,14 @@ export async function withdrawInvitedEmployee(userId) {
   );
 }
 
-/** The person chose their password through their invitation link: the account becomes usable. */
+/**
+ * The person chose their password through their invitation link: the account becomes usable. The
+ * link was emailed to the account's address, so opening it also confirms that address.
+ */
 export async function activateInvitedAccount(userId, password) {
   const user = await User.findOne({ _id: userId, status: ACCOUNT_STATUSES.INVITED });
   if (!user) return null;
-  user.set({ password, status: ACCOUNT_STATUSES.ACTIVE });
+  user.set({ password, status: ACCOUNT_STATUSES.ACTIVE, emailVerifiedAt: new Date() });
   await user.save();
   return user;
 }

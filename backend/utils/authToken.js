@@ -9,6 +9,8 @@
  *       jti  a random UUID identifying this session, used to revoke it on logout
  *       csrf SHA-256 hex digest of this session's CSRF token (see below)
  *       iat / exp  issued-at and expiry, from JWT_EXPIRES_IN
+ *       iatms      issued-at in milliseconds (the same moment as `iat`), so a password change
+ *                  revokes even a session started earlier in the same second
  *   - Role and email are not embedded: the auth middleware reloads the user on every request,
  *     so a role change or account deletion takes effect immediately.
  *
@@ -47,7 +49,9 @@ export function issueSessionTokens(userId, authConfig) {
   const csrfToken = randomBytes(CSRF_TOKEN_BYTES).toString('base64url');
   const sessionId = randomUUID();
 
-  const accessToken = jwt.sign({ csrf: hashCsrfToken(csrfToken) }, authConfig.jwtSecret, {
+  const issuedAtMs = Date.now();
+  const sessionClaims = { csrf: hashCsrfToken(csrfToken), iat: Math.floor(issuedAtMs / 1000), iatms: issuedAtMs };
+  const accessToken = jwt.sign(sessionClaims, authConfig.jwtSecret, {
     algorithm: ACCESS_TOKEN_ALGORITHM,
     subject: String(userId),
     jwtid: sessionId,

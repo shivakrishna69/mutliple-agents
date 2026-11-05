@@ -141,8 +141,13 @@ async function checkAgainstAccounts(rows) {
     const account = accountByEmail.get(row.input.personalEmail);
     if (account?.status === ACCOUNT_STATUSES.INVITED)
       row.issues.push({ field: 'personal_email', message: 'this person is already invited; resend their invitation' });
-    // A revoked invitation that was never used can be invited again; anything else is a real account.
-    else if (account && !(account.status === ACCOUNT_STATUSES.DISABLED && !account.password))
+    // A revoked invitation that was never used can be invited again, and an unconfirmed signup is
+    // replaced by the invitation (services/employeeProvisioning.js); anything else is a real account.
+    else if (
+      account &&
+      account.status !== ACCOUNT_STATUSES.UNVERIFIED &&
+      !(account.status === ACCOUNT_STATUSES.DISABLED && !account.password)
+    )
       row.issues.push({ field: 'personal_email', message: 'someone with this email already has an account' });
     if (row.input.companyEmail && takenCompanyEmails.has(row.input.companyEmail))
       row.issues.push({ field: 'company_email', message: 'another account already has this address' });

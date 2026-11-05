@@ -10,6 +10,11 @@
  *
  * MongoDB: TEST_MONGO_URL (default mongodb://127.0.0.1:27017). When it cannot be reached the
  * integration tests are skipped locally, but fail in CI (CI=true) so a broken setup is never green.
+ *
+ * Email: by default the server sends through a test mail server (mailCatcher.js), exposed as
+ * `mailbox`, so signups are confirmed with the emailed link like a person would. `mail: false`
+ * starts a server without email (for the "no mail server" behaviour); accounts are then written
+ * straight to the database by createSignedInClient, since signing up needs email.
  */
 
 import { spawn } from 'node:child_process';
@@ -19,15 +24,19 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import { startMailCatcher, tokenFromEmail } from './mailCatcher.js';
 
 const SERVER_ENTRY_PATH = fileURLToPath(new URL('../../server.js', import.meta.url));
 const MONGO_BASE_URL = (process.env.TEST_MONGO_URL ?? 'mongodb://127.0.0.1:27017').replace(/\/+$/, '');
-const STARTUP_TIMEOUT_MS = 30_000;
+// A ceiling, not a delay: a server alone starts in about 5 s, but many suites start theirs at once.
+const STARTUP_TIMEOUT_MS = 60_000;
 
 export const TEST_APP_ORIGIN = 'http://localhost:5173';
 export const TEST_ADMIN_EMAIL = 'admin@example.com';
 export const STRONG_PASSWORD = 'Valid#Pass2026';
+export const TEST_MAIL_FROM = 'Test HR <hr@test.example>';
 
 /** Host variables the child needs to run at all; nothing application-specific is inherited. */
 const INHERITED_ENVIRONMENT_KEYS = ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'TEMP', 'TMP', 'HOME', 'USERPROFILE'];
@@ -114,7 +123,20 @@ export async function startTestServer({
   seedBeforeStart,
   // Extra variables for this server, e.g. { REDIS_URL } to run imports on BullMQ.
   environment = {},
+  // false: no email at all. Otherwise mail goes to a test mail server; `mailHttpPort` also serves
+  // its messages over HTTP (browser tests read them from another process).
+  mail = true,
+  mailHttpPort,
 } = {}) {
+  const mailbox = mail ? await startMailCatcher({ httpPort: mailHttpPort }) : null;
+  const mailEnvironment = mailbox
+    ? {
+        SMTP_HOST: '127.0.0.1',
+        SMTP_PORT: String(mailbox.smtpPort),
+        SMTP_REQUIRE_TLS: 'false',
+        MAIL_FROM: TEST_MAIL_FROM,
+      }
+    : {};
   // The key the backend and the AI service share; tests use it to call /api/internal like the AI service.
   const internalApiKey = randomBytes(32).toString('hex');
   const port = requestedPort ?? (await findFreePort());
@@ -129,7 +151,14 @@ export async function startTestServer({
   function spawnServer() {
     serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
       cwd: workingDirectory,
-      env: buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, internalApiKey, environment }),
+      env: buildServerEnvironment({
+        port,
+        mongoUri,
+        appOrigin,
+        aiServiceUrl,
+        internalApiKey,
+        environment: { ...mailEnvironment, ...environment },
+      }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const captureOutput = (chunk) => {
@@ -147,6 +176,7 @@ export async function startTestServer({
     }
     await database.dropDatabase().catch(() => {});
     await database.close().catch(() => {});
+    await mailbox?.close().catch(() => {});
     await rm(workingDirectory, { recursive: true, force: true });
   }
 
@@ -160,7 +190,7 @@ export async function startTestServer({
     throw startupError;
   }
 
-  return { baseUrl, database, mongoUri, internalApiKey, createClient: () => new TestClient(baseUrl), stop };
+  return { baseUrl, database, mongoUri, internalApiKey, mailbox, createClient: () => new TestClient(baseUrl), stop };
 }
 
 /** A browser-like client: stores cookies from Set-Cookie and sends the CSRF token on writes. */
@@ -195,11 +225,12 @@ export class TestClient {
   /**
    * @param {string} method
    * @param {string} requestPath
-   * @param {{ body?: unknown, sendCsrfToken?: boolean }} [options]  a FormData body is sent as multipart
+   * @param {{ body?: unknown, sendCsrfToken?: boolean, headers?: Record<string, string> }} [options]
+   *   a FormData body is sent as multipart; `headers` are added (e.g. X-Forwarded-For through a proxy)
    * @returns {Promise<{ status: number, body: any }>}
    */
-  async request(method, requestPath, { body, sendCsrfToken = true } = {}) {
-    const headers = { Origin: TEST_APP_ORIGIN, Accept: 'application/json' };
+  async request(method, requestPath, { body, sendCsrfToken = true, headers: extraHeaders = {} } = {}) {
+    const headers = { Origin: TEST_APP_ORIGIN, Accept: 'application/json', ...extraHeaders };
     const isMultipart = body instanceof FormData;
     // fetch sets the multipart Content-Type itself, with the boundary.
     if (body !== undefined && !isMultipart) headers['Content-Type'] = 'application/json';
@@ -245,16 +276,61 @@ export class TestClient {
   }
 }
 
+/** Stands in for "a minute later": ends every per-address email cooldown (test data only). */
+export async function endEmailCooldowns(testServer) {
+  await testServer.database.collection('emailcooldowns').deleteMany({});
+}
+
+/** The token of the newest confirmation link emailed to `email` (waits for it to arrive). */
+export async function latestVerificationToken(testServer, email, expectedCount = 1) {
+  const messages = await testServer.mailbox.waitForMessages(email, expectedCount);
+  return tokenFromEmail(messages.at(-1), '/verify-email');
+}
+
+/** Signs up and confirms the email through the API, leaving `client` signed in. */
+export async function signUpAndConfirm(testServer, client, { name, email, password = STRONG_PASSWORD }) {
+  const alreadyReceived = testServer.mailbox.messagesTo(email).length;
+  const signupResponse = await client.signup(name, email, password);
+  if (signupResponse.status !== 202) {
+    throw new Error(`Signup for ${email} failed: ${signupResponse.status} ${JSON.stringify(signupResponse.body)}`);
+  }
+  const token = await latestVerificationToken(testServer, email, alreadyReceived + 1);
+  const confirmResponse = await client.post('/api/auth/verify-email', { token });
+  if (confirmResponse.status !== 200) {
+    throw new Error(`Confirming ${email} failed: ${confirmResponse.status} ${JSON.stringify(confirmResponse.body)}`);
+  }
+}
+
 /**
- * Signs a new account up, optionally switches its role directly in the database (the same thing
- * scripts/setUserRole.js does), and returns a client signed in with that role.
+ * On a server without email: an active, confirmed account written straight to the database (test
+ * data, like the role switch below), then signed in through the API.
+ */
+async function seedConfirmedAccount(testServer, client, { name, email }) {
+  const now = new Date();
+  await testServer.database.collection('users').insertOne({
+    name,
+    email,
+    password: await bcrypt.hash(STRONG_PASSWORD, 4),
+    role: email === TEST_ADMIN_EMAIL ? 'admin' : 'customer',
+    status: 'active',
+    emailVerifiedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const loginResponse = await client.login(email);
+  if (loginResponse.status !== 200) {
+    throw new Error(`Login for ${email} failed: ${loginResponse.status} ${JSON.stringify(loginResponse.body)}`);
+  }
+}
+
+/**
+ * A new account with a confirmed email, optionally with its role switched directly in the database
+ * (the same thing scripts/setUserRole.js does), and a client signed in with that role.
  */
 export async function createSignedInClient(testServer, { name, email, role = null }) {
   const client = testServer.createClient();
-  const signupResponse = await client.signup(name, email);
-  if (signupResponse.status !== 201) {
-    throw new Error(`Signup for ${email} failed: ${signupResponse.status} ${JSON.stringify(signupResponse.body)}`);
-  }
+  if (testServer.mailbox) await signUpAndConfirm(testServer, client, { name, email });
+  else await seedConfirmedAccount(testServer, client, { name, email });
   if (role) {
     await testServer.database.collection('users').updateOne({ email }, { $set: { role } });
     const loginResponse = await client.login(email);

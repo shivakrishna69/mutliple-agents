@@ -9,8 +9,9 @@
  *      Errors for a field appear once that field has been blurred or a submit was attempted;
  *      the password checklist and the password-match check update live while typing.
  *   3. Submit: if any field is invalid, focus moves to the first invalid field and no request
- *      is sent. Otherwise the form is locked, the request is sent, and on success the session
- *      is recorded in AuthContext and the user is redirected to /dashboard.
+ *      is sent. Otherwise the form is locked and the request is sent. On success the form is
+ *      replaced by the backend's own message (check your email to confirm the address); no
+ *      session starts until the emailed link is opened.
  *   4. Unmount: an in-flight request is aborted so its result cannot update a page that is gone.
  *
  * State flow
@@ -34,9 +35,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { ApiError, requestSignup } from '../api/authApi.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import FormField from '../components/FormField.jsx';
@@ -59,15 +59,14 @@ export default function Signup() {
   // State & Hook Definitions
   // ==========================================================================
 
-  const navigate = useNavigate();
-  const { establishSession } = useAuth();
-
   const [formValues, setFormValues] = useState(INITIAL_FORM_VALUES);
   const [touchedFields, setTouchedFields] = useState({});
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [serverFieldErrors, setServerFieldErrors] = useState({});
   const [submissionError, setSubmissionError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The backend's answer to a successful signup: { message, email }. Shown instead of the form.
+  const [signupConfirmation, setSignupConfirmation] = useState(null);
 
   // State updates are asynchronous, so `isSubmitting` alone cannot stop two clicks fired in
   // the same tick. This ref flips synchronously and is the authoritative double-submit guard.
@@ -172,7 +171,7 @@ export default function Signup() {
     activeRequestControllerRef.current = requestController;
 
     try {
-      const authResult = await requestSignup(
+      const signupResult = await requestSignup(
         {
           name: formValues.name.trim(),
           email: formValues.email.trim(),
@@ -181,14 +180,8 @@ export default function Signup() {
         { signal: requestController.signal },
       );
 
-      // The session cookies were set by the response; record the user and CSRF token in memory.
-      establishSession(authResult);
-
-      // Navigation trigger: the account exists and the session is active, so leave the
-      // signup page. `replace` swaps /signup out of the history stack, so the browser's
-      // Back button from the dashboard does not return to a form for an account that
-      // already exists.
-      navigate(ROUTE_PATHS.DASHBOARD, { replace: true });
+      // No session yet: the account waits for its email to be confirmed through the emailed link.
+      setSignupConfirmation(signupResult);
     } catch (signupError) {
       if (requestController.signal.aborted) return;
 
@@ -216,6 +209,16 @@ export default function Signup() {
   // ==========================================================================
   // JSX Render Blocks
   // ==========================================================================
+
+  if (signupConfirmation) {
+    return (
+      <AuthLayout heading="Create your account" subheading={signupConfirmation.email}>
+        <p role="status" className="rounded-xl bg-brand-50 p-4 text-sm text-slate-700">
+          {signupConfirmation.message}
+        </p>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout

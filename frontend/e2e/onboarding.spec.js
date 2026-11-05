@@ -7,7 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { ACCOUNTS, DEPARTMENT_NAME, PASSWORD } from './environment.js';
-import { localToday, signIn, watchForPageProblems } from './helpers.js';
+import { emailedLink, localToday, signIn, watchForPageProblems } from './helpers.js';
 
 function importFile() {
   const today = localToday();
@@ -34,10 +34,8 @@ test('HR invites a new joiner, then imports more from a CSV', async ({ page, bro
   await page.getByLabel('Department').selectOption({ label: DEPARTMENT_NAME });
   await page.getByRole('button', { name: 'Send invitation' }).click();
 
-  // No mail server in tests, so HR is given the link to share.
-  const inviteLink = page.locator('code').filter({ hasText: '/invite/' });
-  await expect(inviteLink).toBeVisible();
-  const inviteUrl = (await inviteLink.textContent()).trim();
+  // The invitation is emailed; the new joiner opens the link from their inbox.
+  const inviteUrl = await emailedLink('nisha.kapoor@example.com', '/invite');
   const invitationRow = page.getByRole('listitem').filter({ hasText: 'nisha.kapoor@example.com' });
   await expect(invitationRow.getByText(/^NSK\d{4}$/)).toBeVisible();
 
@@ -70,13 +68,13 @@ test('HR invites a new joiner, then imports more from a CSV', async ({ page, bro
   await page.getByRole('button', { name: 'Import 2 people' }).click();
 
   await expect(page.getByText('Finished', { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('2 invitation links were not emailed')).toBeVisible();
   const resultRows = page.getByRole('row');
   await expect(resultRows.filter({ hasText: 'Omar Lead' }).getByText('Invited')).toBeVisible();
   await expect(resultRows.filter({ hasText: 'Priya Ops' }).getByText('Invited')).toBeVisible();
   await expect(resultRows.filter({ hasText: 'Bad Row' }).getByText('Not imported')).toBeVisible();
   await expect(resultRows.filter({ hasText: 'Omar Lead' }).getByText(/^NSK\d{4}$/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Copy link' })).toHaveCount(2);
+  // Every invitation was emailed, so there are no links for HR to share by hand.
+  await expect(page.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
 
   const resultsDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download results' }).click();

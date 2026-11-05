@@ -1,7 +1,13 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { mongoUnavailableReason, startTestServer, STRONG_PASSWORD } from './testServer.js';
+import {
+  endEmailCooldowns,
+  latestVerificationToken,
+  mongoUnavailableReason,
+  startTestServer,
+  STRONG_PASSWORD,
+} from './testServer.js';
 
 const skipReason = await mongoUnavailableReason();
 
@@ -16,7 +22,7 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     await testServer?.stop();
   });
 
-  it('signs a new user up as a customer, even when the body asks for another role', async () => {
+  it('signs a new user up as a customer, even when the body asks for another role, once the email is confirmed', async () => {
     const client = testServer.createClient();
     const signupResponse = await client.post('/api/auth/signup', {
       name: 'Asha Rao',
@@ -24,11 +30,18 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
       password: STRONG_PASSWORD,
       role: 'admin',
     });
-    assert.equal(signupResponse.status, 201);
-    assert.equal(signupResponse.body.data.user.email, 'asha.rao@example.com');
-    assert.equal(signupResponse.body.data.user.role, 'customer');
-    assert.equal(signupResponse.body.data.user.password, undefined);
-    assert.equal(typeof signupResponse.body.data.csrfToken, 'string');
+    assert.equal(signupResponse.status, 202);
+    assert.equal(signupResponse.body.data.email, 'asha.rao@example.com');
+    assert.equal(signupResponse.body.data.csrfToken, undefined, 'no session before the email is confirmed');
+    assert.equal((await client.get('/api/auth/me')).status, 401);
+
+    const token = await latestVerificationToken(testServer, 'asha.rao@example.com');
+    const confirmResponse = await client.post('/api/auth/verify-email', { token });
+    assert.equal(confirmResponse.status, 200);
+    assert.equal(confirmResponse.body.data.user.email, 'asha.rao@example.com');
+    assert.equal(confirmResponse.body.data.user.role, 'customer');
+    assert.equal(confirmResponse.body.data.user.password, undefined);
+    assert.equal(typeof confirmResponse.body.data.csrfToken, 'string');
 
     const currentUserResponse = await client.get('/api/auth/me');
     assert.equal(currentUserResponse.status, 200);
@@ -41,11 +54,15 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     assert.notEqual(storedUser.password, STRONG_PASSWORD);
   });
 
-  it('rejects a duplicate email', async () => {
+  it('answers a signup with a registered email like any other, and emails the owner instead', async () => {
+    await endEmailCooldowns(testServer);
     const duplicateResponse = await testServer.createClient().signup('Asha Again', 'asha.rao@example.com');
-    assert.equal(duplicateResponse.status, 400);
-    assert.match(duplicateResponse.body.error.message, /already/i);
+    assert.equal(duplicateResponse.status, 202);
+    const [, ownerNotice] = await testServer.mailbox.waitForMessages('asha.rao@example.com', 2);
+    assert.match(ownerNotice.subject, /already have/i);
     assert.equal(await testServer.database.collection('users').countDocuments({ email: 'asha.rao@example.com' }), 1);
+    const storedUser = await testServer.database.collection('users').findOne({ email: 'asha.rao@example.com' });
+    assert.equal(storedUser.name, 'Asha Rao', 'a confirmed account is never taken over by a signup');
   });
 
   it('gives the same answer for a wrong password and an unknown email', async () => {

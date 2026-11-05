@@ -110,6 +110,22 @@ export const signupRateLimitByClientIp = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_SIGNUP_ATTEMPTS,
 });
 
+/** One budget shared by resend-confirmation and forgot-password (both can send an email). */
+export const accountEmailRequestRateLimitByClientIp = createRateLimiter({
+  limiterName: 'account_email_requests_per_ip',
+  ...RATE_LIMITS.ACCOUNT_EMAIL_REQUESTS_PER_CLIENT_IP,
+  resolveClientKey: resolveClientIp,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_ACCOUNT_EMAIL_REQUESTS,
+});
+
+/** One budget shared by every use of an emailed link (confirm email, check or use a reset link). */
+export const accountLinkUseRateLimitByClientIp = createRateLimiter({
+  limiterName: 'account_link_uses_per_ip',
+  ...RATE_LIMITS.ACCOUNT_LINK_USES_PER_CLIENT_IP,
+  resolveClientKey: resolveClientIp,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_ACCOUNT_LINK_ATTEMPTS,
+});
+
 export const vaultUploadRateLimitByUser = createRateLimiter({
   limiterName: 'vault_uploads_per_user',
   ...RATE_LIMITS.VAULT_UPLOADS_PER_USER,

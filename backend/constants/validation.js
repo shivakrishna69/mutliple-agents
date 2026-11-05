@@ -17,6 +17,32 @@ export const USER_FIELD_LIMITS = Object.freeze({
 });
 
 /**
+ * Links emailed to account owners (services/accountEmailFlows.js):
+ *   EMAIL_VERIFICATION_VALIDITY_MS   how long a "confirm your email" link works
+ *   PASSWORD_RESET_VALIDITY_MS       how long a "reset your password" link works; short, because it
+ *                                    grants control of an existing account
+ *   EMAIL_COOLDOWN_MS                the least time between two such emails to one address, whether
+ *                                    or not it has an account (an inbox cannot be flooded, and the
+ *                                    wait does not reveal which addresses are registered)
+ */
+export const ACCOUNT_EMAIL_SETTINGS = Object.freeze({
+  EMAIL_VERIFICATION_VALIDITY_MS: 24 * 60 * 60 * 1000,
+  PASSWORD_RESET_VALIDITY_MS: 60 * 60 * 1000,
+  EMAIL_COOLDOWN_MS: 60 * 1000,
+});
+
+/**
+ * Frontend pages that account emails link to. The two token links are `${APP_PUBLIC_URL}${path}/<token>`;
+ * the others are plain pages.
+ */
+export const ACCOUNT_LINK_PATHS = Object.freeze({
+  EMAIL_VERIFICATION: '/verify-email',
+  PASSWORD_RESET: '/reset-password',
+  SIGN_IN: '/login',
+  FORGOT_PASSWORD: '/forgot-password',
+});
+
+/**
  * Password strength rules applied at signup, in addition to the length limits above.
  * Each pattern must match at least once somewhere in the password. Messages for each
  * `ruleId` live in constants/messages.js (PASSWORD_RULE_MESSAGES).

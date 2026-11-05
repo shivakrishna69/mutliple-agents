@@ -9,6 +9,12 @@
 # This stack serves plain HTTP on localhost, so the backend runs with NODE_ENV=development (secure
 # cookies and https URLs are required in production). For a real deployment, put it behind TLS and
 # set NODE_ENV=production, COOKIE_SECURE=true and https URLs.
+#
+# Email: signing up needs it (the confirmation link is emailed). To catch every email locally instead
+# of sending it, start Mailpit too and point the backend at it in backend/.env:
+#   docker compose --profile mail up --build
+#   SMTP_HOST=mailpit  SMTP_PORT=1025  SMTP_REQUIRE_TLS=false  MAIL_FROM="NSK HR <hr@localhost>"
+# and read the emails at http://localhost:8025.
 
 # The project name also names the database volume (nsk_mongo-data).
 name: nsk
@@ -86,6 +92,16 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # Optional (--profile mail): a local mail catcher. Nothing it receives leaves the machine.
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    profiles: [mail]
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
