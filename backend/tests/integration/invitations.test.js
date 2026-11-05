@@ -48,7 +48,8 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
   }
 
   before(async () => {
-    testServer = await startTestServer();
+    // Without a mail server, so HR is handed each invitation link (tested below).
+    testServer = await startTestServer({ mail: false });
     const insertResult = await testServer.database.collection('departments').insertOne({
       name: 'Engineering',
       code: 'ENG',

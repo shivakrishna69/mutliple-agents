@@ -25,6 +25,8 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
 
   before(async () => {
     testServer = await startTestServer({
+      // Tests the behaviour without a mail server: HR is handed the invitation links.
+      mail: false,
       // Data from before account statuses and employee IDs: an account, its profile, and an open invitation.
       seedBeforeStart: async (database) => {
         const now = new Date();
@@ -150,8 +152,6 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
 
     const signIn = await testServer.createClient().login('puja@example.com', STRONG_PASSWORD);
     assert.equal(signIn.status, 401);
-    const signUp = await testServer.createClient().signup('Puja', 'puja@example.com');
-    assert.equal(signUp.status, 400, 'signing up with an invited email is refused like any taken email');
     const again = await invite({ name: 'Puja Sharma', email: 'puja@example.com' });
     assert.equal(again.status, 409);
     assert.equal(again.body.error.code, 'INVITATION_EXISTS');

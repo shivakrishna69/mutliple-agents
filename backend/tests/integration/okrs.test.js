@@ -5,6 +5,7 @@ import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../../models/EmployeeP
 import { KEY_RESULT_UNITS } from '../../models/KeyResult.js';
 import { OBJECTIVE_LEVELS } from '../../models/Objective.js';
 import { createSignedInClient, mongoUnavailableReason, startTestServer, STRONG_PASSWORD } from './testServer.js';
+import { invitationTokenFrom } from './fixtures.js';
 
 const skipReason = await mongoUnavailableReason();
 const CURRENT_PERIOD = { year: 2026, quarter: 4 };
@@ -41,7 +42,7 @@ describe('OKR edits by several people at once', { skip: skipReason ?? false }, (
       employmentStatus: EMPLOYMENT_STATUSES.ACTIVE,
     });
     assert.equal(invitationResponse.status, 201, JSON.stringify(invitationResponse.body));
-    const token = new URL(invitationResponse.body.data.delivery.inviteUrl).pathname.split('/').pop();
+    const token = await invitationTokenFrom(testServer, invitationResponse, email);
 
     const client = testServer.createClient();
     const acceptResponse = await client.post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD });

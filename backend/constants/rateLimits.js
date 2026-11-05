@@ -16,6 +16,12 @@ export const RATE_LIMITS = Object.freeze({
   LOGIN_PER_CLIENT_IP: Object.freeze({ windowMs: FIFTEEN_MINUTES_MS, maxRequests: 30 }),
   LOGIN_PER_IP_AND_EMAIL: Object.freeze({ windowMs: FIFTEEN_MINUTES_MS, maxRequests: 5 }),
   SIGNUP_PER_CLIENT_IP: Object.freeze({ windowMs: ONE_HOUR_MS, maxRequests: 10 }),
+  // "Send me a confirmation link again" and "I forgot my password", together: each can send an email,
+  // so one network cannot use them to mail many addresses (each address also has its own 60 s wait).
+  ACCOUNT_EMAIL_REQUESTS_PER_CLIENT_IP: Object.freeze({ windowMs: ONE_HOUR_MS, maxRequests: 20 }),
+  // Opening emailed links (confirm email, check and use a reset link): enough for a person, too few
+  // to scan the token space.
+  ACCOUNT_LINK_USES_PER_CLIENT_IP: Object.freeze({ windowMs: FIFTEEN_MINUTES_MS, maxRequests: 30 }),
   // Customer chat: generous for a person typing, but stops a script from flooding the AI (each
   // message costs model calls) or the agents' queue.
   SUPPORT_MESSAGES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 15 }),

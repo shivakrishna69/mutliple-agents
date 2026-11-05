@@ -31,6 +31,8 @@ export const SESSION_MESSAGES = Object.freeze({
 export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_LOGIN_ATTEMPTS: 'Too many sign-in attempts. Please wait a few minutes and try again',
   TOO_MANY_SIGNUP_ATTEMPTS: 'Too many accounts created from this network. Please try again later',
+  TOO_MANY_ACCOUNT_EMAIL_REQUESTS: 'Too many email requests from this network. Please try again later',
+  TOO_MANY_ACCOUNT_LINK_ATTEMPTS: 'Too many attempts with emailed links. Please wait a few minutes and try again',
   TOO_MANY_SUPPORT_MESSAGES: 'You are sending messages too quickly. Please wait a moment and try again',
   TOO_MANY_VAULT_UPLOADS: 'Too many document uploads. Please wait a few minutes and try again',
   TOO_MANY_VAULT_DOWNLOADS: 'Too many download requests. Please wait a moment and try again',
@@ -72,11 +74,32 @@ export const VALIDATION_MESSAGES = Object.freeze({
   PASSWORD_TOO_SHORT: `Password must be at least ${USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH} characters`,
   PASSWORD_TOO_LONG: `Password must be at most ${USER_FIELD_LIMITS.PASSWORD_MAX_BYTES} bytes`,
   NEW_PASSWORD_SAME_AS_CURRENT: 'The new password must be different from the current one',
+  TOKEN_REQUIRED: 'The link token is required',
+  TOKEN_MUST_BE_STRING: 'The link token must be a string',
 });
 
 export const ACCOUNT_MESSAGES = Object.freeze({
   PASSWORD_CHANGED: 'Password changed. Other devices have been signed out',
   CURRENT_PASSWORD_INCORRECT: 'The current password is incorrect',
+});
+
+/**
+ * Signup confirmation and password reset (controllers/accountEmailController.js). The answers to
+ * signup, resend and forgot-password are the same whether or not the address has an account.
+ */
+export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
+  SIGNUP_CHECK_EMAIL: 'Check your email for a link to finish signing up',
+  VERIFICATION_RESENT: 'If this address is waiting to be confirmed, a new link is on its way',
+  EMAIL_VERIFIED: 'Email confirmed. You are signed in',
+  VERIFICATION_LINK_INVALID: 'This confirmation link is not valid or has expired. Ask for a new one',
+  EMAIL_NOT_VERIFIED: 'Confirm your email address first: open the link we sent you, or ask for a new one',
+  PASSWORD_RESET_REQUESTED: 'If this address has an account, a link to reset the password is on its way',
+  RESET_LINK_VALID: 'This password reset link is valid',
+  RESET_LINK_INVALID: 'This password reset link is not valid or has expired. Ask for a new one',
+  PASSWORD_RESET_DONE: 'Your password has been changed and every device signed out. Sign in with your new password',
+  EMAIL_COOLDOWN: 'An email was sent to this address a moment ago. Please wait before asking for another',
+  EMAIL_UNAVAILABLE:
+    'Email is not available on this server, so this cannot be done right now. Contact your administrator',
 });
 
 export const ADMIN_MESSAGES = Object.freeze({

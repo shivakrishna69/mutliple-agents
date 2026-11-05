@@ -49,6 +49,7 @@ import {
   undoProvisioning,
   withdrawInvitedEmployee,
 } from './employeeProvisioning.js';
+import { discardUnverifiedAccount } from './accountEmailFlows.js';
 import { buildInvitationEmail } from './invitationEmail.js';
 import { MAIL_OUTCOMES, sendMail } from './mailService.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
@@ -74,7 +75,6 @@ export function invitableRolesFor(inviterRole) {
   if (inviterRole === ROLES.HR) return INVITABLE_ROLES.filter((invitableRole) => invitableRole !== ROLES.HR);
   return [];
 }
-
 
 function displayStatusOf(invitation, now = new Date()) {
   if (invitation.status === INVITATION_STATUSES.ACCEPTING) return 'pending';
@@ -448,7 +448,8 @@ async function acceptLegacyInvitation(claimedInvitation, password) {
   let createdUser = null;
   let createdProfileId = null;
   try {
-    // Step 2: account, then profile.
+    // Step 2: account, then profile. An unconfirmed signup with this address gives way to the invitation.
+    await discardUnverifiedAccount(claimedInvitation.email);
     if (await User.exists({ email: claimedInvitation.email })) {
       throw new InvitationError(
         409,
@@ -461,6 +462,8 @@ async function acceptLegacyInvitation(claimedInvitation, password) {
       email: claimedInvitation.email,
       password,
       role: claimedInvitation.role,
+      // The invitation link was emailed to this address.
+      emailVerifiedAt: new Date(),
     });
     const draft = claimedInvitation.profileDraft;
     const createdProfile = await EmployeeProfile.create({

@@ -43,7 +43,8 @@ describe('employee import', { skip: skipReason ?? false }, () => {
   let hrClient;
 
   before(async () => {
-    testServer = await startTestServer();
+    // Without a mail server: rows report their links instead of pacing emails.
+    testServer = await startTestServer({ mail: false });
     adminClient = await createSignedInClient(testServer, { name: 'Ada Admin', email: 'admin@example.com' });
     hrClient = await createSignedInClient(testServer, { name: 'Hema HR', email: 'hema.hr@example.com', role: 'hr' });
   });
@@ -277,6 +278,7 @@ describe('employee import after a restart', { skip: skipReason ?? false }, () =>
 
   before(async () => {
     testServer = await startTestServer({
+      mail: false,
       // Imports a stopped server left behind: one interrupted mid-row (its lease ran out), one
       // that has already been tried too often.
       seedBeforeStart: async (database) => {
@@ -333,7 +335,7 @@ describe('employee import on BullMQ', { skip: skipReason ?? redisSkipReason ?? f
   let testServer;
 
   before(async () => {
-    testServer = await startTestServer({ environment: { REDIS_URL: process.env.TEST_REDIS_URL } });
+    testServer = await startTestServer({ mail: false, environment: { REDIS_URL: process.env.TEST_REDIS_URL } });
   });
 
   after(async () => {
