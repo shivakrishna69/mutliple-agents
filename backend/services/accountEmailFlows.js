@@ -36,6 +36,8 @@ import {
   buildVerificationEmail,
 } from './accountEmails.js';
 import {
+  ACCOUNT_CODE_OUTCOMES,
+  consumeAccountCode,
   consumeAccountToken,
   findUsableAccountToken,
   issueAccountToken,
@@ -48,6 +50,7 @@ export const ACCOUNT_FLOW_ERROR_CODES = Object.freeze({
   EMAIL_UNAVAILABLE: 'EMAIL_UNAVAILABLE',
   EMAIL_COOLDOWN: 'EMAIL_COOLDOWN',
   VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
+  VERIFICATION_CODE_INVALID: 'VERIFICATION_CODE_INVALID',
   RESET_LINK_INVALID: 'RESET_LINK_INVALID',
 });
 
@@ -79,6 +82,8 @@ const settings = ACCOUNT_EMAIL_SETTINGS;
 const linkFailure = (code, message) => new AccountFlowError(HTTP_STATUS.BAD_REQUEST, code, message);
 const invalidVerificationLink = () =>
   linkFailure(ACCOUNT_FLOW_ERROR_CODES.VERIFICATION_LINK_INVALID, ACCOUNT_EMAIL_MESSAGES.VERIFICATION_LINK_INVALID);
+const invalidVerificationCode = () =>
+  linkFailure(ACCOUNT_FLOW_ERROR_CODES.VERIFICATION_CODE_INVALID, ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
 const invalidResetLink = () =>
   linkFailure(ACCOUNT_FLOW_ERROR_CODES.RESET_LINK_INVALID, ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
 
@@ -114,15 +119,18 @@ async function deliver(user, message, kind) {
 }
 
 async function sendVerificationLink(user, { companyName, appPublicUrl }) {
-  const { rawToken } = await issueAccountToken(
+  const { rawToken, code } = await issueAccountToken(
     user._id,
     ACCOUNT_TOKEN_PURPOSES.EMAIL_VERIFICATION,
     settings.EMAIL_VERIFICATION_VALIDITY_MS,
+    new Date(),
+    { codeDigits: settings.VERIFICATION_CODE_DIGITS },
   );
   const message = buildVerificationEmail({
     name: user.name,
     companyName,
     verificationUrl: tokenUrl(appPublicUrl, ACCOUNT_LINK_PATHS.EMAIL_VERIFICATION, rawToken),
+    verificationCode: code,
     validityMs: settings.EMAIL_VERIFICATION_VALIDITY_MS,
   });
   await deliver(user, message, 'email_verification');
@@ -230,12 +238,38 @@ export async function resendVerification({ email, emailContext }) {
 export async function verifyEmail(rawToken, now = new Date()) {
   const userId = await consumeAccountToken(rawToken, ACCOUNT_TOKEN_PURPOSES.EMAIL_VERIFICATION, now);
   if (!userId) throw invalidVerificationLink();
+  return activateVerifiedAccount(userId, now, invalidVerificationLink);
+}
+
+/**
+ * POST /api/auth/verify-email with { email, code }: the code from the confirmation email, typed in
+ * instead of opening its link. A wrong code, an unknown address and an account with nothing to
+ * confirm all get the same answer; wrong codes count towards VERIFICATION_CODE_MAX_ATTEMPTS.
+ * @returns {Promise<object>}  the User document
+ */
+export async function verifyEmailWithCode({ email, code }, now = new Date()) {
+  const user = await User.findOne({ email, status: ACCOUNT_STATUSES.UNVERIFIED }).select('_id').lean();
+  const outcome = user
+    ? await consumeAccountCode(
+        user._id,
+        ACCOUNT_TOKEN_PURPOSES.EMAIL_VERIFICATION,
+        code,
+        settings.VERIFICATION_CODE_MAX_ATTEMPTS,
+        now,
+      )
+    : ACCOUNT_CODE_OUTCOMES.NONE;
+  if (outcome !== ACCOUNT_CODE_OUTCOMES.USED) throw invalidVerificationCode();
+  return activateVerifiedAccount(user._id, now, invalidVerificationCode);
+}
+
+/** The confirmed account becomes active; its other links are revoked. */
+async function activateVerifiedAccount(userId, now, invalidError) {
   const user = await User.findOneAndUpdate(
     { _id: userId, status: ACCOUNT_STATUSES.UNVERIFIED },
     { $set: { status: ACCOUNT_STATUSES.ACTIVE, emailVerifiedAt: now } },
     { new: true },
   );
-  if (!user) throw invalidVerificationLink();
+  if (!user) throw invalidError();
   await revokeAccountTokens(userId);
   return user;
 }

@@ -4,13 +4,15 @@
  *   POST /api/auth/signup   { firstName, lastName, email, phoneNumber, password, acceptTerms }
  *                                                                  202: check your email
  *   POST /api/auth/verify-email/resend    { email }                  202: a new link if one is due
- *   POST /api/auth/verify-email           { token }                  200: confirmed and signed in
+ *   POST /api/auth/verify-email   { token } or { email, code }       200: confirmed and signed in
  *   POST /api/auth/password/forgot        { email }                  202: a reset link if there is an account
  *   GET  /api/auth/password/reset/:token                             200: the link works (and until when)
  *   POST /api/auth/password/reset         { token, password }        200: changed, every device signed out
  *
  * Errors carry a stable `code` (sendCodedError) for the screens to branch on:
  *   400 VERIFICATION_LINK_INVALID / RESET_LINK_INVALID   unknown, used, revoked or expired link
+ *   400 VERIFICATION_CODE_INVALID   wrong or expired code (or nothing to confirm for that email);
+ *                                   too many wrong codes cancel the code and its link
  *   429 EMAIL_COOLDOWN   an email went to this address less than a minute ago; the wait is in the
  *                        Retry-After header and in error.context.retryAfterSeconds
  *   503 EMAIL_UNAVAILABLE   the server has no email configured
@@ -30,6 +32,7 @@ import {
   resendVerification,
   resetPassword,
   verifyEmail,
+  verifyEmailWithCode,
 } from '../services/accountEmailFlows.js';
 import { loadEmailContext } from '../services/companySettings.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
@@ -114,6 +117,7 @@ export const registerUser = accountEmailHandler('signup', async (req, res) => {
   return sendSuccess(res, HTTP_STATUS.ACCEPTED, ACCOUNT_EMAIL_MESSAGES.SIGNUP_CHECK_EMAIL, {
     email,
     resendAfterSeconds: RESEND_AFTER_SECONDS,
+    codeDigits: ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS,
   });
 });
 
@@ -134,12 +138,16 @@ export const resendVerificationEmail = accountEmailHandler('email_verification_r
   });
 });
 
-/** Confirms the email and signs the person in with a new session, like a login. */
+/**
+ * Confirms the email, by the emailed link's token or by the code from the same email, and signs
+ * the person in with a new session, like a login.
+ */
 export const confirmEmail = accountEmailHandler('email_verification', async (req, res) => {
   const validation = validateVerifyEmailInput(req.body);
   if (!validation.isValid) return sendValidationFailure(req, res, validation);
 
-  const user = await verifyEmail(validation.sanitizedInput.token);
+  const { token, email, code } = validation.sanitizedInput;
+  const user = token ? await verifyEmail(token) : await verifyEmailWithCode({ email, code });
   const csrfToken = startSession(res, req.app.locals.config, user._id);
   recordAuditEvent(req, {
     category: AUDIT_CATEGORY,

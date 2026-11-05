@@ -50,6 +50,10 @@ export const ACCOUNT_EMAIL_SETTINGS = Object.freeze({
   EMAIL_VERIFICATION_VALIDITY_MS: 24 * 60 * 60 * 1000,
   PASSWORD_RESET_VALIDITY_MS: 60 * 60 * 1000,
   EMAIL_COOLDOWN_MS: 60 * 1000,
+  // The confirmation email also carries a code to type instead of opening the link. Wrong codes
+  // are counted per email: after the last allowed try, the code and its link stop working.
+  VERIFICATION_CODE_DIGITS: 6,
+  VERIFICATION_CODE_MAX_ATTEMPTS: 5,
 });
 
 /**

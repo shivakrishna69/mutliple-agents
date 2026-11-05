@@ -4,7 +4,7 @@
  * is reviewed in one place and the frontend can rely on stable text.
  */
 
-import { MESSAGE_FIELD_LIMITS, USER_FIELD_LIMITS, WEBHOOK_FIELD_LIMITS } from './validation.js';
+import { ACCOUNT_EMAIL_SETTINGS, MESSAGE_FIELD_LIMITS, USER_FIELD_LIMITS, WEBHOOK_FIELD_LIMITS } from './validation.js';
 
 export const AUTH_MESSAGES = Object.freeze({
   REGISTRATION_SUCCESSFUL: 'Account created successfully',
@@ -85,6 +85,7 @@ export const VALIDATION_MESSAGES = Object.freeze({
   PHONE_INVALID:
     'Enter a valid phone number: a 10-digit Indian mobile number, or the number with its country code (e.g. +44 20 7946 0958)',
   TERMS_NOT_ACCEPTED: 'Please accept the terms of service and privacy policy to continue',
+  VERIFICATION_CODE_FORMAT: `Enter the ${ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS}-digit code from the email`,
   TOKEN_REQUIRED: 'The link token is required',
   TOKEN_MUST_BE_STRING: 'The link token must be a string',
 });
@@ -103,6 +104,8 @@ export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
   VERIFICATION_RESENT: 'If this address is waiting to be confirmed, a new link is on its way',
   EMAIL_VERIFIED: 'Email confirmed. You are signed in',
   VERIFICATION_LINK_INVALID: 'This confirmation link is not valid or has expired. Ask for a new one',
+  VERIFICATION_CODE_INVALID:
+    'This code is not correct or has expired. Check the latest email we sent, or ask for a new code',
   EMAIL_NOT_VERIFIED: 'Confirm your email address first: open the link we sent you, or ask for a new one',
   PASSWORD_RESET_REQUESTED: 'If this address has an account, a link to reset the password is on its way',
   RESET_LINK_VALID: 'This password reset link is valid',

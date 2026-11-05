@@ -12,7 +12,12 @@
  * `{"email": {"$ne": null}}` would pass an object into a MongoDB query (NoSQL injection).
  */
 
-import { EMAIL_PATTERN, PASSWORD_STRENGTH_RULES, USER_FIELD_LIMITS } from '../constants/validation.js';
+import {
+  ACCOUNT_EMAIL_SETTINGS,
+  EMAIL_PATTERN,
+  PASSWORD_STRENGTH_RULES,
+  USER_FIELD_LIMITS,
+} from '../constants/validation.js';
 import { PASSWORD_RULE_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { normalizePhoneNumber } from '../utils/phoneNumbers.js';
 
@@ -251,14 +256,33 @@ export function validateEmailRequestInput(requestBody) {
   return { isValid: true, validationErrors: [], sanitizedInput: { email: normalizeEmail(requestBody.email) } };
 }
 
-/** Validates POST /verify-email: { token }. */
+const VERIFICATION_CODE_PATTERN = new RegExp(`^\\d{${ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS}}$`);
+
+/**
+ * Validates POST /verify-email: either { token } (the emailed link) or { email, code } (the code from
+ * the same email, typed in). Without a token, both email and code are required.
+ * @returns sanitizedInput `{ token }` or `{ email, code }`
+ */
 export function validateVerifyEmailInput(requestBody) {
   if (!isPlainObject(requestBody)) return notAnObject();
-  const tokenError = checkLinkToken(requestBody.token);
-  if (tokenError) {
-    return { isValid: false, validationErrors: [{ field: 'token', message: tokenError }], sanitizedInput: null };
+  const { token, email, code } = requestBody;
+  if (token !== undefined || (email === undefined && code === undefined)) {
+    const tokenError = checkLinkToken(token);
+    if (tokenError) {
+      return { isValid: false, validationErrors: [{ field: 'token', message: tokenError }], sanitizedInput: null };
+    }
+    return { isValid: true, validationErrors: [], sanitizedInput: { token } };
   }
-  return { isValid: true, validationErrors: [], sanitizedInput: { token: requestBody.token } };
+
+  const validationErrors = [];
+  const emailError = checkEmailAddress(email);
+  if (emailError) validationErrors.push({ field: 'email', message: emailError });
+  const trimmedCode = typeof code === 'string' ? code.trim() : null;
+  if (trimmedCode === null || !VERIFICATION_CODE_PATTERN.test(trimmedCode)) {
+    validationErrors.push({ field: 'code', message: VALIDATION_MESSAGES.VERIFICATION_CODE_FORMAT });
+  }
+  if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
+  return { isValid: true, validationErrors: [], sanitizedInput: { email: normalizeEmail(email), code: trimmedCode } };
 }
 
 /**
