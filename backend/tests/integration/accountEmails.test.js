@@ -349,8 +349,12 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     const requested = await forgot('priya@example.com');
     assert.equal(requested.status, 202);
     assert.equal(requested.body.message, ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_REQUESTED);
+    assert.equal(requested.body.data.linkValidMinutes, 15);
+    assert.match(requested.body.message, /15 minutes/);
     // 1: the signup confirmation; 2: the reset link.
     resetToken = await latestResetToken('priya@example.com', 2);
+    const [, resetEmail] = testServer.mailbox.messagesTo('priya@example.com');
+    assert.match(resetEmail.text, /expires in 15 minutes/);
 
     const check = await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`);
     assert.equal(check.status, 200);

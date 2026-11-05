@@ -11,6 +11,7 @@ export const AUTH_MESSAGES = Object.freeze({
   LOGIN_SUCCESSFUL: 'Logged in successfully',
   LOGOUT_SUCCESSFUL: 'Logged out successfully',
   CURRENT_USER_RETRIEVED: 'Session is active',
+  PASSWORD_POLICY_RETRIEVED: 'Password rules',
   EMAIL_ALREADY_REGISTERED: 'An account with this email already exists',
   // Deliberately identical for "no such email" and "wrong password" so a caller
   // cannot use the login endpoint to discover which emails have accounts.
@@ -108,7 +109,7 @@ export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
   VERIFICATION_CODE_INVALID:
     'This code is not correct or has expired. Check the latest email we sent, or ask for a new code',
   EMAIL_NOT_VERIFIED: 'Confirm your email address first: open the link we sent you, or ask for a new one',
-  PASSWORD_RESET_REQUESTED: 'If this address has an account, a link to reset the password is on its way',
+  PASSWORD_RESET_REQUESTED: `If this address has an account, a link to reset the password is on its way. It works for ${ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000} minutes`,
   RESET_LINK_VALID: 'This password reset link is valid',
   RESET_LINK_INVALID: 'This password reset link is not valid or has expired. Ask for a new one',
   PASSWORD_RESET_DONE: 'Your password has been changed and every device signed out. Sign in with your new password',
@@ -528,4 +529,21 @@ export const PASSWORD_RULE_MESSAGES = Object.freeze({
   lowercaseLetter: 'Password must contain at least one lowercase letter (a-z)',
   digit: 'Password must contain at least one number (0-9)',
   specialCharacter: 'Password must contain at least one special character',
+});
+
+/** The password checklist the signup and reset screens show (GET /api/auth/password-policy). */
+export const PASSWORD_CHECKLIST_LABELS = Object.freeze({
+  minimumLength: `At least ${USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH} characters`,
+  uppercaseLetter: 'One uppercase letter (A-Z)',
+  lowercaseLetter: 'One lowercase letter (a-z)',
+  digit: 'One number (0-9)',
+  specialCharacter: 'One symbol (for example @ $ # !)',
+});
+
+/** Words for the strength meter, by how many checklist items a password meets (PASSWORD_STRENGTH_LEVELS). */
+export const PASSWORD_STRENGTH_LABELS = Object.freeze({
+  weak: 'Weak',
+  fair: 'Fair',
+  good: 'Good',
+  strong: 'Strong',
 });

@@ -177,6 +177,7 @@ export const forgotPassword = accountEmailHandler('password_reset_request', asyn
   });
   return sendSuccess(res, HTTP_STATUS.ACCEPTED, ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_REQUESTED, {
     resendAfterSeconds: RESEND_AFTER_SECONDS,
+    linkValidMinutes: ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000,
   });
 });
 

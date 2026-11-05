@@ -44,6 +44,21 @@ import { SOCKET_ERROR_CODES, disconnectSessionSockets, disconnectUserSockets } f
 import { logger } from '../utils/logger.js';
 import { validateChangePasswordInput, validateLoginInput } from '../validators/authValidators.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { describePasswordPolicy } from '../services/passwordPolicy.js';
+
+/** The rules change only with a deployment, so browsers may reuse the answer for a while. */
+const PASSWORD_POLICY_CACHE_SECONDS = 300;
+
+/**
+ * GET /api/auth/password-policy   (public)
+ *
+ * The password checklist and strength meter for the signup and reset screens, built from the rules
+ * the server enforces (services/passwordPolicy.js).
+ */
+export function getPasswordPolicy(req, res) {
+  res.set('Cache-Control', `public, max-age=${PASSWORD_POLICY_CACHE_SECONDS}`);
+  return sendSuccess(res, HTTP_STATUS.OK, AUTH_MESSAGES.PASSWORD_POLICY_RETRIEVED, describePasswordPolicy());
+}
 
 /** Code of the 403 a correct password gets while the account's email is still unconfirmed. */
 export const EMAIL_NOT_VERIFIED_CODE = 'EMAIL_NOT_VERIFIED';

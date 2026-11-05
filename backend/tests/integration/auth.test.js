@@ -111,6 +111,16 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     assert.equal(anonymousResponse.status, 401);
   });
 
+  it('publishes the password rules for the signup and reset screens, without a session', async () => {
+    const response = await testServer.createClient().get('/api/auth/password-policy');
+    assert.equal(response.status, 200);
+    const { checks, strengthLevels, minLength } = response.body.data;
+    assert.equal(minLength, 8);
+    assert.equal(checks.length, 5);
+    assert.ok(checks.slice(1).every((check) => typeof check.pattern.source === 'string' && check.label));
+    assert.equal(strengthLevels.at(-1).level, 'strong');
+  });
+
   it('refuses state-changing requests without the CSRF token', async () => {
     const client = testServer.createClient();
     await client.login('asha.rao@example.com');

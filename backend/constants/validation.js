@@ -48,7 +48,7 @@ export const TERMS_VERSION = 1;
  */
 export const ACCOUNT_EMAIL_SETTINGS = Object.freeze({
   EMAIL_VERIFICATION_VALIDITY_MS: 24 * 60 * 60 * 1000,
-  PASSWORD_RESET_VALIDITY_MS: 60 * 60 * 1000,
+  PASSWORD_RESET_VALIDITY_MS: 15 * 60 * 1000,
   EMAIL_COOLDOWN_MS: 60 * 1000,
   // The confirmation email also carries a code to type instead of opening the link. Wrong codes
   // are counted per email: after the last allowed try, the code and its link stop working.
@@ -86,6 +86,18 @@ export const PASSWORD_STRENGTH_RULES = Object.freeze([
   // [^A-Za-z0-9\s]: at least one character that is not a letter, digit, or whitespace
   // (punctuation or a symbol). Spaces are allowed in passwords but do not satisfy this rule.
   { ruleId: 'specialCharacter', pattern: /[^A-Za-z0-9\s]/ },
+]);
+
+/**
+ * The strength meter: how many checklist items (the minimum length plus each strength rule, five in
+ * all) a password meets decides its level. Only "strong" (all of them) is accepted at signup and
+ * reset; the lower levels guide the person while typing. Labels: PASSWORD_STRENGTH_LABELS.
+ */
+export const PASSWORD_STRENGTH_LEVELS = Object.freeze([
+  Object.freeze({ level: 'weak', minimumChecksMet: 0 }),
+  Object.freeze({ level: 'fair', minimumChecksMet: 3 }),
+  Object.freeze({ level: 'good', minimumChecksMet: 4 }),
+  Object.freeze({ level: 'strong', minimumChecksMet: 5 }),
 ]);
 
 /** Limits for conversation messages, shared by the Message model and the webhook validator. */
