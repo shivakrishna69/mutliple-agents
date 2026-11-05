@@ -208,6 +208,32 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  deployment-files:
+    name: Deployment files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Throwaway settings outside the checkout, in the shape deploy/setup-server.sh writes them.
+      STACK_ENV_FILE: /tmp/ci-stack.env
+      BACKEND_ENV_FILE: /tmp/ci-backend.env
+      AI_SERVICE_ENV_FILE: /tmp/ci-ai-service.env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the scripts
+        run: shellcheck --severity=warning deploy/*.sh
+      - name: Check the production compose file
+        run: |
+          set -euo pipefail
+          printf '%s\n' APP_DOMAIN=ci.example.com ACME_EMAIL=ci@example.com MONGO_ROOT_USERNAME=nsk \
+            "MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)" "REDIS_PASSWORD=$(openssl rand -hex 24)" > "$STACK_ENV_FILE"
+          touch "$BACKEND_ENV_FILE" "$AI_SERVICE_ENV_FILE"
+          docker compose -f docker-compose.prod.yml --env-file "$STACK_ENV_FILE" config --quiet
+      - name: Check the Caddy configuration
+        run: |
+          docker run --rm -e APP_DOMAIN=ci.example.com -e ACME_EMAIL=ci@example.com \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   ai-service-image:
     name: AI service Docker image
     runs-on: ubuntu-latest
