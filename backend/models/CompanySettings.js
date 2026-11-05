@@ -7,6 +7,9 @@
  *   emailDomain        the company's mail domain (nsksofttech.in); work addresses are suggested in it.
  *                      null until the company has one
  *   logoUrl            an https (or site-relative /...) address of the logo; null shows the product logo
+ *   supportEmail       where the sign-in pages' "Support" and "Contact HR" links write to; null hides them
+ *   termsUrl, privacyUrl  the company's terms of service and privacy policy (https or /...), linked
+ *                      where people agree to them at signup; null shows the agreement without links
  *   brandColors        primary and accent colours as #RRGGBB
  *   timeZone           the company's IANA time zone, for company-wide dates and new offices
  *   employeeIdDigits   how many digits employee IDs are padded to (NSK0001 is 4)
@@ -22,9 +25,11 @@ import mongoose from 'mongoose';
 import {
   COMPANY_LIMITS,
   EMAIL_DOMAIN_PATTERN,
+  EMAIL_PATTERN,
   HEX_COLOR_PATTERN,
   PRESENCE_DEFAULTS,
   PRESENCE_LIMITS,
+  USER_FIELD_LIMITS,
 } from '../constants/validation.js';
 import { isValidIanaTimeZone } from './OfficeLocation.js';
 
@@ -35,6 +40,9 @@ export const DEFAULT_COMPANY_SETTINGS = Object.freeze({
   shortCode: 'NSK',
   emailDomain: null,
   logoUrl: null,
+  supportEmail: null,
+  termsUrl: null,
+  privacyUrl: null,
   brandColors: Object.freeze({ primary: '#c75000', accent: '#282828' }),
   timeZone: 'Asia/Kolkata',
   employeeIdDigits: 4,
@@ -44,15 +52,24 @@ const SHORT_CODE_PATTERN = new RegExp(
   `^[A-Z]{${COMPANY_LIMITS.SHORT_CODE_MIN_LENGTH},${COMPANY_LIMITS.SHORT_CODE_MAX_LENGTH}}$`,
 );
 
-const isLogoUrl = (logoUrl) => {
-  if (logoUrl === null) return true;
-  if (logoUrl.startsWith('/') && !logoUrl.startsWith('//')) return true;
+/** An https address, or a path on this site (/...); null for none. */
+const isPageOrAssetUrl = (url) => {
+  if (url === null) return true;
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
   try {
-    return new URL(logoUrl).protocol === 'https:';
+    return new URL(url).protocol === 'https:';
   } catch {
     return false;
   }
 };
+
+const linkField = (defaultValue, label) => ({
+  type: String,
+  trim: true,
+  default: defaultValue,
+  maxlength: COMPANY_LIMITS.LOGO_URL_MAX_LENGTH,
+  validate: { validator: isPageOrAssetUrl, message: `${label} must be https:// or start with /` },
+});
 
 /** A whole number of `unit` in [minimum, maximum], e.g. "Away after must be 1 to 60 minutes". */
 const wholeNumberField = (label, unit, defaultValue, [minimum, maximum]) => ({
@@ -101,13 +118,20 @@ const companySettingsSchema = new mongoose.Schema(
         message: 'Email domain "{VALUE}" is not a domain such as example.com',
       },
     },
-    logoUrl: {
+    logoUrl: linkField(DEFAULT_COMPANY_SETTINGS.logoUrl, 'Logo address'),
+    supportEmail: {
       type: String,
       trim: true,
-      default: DEFAULT_COMPANY_SETTINGS.logoUrl,
-      maxlength: COMPANY_LIMITS.LOGO_URL_MAX_LENGTH,
-      validate: { validator: isLogoUrl, message: 'Logo address must be https:// or start with /' },
+      lowercase: true,
+      default: DEFAULT_COMPANY_SETTINGS.supportEmail,
+      maxlength: USER_FIELD_LIMITS.EMAIL_MAX_LENGTH,
+      validate: {
+        validator: (email) => email === null || EMAIL_PATTERN.test(email),
+        message: 'Support email "{VALUE}" is not an email address',
+      },
     },
+    termsUrl: linkField(DEFAULT_COMPANY_SETTINGS.termsUrl, 'Terms of service address'),
+    privacyUrl: linkField(DEFAULT_COMPANY_SETTINGS.privacyUrl, 'Privacy policy address'),
     brandColors: {
       primary: colorField(DEFAULT_COMPANY_SETTINGS.brandColors.primary),
       accent: colorField(DEFAULT_COMPANY_SETTINGS.brandColors.accent),

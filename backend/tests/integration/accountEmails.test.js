@@ -480,7 +480,7 @@ describe('invitations and unconfirmed signups', { skip: skipReason ?? false }, (
     const token = await invitationTokenFrom(testServer, invitation, 'sam@example.com');
     const accepted = await testServer
       .createClient()
-      .post(`/api/invitations/${token}/accept`, { password: NEW_PASSWORD });
+      .post(`/api/invitations/${token}/accept`, { password: NEW_PASSWORD, acceptTerms: true });
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     const account = await findUser(testServer, 'sam@example.com');
     assert.equal(account.status, 'active');

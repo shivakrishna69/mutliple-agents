@@ -9,6 +9,7 @@
  */
 
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
+import { TERMS_VERSION } from '../constants/validation.js';
 import User, { ACCOUNT_STATUSES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
@@ -131,13 +132,21 @@ export async function withdrawInvitedEmployee(userId) {
 }
 
 /**
+ * What accepting an invitation records on the account: the link was emailed to its address, so the
+ * address is confirmed, and the person agreed to the terms on the activation page.
+ */
+export function acceptedInvitationFields(now = new Date()) {
+  return { emailVerifiedAt: now, termsVersion: TERMS_VERSION, termsAcceptedAt: now };
+}
+
+/**
  * The person chose their password through their invitation link: the account becomes usable. The
  * link was emailed to the account's address, so opening it also confirms that address.
  */
 export async function activateInvitedAccount(userId, password) {
   const user = await User.findOne({ _id: userId, status: ACCOUNT_STATUSES.INVITED });
   if (!user) return null;
-  user.set({ password, status: ACCOUNT_STATUSES.ACTIVE, emailVerifiedAt: new Date() });
+  user.set({ password, status: ACCOUNT_STATUSES.ACTIVE, ...acceptedInvitationFields() });
   await user.save();
   return user;
 }

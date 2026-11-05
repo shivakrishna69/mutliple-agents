@@ -308,3 +308,19 @@ export function validatePasswordResetInput(requestBody) {
     sanitizedInput: { token: requestBody.token, password: requestBody.password },
   };
 }
+
+/**
+ * Validates POST /api/invitations/:token/accept: { password, acceptTerms }. The password must meet
+ * every signup rule, and the person must agree to the terms and privacy policy, as at signup.
+ */
+export function validateInvitationAcceptance(requestBody) {
+  if (!isPlainObject(requestBody)) return notAnObject();
+  const validationErrors = [];
+  const passwordError = checkNewPassword(requestBody.password);
+  if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
+  if (requestBody.acceptTerms !== true) {
+    validationErrors.push({ field: 'acceptTerms', message: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED });
+  }
+  if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
+  return { isValid: true, validationErrors: [], sanitizedInput: { password: requestBody.password } };
+}

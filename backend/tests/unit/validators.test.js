@@ -47,30 +47,57 @@ describe('checkNewPassword', () => {
 });
 
 describe('validateRegistrationInput', () => {
-  it('normalises the email, trims the name and drops unexpected fields such as role', () => {
+  const validSignup = Object.freeze({
+    firstName: 'Asha',
+    lastName: 'Rao',
+    email: 'asha.rao@example.com',
+    phoneNumber: '98765 43210',
+    password: STRONG_PASSWORD,
+    acceptTerms: true,
+  });
+
+  it('normalises the email and phone, trims and joins the names, and drops unexpected fields such as role', () => {
     const result = validateRegistrationInput({
-      name: '  Asha Rao ',
+      ...validSignup,
+      firstName: '  Asha ',
+      lastName: ' Rao  ',
       email: ' Asha.Rao@Example.COM ',
-      password: STRONG_PASSWORD,
       role: 'admin',
     });
     assert.equal(result.isValid, true);
     assert.deepEqual(result.sanitizedInput, {
+      firstName: 'Asha',
+      lastName: 'Rao',
       name: 'Asha Rao',
       email: 'asha.rao@example.com',
+      phoneNumber: '+919876543210',
       password: STRONG_PASSWORD,
     });
   });
 
   it('reports every failing field at once', () => {
-    const result = validateRegistrationInput({ name: '', email: 'not-an-email', password: 'short' });
+    const result = validateRegistrationInput({
+      firstName: '',
+      lastName: 'x'.repeat(60),
+      email: 'not-an-email',
+      phoneNumber: '123',
+      password: 'short',
+      acceptTerms: false,
+    });
     assert.equal(result.isValid, false);
-    assert.deepEqual(fieldsOf(result).sort(), ['email', 'name', 'password']);
+    assert.deepEqual(fieldsOf(result).sort(), [
+      'acceptTerms',
+      'email',
+      'firstName',
+      'lastName',
+      'password',
+      'phoneNumber',
+    ]);
   });
 
   it('rejects operator objects (NoSQL injection) and non-object bodies', () => {
-    const injected = validateRegistrationInput({ name: 'Asha', email: { $ne: null }, password: STRONG_PASSWORD });
-    assert.deepEqual(fieldsOf(injected), ['email']);
+    const injected = validateRegistrationInput({ ...validSignup, email: { $ne: null }, phoneNumber: { $gt: '' } });
+    assert.deepEqual(fieldsOf(injected), ['email', 'phoneNumber']);
     assert.deepEqual(fieldsOf(validateRegistrationInput([])), ['body']);
     assert.deepEqual(fieldsOf(validateLoginInput(null)), ['body']);
   });
