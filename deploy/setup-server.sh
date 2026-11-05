@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Prepares a fresh Ubuntu server (22.04 or 24.04, x86 or ARM such as Oracle's free Ampere) to run
+# Prepares a fresh Ubuntu server (22.04 or 24.04, x86 or ARM, e.g. AWS t4g or Oracle Ampere) to run
 # the app with docker-compose.prod.yml. Run it once as the login user, with sudo:
 #
 #   sudo bash setup-server.sh
@@ -16,10 +16,14 @@
 #   NSK_GROQ_API_KEY       the AI service's Groq key (asked without echoing it)
 #   NSK_DEPLOY_PUBLIC_KEY  GitHub Actions' public key; it may run deploy/deploy.sh and nothing else
 #   NSK_REPO_URL           the repository to deploy (default below)
+#   NSK_SWAP_SIZE          swap file size on a server with less than 4 GB of memory (default 2G;
+#                          0 skips it)
 #
 # What it does:
-#   1. installs Docker Engine and Compose from Docker's own repository
-#   2. opens ports 80 and 443 in the server's firewall (Oracle's images allow only SSH)
+#   1. installs Docker Engine and Compose from Docker's own repository, and on a small server adds a
+#      swap file so building the images and running the stack does not run out of memory
+#   2. opens ports 80 and 443 in the server's firewall (Oracle's images allow only SSH; on AWS the
+#      security group does this, and the script changes nothing)
 #   3. clones the repository to /opt/nsk
 #   4. writes /etc/nsk/{stack,backend,ai-service}.env with new random secrets, readable only by the
 #      login user; nothing secret is stored in the repository or in GitHub
@@ -32,6 +36,10 @@ set -euo pipefail
 readonly APP_DIR=/opt/nsk
 readonly CONFIG_DIR=/etc/nsk
 readonly DEFAULT_REPO_URL=https://github.com/shivakrishna69/mutliple-agents.git
+readonly DEFAULT_SWAP_SIZE=2G
+# Below this much memory (in kB) the server gets a swap file.
+readonly SWAP_BELOW_MEMORY_KB=$((4 * 1024 * 1024))
+readonly SWAP_FILE=/swapfile
 
 say() { printf '\n==> %s\n' "$*"; }
 fail() {
@@ -80,6 +88,25 @@ fi
 systemctl enable --now docker >/dev/null
 usermod -aG docker "$DEPLOY_USER"
 docker compose version
+
+# Swap: lets a 1-2 GB server build the images and absorb peaks instead of killing a service.
+swap_size="${NSK_SWAP_SIZE:-$DEFAULT_SWAP_SIZE}"
+memory_kb="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)"
+if [[ "$swap_size" != 0 && "$memory_kb" -lt "$SWAP_BELOW_MEMORY_KB" ]]; then
+  if [[ -n "$(swapon --noheadings --show=NAME)" ]]; then
+    echo "swap already on: $(swapon --noheadings --show=NAME,SIZE | tr '\n' ' ')"
+  else
+    say "Adding a $swap_size swap file ($SWAP_FILE)"
+    [[ -e "$SWAP_FILE" ]] || fallocate -l "$swap_size" "$SWAP_FILE"
+    chmod 600 "$SWAP_FILE"
+    mkswap "$SWAP_FILE" >/dev/null
+    swapon "$SWAP_FILE"
+    grep -q "^$SWAP_FILE " /etc/fstab || echo "$SWAP_FILE none swap sw 0 0" >>/etc/fstab
+    # Use swap only under pressure, so the database stays in memory.
+    echo 'vm.swappiness=10' >/etc/sysctl.d/90-nsk-swap.conf
+    sysctl -q -p /etc/sysctl.d/90-nsk-swap.conf
+  fi
+fi
 
 # --- 2. Firewall ---------------------------------------------------------------------------------
 say "Opening ports 80 and 443"

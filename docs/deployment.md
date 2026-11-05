@@ -1,8 +1,9 @@
 # Deploying to a server
 
 The whole app runs on one Linux server with Docker, behind HTTPS, and every merge to `main` that
-passes CI is deployed automatically. This guide uses Oracle Cloud's Always Free server; any Ubuntu
-22.04/24.04 server with 4 GB of memory or more works the same way.
+passes CI is deployed automatically. Any Ubuntu 22.04/24.04 server works the same way, x86 or ARM.
+It needs 2 GB of memory or more; below 4 GB the setup script adds a 2 GB swap file. This guide shows
+AWS (EC2) and Oracle Cloud.
 
 ```
 browser ──https──► Caddy (certificates) ──► nginx (the web app) ──► backend ──► MongoDB, Redis
@@ -28,16 +29,38 @@ Secrets never go into the repository or GitHub: the setup script generates them 
 - A Groq API key for the AI service (console.groq.com).
 - The email address of the first administrator.
 
-## 2. Create the server (Oracle Cloud)
+## 2. Create the server
+
+On your computer, create two SSH keys: one for you to log in, one that GitHub uses to deploy.
+
+```
+ssh-keygen -t ed25519 -f ~/.ssh/nsk_login  -C "nsk login"
+ssh-keygen -t ed25519 -f ~/.ssh/nsk_deploy -C "nsk github deploy" -N ""
+```
+
+The files without `.pub` are private: never share them or commit them.
+
+### AWS (EC2)
+
+1. In the region nearest your users, **EC2 → Key pairs → Actions → Import key pair**: upload
+   `nsk_login.pub`.
+2. **EC2 → Security groups → Create security group**, inbound rules: SSH (TCP 22) from your own IP
+   only (`<your ip>/32`); HTTP (TCP 80) and HTTPS (TCP 443) from `0.0.0.0/0` and `::/0`.
+3. **EC2 → Launch instance**:
+   - Image: Ubuntu Server 24.04 LTS (64-bit Arm for `t4g`, x86 for `t3`)
+   - Type: `t4g.small` (2 GB) is enough for a small company; `t4g.medium` (4 GB) for more people
+   - Key pair and security group: the two above
+   - Storage: 30 GB gp3, encrypted
+   - Advanced details: credit specification **Standard** (`Unlimited`, the default for T types,
+     bills extra when the CPU stays busy), metadata **IMDSv2 required**, termination protection on
+4. **EC2 → Elastic IPs → Allocate**, then **Associate** it with the instance, so the address
+   survives restarts. That address is the server's **public IP**. Log in as `ubuntu`.
+5. Set a budget alert (**Billing → Budgets**) so a surprise cost reaches you by email.
+
+### Oracle Cloud (Always Free)
 
 1. Sign up at oracle.com/cloud/free. Pick the home region nearest your users; it cannot be changed.
-2. On your computer, create two SSH keys: one for you to log in, one that GitHub uses to deploy.
-   ```
-   ssh-keygen -t ed25519 -f ~/.ssh/nsk_login  -C "nsk login"
-   ssh-keygen -t ed25519 -f ~/.ssh/nsk_deploy -C "nsk github deploy" -N ""
-   ```
-   The files without `.pub` are private: never share them or commit them.
-3. **Compute → Instances → Create instance**:
+2. **Compute → Instances → Create instance**:
    - Image: Canonical Ubuntu 24.04
    - Shape: Ampere `VM.Standard.A1.Flex`, 2 OCPUs, 12 GB memory (the free allowance)
    - Networking: a public subnet, with a public IPv4 address
@@ -45,9 +68,9 @@ Secrets never go into the repository or GitHub: the setup script generates them 
    - Boot volume: 100 GB
 
    "Out of capacity" is common; try another availability domain or try again later.
-4. Open the web ports: the instance's **Subnet → Default Security List → Add Ingress Rules**:
+3. Open the web ports: the instance's **Subnet → Default Security List → Add Ingress Rules**:
    source `0.0.0.0/0`, TCP, destination port `80`; and the same for `443`.
-5. Note the instance's **public IP address**.
+4. Note the instance's **public IP address**.
 
 ## 3. Point the domain at the server
 
@@ -64,7 +87,8 @@ sudo bash /tmp/nsk-setup/deploy/setup-server.sh
 
 It asks for the domain, an email for certificate notices, the administrator's email, the company
 name (optional), the Groq key (hidden) and the deploy public key (paste the contents of
-`nsk_deploy.pub`). It installs Docker, opens ports 80 and 443 in the server's firewall, clones the
+`nsk_deploy.pub`). It installs Docker, adds swap on a server under 4 GB, opens ports 80 and 443 in
+the server's firewall, clones the
 code to `/opt/nsk`, writes the settings with new random secrets, and installs the nightly backup.
 It can be run again safely: existing settings are kept.
 
@@ -134,7 +158,7 @@ nsk exec -T mongo mongorestore --username "$MONGO_ROOT_USERNAME" --password "$MO
 ## When something is wrong
 
 - **The site has no certificate / "connection not private"**: the DNS record must point at the
-  server and ports 80 and 443 must be open in the cloud's firewall (step 2.4). `nsk logs caddy`
+  server and ports 80 and 443 must be open in the cloud's firewall (step 2). `nsk logs caddy`
   shows what Let's Encrypt answered.
 - **A deploy failed**: the Actions log shows the last lines of every service's log; the previous
   version was started again. On the server, `nsk logs <service>` shows more.
