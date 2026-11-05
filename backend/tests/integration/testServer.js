@@ -281,6 +281,7 @@ export class TestClient {
       email,
       phoneNumber: TEST_PHONE_NUMBER,
       password,
+      confirmPassword: password,
       acceptTerms: true,
       ...overrides,
     });

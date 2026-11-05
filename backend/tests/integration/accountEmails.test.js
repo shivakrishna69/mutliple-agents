@@ -368,14 +368,28 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
   it('refuses a weak password with the rule broken, and keeps the link usable', async () => {
     const weak = await testServer
       .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: 'short' });
+      .post('/api/auth/password/reset', { token: resetToken, password: 'short', confirmPassword: 'short' });
     assert.equal(weak.status, 400);
     assert.deepEqual(weak.body.error.details, [{ field: 'password', message: VALIDATION_MESSAGES.PASSWORD_TOO_SHORT }]);
     const noSymbol = await testServer
       .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: 'NoSymbol2027' });
+      .post('/api/auth/password/reset', {
+        token: resetToken,
+        password: 'NoSymbol2027',
+        confirmPassword: 'NoSymbol2027',
+      });
     assert.deepEqual(noSymbol.body.error.details, [
       { field: 'password', message: PASSWORD_RULE_MESSAGES.specialCharacter },
+    ]);
+    const mismatch = await testServer
+      .createClient()
+      .post('/api/auth/password/reset', {
+        token: resetToken,
+        password: NEW_PASSWORD,
+        confirmPassword: 'Other#Pass2027',
+      });
+    assert.deepEqual(mismatch.body.error.details, [
+      { field: 'confirmPassword', message: VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH },
     ]);
     assert.equal((await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`)).status, 200);
   });
@@ -384,7 +398,7 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     assert.equal((await signedInClient.get('/api/auth/me')).status, 200);
     const reset = await testServer
       .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: NEW_PASSWORD });
+      .post('/api/auth/password/reset', { token: resetToken, password: NEW_PASSWORD, confirmPassword: NEW_PASSWORD });
     assert.equal(reset.status, 200);
     assert.equal(reset.body.message, ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_DONE);
 
@@ -397,7 +411,11 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
 
     const reused = await testServer
       .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: STRONG_PASSWORD });
+      .post('/api/auth/password/reset', {
+        token: resetToken,
+        password: STRONG_PASSWORD,
+        confirmPassword: STRONG_PASSWORD,
+      });
     assertCodedError(reused, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
     const checkAfter = await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`);
     assertCodedError(checkAfter, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
@@ -423,7 +441,8 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
   it('lets a reset link work once even when it is used twice at the same moment', async () => {
     // The newest link from the test above (5 emails so far: confirmation, reset, changed, two resets).
     const token = await latestResetToken('priya@example.com', 5);
-    const useLink = (password) => testServer.createClient().post('/api/auth/password/reset', { token, password });
+    const useLink = (password) =>
+      testServer.createClient().post('/api/auth/password/reset', { token, password, confirmPassword: password });
     const outcomes = await Promise.all([useLink('First#Pass2027'), useLink('Second#Pass2027')]);
     assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [200, 400]);
     const winner =
@@ -480,7 +499,11 @@ describe('invitations and unconfirmed signups', { skip: skipReason ?? false }, (
     const token = await invitationTokenFrom(testServer, invitation, 'sam@example.com');
     const accepted = await testServer
       .createClient()
-      .post(`/api/invitations/${token}/accept`, { password: NEW_PASSWORD, acceptTerms: true });
+      .post(`/api/invitations/${token}/accept`, {
+        password: NEW_PASSWORD,
+        confirmPassword: NEW_PASSWORD,
+        acceptTerms: true,
+      });
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     const account = await findUser(testServer, 'sam@example.com');
     assert.equal(account.status, 'active');

@@ -130,6 +130,7 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
 
     const weakPasswordResponse = await inviteeClient.post(`/api/invitations/${token}/accept`, {
       password: 'weak',
+      confirmPassword: 'weak',
       acceptTerms: true,
     });
     assert.equal(weakPasswordResponse.status, 400);
@@ -140,14 +141,17 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
 
     const withoutAgreement = await inviteeClient.post(`/api/invitations/${token}/accept`, {
       password: STRONG_PASSWORD,
+      confirmPassword: 'Different#Pass2026',
     });
     assert.equal(withoutAgreement.status, 400);
     assert.deepEqual(withoutAgreement.body.error.details, [
+      { field: 'confirmPassword', message: VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH },
       { field: 'acceptTerms', message: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED },
     ]);
 
     const acceptResponse = await inviteeClient.post(`/api/invitations/${token}/accept`, {
       password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
       acceptTerms: true,
     });
     assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));
@@ -167,7 +171,11 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
 
     const secondAccept = await testServer
       .createClient()
-      .post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD, acceptTerms: true });
+      .post(`/api/invitations/${token}/accept`, {
+        password: STRONG_PASSWORD,
+        confirmPassword: STRONG_PASSWORD,
+        acceptTerms: true,
+      });
     assert.equal(secondAccept.status, 410);
     assert.equal(secondAccept.body.error.code, 'INVITATION_USED');
   });

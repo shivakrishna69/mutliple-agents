@@ -62,6 +62,17 @@ const notAnObject = () => ({
   sanitizedInput: null,
 });
 
+/**
+ * The repeated password on forms that set a new one (signup, reset, invitation): present and
+ * exactly the same as the password. Checked here, so the screens show the server's message.
+ */
+function checkPasswordConfirmation(password, confirmPassword) {
+  if (typeof confirmPassword !== 'string' || confirmPassword.length === 0) {
+    return VALIDATION_MESSAGES.CONFIRM_PASSWORD_REQUIRED;
+  }
+  return confirmPassword === password ? null : VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH;
+}
+
 /** A link token from the request body: present and a string. Its shape is checked by the service. */
 function checkLinkToken(rawToken) {
   return checkRequiredString(rawToken, VALIDATION_MESSAGES.TOKEN_REQUIRED, VALIDATION_MESSAGES.TOKEN_MUST_BE_STRING);
@@ -147,7 +158,7 @@ function checkNamePart(rawValue, maxLength, messages) {
 export function validateRegistrationInput(requestBody) {
   if (!isPlainObject(requestBody)) return notAnObject();
 
-  const { firstName, lastName, email, phoneNumber, password, acceptTerms } = requestBody;
+  const { firstName, lastName, email, phoneNumber, password, confirmPassword, acceptTerms } = requestBody;
   const validationErrors = [];
   const fail = (field, message) => validationErrors.push({ field, message });
 
@@ -178,6 +189,8 @@ export function validateRegistrationInput(requestBody) {
 
   const passwordError = checkNewPassword(password);
   if (passwordError) fail('password', passwordError);
+  const confirmationError = checkPasswordConfirmation(password, confirmPassword);
+  if (confirmationError) fail('confirmPassword', confirmationError);
 
   if (acceptTerms !== true) fail('acceptTerms', VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED);
 
@@ -291,8 +304,9 @@ export function validateVerifyEmailInput(requestBody) {
 }
 
 /**
- * Validates POST /password/reset: { token, password }. The new password must meet every signup
- * rule; it is checked before the link is used up, so a weak password does not waste the link.
+ * Validates POST /password/reset: { token, password, confirmPassword }. The new password must meet
+ * every signup rule; it is checked before the link is used up, so a weak password does not waste
+ * the link.
  */
 export function validatePasswordResetInput(requestBody) {
   if (!isPlainObject(requestBody)) return notAnObject();
@@ -301,6 +315,8 @@ export function validatePasswordResetInput(requestBody) {
   if (tokenError) validationErrors.push({ field: 'token', message: tokenError });
   const passwordError = checkNewPassword(requestBody.password);
   if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
+  const confirmationError = checkPasswordConfirmation(requestBody.password, requestBody.confirmPassword);
+  if (confirmationError) validationErrors.push({ field: 'confirmPassword', message: confirmationError });
   if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
   return {
     isValid: true,
@@ -310,14 +326,17 @@ export function validatePasswordResetInput(requestBody) {
 }
 
 /**
- * Validates POST /api/invitations/:token/accept: { password, acceptTerms }. The password must meet
- * every signup rule, and the person must agree to the terms and privacy policy, as at signup.
+ * Validates POST /api/invitations/:token/accept: { password, confirmPassword, acceptTerms }. The
+ * password must meet every signup rule, and the person must agree to the terms and privacy policy,
+ * as at signup.
  */
 export function validateInvitationAcceptance(requestBody) {
   if (!isPlainObject(requestBody)) return notAnObject();
   const validationErrors = [];
   const passwordError = checkNewPassword(requestBody.password);
   if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
+  const confirmationError = checkPasswordConfirmation(requestBody.password, requestBody.confirmPassword);
+  if (confirmationError) validationErrors.push({ field: 'confirmPassword', message: confirmationError });
   if (requestBody.acceptTerms !== true) {
     validationErrors.push({ field: 'acceptTerms', message: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED });
   }

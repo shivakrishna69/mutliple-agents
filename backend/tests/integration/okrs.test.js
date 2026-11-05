@@ -47,6 +47,7 @@ describe('OKR edits by several people at once', { skip: skipReason ?? false }, (
     const client = testServer.createClient();
     const acceptResponse = await client.post(`/api/invitations/${token}/accept`, {
       password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
       acceptTerms: true,
     });
     assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));

@@ -67,6 +67,7 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
       email: VALIDATION_MESSAGES.EMAIL_REQUIRED,
       phoneNumber: VALIDATION_MESSAGES.PHONE_REQUIRED,
       password: VALIDATION_MESSAGES.PASSWORD_REQUIRED,
+      confirmPassword: VALIDATION_MESSAGES.CONFIRM_PASSWORD_REQUIRED,
       acceptTerms: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED,
     });
 

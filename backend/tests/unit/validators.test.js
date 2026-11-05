@@ -53,6 +53,7 @@ describe('validateRegistrationInput', () => {
     email: 'asha.rao@example.com',
     phoneNumber: '98765 43210',
     password: STRONG_PASSWORD,
+    confirmPassword: STRONG_PASSWORD,
     acceptTerms: true,
   });
 
@@ -87,6 +88,7 @@ describe('validateRegistrationInput', () => {
     assert.equal(result.isValid, false);
     assert.deepEqual(fieldsOf(result).sort(), [
       'acceptTerms',
+      'confirmPassword',
       'email',
       'firstName',
       'lastName',

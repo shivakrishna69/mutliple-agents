@@ -87,6 +87,8 @@ export const VALIDATION_MESSAGES = Object.freeze({
     'Enter a valid phone number: a 10-digit Indian mobile number, or the number with its country code (e.g. +44 20 7946 0958)',
   TERMS_NOT_ACCEPTED: 'Please accept the terms of service and privacy policy to continue',
   VERIFICATION_CODE_FORMAT: `Enter the ${ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS}-digit code from the email`,
+  CONFIRM_PASSWORD_REQUIRED: 'Type the password again to confirm it',
+  PASSWORDS_DO_NOT_MATCH: 'The two passwords do not match',
   REMEMBER_DEVICE_MUST_BE_BOOLEAN: '"Remember this device" must be true or false',
   TOKEN_REQUIRED: 'The link token is required',
   TOKEN_MUST_BE_STRING: 'The link token must be a string',
