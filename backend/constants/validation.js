@@ -14,7 +14,28 @@ export const USER_FIELD_LIMITS = Object.freeze({
   // ignored, so a longer password would give a false sense of strength. Measured in UTF-8
   // bytes, not characters, because multi-byte characters count more than once.
   PASSWORD_MAX_BYTES: 72,
+  // First and last name at signup; together (with a space) they stay within NAME_MAX_LENGTH.
+  GIVEN_NAME_MAX_LENGTH: 50,
+  FAMILY_NAME_MAX_LENGTH: 49,
 });
+
+/**
+ * Phone numbers are stored in international (E.164) form: "+", the country code, then the number,
+ * 8 to 15 digits in all. A number typed without a country code is read as a national number of
+ * DEFAULT_COUNTRY_CODE (utils/phoneNumbers.js).
+ */
+export const PHONE_SETTINGS = Object.freeze({
+  DEFAULT_COUNTRY_CODE: '91',
+  E164_PATTERN: /^\+[1-9]\d{7,14}$/,
+  // What a person may type: digits, spaces, dashes, dots, brackets and a leading + or 00.
+  MAX_INPUT_LENGTH: 25,
+});
+
+/**
+ * The version of the terms of service and privacy policy a signup agrees to. Raise it when they
+ * change; each account keeps the version it accepted (User.termsVersion).
+ */
+export const TERMS_VERSION = 1;
 
 /**
  * Links emailed to account owners (services/accountEmailFlows.js):

@@ -1,6 +1,8 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { VALIDATION_MESSAGES } from '../../constants/messages.js';
+import { TERMS_VERSION } from '../../constants/validation.js';
 import {
   endEmailCooldowns,
   latestVerificationToken,
@@ -24,12 +26,7 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
 
   it('signs a new user up as a customer, even when the body asks for another role, once the email is confirmed', async () => {
     const client = testServer.createClient();
-    const signupResponse = await client.post('/api/auth/signup', {
-      name: 'Asha Rao',
-      email: 'Asha.Rao@Example.com',
-      password: STRONG_PASSWORD,
-      role: 'admin',
-    });
+    const signupResponse = await client.signup('Asha Rao', 'Asha.Rao@Example.com', STRONG_PASSWORD, { role: 'admin' });
     assert.equal(signupResponse.status, 202);
     assert.equal(signupResponse.body.data.email, 'asha.rao@example.com');
     assert.equal(signupResponse.body.data.csrfToken, undefined, 'no session before the email is confirmed');
@@ -46,6 +43,40 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     const currentUserResponse = await client.get('/api/auth/me');
     assert.equal(currentUserResponse.status, 200);
     assert.equal(currentUserResponse.body.data.user.email, 'asha.rao@example.com');
+  });
+
+  it('stores the signup details: first and last name, the phone in international form, the terms accepted', async () => {
+    const stored = await testServer.database.collection('users').findOne({ email: 'asha.rao@example.com' });
+    assert.equal(stored.firstName, 'Asha');
+    assert.equal(stored.lastName, 'Rao');
+    assert.equal(stored.name, 'Asha Rao');
+    assert.equal(stored.phoneNumber, '+919876543210');
+    assert.equal(stored.phoneVerifiedAt, null);
+    assert.equal(stored.termsVersion, TERMS_VERSION);
+    assert.ok(stored.termsAcceptedAt instanceof Date);
+  });
+
+  it('names every missing or unusable signup field, with messages from the server', async () => {
+    const empty = await testServer.createClient().post('/api/auth/signup', {});
+    assert.equal(empty.status, 400);
+    assert.deepEqual(Object.fromEntries(empty.body.error.details.map(({ field, message }) => [field, message])), {
+      firstName: VALIDATION_MESSAGES.FIRST_NAME_REQUIRED,
+      lastName: VALIDATION_MESSAGES.LAST_NAME_REQUIRED,
+      email: VALIDATION_MESSAGES.EMAIL_REQUIRED,
+      phoneNumber: VALIDATION_MESSAGES.PHONE_REQUIRED,
+      password: VALIDATION_MESSAGES.PASSWORD_REQUIRED,
+      acceptTerms: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED,
+    });
+
+    const unusable = await testServer
+      .createClient()
+      .signup('Ravi Kumar', 'ravi@example.com', STRONG_PASSWORD, { phoneNumber: '12345', acceptTerms: 'yes' });
+    assert.equal(unusable.status, 400);
+    assert.deepEqual(unusable.body.error.details, [
+      { field: 'phoneNumber', message: VALIDATION_MESSAGES.PHONE_INVALID },
+      { field: 'acceptTerms', message: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED },
+    ]);
+    assert.equal(await testServer.database.collection('users').countDocuments({ email: 'ravi@example.com' }), 0);
   });
 
   it('stores only a password hash', async () => {

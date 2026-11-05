@@ -74,6 +74,17 @@ export const VALIDATION_MESSAGES = Object.freeze({
   PASSWORD_TOO_SHORT: `Password must be at least ${USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH} characters`,
   PASSWORD_TOO_LONG: `Password must be at most ${USER_FIELD_LIMITS.PASSWORD_MAX_BYTES} bytes`,
   NEW_PASSWORD_SAME_AS_CURRENT: 'The new password must be different from the current one',
+  FIRST_NAME_REQUIRED: 'First name is required',
+  FIRST_NAME_MUST_BE_STRING: 'First name must be text',
+  FIRST_NAME_TOO_LONG: `First name must be at most ${USER_FIELD_LIMITS.GIVEN_NAME_MAX_LENGTH} characters`,
+  LAST_NAME_REQUIRED: 'Last name is required',
+  LAST_NAME_MUST_BE_STRING: 'Last name must be text',
+  LAST_NAME_TOO_LONG: `Last name must be at most ${USER_FIELD_LIMITS.FAMILY_NAME_MAX_LENGTH} characters`,
+  PHONE_REQUIRED: 'Phone number is required',
+  PHONE_MUST_BE_STRING: 'Phone number must be text',
+  PHONE_INVALID:
+    'Enter a valid phone number: a 10-digit Indian mobile number, or the number with its country code (e.g. +44 20 7946 0958)',
+  TERMS_NOT_ACCEPTED: 'Please accept the terms of service and privacy policy to continue',
   TOKEN_REQUIRED: 'The link token is required',
   TOKEN_MUST_BE_STRING: 'The link token must be a string',
 });

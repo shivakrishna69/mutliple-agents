@@ -14,6 +14,7 @@
 
 import { EMAIL_PATTERN, PASSWORD_STRENGTH_RULES, USER_FIELD_LIMITS } from '../constants/validation.js';
 import { PASSWORD_RULE_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
+import { normalizePhoneNumber } from '../utils/phoneNumbers.js';
 
 /** True when `requestBody` is a plain JSON object (not undefined, null, or an array). */
 function isPlainObject(requestBody) {
@@ -121,9 +122,17 @@ export function validateChangePasswordInput(requestBody) {
   };
 }
 
+/** A first or last name: present, a string, and within `maxLength` once trimmed. */
+function checkNamePart(rawValue, maxLength, messages) {
+  const presenceError = checkRequiredString(rawValue, messages.required, messages.notString);
+  if (presenceError) return presenceError;
+  return rawValue.trim().length > maxLength ? messages.tooLong : null;
+}
+
 /**
- * Validates POST /signup: name, email, and password, with the same limits as the User model,
- * plus the password strength rules (uppercase, lowercase, digit, special character).
+ * Validates POST /signup: { firstName, lastName, email, phoneNumber, password, acceptTerms }, with
+ * the same limits as the User model, the password strength rules, a phone number we can read
+ * (utils/phoneNumbers.js) and the terms accepted (acceptTerms must be exactly true).
  * The password is not trimmed: leading or trailing spaces are part of what the user typed.
  *
  * This is the authoritative check for password strength. The User model cannot enforce it,
@@ -131,51 +140,56 @@ export function validateChangePasswordInput(requestBody) {
  * code path that creates users must pass its input through this validator first.
  */
 export function validateRegistrationInput(requestBody) {
-  if (!isPlainObject(requestBody)) {
-    return {
-      isValid: false,
-      validationErrors: [{ field: 'body', message: VALIDATION_MESSAGES.REQUEST_BODY_MUST_BE_OBJECT }],
-      sanitizedInput: null,
-    };
-  }
+  if (!isPlainObject(requestBody)) return notAnObject();
 
-  const { name: rawName, email: rawEmail, password: rawPassword } = requestBody;
+  const { firstName, lastName, email, phoneNumber, password, acceptTerms } = requestBody;
   const validationErrors = [];
+  const fail = (field, message) => validationErrors.push({ field, message });
 
-  const nameError = checkRequiredString(
-    rawName,
-    VALIDATION_MESSAGES.NAME_REQUIRED,
-    VALIDATION_MESSAGES.NAME_MUST_BE_STRING,
+  const firstNameError = checkNamePart(firstName, USER_FIELD_LIMITS.GIVEN_NAME_MAX_LENGTH, {
+    required: VALIDATION_MESSAGES.FIRST_NAME_REQUIRED,
+    notString: VALIDATION_MESSAGES.FIRST_NAME_MUST_BE_STRING,
+    tooLong: VALIDATION_MESSAGES.FIRST_NAME_TOO_LONG,
+  });
+  if (firstNameError) fail('firstName', firstNameError);
+  const lastNameError = checkNamePart(lastName, USER_FIELD_LIMITS.FAMILY_NAME_MAX_LENGTH, {
+    required: VALIDATION_MESSAGES.LAST_NAME_REQUIRED,
+    notString: VALIDATION_MESSAGES.LAST_NAME_MUST_BE_STRING,
+    tooLong: VALIDATION_MESSAGES.LAST_NAME_TOO_LONG,
+  });
+  if (lastNameError) fail('lastName', lastNameError);
+
+  const emailError = checkEmailAddress(email);
+  if (emailError) fail('email', emailError);
+
+  const phoneError = checkRequiredString(
+    phoneNumber,
+    VALIDATION_MESSAGES.PHONE_REQUIRED,
+    VALIDATION_MESSAGES.PHONE_MUST_BE_STRING,
   );
-  if (nameError) {
-    validationErrors.push({ field: 'name', message: nameError });
-  } else {
-    const trimmedNameLength = rawName.trim().length;
-    if (
-      trimmedNameLength < USER_FIELD_LIMITS.NAME_MIN_LENGTH ||
-      trimmedNameLength > USER_FIELD_LIMITS.NAME_MAX_LENGTH
-    ) {
-      validationErrors.push({ field: 'name', message: VALIDATION_MESSAGES.NAME_LENGTH_INVALID });
-    }
-  }
+  const normalizedPhone = phoneError ? null : normalizePhoneNumber(phoneNumber);
+  if (phoneError) fail('phoneNumber', phoneError);
+  else if (!normalizedPhone) fail('phoneNumber', VALIDATION_MESSAGES.PHONE_INVALID);
 
-  const emailError = checkEmailAddress(rawEmail);
-  if (emailError) validationErrors.push({ field: 'email', message: emailError });
+  const passwordError = checkNewPassword(password);
+  if (passwordError) fail('password', passwordError);
 
-  const passwordError = checkNewPassword(rawPassword);
-  if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
+  if (acceptTerms !== true) fail('acceptTerms', VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED);
 
-  if (validationErrors.length > 0) {
-    return { isValid: false, validationErrors, sanitizedInput: null };
-  }
+  if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
 
+  const trimmedFirstName = firstName.trim();
+  const trimmedLastName = lastName.trim();
   return {
     isValid: true,
     validationErrors: [],
     sanitizedInput: {
-      name: rawName.trim(),
-      email: normalizeEmail(rawEmail),
-      password: rawPassword,
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      name: `${trimmedFirstName} ${trimmedLastName}`,
+      email: normalizeEmail(email),
+      phoneNumber: normalizedPhone,
+      password,
     },
   };
 }

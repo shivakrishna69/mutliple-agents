@@ -1,7 +1,8 @@
 /**
  * Signup with email confirmation, and password reset (rules in services/accountEmailFlows.js).
  *
- *   POST /api/auth/signup                 { name, email, password }  202: check your email
+ *   POST /api/auth/signup   { firstName, lastName, email, phoneNumber, password, acceptTerms }
+ *                                                                  202: check your email
  *   POST /api/auth/verify-email/resend    { email }                  202: a new link if one is due
  *   POST /api/auth/verify-email           { token }                  200: confirmed and signed in
  *   POST /api/auth/password/forgot        { email }                  202: a reset link if there is an account
@@ -96,12 +97,10 @@ const emailContextOf = (req) => loadEmailContext(req.app.locals.config);
 export const registerUser = accountEmailHandler('signup', async (req, res) => {
   const validation = validateRegistrationInput(req.body);
   if (!validation.isValid) return sendValidationFailure(req, res, validation);
-  const { name, email, password } = validation.sanitizedInput;
+  const { email } = validation.sanitizedInput;
 
   const { outcome, userId } = await registerAccount({
-    name,
-    email,
-    password,
+    ...validation.sanitizedInput,
     bootstrapAdminEmail: req.app.locals.config.bootstrapAdminEmail,
     emailContext: await emailContextOf(req),
   });
