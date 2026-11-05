@@ -169,13 +169,11 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
       .findOne({ userId: new testServer.database.base.Types.ObjectId(newUserId) });
     assert.ok(profile, 'expected an employee profile linked to the new user');
 
-    const secondAccept = await testServer
-      .createClient()
-      .post(`/api/invitations/${token}/accept`, {
-        password: STRONG_PASSWORD,
-        confirmPassword: STRONG_PASSWORD,
-        acceptTerms: true,
-      });
+    const secondAccept = await testServer.createClient().post(`/api/invitations/${token}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(secondAccept.status, 410);
     assert.equal(secondAccept.body.error.code, 'INVITATION_USED');
   });

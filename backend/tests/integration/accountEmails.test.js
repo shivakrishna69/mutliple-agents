@@ -371,23 +371,19 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
       .post('/api/auth/password/reset', { token: resetToken, password: 'short', confirmPassword: 'short' });
     assert.equal(weak.status, 400);
     assert.deepEqual(weak.body.error.details, [{ field: 'password', message: VALIDATION_MESSAGES.PASSWORD_TOO_SHORT }]);
-    const noSymbol = await testServer
-      .createClient()
-      .post('/api/auth/password/reset', {
-        token: resetToken,
-        password: 'NoSymbol2027',
-        confirmPassword: 'NoSymbol2027',
-      });
+    const noSymbol = await testServer.createClient().post('/api/auth/password/reset', {
+      token: resetToken,
+      password: 'NoSymbol2027',
+      confirmPassword: 'NoSymbol2027',
+    });
     assert.deepEqual(noSymbol.body.error.details, [
       { field: 'password', message: PASSWORD_RULE_MESSAGES.specialCharacter },
     ]);
-    const mismatch = await testServer
-      .createClient()
-      .post('/api/auth/password/reset', {
-        token: resetToken,
-        password: NEW_PASSWORD,
-        confirmPassword: 'Other#Pass2027',
-      });
+    const mismatch = await testServer.createClient().post('/api/auth/password/reset', {
+      token: resetToken,
+      password: NEW_PASSWORD,
+      confirmPassword: 'Other#Pass2027',
+    });
     assert.deepEqual(mismatch.body.error.details, [
       { field: 'confirmPassword', message: VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH },
     ]);
@@ -409,13 +405,11 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     const [, , changedNotice] = await testServer.mailbox.waitForMessages('priya@example.com', 3);
     assert.match(changedNotice.subject, /password was changed/i);
 
-    const reused = await testServer
-      .createClient()
-      .post('/api/auth/password/reset', {
-        token: resetToken,
-        password: STRONG_PASSWORD,
-        confirmPassword: STRONG_PASSWORD,
-      });
+    const reused = await testServer.createClient().post('/api/auth/password/reset', {
+      token: resetToken,
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+    });
     assertCodedError(reused, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
     const checkAfter = await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`);
     assertCodedError(checkAfter, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
@@ -497,13 +491,11 @@ describe('invitations and unconfirmed signups', { skip: skipReason ?? false }, (
     assertCodedError(revoked, 400, 'VERIFICATION_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_LINK_INVALID);
 
     const token = await invitationTokenFrom(testServer, invitation, 'sam@example.com');
-    const accepted = await testServer
-      .createClient()
-      .post(`/api/invitations/${token}/accept`, {
-        password: NEW_PASSWORD,
-        confirmPassword: NEW_PASSWORD,
-        acceptTerms: true,
-      });
+    const accepted = await testServer.createClient().post(`/api/invitations/${token}/accept`, {
+      password: NEW_PASSWORD,
+      confirmPassword: NEW_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     const account = await findUser(testServer, 'sam@example.com');
     assert.equal(account.status, 'active');

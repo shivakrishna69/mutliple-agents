@@ -123,13 +123,11 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
     assert.equal(oldAccount.profileCompleted, true);
     assert.equal((await profiles().findOne({ userId: legacy.userId })).employeeCode, 'NSK0001');
 
-    const accepted = await testServer
-      .createClient()
-      .post(`/api/invitations/${legacy.inviteToken}/accept`, {
-        password: STRONG_PASSWORD,
-        confirmPassword: STRONG_PASSWORD,
-        acceptTerms: true,
-      });
+    const accepted = await testServer.createClient().post(`/api/invitations/${legacy.inviteToken}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     const legacyAccount = await users().findOne({ email: 'legacy.invitee@example.com' });
     assert.equal(legacyAccount.status, 'active');
@@ -160,24 +158,20 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
     assert.equal(again.status, 409);
     assert.equal(again.body.error.code, 'INVITATION_EXISTS');
 
-    const activated = await testServer
-      .createClient()
-      .post(`/api/invitations/${tokenOf(invited)}/accept`, {
-        password: STRONG_PASSWORD,
-        confirmPassword: STRONG_PASSWORD,
-        acceptTerms: true,
-      });
+    const activated = await testServer.createClient().post(`/api/invitations/${tokenOf(invited)}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(activated.status, 201, JSON.stringify(activated.body));
     assert.equal(activated.body.data.user.id, account._id.toString());
     assert.equal((await users().findOne({ _id: account._id })).status, 'active');
     assert.equal((await testServer.createClient().login('puja@example.com', STRONG_PASSWORD)).status, 200);
-    const reused = await testServer
-      .createClient()
-      .post(`/api/invitations/${tokenOf(invited)}/accept`, {
-        password: STRONG_PASSWORD,
-        confirmPassword: STRONG_PASSWORD,
-        acceptTerms: true,
-      });
+    const reused = await testServer.createClient().post(`/api/invitations/${tokenOf(invited)}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(reused.status, 410);
   });
 
@@ -232,13 +226,11 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
     const reopenedProfile = await profiles().findOne({ userId: account._id });
     assert.equal(reopenedProfile.organizationData.employmentStatus, 'Probation');
     assert.equal(reopenedProfile.organizationData.designation, 'Data Engineer II');
-    const activated = await testServer
-      .createClient()
-      .post(`/api/invitations/${tokenOf(reinvited)}/accept`, {
-        password: STRONG_PASSWORD,
-        confirmPassword: STRONG_PASSWORD,
-        acceptTerms: true,
-      });
+    const activated = await testServer.createClient().post(`/api/invitations/${tokenOf(reinvited)}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(activated.status, 201, JSON.stringify(activated.body));
   });
 
