@@ -48,13 +48,18 @@ function buildBaseCookieOptions(cookieConfig) {
 }
 
 /**
- * Writes both session cookies.
+ * Writes both session cookies. A persistent session ("remember this device") keeps them until the
+ * token expires; otherwise they are browser-session cookies, deleted when the browser closes (the
+ * token still expires at JWT_EXPIRES_IN if the browser stays open).
  * @param {import('express').Response} res
  * @param {{ cookieSecure: boolean }} cookieConfig
- * @param {{ accessToken: string, csrfToken: string, expiresAtMs: number }} sessionTokens
+ * @param {{ accessToken: string, csrfToken: string, expiresAtMs: number, persistent?: boolean }} sessionTokens
  */
-export function setSessionCookies(res, cookieConfig, { accessToken, csrfToken, expiresAtMs }) {
-  const cookieOptions = { ...buildBaseCookieOptions(cookieConfig), maxAge: Math.max(0, expiresAtMs - Date.now()) };
+export function setSessionCookies(res, cookieConfig, { accessToken, csrfToken, expiresAtMs, persistent = false }) {
+  const cookieOptions = {
+    ...buildBaseCookieOptions(cookieConfig),
+    ...(persistent && { maxAge: Math.max(0, expiresAtMs - Date.now()) }),
+  };
   res.cookie(resolveAccessTokenCookieName(cookieConfig), accessToken, cookieOptions);
   res.cookie(resolveCsrfTokenCookieName(cookieConfig), csrfToken, cookieOptions);
 }

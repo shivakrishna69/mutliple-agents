@@ -4,11 +4,13 @@ import assert from 'node:assert/strict';
 import { VALIDATION_MESSAGES } from '../../constants/messages.js';
 import { TERMS_VERSION } from '../../constants/validation.js';
 import {
+  createSignedInClient,
   endEmailCooldowns,
   latestVerificationToken,
   mongoUnavailableReason,
   startTestServer,
   STRONG_PASSWORD,
+  TEST_APP_ORIGIN,
 } from './testServer.js';
 
 const skipReason = await mongoUnavailableReason();
@@ -150,5 +152,52 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
 
     const newLoginResponse = await testServer.createClient().login('asha.rao@example.com', newPassword);
     assert.equal(newLoginResponse.status, 200);
+  });
+
+  it('keeps a session after the browser closes only when asked to remember the device', async () => {
+    const email = 'remy@example.com';
+    await createSignedInClient(testServer, { name: 'Remy Dsouza', email });
+    const send = (path, body, headers = {}) =>
+      fetch(`${testServer.baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: TEST_APP_ORIGIN, ...headers },
+        body: JSON.stringify(body),
+      });
+    // Max-Age of each session cookie; null for a browser-session cookie.
+    const cookieLifetimes = (response) =>
+      response.headers.getSetCookie().map((line) => {
+        const maxAge = /;\s*max-age=(\d+)/i.exec(line)?.[1];
+        return maxAge === undefined ? null : Number(maxAge);
+      });
+    const rememberedSeconds = 30 * 24 * 60 * 60;
+    const lastsAboutThirtyDays = (seconds) => seconds > rememberedSeconds - 60 && seconds <= rememberedSeconds;
+
+    const plain = await send('/api/auth/login', { email, password: STRONG_PASSWORD });
+    assert.equal(plain.status, 200);
+    assert.deepEqual(cookieLifetimes(plain), [null, null], 'deleted when the browser closes');
+
+    const remembered = await send('/api/auth/login', { email, password: STRONG_PASSWORD, rememberDevice: true });
+    assert.equal(remembered.status, 200);
+    assert.ok(cookieLifetimes(remembered).every(lastsAboutThirtyDays), String(cookieLifetimes(remembered)));
+
+    const notABoolean = await send('/api/auth/login', { email, password: STRONG_PASSWORD, rememberDevice: 'true' });
+    assert.equal(notABoolean.status, 400);
+    assert.deepEqual((await notABoolean.json()).error.details, [
+      { field: 'rememberDevice', message: VALIDATION_MESSAGES.REMEMBER_DEVICE_MUST_BE_BOOLEAN },
+    ]);
+
+    // Changing the password renews the session; a remembered one stays remembered.
+    const { csrfToken } = (await remembered.json()).data;
+    const cookies = remembered.headers
+      .getSetCookie()
+      .map((line) => line.split(';')[0])
+      .join('; ');
+    const changed = await send(
+      '/api/auth/password',
+      { currentPassword: STRONG_PASSWORD, newPassword: 'Third#Pass2028' },
+      { Cookie: cookies, 'X-CSRF-Token': csrfToken },
+    );
+    assert.equal(changed.status, 200);
+    assert.ok(cookieLifetimes(changed).every(lastsAboutThirtyDays), String(cookieLifetimes(changed)));
   });
 });

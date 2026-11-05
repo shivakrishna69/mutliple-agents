@@ -20,6 +20,18 @@ const MIN_SECRET_LENGTH = 32;
 /** Bounds for IMPORT_EMAILS_PER_MINUTE. */
 const IMPORT_EMAILS_PER_MINUTE_BOUNDS = Object.freeze({ MIN: 1, MAX: 600, DEFAULT: 30 });
 
+/** Bounds for REMEMBERED_SESSION_DAYS: how long "remember this device" keeps someone signed in. */
+const REMEMBERED_SESSION_DAYS_BOUNDS = Object.freeze({ MIN: 1, MAX: 90, DEFAULT: 30 });
+
+/** A whole-number setting within `bounds` ({ MIN, MAX, DEFAULT }); refuses startup otherwise. */
+function readBoundedInteger(variableName, bounds) {
+  const value = Number(process.env[variableName] ?? bounds.DEFAULT);
+  if (!Number.isInteger(value) || value < bounds.MIN || value > bounds.MAX) {
+    throw new Error(`${variableName} must be a whole number from ${bounds.MIN} to ${bounds.MAX}`);
+  }
+  return value;
+}
+
 /** Bounds for AI_SERVICE_TIMEOUT_MS: long enough for an LLM round trip, short enough not to hang webhooks. */
 const AI_SERVICE_TIMEOUT_BOUNDS_MS = Object.freeze({ MIN: 1_000, MAX: 120_000, DEFAULT: 20_000 });
 
@@ -318,16 +330,10 @@ export function loadConfig() {
 
   // Optional. How many invitation emails an employee import sends per minute: mail providers cap
   // sending (often a few hundred an hour), and a steady pace keeps the import within it.
-  const importEmailsPerMinute = Number(process.env.IMPORT_EMAILS_PER_MINUTE ?? IMPORT_EMAILS_PER_MINUTE_BOUNDS.DEFAULT);
-  if (
-    !Number.isInteger(importEmailsPerMinute) ||
-    importEmailsPerMinute < IMPORT_EMAILS_PER_MINUTE_BOUNDS.MIN ||
-    importEmailsPerMinute > IMPORT_EMAILS_PER_MINUTE_BOUNDS.MAX
-  ) {
-    throw new Error(
-      `IMPORT_EMAILS_PER_MINUTE must be a whole number from ${IMPORT_EMAILS_PER_MINUTE_BOUNDS.MIN} to ${IMPORT_EMAILS_PER_MINUTE_BOUNDS.MAX}`,
-    );
-  }
+  const importEmailsPerMinute = readBoundedInteger('IMPORT_EMAILS_PER_MINUTE', IMPORT_EMAILS_PER_MINUTE_BOUNDS);
+  // Optional. "Remember this device" at sign-in keeps a session this many days; otherwise it ends
+  // when the browser closes (and at JWT_EXPIRES_IN at the latest).
+  const rememberedSessionDays = readBoundedInteger('REMEMBERED_SESSION_DAYS', REMEMBERED_SESSION_DAYS_BOUNDS);
 
   // Optional. Employee document vault storage; null disables the vault.
   const vaultStorage = loadS3StorageConfig(env, 'VAULT');
@@ -354,6 +360,7 @@ export function loadConfig() {
     mongoUri: process.env.MONGO_URI,
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+    rememberedSessionDays,
     corsOrigins,
     mail,
     appPublicUrl,

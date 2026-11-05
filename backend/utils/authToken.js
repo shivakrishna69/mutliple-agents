@@ -11,6 +11,7 @@
  *       iat / exp  issued-at and expiry, from JWT_EXPIRES_IN
  *       iatms      issued-at in milliseconds (the same moment as `iat`), so a password change
  *                  revokes even a session started earlier in the same second
+ *       rem        true for a "remember this device" session (lasts REMEMBERED_SESSION_DAYS)
  *   - Role and email are not embedded: the auth middleware reloads the user on every request,
  *     so a role change or account deletion takes effect immediately.
  *
@@ -42,26 +43,36 @@ export function hashCsrfToken(csrfToken) {
 /**
  * Creates a new session for a user: a signed JWT and its paired CSRF token.
  * @param {import('mongoose').Types.ObjectId|string} userId
- * @param {{ jwtSecret: string, jwtExpiresIn: string }} authConfig  From `req.app.locals.config`.
- * @returns {{ accessToken: string, csrfToken: string, sessionId: string, expiresAtMs: number }}
+ * @param {{ jwtSecret: string, jwtExpiresIn: string, rememberedSessionDays: number }} authConfig
+ *   From `req.app.locals.config`.
+ * @param {{ remember?: boolean }} [options]  remember: the person asked to stay signed in on this
+ *   device, so the session lasts rememberedSessionDays and its cookies outlive the browser
+ * @returns {{ accessToken: string, csrfToken: string, sessionId: string, expiresAtMs: number,
+ *   persistent: boolean }}  `persistent`: whether the cookies should outlive the browser
  */
-export function issueSessionTokens(userId, authConfig) {
+export function issueSessionTokens(userId, authConfig, { remember = false } = {}) {
   const csrfToken = randomBytes(CSRF_TOKEN_BYTES).toString('base64url');
   const sessionId = randomUUID();
 
   const issuedAtMs = Date.now();
-  const sessionClaims = { csrf: hashCsrfToken(csrfToken), iat: Math.floor(issuedAtMs / 1000), iatms: issuedAtMs };
+  const sessionClaims = {
+    csrf: hashCsrfToken(csrfToken),
+    iat: Math.floor(issuedAtMs / 1000),
+    iatms: issuedAtMs,
+    // Remembered sessions say so, so a session renewed in their place (password change) stays one.
+    ...(remember && { rem: true }),
+  };
   const accessToken = jwt.sign(sessionClaims, authConfig.jwtSecret, {
     algorithm: ACCESS_TOKEN_ALGORITHM,
     subject: String(userId),
     jwtid: sessionId,
-    expiresIn: authConfig.jwtExpiresIn,
+    expiresIn: remember ? `${authConfig.rememberedSessionDays}d` : authConfig.jwtExpiresIn,
   });
 
   // Read `exp` back from the signed token so the cookie lifetime matches it exactly,
   // whatever format JWT_EXPIRES_IN uses ("15m", "1d", a number of seconds).
   const { exp: expiresAtSeconds } = jwt.decode(accessToken);
-  return { accessToken, csrfToken, sessionId, expiresAtMs: expiresAtSeconds * 1000 };
+  return { accessToken, csrfToken, sessionId, expiresAtMs: expiresAtSeconds * 1000, persistent: remember };
 }
 
 /**

@@ -86,6 +86,18 @@ describe('loadConfig', () => {
     assert.equal(loadWith({ AI_SERVICE_URL: 'http://ai-service:8000/' }).aiServiceUrl, 'http://ai-service:8000');
   });
 
+  it('keeps remembered sign-ins 30 days by default, within 1 to 90 days', () => {
+    assert.equal(loadWith().rememberedSessionDays, 30);
+    assert.equal(loadWith({ REMEMBERED_SESSION_DAYS: '7' }).rememberedSessionDays, 7);
+    for (const value of ['0', '91', '2.5', 'month']) {
+      assert.throws(
+        () => loadWith({ REMEMBERED_SESSION_DAYS: value }),
+        /REMEMBERED_SESSION_DAYS must be a whole number from 1 to 90/,
+        value,
+      );
+    }
+  });
+
   it('validates proxy hops, the bootstrap admin email and the Redis URL', () => {
     assert.throws(() => loadWith({ TRUST_PROXY_HOPS: '-1' }), /TRUST_PROXY_HOPS must be a non-negative integer/);
     assert.throws(() => loadWith({ BOOTSTRAP_ADMIN_EMAIL: 'not-an-email' }), /BOOTSTRAP_ADMIN_EMAIL must be a valid/);

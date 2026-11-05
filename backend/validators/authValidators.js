@@ -214,7 +214,7 @@ export function validateLoginInput(requestBody) {
     };
   }
 
-  const { email: rawEmail, password: rawPassword } = requestBody;
+  const { email: rawEmail, password: rawPassword, rememberDevice = false } = requestBody;
   const validationErrors = [];
 
   const emailError = checkRequiredString(
@@ -231,6 +231,11 @@ export function validateLoginInput(requestBody) {
   );
   if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
 
+  // Optional; only a real boolean counts, so "false" (a string) is not read as yes.
+  if (typeof rememberDevice !== 'boolean') {
+    validationErrors.push({ field: 'rememberDevice', message: VALIDATION_MESSAGES.REMEMBER_DEVICE_MUST_BE_BOOLEAN });
+  }
+
   if (validationErrors.length > 0) {
     return { isValid: false, validationErrors, sanitizedInput: null };
   }
@@ -238,7 +243,7 @@ export function validateLoginInput(requestBody) {
   return {
     isValid: true,
     validationErrors: [],
-    sanitizedInput: { email: normalizeEmail(rawEmail), password: rawPassword },
+    sanitizedInput: { email: normalizeEmail(rawEmail), password: rawPassword, rememberDevice },
   };
 }
 
