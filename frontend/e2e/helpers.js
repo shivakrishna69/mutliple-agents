@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { PASSWORD } from './environment.js';
+import { MAIL_INBOX_URL, PASSWORD } from './environment.js';
 
 /** Signs in through the login form and waits for the dashboard. */
 export async function signIn(page, email, password = PASSWORD) {
@@ -9,6 +9,29 @@ export async function signIn(page, email, password = PASSWORD) {
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+}
+
+/**
+ * The newest link starting with `pathPrefix` (e.g. '/invite') emailed to `address`, read from the
+ * test backend's inbox; waits for the email to arrive.
+ */
+export async function emailedLink(address, pathPrefix) {
+  let link = null;
+  await expect
+    .poll(
+      async () => {
+        const response = await fetch(`${MAIL_INBOX_URL}/messages?to=${encodeURIComponent(address)}`);
+        const messages = await response.json();
+        const links = messages
+          .flatMap((message) => message.text.match(/https?:\/\/\S+/g) ?? [])
+          .filter((url) => new URL(url).pathname.startsWith(`${pathPrefix}/`));
+        link = links.at(-1) ?? null;
+        return link;
+      },
+      { message: `an email to ${address} with a ${pathPrefix} link` },
+    )
+    .not.toBeNull();
+  return link;
 }
 
 export function mainNavigation(page) {

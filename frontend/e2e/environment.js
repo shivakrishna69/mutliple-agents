@@ -7,6 +7,9 @@ export const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 5174);
 export const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 5065);
 export const FRONTEND_ORIGIN = `http://localhost:${FRONTEND_PORT}`;
 export const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
+/** The test backend's mail inbox: everything it emails, readable at GET /messages?to=<address>. */
+export const MAIL_INBOX_PORT = Number(process.env.E2E_MAIL_INBOX_PORT ?? 5066);
+export const MAIL_INBOX_URL = `http://127.0.0.1:${MAIL_INBOX_PORT}`;
 
 export const PASSWORD = 'Valid#Pass2026';
 

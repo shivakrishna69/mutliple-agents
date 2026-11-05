@@ -70,8 +70,9 @@ function convertDetailsToFieldErrors(errorDetails) {
 }
 
 /**
- * Sends one request to the backend and returns `{ responseData, httpStatus }` on 2xx,
- * where `responseData` is the response's `data` object.
+ * Sends one request to the backend and returns `{ responseData, responseMessage, httpStatus }` on
+ * 2xx, where `responseData` is the response's `data` object and `responseMessage` its `message`
+ * (the text to show the person, written by the backend).
  * @param {object} requestDescription
  * @param {'GET'|'POST'|'PATCH'} requestDescription.method
  * @param {string} requestDescription.endpointPath
@@ -137,5 +138,6 @@ export async function sendApiRequest({ method, endpointPath, requestPayload, for
     });
   }
 
-  return { responseData: responseBody?.data, httpStatus: httpResponse.status };
+  const responseMessage = typeof responseBody?.message === 'string' ? responseBody.message : null;
+  return { responseData: responseBody?.data, responseMessage, httpStatus: httpResponse.status };
 }

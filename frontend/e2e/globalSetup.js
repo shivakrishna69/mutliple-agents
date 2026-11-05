@@ -12,7 +12,7 @@
  */
 
 import { onboardEmployee } from '../../backend/tests/integration/fixtures.js';
-import { startTestServer } from '../../backend/tests/integration/testServer.js';
+import { signUpAndConfirm, startTestServer } from '../../backend/tests/integration/testServer.js';
 import { startStandInAiService } from './standInAiService.js';
 import {
   ACCOUNTS,
@@ -20,6 +20,7 @@ import {
   DEPARTMENT_NAME,
   EMPLOYEE,
   FRONTEND_ORIGIN,
+  MAIL_INBOX_PORT,
   LEAVE_EMPLOYEE,
   LEAVE_EMPLOYEE_CASUAL_DAYS,
   LEAVE_MANAGER,
@@ -28,12 +29,9 @@ import {
   TWO_STEP_EMPLOYEE,
 } from './environment.js';
 
+/** Signs up and confirms the email from the emailed link, through the API. */
 async function signUp(testServer, { name, email }) {
-  const client = testServer.createClient();
-  const response = await client.signup(name, email, PASSWORD);
-  if (response.status !== 201) {
-    throw new Error(`Seeding ${email} failed: ${response.status} ${JSON.stringify(response.body)}`);
-  }
+  await signUpAndConfirm(testServer, testServer.createClient(), { name, email, password: PASSWORD });
 }
 
 async function expectCreated(responsePromise, what) {
@@ -129,7 +127,13 @@ export default async function globalSetup() {
     internalApiKey: () => testServer.internalApiKey,
   });
   try {
-    testServer = await startTestServer({ port: BACKEND_PORT, appOrigin: FRONTEND_ORIGIN, aiServiceUrl: standIn.url });
+    testServer = await startTestServer({
+      port: BACKEND_PORT,
+      appOrigin: FRONTEND_ORIGIN,
+      aiServiceUrl: standIn.url,
+      // Email goes to a test inbox the specs read over HTTP, like a person reading their mail.
+      mailHttpPort: MAIL_INBOX_PORT,
+    });
   } catch (startupError) {
     await standIn.close();
     throw startupError;

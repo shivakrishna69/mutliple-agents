@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { ACCOUNTS, PASSWORD } from './environment.js';
-import { mainNavigation, signIn } from './helpers.js';
+import { ACCOUNT_EMAIL_MESSAGES } from '../../backend/constants/messages.js';
+import { ACCOUNTS, BACKEND_URL, FRONTEND_ORIGIN, PASSWORD } from './environment.js';
+import { emailedLink, mainNavigation, signIn } from './helpers.js';
 
-test('a new customer signs up, sees their workspace and signs out', async ({ page }) => {
+test('a new customer signs up, confirms the email, sees their workspace and signs out', async ({ page }) => {
   await page.goto('/signup');
   await page.getByLabel('Full name').fill('Priya Nair');
   await page.getByLabel('Email address').fill('priya.nair@example.com');
@@ -11,7 +12,22 @@ test('a new customer signs up, sees their workspace and signs out', async ({ pag
   await page.getByLabel('Confirm password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
+  // The page shows the backend's own message; there is no session until the email is confirmed.
+  await expect(page.getByRole('status')).toHaveText(ACCOUNT_EMAIL_MESSAGES.SIGNUP_CHECK_EMAIL);
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/login$/);
+
+  // The confirmation page comes with the new screens; until then the emailed link is confirmed
+  // through the API, as that page will do.
+  const confirmationLink = await emailedLink('priya.nair@example.com', '/verify-email');
+  const confirmation = await fetch(`${BACKEND_URL}/api/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: FRONTEND_ORIGIN },
+    body: JSON.stringify({ token: new URL(confirmationLink).pathname.split('/').pop() }),
+  });
+  expect(confirmation.status).toBe(200);
+
+  await signIn(page, 'priya.nair@example.com');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Priya');
   await expect(mainNavigation(page).getByRole('link', { name: 'Support chat' })).toBeVisible();
   await expect(mainNavigation(page).getByRole('link', { name: 'Users & roles' })).toHaveCount(0);
