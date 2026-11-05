@@ -34,11 +34,16 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 - on a free port, against a new randomly named database that is dropped afterwards;
 - in an empty temporary directory, with a minimal environment, so your `backend/.env` (SMTP, S3,
   Redis, real secrets) is never used;
-- with a cookie-keeping client that sends the CSRF token on writes, like the browser does.
+- with a cookie-keeping client that sends the CSRF token on writes, like the browser does;
+- sending email to a test mail server (`mailCatcher.js`, exposed as `testServer.mailbox`), so links
+  are read from the email and used through the API. `createSignedInClient` signs up and confirms
+  the email that way; `startTestServer({ mail: false })` runs without email (accounts are then
+  written to the database directly), for the "no mail server" behaviour.
 
 | File | Covers |
 |---|---|
-| `auth.test.js` | Signup ignores a requested role, password hashing, identical errors for unknown email and wrong password, CSRF enforcement, session revocation on logout, password change |
+| `auth.test.js` | Signup ignores a requested role and signs in only once the email is confirmed, password hashing, a registered email answered like any other, identical errors for unknown email and wrong password, CSRF enforcement, session revocation on logout, password change |
+| `accountEmails.test.js` | Email confirmation (403 until confirmed, only the newest link works and only once, expiry, replacing an unconfirmed signup revokes its links, the first admin confirms too), the 60 s per-address cooldown (429 with Retry-After, same for unknown addresses), password reset (checking a link, weak passwords, every device signed out, owner notified), invitations replacing unconfirmed signups, 503 without email, the migration for existing accounts, per-IP limits behind a proxy with a forged X-Forwarded-For |
 | `permissions.test.js` | Bootstrap admin, admin-only user management, no self-promotion, HR/admin-only analytics and onboarding |
 | `invitations.test.js` | Only the token hash is stored, one open invitation per email, who may invite whom, acceptance creates the user and profile exactly once, revoked/expired/malformed links |
 | `okrs.test.js` | Concurrent edits get `409 STALE_VERSION`, key-result owners can check in, company objectives are HR/admin only, no OKR access without an employee profile |
@@ -70,6 +75,8 @@ that one test is skipped. CI runs it.
 - Put pure logic tests in `unit/` and anything that needs HTTP or the database in `integration/`.
 - Start one server per file in `before()` and stop it in `after()`. Files run in parallel.
 - Keep each file under the signup rate limit (10 signups per hour per IP).
+- A second account email to the same address within a minute is refused (429); call
+  `endEmailCooldowns(testServer)` to stand in for the wait.
 - Build common data with `fixtures.js` (offices, departments, onboarded employees) rather than a
   local helper. Seed data the API cannot create yet (such as departments) directly through
   `testServer.database`; use `startTestServer({ seedBeforeStart })` for data that must exist before

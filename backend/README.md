@@ -44,7 +44,7 @@ scripts/         operational scripts
 
 | Mount | Purpose | Access |
 |---|---|---|
-| `/api/auth` | signup, login, logout, current user, password change | public / signed in |
+| `/api/auth` | signup with email confirmation, login, logout, current user, password change, forgotten password reset | public / signed in |
 | `/api/support`, `/api/conversations`, `/api/webhooks` | support desk | customers / staff / signed webhooks |
 | `/api/admin` | users and roles | admin |
 | `/api/attendance` | punch-in (office, home or on duty), punch-out, today's board, AI regularization, manager reviews | employees / managers / HR |
@@ -62,6 +62,39 @@ scripts/         operational scripts
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
 | `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export | HR, admin manage / employees their own / reporting managers decide their team's requests |
 | `/api/internal` | calls from the AI service | internal API key |
+
+## Signup, email confirmation and password reset
+
+Signing up creates an **unverified** account and emails a confirmation link; the account cannot sign
+in until the link is opened (`services/accountEmailFlows.js`, `controllers/accountEmailController.js`).
+
+| Endpoint | What it does |
+|---|---|
+| `POST /api/auth/signup` `{ name, email, password }` | 202 "check your email"; no session yet |
+| `POST /api/auth/verify-email` `{ token }` | confirms the email and signs in (200, with the session) |
+| `POST /api/auth/verify-email/resend` `{ email }` | a new confirmation link |
+| `POST /api/auth/password/forgot` `{ email }` | a reset link for an active account (a confirmation link for an unverified one) |
+| `GET /api/auth/password/reset/:token` | whether a reset link still works, and until when |
+| `POST /api/auth/password/reset` `{ token, password }` | new password; every session ends; the owner is emailed |
+
+- **Messages come from the server.** Every answer carries a `message` from `constants/messages.js`,
+  and errors a stable `code`: `EMAIL_NOT_VERIFIED` (403 at login, right password only),
+  `VERIFICATION_LINK_INVALID` / `RESET_LINK_INVALID` (400), `EMAIL_COOLDOWN` (429, with
+  `Retry-After` and `error.context.retryAfterSeconds`), `EMAIL_UNAVAILABLE` (503, no SMTP).
+  Screens show these texts; they do not write their own.
+- **Links** are 32 random bytes; only their SHA-256 is stored (`models/AccountToken.js`). A link works
+  once, expires (confirmation 24 h, reset 1 h: `ACCOUNT_EMAIL_SETTINGS`), and issuing one revokes
+  the account's earlier ones, so only the newest works.
+- **Nothing reveals which emails are registered.** Signup, resend and forgot answer alike for every
+  address; signing up with a registered one emails its owner instead.
+- **Unconfirmed accounts can be taken over** by a new signup (its earlier links are revoked first)
+  or by HR's invitation, so whoever types an address first cannot lock its owner out. The configured
+  first administrator (`BOOTSTRAP_ADMIN_EMAIL`) confirms like everyone else. Accepting an invitation
+  confirms the address.
+- **Rate limits:** one account email per address per minute of each kind (`models/EmailCooldown.js`,
+  stored in MongoDB, claimed for every address alike), plus per-IP budgets keyed on `req.ip`
+  (X-Forwarded-For is trusted for exactly `TRUST_PROXY_HOPS` proxies).
+- Accounts that existed before confirmation was required count as confirmed (startup migration).
 
 ## Onboarding: invitations and bulk import
 
