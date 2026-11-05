@@ -17,11 +17,12 @@ browser ──https──► Caddy (certificates) ──► nginx (the web app) 
 | `deploy/Caddyfile` | HTTPS for your domain with a free Let's Encrypt certificate |
 | `deploy/setup-server.sh` | prepares a fresh server once |
 | `deploy/deploy.sh` | deploys one commit; starts the previous one again if the new one is not healthy |
+| `deploy/auto-deploy.sh` | runs on the server every 2 minutes: deploys a new commit of `main` once CI has passed on it |
 | `deploy/backup-mongo.sh` | the nightly database backup |
-| `.github/workflows/deploy.yml` | runs `deploy.sh` on the server after CI passes on `main` |
 
 Secrets never go into the repository or GitHub: the setup script generates them on the server, in
-`/etc/nsk/`, readable only by the login user.
+`/etc/nsk/`, readable only by the login user. The server pulls new versions itself, so GitHub holds
+no key to it and SSH can stay open to your own IP address only.
 
 ## 1. What you need
 
@@ -31,14 +32,13 @@ Secrets never go into the repository or GitHub: the setup script generates them 
 
 ## 2. Create the server
 
-On your computer, create two SSH keys: one for you to log in, one that GitHub uses to deploy.
+On your computer, create an SSH key to log in to the server:
 
 ```
-ssh-keygen -t ed25519 -f ~/.ssh/nsk_login  -C "nsk login"
-ssh-keygen -t ed25519 -f ~/.ssh/nsk_deploy -C "nsk github deploy" -N ""
+ssh-keygen -t ed25519 -f ~/.ssh/nsk_login -C "nsk login"
 ```
 
-The files without `.pub` are private: never share them or commit them.
+The file without `.pub` is private: never share it or commit it.
 
 ### AWS (EC2)
 
@@ -86,11 +86,10 @@ sudo bash /tmp/nsk-setup/deploy/setup-server.sh
 ```
 
 It asks for the domain, an email for certificate notices, the administrator's email, the company
-name (optional), the Groq key (hidden) and the deploy public key (paste the contents of
-`nsk_deploy.pub`). It installs Docker, adds swap on a server under 4 GB, opens ports 80 and 443 in
-the server's firewall, clones the
-code to `/opt/nsk`, writes the settings with new random secrets, and installs the nightly backup.
-It can be run again safely: existing settings are kept.
+name (optional) and the Groq key (hidden). It installs Docker, adds swap on a server under 4 GB,
+opens ports 80 and 443 in the server's firewall, clones the code to `/opt/nsk`, writes the settings
+with new random secrets, and installs the nightly backup and the automatic deploys. It can be run
+again safely: existing settings are kept.
 
 ## 5. First deploy
 
@@ -103,22 +102,24 @@ sudo -u ubuntu /opt/nsk/deploy/deploy.sh main
 The first build takes several minutes. Then open `https://<your domain>` and sign up with the
 administrator email: that account becomes the administrator.
 
-## 6. Deploy on every merge to main
+## 6. Deploys on every merge to main
 
-In GitHub: **Settings → Secrets and variables → Actions**.
+Nothing to set up in GitHub. Every 2 minutes the server (`nsk-deploy` timer) fetches `main`. When
+there is a new commit, it asks GitHub whether the **CI** workflow passed on it, and deploys it once
+it has; while CI runs it waits, and a commit whose CI failed is not deployed. A merge is usually live
+a few minutes after its CI finishes.
 
-| Kind | Name | Value |
-|---|---|---|
-| Secret | `DEPLOY_HOST` | your domain |
-| Secret | `DEPLOY_USER` | `ubuntu` |
-| Secret | `DEPLOY_SSH_KEY` | the contents of `~/.ssh/nsk_deploy` (the private key) |
-| Secret | `DEPLOY_KNOWN_HOSTS` | the line the setup script printed (`<domain> ssh-ed25519 AAAA…`) |
-| Variable | `APP_URL` | `https://<your domain>` |
-| Variable | `DEPLOY_ENABLED` | `true` |
+```
+journalctl -u nsk-deploy -n 50   # what was deployed, waited for or refused, and when
+systemctl list-timers nsk-deploy # the next check
+```
 
-From then on, each push to `main` runs CI, and when CI passes, **Deploy** runs. It can also be
-started by hand: **Actions → Deploy → Run workflow**. The deploy key can only run `deploy.sh`: it
-cannot open a shell on the server.
+If a deploy fails, the previous version is started again and that commit is not retried: fix it on
+`main` (the next commit is deployed as usual), or deploy a commit by hand with `deploy/deploy.sh`.
+
+The CI result is read from GitHub's public API, which works for a public repository. For a private
+one, put a read-only token in `/etc/nsk/auto-deploy.env` as `GITHUB_TOKEN=...` (the server then also
+needs read access to clone and fetch the code).
 
 ## Running it
 
@@ -160,6 +161,8 @@ nsk exec -T mongo mongorestore --username "$MONGO_ROOT_USERNAME" --password "$MO
 - **The site has no certificate / "connection not private"**: the DNS record must point at the
   server and ports 80 and 443 must be open in the cloud's firewall (step 2). `nsk logs caddy`
   shows what Let's Encrypt answered.
-- **A deploy failed**: the Actions log shows the last lines of every service's log; the previous
-  version was started again. On the server, `nsk logs <service>` shows more.
+- **A deploy failed**: `journalctl -u nsk-deploy` shows the last lines of every service's log; the
+  previous version was started again. `nsk logs <service>` shows more.
+- **A merge was not deployed**: `journalctl -u nsk-deploy` says whether it is waiting for CI, CI
+  failed, or the deploy failed.
 - **The AI service is unhealthy**: the Groq key in `/etc/nsk/ai-service.env` is missing or wrong.

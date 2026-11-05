@@ -14,8 +14,7 @@
 #   NSK_ADMIN_EMAIL        the account that becomes the first administrator when it signs up
 #   NSK_COMPANY_NAME       the company name the installation starts with (optional)
 #   NSK_GROQ_API_KEY       the AI service's Groq key (asked without echoing it)
-#   NSK_DEPLOY_PUBLIC_KEY  GitHub Actions' public key; it may run deploy/deploy.sh and nothing else
-#   NSK_REPO_URL           the repository to deploy (default below)
+#   NSK_REPO_URL          the repository to deploy (default below)
 #   NSK_SWAP_SIZE          swap file size on a server with less than 4 GB of memory (default 2G;
 #                          0 skips it)
 #
@@ -28,8 +27,9 @@
 #   4. writes /etc/nsk/{stack,backend,ai-service}.env with new random secrets, readable only by the
 #      login user; nothing secret is stored in the repository or in GitHub
 #   5. installs a daily database backup (deploy/backup-mongo.sh, systemd timer nsk-backup)
-#   6. lets the deploy key run deploy/deploy.sh only
-# Then it prints what to put in GitHub and how to run the first deploy.
+#   6. installs automatic deploys: every few minutes the server deploys a new commit of main once CI
+#      has passed on it (deploy/auto-deploy.sh, systemd timer nsk-deploy); GitHub needs no access
+# Then it prints how to run the first deploy.
 
 set -euo pipefail
 
@@ -50,7 +50,6 @@ fail() {
 [[ $EUID -eq 0 ]] || fail "run it with sudo: sudo bash setup-server.sh"
 DEPLOY_USER="${SUDO_USER:-}"
 [[ -n "$DEPLOY_USER" && "$DEPLOY_USER" != root ]] || fail "run it with sudo from the login user (e.g. ubuntu), not as root"
-DEPLOY_HOME="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)"
 # shellcheck source=/dev/null
 . /etc/os-release
 [[ "${ID:-}" == ubuntu ]] || fail "this script supports Ubuntu only"
@@ -77,7 +76,8 @@ say "Installing Docker"
 # No package asks questions: the script also runs without a terminal (e.g. over ssh with a command).
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git openssl >/dev/null
+# jq: deploy/auto-deploy.sh reads GitHub's answer about CI with it.
+apt-get install -y -qq ca-certificates curl git jq openssl >/dev/null
 if ! docker compose version >/dev/null 2>&1; then
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -232,23 +232,35 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now nsk-backup.timer >/dev/null
 
-# --- 6. Deploy key -------------------------------------------------------------------------------
-say "Allowing GitHub Actions to deploy"
-ask NSK_DEPLOY_PUBLIC_KEY "GitHub deploy public key (ssh-ed25519 ..., Enter to skip)" optional
-if [[ -n "${NSK_DEPLOY_PUBLIC_KEY:-}" ]]; then
-  [[ "$NSK_DEPLOY_PUBLIC_KEY" =~ ^ssh-ed25519\ [A-Za-z0-9+/=]+ ]] || fail "that is not an ssh-ed25519 public key"
-  key_body="$(awk '{ print $2 }' <<<"$NSK_DEPLOY_PUBLIC_KEY")"
-  authorized_keys="$DEPLOY_HOME/.ssh/authorized_keys"
-  install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$DEPLOY_HOME/.ssh"
-  touch "$authorized_keys"
-  if ! grep -qF "$key_body" "$authorized_keys"; then
-    # "restrict" turns off forwarding and terminals; the key can only run the deploy script.
-    echo "restrict,command=\"$APP_DIR/deploy/deploy.sh\" $NSK_DEPLOY_PUBLIC_KEY" >>"$authorized_keys"
-  fi
-  chown "$DEPLOY_USER:$DEPLOY_USER" "$authorized_keys"
-  chmod 600 "$authorized_keys"
-  echo "deploy key installed for $DEPLOY_USER"
-fi
+# --- 6. Automatic deploys ------------------------------------------------------------------------
+say "Installing automatic deploys of main"
+cat >/etc/systemd/system/nsk-deploy.service <<UNIT
+[Unit]
+Description=Deploy new commits of main that passed CI
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=$DEPLOY_USER
+# Optional: NSK_CI_WORKFLOW, and GITHUB_TOKEN for a private repository.
+EnvironmentFile=-$CONFIG_DIR/auto-deploy.env
+ExecStart=/usr/bin/env bash $APP_DIR/deploy/auto-deploy.sh
+UNIT
+cat >/etc/systemd/system/nsk-deploy.timer <<UNIT
+[Unit]
+Description=Look for a new commit of main to deploy every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now nsk-deploy.timer >/dev/null
 
 # --- Next steps ----------------------------------------------------------------------------------
 domain="$(sed -n 's/^APP_DOMAIN=//p' "$CONFIG_DIR/stack.env" | tail -n 1)"
@@ -259,15 +271,8 @@ Setup finished. Next:
 1. Point the DNS A record of $domain at this server, then run the first deploy:
      sudo -u $DEPLOY_USER $APP_DIR/deploy/deploy.sh main
 
-2. In GitHub, Settings -> Secrets and variables -> Actions, for deploys on every merge to main:
-     Secrets:
-       DEPLOY_HOST         $domain
-       DEPLOY_USER         $DEPLOY_USER
-       DEPLOY_SSH_KEY      the private half of the deploy key (from your computer)
-       DEPLOY_KNOWN_HOSTS  $domain $(awk '{ print $1, $2 }' /etc/ssh/ssh_host_ed25519_key.pub)
-     Variables:
-       APP_URL             https://$domain
-       DEPLOY_ENABLED      true
+2. Open https://$domain and sign up with the administrator email.
 
-3. Open https://$domain and sign up with the administrator email.
+From then on, each commit on main is deployed a few minutes after CI passes on it:
+     journalctl -u nsk-deploy      what was deployed, or why not
 NEXT
