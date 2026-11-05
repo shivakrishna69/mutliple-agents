@@ -105,13 +105,13 @@ export const ACCOUNT_MESSAGES = Object.freeze({
  * signup, resend and forgot-password are the same whether or not the address has an account.
  */
 export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
-  SIGNUP_CHECK_EMAIL: 'Check your email for a link to finish signing up',
-  VERIFICATION_RESENT: 'If this address is waiting to be confirmed, a new link is on its way',
+  SIGNUP_CHECK_EMAIL: 'Check your email for a code and a link to finish signing up',
+  VERIFICATION_RESENT: 'If this address is waiting to be confirmed, a new code and link are on their way',
   EMAIL_VERIFIED: 'Email confirmed. You are signed in',
   VERIFICATION_LINK_INVALID: 'This confirmation link is not valid or has expired. Ask for a new one',
   VERIFICATION_CODE_INVALID:
     'This code is not correct or has expired. Check the latest email we sent, or ask for a new code',
-  EMAIL_NOT_VERIFIED: 'Confirm your email address first: open the link we sent you, or ask for a new one',
+  EMAIL_NOT_VERIFIED: 'Confirm your email address first: enter the code or open the link we sent you, or ask for a new one',
   PASSWORD_RESET_REQUESTED: `If this address has an account, a link to reset the password is on its way. It works for ${ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000} minutes`,
   RESET_LINK_VALID: 'This password reset link is valid',
   RESET_LINK_INVALID: 'This password reset link is not valid or has expired. Ask for a new one',
