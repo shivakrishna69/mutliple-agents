@@ -89,7 +89,10 @@ export function verifySessionToken(accessToken, authConfig) {
     csrf: csrfTokenHash,
     exp: expiresAtSeconds,
     iat: issuedAtSeconds,
+    iatms: issuedAtMsClaim,
   } = decodedTokenPayload;
+  // Tokens issued before `iatms` existed have only whole seconds; they are compared in seconds.
+  const issuedAtMs = Number.isSafeInteger(issuedAtMsClaim) ? issuedAtMsClaim : null;
   const hasExpectedClaims =
     typeof userId === 'string' &&
     mongoose.isValidObjectId(userId) &&
@@ -104,7 +107,14 @@ export function verifySessionToken(accessToken, authConfig) {
 
   return {
     isValid: true,
-    sessionClaims: { userId, sessionId, csrfTokenHash, issuedAtSeconds, expiresAtMs: expiresAtSeconds * 1000 },
+    sessionClaims: {
+      userId,
+      sessionId,
+      csrfTokenHash,
+      issuedAtSeconds,
+      issuedAtMs,
+      expiresAtMs: expiresAtSeconds * 1000,
+    },
   };
 }
 
@@ -112,13 +122,14 @@ export function verifySessionToken(accessToken, authConfig) {
  * Steps 5–6. Returns `{ isValid: true, user }` with the public profile, or a failure.
  * Database errors are thrown.
  *
- * A session issued before the account's latest password change is treated as revoked, so
- * changing the password signs out every other device. The comparison is at whole-second
- * resolution (JWT `iat` is in seconds): the session issued in the same request as the change
- * shares that second and stays valid.
- * @param {{ userId: string, sessionId: string, issuedAtSeconds: number }} sessionClaims
+ * A session issued before the account's latest password change (or password reset) is treated
+ * as revoked, so changing the password signs out every other device. Sessions carry their issue
+ * time in milliseconds (`iatms`), so one started even a moment before the change ends, while the
+ * session issued by the change itself (after it) stays valid. Older tokens without `iatms` are
+ * compared at whole-second resolution.
+ * @param {{ userId: string, sessionId: string, issuedAtSeconds: number, issuedAtMs: number|null }} sessionClaims
  */
-export async function loadSessionUser({ userId, sessionId, issuedAtSeconds }) {
+export async function loadSessionUser({ userId, sessionId, issuedAtSeconds, issuedAtMs = null }) {
   const [userRecord, isSessionRevoked] = await Promise.all([
     User.findById(userId).select(`${PUBLIC_USER_PROFILE_FIELDS} passwordChangedAt status`).lean(),
     RevokedSession.exists({ sessionId }),
@@ -134,11 +145,13 @@ export async function loadSessionUser({ userId, sessionId, issuedAtSeconds }) {
   if ((userRecord.status ?? ACCOUNT_STATUSES.ACTIVE) !== ACCOUNT_STATUSES.ACTIVE) {
     return sessionFailure(SESSION_FAILURE_REASON.ACCOUNT_NOT_ACTIVE, SESSION_MESSAGES.ACCOUNT_NOT_ACTIVE, true);
   }
-  const passwordChangedAtSeconds = userRecord.passwordChangedAt
-    ? Math.floor(userRecord.passwordChangedAt.getTime() / 1000)
-    : null;
-  if (passwordChangedAtSeconds !== null && issuedAtSeconds < passwordChangedAtSeconds) {
-    return sessionFailure(SESSION_FAILURE_REASON.SESSION_REVOKED, SESSION_MESSAGES.SESSION_REVOKED, true);
+  if (userRecord.passwordChangedAt) {
+    const passwordChangedAtMs = userRecord.passwordChangedAt.getTime();
+    const issuedBeforeChange =
+      issuedAtMs !== null ? issuedAtMs < passwordChangedAtMs : issuedAtSeconds < Math.floor(passwordChangedAtMs / 1000);
+    if (issuedBeforeChange) {
+      return sessionFailure(SESSION_FAILURE_REASON.SESSION_REVOKED, SESSION_MESSAGES.SESSION_REVOKED, true);
+    }
   }
   return { isValid: true, user: toPublicUserProfile(userRecord) };
 }
