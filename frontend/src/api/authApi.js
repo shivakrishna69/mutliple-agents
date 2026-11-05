@@ -1,6 +1,10 @@
 /**
- * Auth endpoints: signup, login, current session, logout. Transport, CSRF header, and error
- * mapping live in api/httpClient.js.
+ * Auth endpoints: signup and email confirmation, login, current session, logout, password change,
+ * forgotten password, and the rules and numbers the sign-in screens show. Transport, CSRF header,
+ * and error mapping live in api/httpClient.js.
+ *
+ * Every text the screens show comes from these answers: `message` on success, ApiError.message,
+ * .fieldErrors, .code and .context on failure (written by the backend, constants/messages.js).
  */
 
 import { API_MESSAGES } from '../constants/messages.js';
@@ -11,11 +15,38 @@ export { ApiError };
 
 export const AUTH_ENDPOINTS = Object.freeze({
   SIGNUP: '/api/auth/signup',
+  VERIFY_EMAIL: '/api/auth/verify-email',
+  RESEND_VERIFICATION: '/api/auth/verify-email/resend',
   LOGIN: '/api/auth/login',
   CURRENT_SESSION: '/api/auth/me',
   LOGOUT: '/api/auth/logout',
   CHANGE_PASSWORD: '/api/auth/password',
+  FORGOT_PASSWORD: '/api/auth/password/forgot',
+  RESET_PASSWORD: '/api/auth/password/reset',
+  PASSWORD_POLICY: '/api/auth/password-policy',
+  OPTIONS: '/api/auth/options',
 });
+
+/** Codes the backend sends with errors the screens react to (backend/services/accountEmailFlows.js). */
+export const AUTH_ERROR_CODES = Object.freeze({
+  EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
+  EMAIL_COOLDOWN: 'EMAIL_COOLDOWN',
+  VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
+  VERIFICATION_CODE_INVALID: 'VERIFICATION_CODE_INVALID',
+  RESET_LINK_INVALID: 'RESET_LINK_INVALID',
+});
+
+/** A request whose answer is `{ message, data }`; resolves to `{ message, ...data }`. */
+async function sendForMessage(method, endpointPath, { requestPayload, signal } = {}) {
+  const { responseData, responseMessage, httpStatus } = await sendApiRequest({
+    method,
+    endpointPath,
+    requestPayload,
+    callerSignal: signal,
+  });
+  if (!responseMessage) throw new ApiError({ message: API_MESSAGES.UNEXPECTED_RESPONSE, status: httpStatus });
+  return { message: responseMessage, ...(responseData ?? {}) };
+}
 
 /**
  * Checks that a session response carries `{ user, csrfToken }` and returns exactly those.
@@ -31,28 +62,68 @@ function extractSessionPayload({ responseData, httpStatus }) {
 }
 
 /**
- * Creates an account that must confirm its email before signing in; the backend emails the link.
- * Resolves to `{ message, email }`: the backend's text for the person ("check your email…") and
- * the address it was sent to. No session is started.
- * @param {{ name: string, email: string, password: string }} signupDetails
+ * Creates an account that must confirm its email before signing in; the backend emails a code and
+ * a link. No session is started.
+ * @param {{ firstName: string, lastName: string, email: string, phoneNumber: string, password: string,
+ *   confirmPassword: string, acceptTerms: boolean }} signupDetails
  * @param {{ signal?: AbortSignal }} [requestOptions]
+ * @returns {Promise<{ message: string, email: string, resendAfterSeconds: number, codeDigits: number }>}
  */
-export async function requestSignup(signupDetails, { signal } = {}) {
+export function requestSignup(signupDetails, { signal } = {}) {
+  return sendForMessage('POST', AUTH_ENDPOINTS.SIGNUP, { requestPayload: signupDetails, signal });
+}
+
+/**
+ * Confirms an email with `{ token }` (the emailed link) or `{ email, code }` (the emailed code), and
+ * signs the person in. Resolves to `{ message, user, csrfToken }`.
+ */
+export async function requestEmailConfirmation(confirmation, { signal } = {}) {
   const { responseData, responseMessage, httpStatus } = await sendApiRequest({
     method: 'POST',
-    endpointPath: AUTH_ENDPOINTS.SIGNUP,
-    requestPayload: signupDetails,
+    endpointPath: AUTH_ENDPOINTS.VERIFY_EMAIL,
+    requestPayload: confirmation,
     callerSignal: signal,
   });
-  if (!responseMessage || typeof responseData?.email !== 'string') {
-    throw new ApiError({ message: API_MESSAGES.UNEXPECTED_RESPONSE, status: httpStatus });
-  }
-  return { message: responseMessage, email: responseData.email };
+  return { message: responseMessage, ...extractSessionPayload({ responseData, httpStatus }) };
+}
+
+/** A new confirmation email. Resolves to `{ message, resendAfterSeconds }`. */
+export function requestVerificationEmail(email, { signal } = {}) {
+  return sendForMessage('POST', AUTH_ENDPOINTS.RESEND_VERIFICATION, { requestPayload: { email }, signal });
+}
+
+/** A password reset email. Resolves to `{ message, resendAfterSeconds, linkValidMinutes }`. */
+export function requestPasswordResetEmail(email, { signal } = {}) {
+  return sendForMessage('POST', AUTH_ENDPOINTS.FORGOT_PASSWORD, { requestPayload: { email }, signal });
+}
+
+/** Whether a reset link still works. Resolves to `{ message, expiresAt }`. */
+export function requestResetLinkStatus(token, { signal } = {}) {
+  return sendForMessage('GET', `${AUTH_ENDPOINTS.RESET_PASSWORD}/${encodeURIComponent(token)}`, { signal });
+}
+
+/** Sets a new password with a reset link. Resolves to `{ message }`; nobody is signed in. */
+export function requestPasswordReset({ token, password, confirmPassword }, { signal } = {}) {
+  return sendForMessage('POST', AUTH_ENDPOINTS.RESET_PASSWORD, {
+    requestPayload: { token, password, confirmPassword },
+    signal,
+  });
+}
+
+/** The password checklist and strength meter (backend/services/passwordPolicy.js). */
+export function requestPasswordPolicy({ signal } = {}) {
+  return sendForMessage('GET', AUTH_ENDPOINTS.PASSWORD_POLICY, { signal });
+}
+
+/** rememberedSessionDays, verificationCodeDigits and passwordResetLinkMinutes, as configured. */
+export function requestAuthOptions({ signal } = {}) {
+  return sendForMessage('GET', AUTH_ENDPOINTS.OPTIONS, { signal });
 }
 
 /**
  * Exchanges credentials for a session. Resolves to `{ user, csrfToken }`.
- * @param {{ email: string, password: string }} loginCredentials
+ * @param {{ email: string, password: string, rememberDevice?: boolean }} loginCredentials
+ *   rememberDevice: stay signed in on this device for the configured number of days
  * @param {{ signal?: AbortSignal }} [requestOptions]
  */
 export async function requestLogin(loginCredentials, { signal } = {}) {

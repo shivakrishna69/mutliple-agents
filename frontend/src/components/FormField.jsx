@@ -8,7 +8,8 @@
  *     screen readers read them after the label.
  *
  * `trailingControl` renders inside the input's right edge (e.g. the password visibility toggle);
- * the input gets matching right padding so text never runs under it.
+ * the input gets matching right padding so text never runs under it. `leadingIcon` (decorative)
+ * renders inside the left edge the same way.
  */
 
 export default function FormField({
@@ -22,6 +23,7 @@ export default function FormField({
   placeholder,
   describedByIds = [],
   trailingControl = null,
+  leadingIcon = null,
   onFieldChange,
   onFieldBlur,
   children,
@@ -36,6 +38,11 @@ export default function FormField({
         {label}
       </label>
       <div className="relative mt-1.5">
+        {leadingIcon && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+            {leadingIcon}
+          </div>
+        )}
         <input
           id={fieldId}
           name={fieldId}
@@ -53,6 +60,7 @@ export default function FormField({
             'placeholder:text-slate-400 focus:outline-none focus:ring-4',
             'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
             trailingControl ? 'pr-11' : '',
+            leadingIcon ? 'pl-11' : '',
             errorMessage
               ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
               : 'border-slate-200 hover:border-slate-300 focus:border-brand-500 focus:ring-brand-100',
