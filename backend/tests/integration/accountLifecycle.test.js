@@ -11,7 +11,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 
-import { hashInvitationToken } from '../../services/invitationService.js';
+import { hashSecureToken } from '../../utils/secureTokens.js';
 import { STRONG_PASSWORD, createSignedInClient, mongoUnavailableReason, startTestServer } from './testServer.js';
 
 const skipReason = await mongoUnavailableReason();
@@ -77,7 +77,7 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
             dateOfJoining: now,
             employmentStatus: 'Probation',
           },
-          tokenHash: hashInvitationToken(legacy.inviteToken),
+          tokenHash: hashSecureToken(legacy.inviteToken),
           expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
           status: 'pending',
           invitedByUserId: legacy.userId,

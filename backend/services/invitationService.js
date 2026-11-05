@@ -29,7 +29,6 @@
  * another way; the invitation is still created.
  */
 
-import { createHash, randomBytes } from 'node:crypto';
 import Department from '../models/Department.js';
 import EmployeeInvitation, {
   INVITABLE_ROLES,
@@ -53,6 +52,7 @@ import {
 import { buildInvitationEmail } from './invitationEmail.js';
 import { MAIL_OUTCOMES, sendMail } from './mailService.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { createSecureToken, hashSecureToken, isWellFormedSecureToken } from '../utils/secureTokens.js';
 
 export class InvitationError extends Error {
   constructor(httpStatus, code, message) {
@@ -75,12 +75,6 @@ export function invitableRolesFor(inviterRole) {
   return [];
 }
 
-export const hashInvitationToken = (rawToken) => createHash('sha256').update(rawToken, 'utf8').digest('hex');
-
-function newInvitationToken() {
-  const rawToken = randomBytes(INVITATION_LIMITS.TOKEN_BYTES).toString('base64url');
-  return { rawToken, tokenHash: hashInvitationToken(rawToken) };
-}
 
 function displayStatusOf(invitation, now = new Date()) {
   if (invitation.status === INVITATION_STATUSES.ACCEPTING) return 'pending';
@@ -226,7 +220,7 @@ export async function createInvitation({ inviter, input, appContext }) {
         wasReopened: false,
       };
 
-  const { rawToken, tokenHash } = newInvitationToken();
+  const { rawToken, tokenHash } = createSecureToken();
   const now = new Date();
   let invitation;
   try {
@@ -291,7 +285,7 @@ export async function resendInvitation({ invitationId, inviter, appContext }) {
     throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot manage invitations for this role');
   await assertInviteeStillInvited(invitation);
 
-  const { rawToken, tokenHash } = newInvitationToken();
+  const { rawToken, tokenHash } = createSecureToken();
   const now = new Date();
   invitation.tokenHash = tokenHash;
   invitation.expiresAt = new Date(now.getTime() + INVITATION_LIMITS.VALIDITY_DAYS * DAY_MS);
@@ -369,8 +363,8 @@ export async function listInvitations({ status }) {
 // =================================================================================================
 
 async function findInvitationByToken(rawToken) {
-  if (typeof rawToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(rawToken)) return null;
-  return EmployeeInvitation.findOne({ tokenHash: hashInvitationToken(rawToken) });
+  if (!isWellFormedSecureToken(rawToken)) return null;
+  return EmployeeInvitation.findOne({ tokenHash: hashSecureToken(rawToken) });
 }
 
 function assertUsable(invitation) {
