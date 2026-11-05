@@ -45,9 +45,10 @@ import { logger } from '../utils/logger.js';
 import { validateChangePasswordInput, validateLoginInput } from '../validators/authValidators.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 import { describePasswordPolicy } from '../services/passwordPolicy.js';
+import { ACCOUNT_EMAIL_SETTINGS } from '../constants/validation.js';
 
-/** The rules change only with a deployment, so browsers may reuse the answer for a while. */
-const PASSWORD_POLICY_CACHE_SECONDS = 300;
+/** Both answers change only with a deployment, so browsers may reuse them for a while. */
+const PUBLIC_AUTH_SETTINGS_CACHE_SECONDS = 300;
 
 /**
  * GET /api/auth/password-policy   (public)
@@ -56,8 +57,23 @@ const PASSWORD_POLICY_CACHE_SECONDS = 300;
  * the server enforces (services/passwordPolicy.js).
  */
 export function getPasswordPolicy(req, res) {
-  res.set('Cache-Control', `public, max-age=${PASSWORD_POLICY_CACHE_SECONDS}`);
+  res.set('Cache-Control', `public, max-age=${PUBLIC_AUTH_SETTINGS_CACHE_SECONDS}`);
   return sendSuccess(res, HTTP_STATUS.OK, AUTH_MESSAGES.PASSWORD_POLICY_RETRIEVED, describePasswordPolicy());
+}
+
+/**
+ * GET /api/auth/options   (public)
+ *
+ * The numbers the sign-in screens state, as this server is configured: how long "remember this
+ * device" lasts, how many digits the emailed code has, how long a reset link works.
+ */
+export function getAuthOptions(req, res) {
+  res.set('Cache-Control', `public, max-age=${PUBLIC_AUTH_SETTINGS_CACHE_SECONDS}`);
+  return sendSuccess(res, HTTP_STATUS.OK, AUTH_MESSAGES.AUTH_OPTIONS_RETRIEVED, {
+    rememberedSessionDays: req.app.locals.config.rememberedSessionDays,
+    verificationCodeDigits: ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS,
+    passwordResetLinkMinutes: ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000,
+  });
 }
 
 /** Code of the 403 a correct password gets while the account's email is still unconfirmed. */

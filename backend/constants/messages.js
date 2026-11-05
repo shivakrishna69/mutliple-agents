@@ -12,6 +12,7 @@ export const AUTH_MESSAGES = Object.freeze({
   LOGOUT_SUCCESSFUL: 'Logged out successfully',
   CURRENT_USER_RETRIEVED: 'Session is active',
   PASSWORD_POLICY_RETRIEVED: 'Password rules',
+  AUTH_OPTIONS_RETRIEVED: 'Sign-in options',
   EMAIL_ALREADY_REGISTERED: 'An account with this email already exists',
   // Deliberately identical for "no such email" and "wrong password" so a caller
   // cannot use the login endpoint to discover which emails have accounts.

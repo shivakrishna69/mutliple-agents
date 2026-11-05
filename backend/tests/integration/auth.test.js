@@ -122,6 +122,16 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     assert.equal(strengthLevels.at(-1).level, 'strong');
   });
 
+  it('tells the sign-in screens the numbers they state, as configured', async () => {
+    const response = await testServer.createClient().get('/api/auth/options');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.data, {
+      rememberedSessionDays: 30,
+      verificationCodeDigits: 6,
+      passwordResetLinkMinutes: 15,
+    });
+  });
+
   it('refuses state-changing requests without the CSRF token', async () => {
     const client = testServer.createClient();
     await client.login('asha.rao@example.com');
