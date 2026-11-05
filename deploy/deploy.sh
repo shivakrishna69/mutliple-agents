@@ -7,9 +7,8 @@
 #   deploy/deploy.sh <40-character commit id>    a commit that is on origin/main
 #   deploy/deploy.sh main                        the latest origin/main
 #
-# GitHub Actions (.github/workflows/deploy.yml) runs it over SSH with a key that may run nothing
-# else (a forced command in ~/.ssh/authorized_keys, set up by deploy/setup-server.sh), so the
-# commit arrives in SSH_ORIGINAL_COMMAND. Only one deploy runs at a time.
+# deploy/auto-deploy.sh runs it for each new commit of main that passed CI; run it by hand to deploy
+# or go back to a particular commit. Only one deploy runs at a time.
 #
 # Everything runs inside main(), defined before anything runs: the checkout below replaces this very
 # file, and bash would otherwise read the rest of it from the new version.
@@ -36,8 +35,7 @@ start_stack() {
 }
 
 main() {
-  local requested="${SSH_ORIGINAL_COMMAND:-${1:-}}"
-  requested="${requested#deploy }"
+  local requested="${1:-}"
   [[ -n "$requested" ]] || fail "usage: deploy.sh <commit id> | main"
 
   exec 9>"$APP_DIR/.deploy.lock"
