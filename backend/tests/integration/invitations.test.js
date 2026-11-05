@@ -2,6 +2,8 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
+import { VALIDATION_MESSAGES } from '../../constants/messages.js';
+import { TERMS_VERSION } from '../../constants/validation.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../../models/EmployeeProfile.js';
 import {
   createSignedInClient,
@@ -121,14 +123,42 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
 
     const previewResponse = await inviteeClient.get(`/api/invitations/${token}`);
     assert.equal(previewResponse.status, 200);
-    assert.equal(previewResponse.body.data.invitation.departmentName, 'Engineering');
+    const { invitation } = previewResponse.body.data;
+    assert.equal(invitation.departmentName, 'Engineering');
+    assert.equal(invitation.inviterName, 'Hema HR', 'the invitee sees who invited them');
+    assert.match(invitation.employeeCode, /^NSK\d{4}$/);
 
-    const weakPasswordResponse = await inviteeClient.post(`/api/invitations/${token}/accept`, { password: 'weak' });
+    const weakPasswordResponse = await inviteeClient.post(`/api/invitations/${token}/accept`, {
+      password: 'weak',
+      confirmPassword: 'weak',
+      acceptTerms: true,
+    });
     assert.equal(weakPasswordResponse.status, 400);
+    assert.deepEqual(
+      weakPasswordResponse.body.error.details.map((detail) => detail.field),
+      ['password'],
+    );
 
-    const acceptResponse = await inviteeClient.post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD });
+    const withoutAgreement = await inviteeClient.post(`/api/invitations/${token}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: 'Different#Pass2026',
+    });
+    assert.equal(withoutAgreement.status, 400);
+    assert.deepEqual(withoutAgreement.body.error.details, [
+      { field: 'confirmPassword', message: VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH },
+      { field: 'acceptTerms', message: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED },
+    ]);
+
+    const acceptResponse = await inviteeClient.post(`/api/invitations/${token}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));
     assert.equal(acceptResponse.body.data.user.role, 'customer');
+    const account = await testServer.database.collection('users').findOne({ email: 'nisha@example.com' });
+    assert.equal(account.termsVersion, TERMS_VERSION);
+    assert.ok(account.termsAcceptedAt instanceof Date && account.emailVerifiedAt instanceof Date);
 
     const currentUserResponse = await inviteeClient.get('/api/auth/me');
     assert.equal(currentUserResponse.body.data.user.email, 'nisha@example.com');
@@ -139,9 +169,11 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
       .findOne({ userId: new testServer.database.base.Types.ObjectId(newUserId) });
     assert.ok(profile, 'expected an employee profile linked to the new user');
 
-    const secondAccept = await testServer
-      .createClient()
-      .post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD });
+    const secondAccept = await testServer.createClient().post(`/api/invitations/${token}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(secondAccept.status, 410);
     assert.equal(secondAccept.body.error.code, 'INVITATION_USED');
   });

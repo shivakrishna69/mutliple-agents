@@ -64,6 +64,11 @@ const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
 const PeopleOnboarding = lazy(() => import('./pages/PeopleOnboarding.jsx'));
 const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation.jsx'));
+// Reached from emailed links and from sign-in; loaded on first visit like the invitation page.
+const CheckEmail = lazy(() => import('./pages/CheckEmail.jsx'));
+const VerifyEmailLink = lazy(() => import('./pages/VerifyEmailLink.jsx'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword.jsx'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword.jsx'));
 const LeaveCenter = lazy(() => import('./pages/LeaveCenter.jsx'));
 const MyLeavePanel = lazy(() => import('./components/leave/MyLeavePanel.jsx'));
 const LeaveCalendarPanel = lazy(() => import('./components/leave/LeaveCalendarPanel.jsx'));
@@ -78,10 +83,15 @@ export default function App() {
         <Route path="/" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
         <Route path={ROUTE_PATHS.VERIFY_PAYSLIP} element={<PayslipVerification />} />
         <Route path={ROUTE_PATHS.ACCEPT_INVITATION} element={<AcceptInvitation />} />
+        {/* Emailed links work whether or not someone is signed in on this browser. */}
+        <Route path={ROUTE_PATHS.VERIFY_EMAIL} element={<VerifyEmailLink />} />
+        <Route path={ROUTE_PATHS.RESET_PASSWORD} element={<ResetPassword />} />
 
         <Route element={<PublicOnlyRoute />}>
           <Route path={ROUTE_PATHS.LOGIN} element={<Login />} />
           <Route path={ROUTE_PATHS.SIGNUP} element={<Signup />} />
+          <Route path={ROUTE_PATHS.CHECK_EMAIL} element={<CheckEmail />} />
+          <Route path={ROUTE_PATHS.FORGOT_PASSWORD} element={<ForgotPassword />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>

@@ -26,7 +26,6 @@ export const API_MESSAGES = Object.freeze({
   REQUEST_TIMED_OUT: 'The request took too long. Please try again.',
   UNEXPECTED_SERVER_ERROR: 'Something went wrong on our side. Please try again in a moment.',
   UNEXPECTED_RESPONSE: 'The server sent an unexpected response. Please try again.',
-  INVALID_CREDENTIALS: 'The email or password you entered is incorrect.',
 });
 
 export const SESSION_MESSAGES = Object.freeze({
@@ -45,6 +44,9 @@ export const BANNER_TITLES = Object.freeze({
   PASSWORD_CHANGE_FAILED: 'We could not change your password',
   USERS_LOAD_FAILED: 'We could not load users',
   ROLE_CHANGE_FAILED: 'We could not change that role',
+  // Headings above the server's message on the signed-out screens.
+  REQUEST_FAILED: 'That did not work',
+  LINK_NOT_USABLE: 'This link cannot be used',
 });
 
 export const SUCCESS_MESSAGES = Object.freeze({

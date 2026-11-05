@@ -23,6 +23,8 @@ async function sendData(method, endpointPath, requestPayload, csrfToken) {
 }
 
 // --- Company settings -----------------------------------------------------------------------------
+// Public: name, logo, support email and terms links for the sign-in pages.
+export const requestCompanyBranding = (callerSignal) => getData('/api/company/branding', callerSignal);
 export const requestCompanySettings = (callerSignal) => getData('/api/company/settings', callerSignal);
 export const requestCompanySettingsUpdate = (changesWithVersion, csrfToken) =>
   sendData('PATCH', '/api/company/settings', changesWithVersion, csrfToken);

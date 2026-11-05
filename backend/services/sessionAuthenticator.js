@@ -90,6 +90,7 @@ export function verifySessionToken(accessToken, authConfig) {
     exp: expiresAtSeconds,
     iat: issuedAtSeconds,
     iatms: issuedAtMsClaim,
+    rem: rememberedClaim,
   } = decodedTokenPayload;
   // Tokens issued before `iatms` existed have only whole seconds; they are compared in seconds.
   const issuedAtMs = Number.isSafeInteger(issuedAtMsClaim) ? issuedAtMsClaim : null;
@@ -113,6 +114,7 @@ export function verifySessionToken(accessToken, authConfig) {
       csrfTokenHash,
       issuedAtSeconds,
       issuedAtMs,
+      remembered: rememberedClaim === true,
       expiresAtMs: expiresAtSeconds * 1000,
     },
   };

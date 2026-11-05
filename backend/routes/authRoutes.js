@@ -7,6 +7,8 @@
  *   POST /api/auth/password/forgot       -> account email IP limit -> forgotPassword           (public)
  *   GET  /api/auth/password/reset/:token -> link-use IP limit      -> describePasswordResetLink (public)
  *   POST /api/auth/password/reset        -> link-use IP limit      -> applyPasswordReset       (public)
+ *   GET  /api/auth/password-policy                                -> getPasswordPolicy        (public)
+ *   GET  /api/auth/options                                        -> getAuthOptions           (public)
  *   POST /api/auth/login   -> login rate limits -> loginUser       (public)
  *   GET  /api/auth/me      -> protect           -> getCurrentUser  (session required)
  *   POST /api/auth/logout  -> protect           -> logoutUser      (session + CSRF token required)
@@ -29,7 +31,14 @@ import {
   registerUser,
   resendVerificationEmail,
 } from '../controllers/accountEmailController.js';
-import { changePassword, getCurrentUser, loginUser, logoutUser } from '../controllers/authController.js';
+import {
+  changePassword,
+  getCurrentUser,
+  getAuthOptions,
+  getPasswordPolicy,
+  loginUser,
+  logoutUser,
+} from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import {
   accountEmailRequestRateLimitByClientIp,
@@ -47,6 +56,8 @@ authRouter.post('/verify-email', accountLinkUseRateLimitByClientIp, confirmEmail
 authRouter.post('/password/forgot', accountEmailRequestRateLimitByClientIp, forgotPassword);
 authRouter.get('/password/reset/:token', accountLinkUseRateLimitByClientIp, describePasswordResetLink);
 authRouter.post('/password/reset', accountLinkUseRateLimitByClientIp, applyPasswordReset);
+authRouter.get('/password-policy', getPasswordPolicy);
+authRouter.get('/options', getAuthOptions);
 authRouter.post('/login', loginRateLimitByClientIp, loginRateLimitByClientIpAndEmail, loginUser);
 authRouter.get('/me', protect, getCurrentUser);
 authRouter.post('/logout', protect, logoutUser);

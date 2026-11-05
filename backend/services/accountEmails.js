@@ -5,7 +5,7 @@
  * are built by the caller from APP_PUBLIC_URL and a URL-safe token.
  */
 
-import { renderEmailLayout } from './emailLayout.js';
+import { EMAIL_THEME, renderEmailLayout } from './emailLayout.js';
 import { escapeHtml } from '../utils/html.js';
 
 const paragraph = (html) => `<p style="margin:0 0 16px;font-size:15px;line-height:1.6">${html}</p>`;
@@ -19,35 +19,43 @@ export function describeDuration(durationMs) {
 }
 
 /**
- * @param {{ name: string, companyName: string, verificationUrl: string, validityMs: number }} details
+ * The code is shown large to type on the "check your email" page; the link does the same in one
+ * click. Both work once and expire together.
+ * @param {{ name: string, companyName: string, verificationUrl: string, verificationCode: string,
+ *   validityMs: number }} details
  * @returns {{ subject: string, html: string, text: string }}
  */
-export function buildVerificationEmail({ name, companyName, verificationUrl, validityMs }) {
+export function buildVerificationEmail({ name, companyName, verificationUrl, verificationCode, validityMs }) {
   const validity = describeDuration(validityMs);
-  const footerText = "If you didn't create an account, you can ignore this email; nothing happens without the link.";
+  const footerText =
+    "If you didn't create an account, you can ignore this email; nothing happens without the code or link.";
   const text = [
     `Hi ${name},`,
     '',
-    `Confirm your email address to finish creating your ${companyName} account:`,
+    `Your code to confirm your email for ${companyName}: ${verificationCode}`,
+    '',
+    'Or confirm in one click:',
     verificationUrl,
     '',
-    `This link works once and expires in ${validity}.`,
+    `The code and the link work once and expire in ${validity}.`,
     footerText,
   ].join('\n');
+  const codeHtml = `<p style="margin:0 0 6px;font-size:13px;color:${EMAIL_THEME.MUTED_TEXT}">Your confirmation code</p>
+<p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:.3em;color:${EMAIL_THEME.TEXT}">${escapeHtml(verificationCode)}</p>`;
   const html = renderEmailLayout({
     companyName,
     heading: 'Confirm your email address',
     bodyHtml: `${paragraph(`Hi ${escapeHtml(name)},`)}${paragraph(
-      `Confirm your email address to finish creating your <strong>${escapeHtml(companyName)}</strong> account.`,
-    )}`,
+      `Enter this code on the confirmation page to finish creating your <strong>${escapeHtml(companyName)}</strong> account, or use the button below.`,
+    )}${codeHtml}`,
     action: {
       label: 'Confirm my email',
       url: verificationUrl,
-      noteHtml: `This link works once and expires in ${escapeHtml(validity)}.`,
+      noteHtml: `The code and the link work once and expire in ${escapeHtml(validity)}.`,
     },
     footerText,
   });
-  return { subject: `Confirm your email for ${companyName}`, html, text };
+  return { subject: `${verificationCode} is your ${companyName} confirmation code`, html, text };
 }
 
 /**

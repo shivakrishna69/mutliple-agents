@@ -210,7 +210,7 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' "$base/invite/any-client-route")" = 200
           curl -sf "$base/api/health"
           signup_status=$(curl -s -H "$origin" -H 'Content-Type: application/json' \
-            -d '{"name":"CI Check","email":"ci.check@example.com","password":"Valid#Pass2026"}' \
+            -d '{"firstName":"CI","lastName":"Check","email":"ci.check@example.com","phoneNumber":"98765 43210","password":"Valid#Pass2026","confirmPassword":"Valid#Pass2026","acceptTerms":true}' \
             -o /dev/null -w '%{http_code}' "$base/api/auth/signup")
           test "$signup_status" = 202
           # The confirmation link arrives by email (Mailpit); opening it signs the person in.

@@ -28,6 +28,11 @@ const accountTokenSchema = new mongoose.Schema(
       immutable: true,
     },
     tokenHash: { type: String, required: true, match: /^[0-9a-f]{64}$/, select: false, immutable: true },
+    // Email confirmation only: the short code sent with the link, as an HMAC keyed with a server
+    // secret (a database copy alone cannot be tried against the million possible codes), and how
+    // many wrong codes were typed (services/accountTokens.js).
+    codeHash: { type: String, default: null, match: /^[0-9a-f]{64}$/, select: false, immutable: true },
+    failedCodeAttempts: { type: Number, default: 0, min: 0 },
     expiresAt: { type: Date, required: true, immutable: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } },

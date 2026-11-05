@@ -2,6 +2,12 @@
 export const ROUTE_PATHS = Object.freeze({
   LOGIN: '/login',
   SIGNUP: '/signup',
+  // Signed out. The backend's account emails link to /verify-email/:token, /reset-password/:token,
+  // /login and /forgot-password (backend constants/validation.js ACCOUNT_LINK_PATHS): keep them.
+  CHECK_EMAIL: '/check-email',
+  VERIFY_EMAIL: '/verify-email/:token',
+  FORGOT_PASSWORD: '/forgot-password',
+  RESET_PASSWORD: '/reset-password/:token',
   DASHBOARD: '/dashboard',
   // Support console for staff (admins and agents) only.
   CONSOLE: '/console',

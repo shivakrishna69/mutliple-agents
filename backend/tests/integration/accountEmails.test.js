@@ -200,6 +200,125 @@ describe('confirming the email address', { skip: skipReason ?? false }, () => {
   });
 });
 
+describe('confirming with the code from the email', { skip: skipReason ?? false }, () => {
+  let testServer;
+  const CODE_DIGITS = ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS;
+  const MAX_ATTEMPTS = ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_MAX_ATTEMPTS;
+
+  /** The code in the newest confirmation email to `email` (waits for the `count`th email). */
+  async function latestCode(email, count = 1) {
+    const message = (await testServer.mailbox.waitForMessages(email, count)).at(-1);
+    const code = message.text.match(new RegExp(`: (\\d{${CODE_DIGITS}})$`, 'm'))?.[1];
+    assert.ok(code, `no code in "${message.subject}"`);
+    assert.ok(message.subject.startsWith(code), 'the subject leads with the code');
+    return code;
+  }
+
+  const confirmWithCode = (client, email, code) => client.post('/api/auth/verify-email', { email, code });
+  const wrongCodeFor = (code) => String((Number(code) + 1) % 10 ** CODE_DIGITS).padStart(CODE_DIGITS, '0');
+
+  before(async () => {
+    testServer = await startTestServer();
+  });
+
+  after(async () => {
+    await testServer?.stop();
+  });
+
+  it('confirms the email and signs in with the code, which then stops working', async () => {
+    const signup = await testServer.createClient().signup('Kavya Menon', 'kavya@example.com');
+    assert.equal(signup.status, 202);
+    assert.equal(signup.body.data.codeDigits, CODE_DIGITS);
+    const code = await latestCode('kavya@example.com');
+
+    const client = testServer.createClient();
+    const confirmed = await confirmWithCode(client, 'Kavya@Example.com', ` ${code} `);
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+    assert.equal(confirmed.body.message, ACCOUNT_EMAIL_MESSAGES.EMAIL_VERIFIED);
+    assert.equal((await client.get('/api/auth/me')).status, 200);
+    assert.equal((await findUser(testServer, 'kavya@example.com')).status, 'active');
+
+    const again = await confirmWithCode(testServer.createClient(), 'kavya@example.com', code);
+    assertCodedError(again, 400, 'VERIFICATION_CODE_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
+  });
+
+  it('cancels the code and its link after too many wrong codes', async () => {
+    assert.equal((await testServer.createClient().signup('Arjun Rao', 'arjun@example.com')).status, 202);
+    const code = await latestCode('arjun@example.com');
+    const linkToken = await latestVerificationToken(testServer, 'arjun@example.com');
+
+    for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const wrong = await confirmWithCode(testServer.createClient(), 'arjun@example.com', wrongCodeFor(code));
+      assertCodedError(wrong, 400, 'VERIFICATION_CODE_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
+    }
+    // The last allowed wrong try cancels everything sent in that email.
+    await confirmWithCode(testServer.createClient(), 'arjun@example.com', wrongCodeFor(code));
+    const rightButTooLate = await confirmWithCode(testServer.createClient(), 'arjun@example.com', code);
+    assertCodedError(
+      rightButTooLate,
+      400,
+      'VERIFICATION_CODE_INVALID',
+      ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID,
+    );
+    const link = await testServer.createClient().post('/api/auth/verify-email', { token: linkToken });
+    assertCodedError(link, 400, 'VERIFICATION_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_LINK_INVALID);
+
+    // A new email brings a new code that works.
+    await endEmailCooldowns(testServer);
+    assert.equal(
+      (await testServer.createClient().post('/api/auth/verify-email/resend', { email: 'arjun@example.com' })).status,
+      202,
+    );
+    const newCode = await latestCode('arjun@example.com', 2);
+    assert.equal((await confirmWithCode(testServer.createClient(), 'arjun@example.com', newCode)).status, 200);
+  });
+
+  it('allows the right code after a few wrong ones, within the limit', async () => {
+    assert.equal((await testServer.createClient().signup('Isha Gupta', 'isha@example.com')).status, 202);
+    const code = await latestCode('isha@example.com');
+    for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt += 1) {
+      await confirmWithCode(testServer.createClient(), 'isha@example.com', wrongCodeFor(code));
+    }
+    assert.equal((await confirmWithCode(testServer.createClient(), 'isha@example.com', code)).status, 200);
+  });
+
+  it('keeps only the newest code working after a resend', async () => {
+    assert.equal((await testServer.createClient().signup('Dev Patel', 'dev@example.com')).status, 202);
+    const firstCode = await latestCode('dev@example.com');
+    await endEmailCooldowns(testServer);
+    await testServer.createClient().post('/api/auth/verify-email/resend', { email: 'dev@example.com' });
+    const secondCode = await latestCode('dev@example.com', 2);
+    if (firstCode !== secondCode) {
+      const old = await confirmWithCode(testServer.createClient(), 'dev@example.com', firstCode);
+      assertCodedError(old, 400, 'VERIFICATION_CODE_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
+    }
+    assert.equal((await confirmWithCode(testServer.createClient(), 'dev@example.com', secondCode)).status, 200);
+  });
+
+  it('answers an unknown address like a wrong code, and asks for the code in the right form', async () => {
+    const unknown = await confirmWithCode(testServer.createClient(), 'nobody@example.com', '123456');
+    assertCodedError(unknown, 400, 'VERIFICATION_CODE_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
+
+    for (const badCode of ['12345', '1234567', '12a456', 123456, null]) {
+      const response = await confirmWithCode(testServer.createClient(), 'kavya@example.com', badCode);
+      assert.equal(response.status, 400, String(badCode));
+      assert.deepEqual(response.body.error.details, [
+        { field: 'code', message: VALIDATION_MESSAGES.VERIFICATION_CODE_FORMAT },
+      ]);
+    }
+  });
+
+  it('stores the code only as a keyed hash', async () => {
+    assert.equal((await testServer.createClient().signup('Neha Shah', 'neha@example.com')).status, 202);
+    const code = await latestCode('neha@example.com');
+    const neha = await findUser(testServer, 'neha@example.com');
+    const [stored] = await testServer.database.collection('accounttokens').find({ userId: neha._id }).toArray();
+    assert.match(stored.codeHash, /^[0-9a-f]{64}$/);
+    assert.equal(JSON.stringify(stored).includes(code), false);
+    assert.equal(stored.failedCodeAttempts, 0);
+  });
+});
+
 describe('resetting a forgotten password', { skip: skipReason ?? false }, () => {
   let testServer;
   let signedInClient;
@@ -230,8 +349,12 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     const requested = await forgot('priya@example.com');
     assert.equal(requested.status, 202);
     assert.equal(requested.body.message, ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_REQUESTED);
+    assert.equal(requested.body.data.linkValidMinutes, 15);
+    assert.match(requested.body.message, /15 minutes/);
     // 1: the signup confirmation; 2: the reset link.
     resetToken = await latestResetToken('priya@example.com', 2);
+    const [, resetEmail] = testServer.mailbox.messagesTo('priya@example.com');
+    assert.match(resetEmail.text, /expires in 15 minutes/);
 
     const check = await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`);
     assert.equal(check.status, 200);
@@ -245,14 +368,24 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
   it('refuses a weak password with the rule broken, and keeps the link usable', async () => {
     const weak = await testServer
       .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: 'short' });
+      .post('/api/auth/password/reset', { token: resetToken, password: 'short', confirmPassword: 'short' });
     assert.equal(weak.status, 400);
     assert.deepEqual(weak.body.error.details, [{ field: 'password', message: VALIDATION_MESSAGES.PASSWORD_TOO_SHORT }]);
-    const noSymbol = await testServer
-      .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: 'NoSymbol2027' });
+    const noSymbol = await testServer.createClient().post('/api/auth/password/reset', {
+      token: resetToken,
+      password: 'NoSymbol2027',
+      confirmPassword: 'NoSymbol2027',
+    });
     assert.deepEqual(noSymbol.body.error.details, [
       { field: 'password', message: PASSWORD_RULE_MESSAGES.specialCharacter },
+    ]);
+    const mismatch = await testServer.createClient().post('/api/auth/password/reset', {
+      token: resetToken,
+      password: NEW_PASSWORD,
+      confirmPassword: 'Other#Pass2027',
+    });
+    assert.deepEqual(mismatch.body.error.details, [
+      { field: 'confirmPassword', message: VALIDATION_MESSAGES.PASSWORDS_DO_NOT_MATCH },
     ]);
     assert.equal((await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`)).status, 200);
   });
@@ -261,7 +394,7 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     assert.equal((await signedInClient.get('/api/auth/me')).status, 200);
     const reset = await testServer
       .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: NEW_PASSWORD });
+      .post('/api/auth/password/reset', { token: resetToken, password: NEW_PASSWORD, confirmPassword: NEW_PASSWORD });
     assert.equal(reset.status, 200);
     assert.equal(reset.body.message, ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_DONE);
 
@@ -272,9 +405,11 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     const [, , changedNotice] = await testServer.mailbox.waitForMessages('priya@example.com', 3);
     assert.match(changedNotice.subject, /password was changed/i);
 
-    const reused = await testServer
-      .createClient()
-      .post('/api/auth/password/reset', { token: resetToken, password: STRONG_PASSWORD });
+    const reused = await testServer.createClient().post('/api/auth/password/reset', {
+      token: resetToken,
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+    });
     assertCodedError(reused, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
     const checkAfter = await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`);
     assertCodedError(checkAfter, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
@@ -300,7 +435,8 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
   it('lets a reset link work once even when it is used twice at the same moment', async () => {
     // The newest link from the test above (5 emails so far: confirmation, reset, changed, two resets).
     const token = await latestResetToken('priya@example.com', 5);
-    const useLink = (password) => testServer.createClient().post('/api/auth/password/reset', { token, password });
+    const useLink = (password) =>
+      testServer.createClient().post('/api/auth/password/reset', { token, password, confirmPassword: password });
     const outcomes = await Promise.all([useLink('First#Pass2027'), useLink('Second#Pass2027')]);
     assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [200, 400]);
     const winner =
@@ -355,9 +491,11 @@ describe('invitations and unconfirmed signups', { skip: skipReason ?? false }, (
     assertCodedError(revoked, 400, 'VERIFICATION_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.VERIFICATION_LINK_INVALID);
 
     const token = await invitationTokenFrom(testServer, invitation, 'sam@example.com');
-    const accepted = await testServer
-      .createClient()
-      .post(`/api/invitations/${token}/accept`, { password: NEW_PASSWORD });
+    const accepted = await testServer.createClient().post(`/api/invitations/${token}/accept`, {
+      password: NEW_PASSWORD,
+      confirmPassword: NEW_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     const account = await findUser(testServer, 'sam@example.com');
     assert.equal(account.status, 'active');

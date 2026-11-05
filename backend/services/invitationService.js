@@ -41,6 +41,7 @@ import { logger } from '../utils/logger.js';
 import { issueEmployeeCode } from './companySettings.js';
 import { listCurrentEmployees } from './employeeDirectory.js';
 import {
+  acceptedInvitationFields,
   activateInvitedAccount,
   findInvitableAccount,
   ProvisioningError,
@@ -386,13 +387,19 @@ function assertUsable(invitation) {
 export async function previewInvitation(rawToken, { companyName }) {
   const invitation = await findInvitationByToken(rawToken);
   assertUsable(invitation);
-  const department = await Department.findById(invitation.profileDraft.departmentId).select('name').lean();
+  const [department, inviter] = await Promise.all([
+    Department.findById(invitation.profileDraft.departmentId).select('name').lean(),
+    User.findById(invitation.invitedByUserId).select('name').lean(),
+  ]);
   return {
     name: invitation.name,
     email: invitation.email,
     companyName,
     designation: invitation.profileDraft.designation,
     departmentName: department?.name ?? null,
+    // Who sent it and the ID issued with it, so the person recognises a genuine invitation.
+    inviterName: inviter?.name ?? null,
+    employeeCode: invitation.employeeCode ?? null,
     expiresAt: invitation.expiresAt.toISOString(),
   };
 }
@@ -462,8 +469,7 @@ async function acceptLegacyInvitation(claimedInvitation, password) {
       email: claimedInvitation.email,
       password,
       role: claimedInvitation.role,
-      // The invitation link was emailed to this address.
-      emailVerifiedAt: new Date(),
+      ...acceptedInvitationFields(),
     });
     const draft = claimedInvitation.profileDraft;
     const createdProfile = await EmployeeProfile.create({

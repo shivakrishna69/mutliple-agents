@@ -120,6 +120,7 @@ export async function protect(req, res, next) {
     sessionId: sessionClaims.sessionId,
     csrfTokenHash: sessionClaims.csrfTokenHash,
     expiresAtMs: sessionClaims.expiresAtMs,
+    remembered: sessionClaims.remembered,
   };
   return next();
 }

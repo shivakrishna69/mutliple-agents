@@ -25,7 +25,7 @@
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { EMAIL_PATTERN, USER_FIELD_LIMITS } from '../constants/validation.js';
+import { EMAIL_PATTERN, PHONE_SETTINGS, USER_FIELD_LIMITS } from '../constants/validation.js';
 import { invalidateOrgHierarchyCache } from '../services/orgHierarchyCache.js';
 
 /** Allowed values for `role`. Import this instead of repeating the strings in route code. */
@@ -78,6 +78,20 @@ const userSchema = new mongoose.Schema(
       minlength: USER_FIELD_LIMITS.NAME_MIN_LENGTH,
       maxlength: USER_FIELD_LIMITS.NAME_MAX_LENGTH,
     },
+    // First and last name as given at signup; `name` is the two together. Accounts created another
+    // way (invitations, older signups) may have only `name`.
+    firstName: {
+      type: String,
+      trim: true,
+      default: null,
+      maxlength: USER_FIELD_LIMITS.GIVEN_NAME_MAX_LENGTH,
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      default: null,
+      maxlength: USER_FIELD_LIMITS.FAMILY_NAME_MAX_LENGTH,
+    },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -127,6 +141,20 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // In international (E.164) form, e.g. "+919876543210" (utils/phoneNumbers.js). Not unique: a
+    // family or a desk may share one. Not verified yet (SMS confirmation is a later step).
+    phoneNumber: {
+      type: String,
+      default: null,
+      validate: {
+        validator: (phoneNumber) => phoneNumber === null || PHONE_SETTINGS.E164_PATTERN.test(phoneNumber),
+        message: 'Phone number is not in international form',
+      },
+    },
+    phoneVerifiedAt: { type: Date, default: null },
+    // The terms of service and privacy policy the person agreed to at signup, and when.
+    termsVersion: { type: Number, default: null },
+    termsAcceptedAt: { type: Date, default: null },
     // Where invitations go: the person's own address. The sign-in email starts as the same address.
     personalEmail: emailField(),
     // The address at the company's mail domain, once there is one (services/companyEmail.js).

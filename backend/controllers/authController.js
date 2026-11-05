@@ -44,6 +44,37 @@ import { SOCKET_ERROR_CODES, disconnectSessionSockets, disconnectUserSockets } f
 import { logger } from '../utils/logger.js';
 import { validateChangePasswordInput, validateLoginInput } from '../validators/authValidators.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { describePasswordPolicy } from '../services/passwordPolicy.js';
+import { ACCOUNT_EMAIL_SETTINGS } from '../constants/validation.js';
+
+/** Both answers change only with a deployment, so browsers may reuse them for a while. */
+const PUBLIC_AUTH_SETTINGS_CACHE_SECONDS = 300;
+
+/**
+ * GET /api/auth/password-policy   (public)
+ *
+ * The password checklist and strength meter for the signup and reset screens, built from the rules
+ * the server enforces (services/passwordPolicy.js).
+ */
+export function getPasswordPolicy(req, res) {
+  res.set('Cache-Control', `public, max-age=${PUBLIC_AUTH_SETTINGS_CACHE_SECONDS}`);
+  return sendSuccess(res, HTTP_STATUS.OK, AUTH_MESSAGES.PASSWORD_POLICY_RETRIEVED, describePasswordPolicy());
+}
+
+/**
+ * GET /api/auth/options   (public)
+ *
+ * The numbers the sign-in screens state, as this server is configured: how long "remember this
+ * device" lasts, how many digits the emailed code has, how long a reset link works.
+ */
+export function getAuthOptions(req, res) {
+  res.set('Cache-Control', `public, max-age=${PUBLIC_AUTH_SETTINGS_CACHE_SECONDS}`);
+  return sendSuccess(res, HTTP_STATUS.OK, AUTH_MESSAGES.AUTH_OPTIONS_RETRIEVED, {
+    rememberedSessionDays: req.app.locals.config.rememberedSessionDays,
+    verificationCodeDigits: ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS,
+    passwordResetLinkMinutes: ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000,
+  });
+}
 
 /** Code of the 403 a correct password gets while the account's email is still unconfirmed. */
 export const EMAIL_NOT_VERIFIED_CODE = 'EMAIL_NOT_VERIFIED';
@@ -61,8 +92,8 @@ const TIMING_EQUALIZATION_HASH = bcrypt.hashSync(randomBytes(32).toString('hex')
  * Issues a new session for `userId`, writes the session cookies, and returns the CSRF token
  * that the response body hands to the frontend. Also used when an email is confirmed.
  */
-export function startSession(res, authConfig, userId) {
-  const sessionTokens = issueSessionTokens(userId, authConfig);
+export function startSession(res, authConfig, userId, { remember = false } = {}) {
+  const sessionTokens = issueSessionTokens(userId, authConfig, { remember });
   setSessionCookies(res, authConfig, sessionTokens);
   return sessionTokens.csrfToken;
 }
@@ -70,7 +101,9 @@ export function startSession(res, authConfig, userId) {
 /**
  * POST /api/auth/login
  *
- * Request body: { email: string, password: string }
+ * Request body: { email: string, password: string, rememberDevice?: boolean }
+ *   rememberDevice: stay signed in on this device for REMEMBERED_SESSION_DAYS; otherwise the session
+ *   ends when the browser closes.
  * Responses:
  *   200 { message, data: { user, csrfToken } } + session cookies   Credentials are correct.
  *   400 { error: { message, requestId, details } }  Email or password missing or not a string.
@@ -103,7 +136,7 @@ export async function loginUser(req, res, next) {
       );
     }
 
-    const { email, password } = loginValidation.sanitizedInput;
+    const { email, password, rememberDevice } = loginValidation.sanitizedInput;
 
     const userRecord = await User.findOne({ email }).select('+password');
 
@@ -150,7 +183,7 @@ export async function loginUser(req, res, next) {
       return sendError(req, res, HTTP_STATUS.UNAUTHORIZED, AUTH_MESSAGES.INVALID_CREDENTIALS);
     }
 
-    const csrfToken = startSession(res, req.app.locals.config, userRecord._id);
+    const csrfToken = startSession(res, req.app.locals.config, userRecord._id, { remember: rememberDevice });
 
     logger.info('User logged in', { requestId: req.id, userId: userRecord._id.toString() });
 
@@ -295,7 +328,10 @@ export async function changePassword(req, res, next) {
     }
     disconnectUserSockets(req.user.id, SOCKET_ERROR_CODES.PASSWORD_CHANGED);
 
-    const csrfToken = startSession(res, req.app.locals.config, userRecord._id);
+    // The renewed session keeps this one's "remember this device" choice.
+    const csrfToken = startSession(res, req.app.locals.config, userRecord._id, {
+      remember: req.authSession.remembered,
+    });
     logger.info('Password changed', { requestId: req.id, userId: req.user.id });
     return sendSuccess(res, HTTP_STATUS.OK, ACCOUNT_MESSAGES.PASSWORD_CHANGED, {
       user: toPublicUserProfile(userRecord),

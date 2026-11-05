@@ -3,15 +3,17 @@
  * the random token in the URL is the credential, so both routes are rate-limited per client IP and
  * never reveal whether a token exists beyond "invalid / expired / used".
  *
- *   GET  /:token          -> 200 { invitation: { name, email, companyName, designation, departmentName, expiresAt } }
- *   POST /:token/accept   { password } -> 201 { user, csrfToken } + session cookies (signed in)
+ *   GET  /:token          -> 200 { invitation: { name, email, companyName, designation, departmentName,
+ *                                                inviterName, employeeCode, expiresAt } }
+ *   POST /:token/accept   { password, acceptTerms: true } -> 201 { user, csrfToken } + session cookies
+ *                         (signed in); the agreement to the terms is recorded on the account
  *
  * Errors carry a code: INVITATION_INVALID (404), INVITATION_EXPIRED / INVITATION_USED (410),
  * INVITATION_IN_PROGRESS / EMAIL_ALREADY_REGISTERED / INVITATION_OUTDATED (409).
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { PEOPLE_MESSAGES } from '../constants/messages.js';
+import { PEOPLE_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { loadEmailContext } from '../services/companySettings.js';
 import { InvitationError, acceptInvitation, previewInvitation } from '../services/invitationService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
@@ -20,7 +22,7 @@ import { setSessionCookies } from '../utils/authCookies.js';
 import { issueSessionTokens } from '../utils/authToken.js';
 import { logger } from '../utils/logger.js';
 import { toPublicUserProfile } from '../utils/userProfile.js';
-import { checkNewPassword } from '../validators/authValidators.js';
+import { validateInvitationAcceptance } from '../validators/authValidators.js';
 
 function handleInvitationError(req, res, error, action) {
   recordAuditEvent(req, { category: 'people', action, outcome: AUDIT_OUTCOMES.REJECTED, reason: error.code });
@@ -39,13 +41,18 @@ export async function getInvitationPreview(req, res, next) {
 
 export async function postAcceptInvitation(req, res, next) {
   try {
-    const passwordError = checkNewPassword(req.body?.password);
-    if (passwordError)
-      return sendError(req, res, HTTP_STATUS.BAD_REQUEST, passwordError, [
-        { field: 'password', message: passwordError },
-      ]);
+    const validation = validateInvitationAcceptance(req.body);
+    if (!validation.isValid) {
+      return sendError(
+        req,
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        VALIDATION_MESSAGES.REQUEST_VALIDATION_FAILED,
+        validation.validationErrors,
+      );
+    }
 
-    const newUser = await acceptInvitation(req.params.token, req.body.password);
+    const newUser = await acceptInvitation(req.params.token, validation.sanitizedInput.password);
     const authConfig = req.app.locals.config;
     const sessionTokens = issueSessionTokens(newUser._id, authConfig);
     setSessionCookies(res, authConfig, sessionTokens);

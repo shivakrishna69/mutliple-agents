@@ -89,7 +89,11 @@ export async function onboardEmployee({
   assert.equal(invitationResponse.status, 201, JSON.stringify(invitationResponse.body));
   const token = await invitationTokenFrom(testServer, invitationResponse, email);
   const client = testServer.createClient();
-  const acceptResponse = await client.post(`/api/invitations/${token}/accept`, { password: STRONG_PASSWORD });
+  const acceptResponse = await client.post(`/api/invitations/${token}/accept`, {
+    password: STRONG_PASSWORD,
+    confirmPassword: STRONG_PASSWORD,
+    acceptTerms: true,
+  });
   assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));
   const userId = acceptResponse.body.data.user.id;
   const profile = await testServer.database

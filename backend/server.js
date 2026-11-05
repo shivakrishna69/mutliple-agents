@@ -52,6 +52,7 @@ import presenceRoutes from './routes/presenceRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { closeMailService, initMailService } from './services/mailService.js';
+import { configureAccountCodeKey } from './services/accountTokens.js';
 import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
@@ -209,6 +210,7 @@ async function start() {
     initVaultStorage(config.vaultStorage);
     initPayslipServices(config.payslips);
     initMailService(config.mail);
+    configureAccountCodeKey(config.jwtSecret);
   } catch (err) {
     logger.error('Startup failed', { error: err.message, stack: err.stack });
     process.exit(1);

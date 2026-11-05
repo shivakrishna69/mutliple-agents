@@ -27,10 +27,11 @@ API.
 
 Playwright drives Chromium through the real app: the Vite dev server (port 5174) in front of the
 real backend (port 5065), which `e2e/globalSetup.js` starts on a throwaway MongoDB database with
-seeded admin, HR and customer accounts, one onboarded employee without an office, and a leave
+seeded admin, HR and customer accounts (plus one only the password-reset test uses), one onboarded employee without an office, and a leave
 scenario (an employee with an office, a manager and a Casual Leave balance). A stand-in AI service
 (`e2e/standInAiService.js`) answers the leave assistant, reading real data through the backend's
-internal API. Your `backend/.env` is never used.
+internal API. Emails go to a test inbox the tests read over HTTP (port 5066), as a person reads
+their mail. Your `backend/.env` is never used.
 
 ```bash
 cd backend && npm ci            # the tests start the backend, so it needs its dependencies
@@ -41,9 +42,9 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 
 | File | Covers |
 |---|---|
-| `e2e/auth.spec.js` | Sign-up, sign-out (and the session ending on the server), wrong password, redirect to sign-in |
+| `e2e/auth.spec.js` | Sign-up with the emailed code (a wrong code refused first), sign-out and the session ending on the server; a sign-in before confirming leads to "check your email" and the emailed link confirms, once; forgot and reset password, the link working once; wrong password; redirect to sign-in |
 | `e2e/roles.spec.js` | What admin, HR and customers see; the admin changes the employee ID format and email domain; admin-only addresses redirect customers |
-| `e2e/onboarding.spec.js` | HR invites a joiner (who gets an employee ID), who activates the account from the link; the link works once; HR imports a CSV with a new department, a manager, their report and a bad row, starts it, sees every row's outcome and downloads the results |
+| `e2e/onboarding.spec.js` | HR invites a joiner (who gets an employee ID), who activates the account from the link (after agreeing to the terms); the link works once; HR imports a CSV with a new department, a manager, their report and a bad row, starts it, sees every row's outcome and downloads the results |
 | `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
 | `e2e/pages.spec.js` | Every page of every role loads with no uncaught errors or 5xx responses; public payslip check |
 | `e2e/leaveApprovalSteps.spec.js` | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved |
@@ -64,12 +65,17 @@ src/components/       AppShell (role-aware sidebar), RouteGuards, ui.jsx design 
                       (workplace/: departments, offices, holidays, base offices; people/: the CSV import;
                       leave/: my leave, calendar, approvals and leave administration, the tabs of
                       pages/LeaveCenter.jsx)
-src/hooks/            useApiResource (load/abort/error), useSocket, useAgentTelemetry
+src/components/auth/  the signed-out screens' shell (company logo, support and terms links), password
+                      strength meter built from the server's policy, code boxes, notices
+src/hooks/            useApiResource (load/abort/error), useAuthRequest (a submit with the server's field
+                      errors), usePublicAuthSettings (branding, auth options, password policy; loaded
+                      once), useCountdown, useSocket, useAgentTelemetry
 src/pages/            one file per screen
 src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels
 src/utils/            dates in the browser's time zone, CSV downloads
 public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
-src/validation/       client-side form checks (the backend validates again)
+src/validation/       client-side form checks (the backend validates again); the signed-out screens check
+                      nothing themselves and show the server's messages
 ```
 
 Route guards only steer navigation; the backend authorises every request.

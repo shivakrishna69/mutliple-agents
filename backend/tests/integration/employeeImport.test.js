@@ -214,9 +214,11 @@ describe('employee import', { skip: skipReason ?? false }, () => {
     assert.equal(ivan.organizationData.dateOfJoining.toISOString().slice(0, 10), '2025-06-30');
 
     // An imported person activates their account with their link.
-    const accepted = await testServer
-      .createClient()
-      .post(`/api/invitations/${linkToken}/accept`, { password: STRONG_PASSWORD });
+    const accepted = await testServer.createClient().post(`/api/invitations/${linkToken}/accept`, {
+      password: STRONG_PASSWORD,
+      confirmPassword: STRONG_PASSWORD,
+      acceptTerms: true,
+    });
     assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
     assert.equal((await testServer.createClient().login('hana@example.com')).status, 200);
 

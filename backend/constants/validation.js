@@ -14,7 +14,28 @@ export const USER_FIELD_LIMITS = Object.freeze({
   // ignored, so a longer password would give a false sense of strength. Measured in UTF-8
   // bytes, not characters, because multi-byte characters count more than once.
   PASSWORD_MAX_BYTES: 72,
+  // First and last name at signup; together (with a space) they stay within NAME_MAX_LENGTH.
+  GIVEN_NAME_MAX_LENGTH: 50,
+  FAMILY_NAME_MAX_LENGTH: 49,
 });
+
+/**
+ * Phone numbers are stored in international (E.164) form: "+", the country code, then the number,
+ * 8 to 15 digits in all. A number typed without a country code is read as a national number of
+ * DEFAULT_COUNTRY_CODE (utils/phoneNumbers.js).
+ */
+export const PHONE_SETTINGS = Object.freeze({
+  DEFAULT_COUNTRY_CODE: '91',
+  E164_PATTERN: /^\+[1-9]\d{7,14}$/,
+  // What a person may type: digits, spaces, dashes, dots, brackets and a leading + or 00.
+  MAX_INPUT_LENGTH: 25,
+});
+
+/**
+ * The version of the terms of service and privacy policy a signup agrees to. Raise it when they
+ * change; each account keeps the version it accepted (User.termsVersion).
+ */
+export const TERMS_VERSION = 1;
 
 /**
  * Links emailed to account owners (services/accountEmailFlows.js):
@@ -27,8 +48,12 @@ export const USER_FIELD_LIMITS = Object.freeze({
  */
 export const ACCOUNT_EMAIL_SETTINGS = Object.freeze({
   EMAIL_VERIFICATION_VALIDITY_MS: 24 * 60 * 60 * 1000,
-  PASSWORD_RESET_VALIDITY_MS: 60 * 60 * 1000,
+  PASSWORD_RESET_VALIDITY_MS: 15 * 60 * 1000,
   EMAIL_COOLDOWN_MS: 60 * 1000,
+  // The confirmation email also carries a code to type instead of opening the link. Wrong codes
+  // are counted per email: after the last allowed try, the code and its link stop working.
+  VERIFICATION_CODE_DIGITS: 6,
+  VERIFICATION_CODE_MAX_ATTEMPTS: 5,
 });
 
 /**
@@ -61,6 +86,18 @@ export const PASSWORD_STRENGTH_RULES = Object.freeze([
   // [^A-Za-z0-9\s]: at least one character that is not a letter, digit, or whitespace
   // (punctuation or a symbol). Spaces are allowed in passwords but do not satisfy this rule.
   { ruleId: 'specialCharacter', pattern: /[^A-Za-z0-9\s]/ },
+]);
+
+/**
+ * The strength meter: how many checklist items (the minimum length plus each strength rule, five in
+ * all) a password meets decides its level. Only "strong" (all of them) is accepted at signup and
+ * reset; the lower levels guide the person while typing. Labels: PASSWORD_STRENGTH_LABELS.
+ */
+export const PASSWORD_STRENGTH_LEVELS = Object.freeze([
+  Object.freeze({ level: 'weak', minimumChecksMet: 0 }),
+  Object.freeze({ level: 'fair', minimumChecksMet: 3 }),
+  Object.freeze({ level: 'good', minimumChecksMet: 4 }),
+  Object.freeze({ level: 'strong', minimumChecksMet: 5 }),
 ]);
 
 /** Limits for conversation messages, shared by the Message model and the webhook validator. */

@@ -4,13 +4,15 @@
  * is reviewed in one place and the frontend can rely on stable text.
  */
 
-import { MESSAGE_FIELD_LIMITS, USER_FIELD_LIMITS, WEBHOOK_FIELD_LIMITS } from './validation.js';
+import { ACCOUNT_EMAIL_SETTINGS, MESSAGE_FIELD_LIMITS, USER_FIELD_LIMITS, WEBHOOK_FIELD_LIMITS } from './validation.js';
 
 export const AUTH_MESSAGES = Object.freeze({
   REGISTRATION_SUCCESSFUL: 'Account created successfully',
   LOGIN_SUCCESSFUL: 'Logged in successfully',
   LOGOUT_SUCCESSFUL: 'Logged out successfully',
   CURRENT_USER_RETRIEVED: 'Session is active',
+  PASSWORD_POLICY_RETRIEVED: 'Password rules',
+  AUTH_OPTIONS_RETRIEVED: 'Sign-in options',
   EMAIL_ALREADY_REGISTERED: 'An account with this email already exists',
   // Deliberately identical for "no such email" and "wrong password" so a caller
   // cannot use the login endpoint to discover which emails have accounts.
@@ -74,6 +76,21 @@ export const VALIDATION_MESSAGES = Object.freeze({
   PASSWORD_TOO_SHORT: `Password must be at least ${USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH} characters`,
   PASSWORD_TOO_LONG: `Password must be at most ${USER_FIELD_LIMITS.PASSWORD_MAX_BYTES} bytes`,
   NEW_PASSWORD_SAME_AS_CURRENT: 'The new password must be different from the current one',
+  FIRST_NAME_REQUIRED: 'First name is required',
+  FIRST_NAME_MUST_BE_STRING: 'First name must be text',
+  FIRST_NAME_TOO_LONG: `First name must be at most ${USER_FIELD_LIMITS.GIVEN_NAME_MAX_LENGTH} characters`,
+  LAST_NAME_REQUIRED: 'Last name is required',
+  LAST_NAME_MUST_BE_STRING: 'Last name must be text',
+  LAST_NAME_TOO_LONG: `Last name must be at most ${USER_FIELD_LIMITS.FAMILY_NAME_MAX_LENGTH} characters`,
+  PHONE_REQUIRED: 'Phone number is required',
+  PHONE_MUST_BE_STRING: 'Phone number must be text',
+  PHONE_INVALID:
+    'Enter a valid phone number: a 10-digit Indian mobile number, or the number with its country code (e.g. +44 20 7946 0958)',
+  TERMS_NOT_ACCEPTED: 'Please accept the terms of service and privacy policy to continue',
+  VERIFICATION_CODE_FORMAT: `Enter the ${ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS}-digit code from the email`,
+  CONFIRM_PASSWORD_REQUIRED: 'Type the password again to confirm it',
+  PASSWORDS_DO_NOT_MATCH: 'The two passwords do not match',
+  REMEMBER_DEVICE_MUST_BE_BOOLEAN: '"Remember this device" must be true or false',
   TOKEN_REQUIRED: 'The link token is required',
   TOKEN_MUST_BE_STRING: 'The link token must be a string',
 });
@@ -88,12 +105,15 @@ export const ACCOUNT_MESSAGES = Object.freeze({
  * signup, resend and forgot-password are the same whether or not the address has an account.
  */
 export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
-  SIGNUP_CHECK_EMAIL: 'Check your email for a link to finish signing up',
-  VERIFICATION_RESENT: 'If this address is waiting to be confirmed, a new link is on its way',
+  SIGNUP_CHECK_EMAIL: 'Check your email for a code and a link to finish signing up',
+  VERIFICATION_RESENT: 'If this address is waiting to be confirmed, a new code and link are on their way',
   EMAIL_VERIFIED: 'Email confirmed. You are signed in',
   VERIFICATION_LINK_INVALID: 'This confirmation link is not valid or has expired. Ask for a new one',
-  EMAIL_NOT_VERIFIED: 'Confirm your email address first: open the link we sent you, or ask for a new one',
-  PASSWORD_RESET_REQUESTED: 'If this address has an account, a link to reset the password is on its way',
+  VERIFICATION_CODE_INVALID:
+    'This code is not correct or has expired. Check the latest email we sent, or ask for a new code',
+  EMAIL_NOT_VERIFIED:
+    'Confirm your email address first: enter the code or open the link we sent you, or ask for a new one',
+  PASSWORD_RESET_REQUESTED: `If this address has an account, a link to reset the password is on its way. It works for ${ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000} minutes`,
   RESET_LINK_VALID: 'This password reset link is valid',
   RESET_LINK_INVALID: 'This password reset link is not valid or has expired. Ask for a new one',
   PASSWORD_RESET_DONE: 'Your password has been changed and every device signed out. Sign in with your new password',
@@ -513,4 +533,21 @@ export const PASSWORD_RULE_MESSAGES = Object.freeze({
   lowercaseLetter: 'Password must contain at least one lowercase letter (a-z)',
   digit: 'Password must contain at least one number (0-9)',
   specialCharacter: 'Password must contain at least one special character',
+});
+
+/** The password checklist the signup and reset screens show (GET /api/auth/password-policy). */
+export const PASSWORD_CHECKLIST_LABELS = Object.freeze({
+  minimumLength: `At least ${USER_FIELD_LIMITS.PASSWORD_MIN_LENGTH} characters`,
+  uppercaseLetter: 'One uppercase letter (A-Z)',
+  lowercaseLetter: 'One lowercase letter (a-z)',
+  digit: 'One number (0-9)',
+  specialCharacter: 'One symbol (for example @ $ # !)',
+});
+
+/** Words for the strength meter, by how many checklist items a password meets (PASSWORD_STRENGTH_LEVELS). */
+export const PASSWORD_STRENGTH_LABELS = Object.freeze({
+  weak: 'Weak',
+  fair: 'Fair',
+  good: 'Good',
+  strong: 'Strong',
 });

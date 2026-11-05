@@ -1,12 +1,16 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { VALIDATION_MESSAGES } from '../../constants/messages.js';
+import { TERMS_VERSION } from '../../constants/validation.js';
 import {
+  createSignedInClient,
   endEmailCooldowns,
   latestVerificationToken,
   mongoUnavailableReason,
   startTestServer,
   STRONG_PASSWORD,
+  TEST_APP_ORIGIN,
 } from './testServer.js';
 
 const skipReason = await mongoUnavailableReason();
@@ -24,12 +28,7 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
 
   it('signs a new user up as a customer, even when the body asks for another role, once the email is confirmed', async () => {
     const client = testServer.createClient();
-    const signupResponse = await client.post('/api/auth/signup', {
-      name: 'Asha Rao',
-      email: 'Asha.Rao@Example.com',
-      password: STRONG_PASSWORD,
-      role: 'admin',
-    });
+    const signupResponse = await client.signup('Asha Rao', 'Asha.Rao@Example.com', STRONG_PASSWORD, { role: 'admin' });
     assert.equal(signupResponse.status, 202);
     assert.equal(signupResponse.body.data.email, 'asha.rao@example.com');
     assert.equal(signupResponse.body.data.csrfToken, undefined, 'no session before the email is confirmed');
@@ -46,6 +45,41 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     const currentUserResponse = await client.get('/api/auth/me');
     assert.equal(currentUserResponse.status, 200);
     assert.equal(currentUserResponse.body.data.user.email, 'asha.rao@example.com');
+  });
+
+  it('stores the signup details: first and last name, the phone in international form, the terms accepted', async () => {
+    const stored = await testServer.database.collection('users').findOne({ email: 'asha.rao@example.com' });
+    assert.equal(stored.firstName, 'Asha');
+    assert.equal(stored.lastName, 'Rao');
+    assert.equal(stored.name, 'Asha Rao');
+    assert.equal(stored.phoneNumber, '+919876543210');
+    assert.equal(stored.phoneVerifiedAt, null);
+    assert.equal(stored.termsVersion, TERMS_VERSION);
+    assert.ok(stored.termsAcceptedAt instanceof Date);
+  });
+
+  it('names every missing or unusable signup field, with messages from the server', async () => {
+    const empty = await testServer.createClient().post('/api/auth/signup', {});
+    assert.equal(empty.status, 400);
+    assert.deepEqual(Object.fromEntries(empty.body.error.details.map(({ field, message }) => [field, message])), {
+      firstName: VALIDATION_MESSAGES.FIRST_NAME_REQUIRED,
+      lastName: VALIDATION_MESSAGES.LAST_NAME_REQUIRED,
+      email: VALIDATION_MESSAGES.EMAIL_REQUIRED,
+      phoneNumber: VALIDATION_MESSAGES.PHONE_REQUIRED,
+      password: VALIDATION_MESSAGES.PASSWORD_REQUIRED,
+      confirmPassword: VALIDATION_MESSAGES.CONFIRM_PASSWORD_REQUIRED,
+      acceptTerms: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED,
+    });
+
+    const unusable = await testServer
+      .createClient()
+      .signup('Ravi Kumar', 'ravi@example.com', STRONG_PASSWORD, { phoneNumber: '12345', acceptTerms: 'yes' });
+    assert.equal(unusable.status, 400);
+    assert.deepEqual(unusable.body.error.details, [
+      { field: 'phoneNumber', message: VALIDATION_MESSAGES.PHONE_INVALID },
+      { field: 'acceptTerms', message: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED },
+    ]);
+    assert.equal(await testServer.database.collection('users').countDocuments({ email: 'ravi@example.com' }), 0);
   });
 
   it('stores only a password hash', async () => {
@@ -76,6 +110,26 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
   it('requires a session for protected routes', async () => {
     const anonymousResponse = await testServer.createClient().get('/api/auth/me');
     assert.equal(anonymousResponse.status, 401);
+  });
+
+  it('publishes the password rules for the signup and reset screens, without a session', async () => {
+    const response = await testServer.createClient().get('/api/auth/password-policy');
+    assert.equal(response.status, 200);
+    const { checks, strengthLevels, minLength } = response.body.data;
+    assert.equal(minLength, 8);
+    assert.equal(checks.length, 5);
+    assert.ok(checks.slice(1).every((check) => typeof check.pattern.source === 'string' && check.label));
+    assert.equal(strengthLevels.at(-1).level, 'strong');
+  });
+
+  it('tells the sign-in screens the numbers they state, as configured', async () => {
+    const response = await testServer.createClient().get('/api/auth/options');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.data, {
+      rememberedSessionDays: 30,
+      verificationCodeDigits: 6,
+      passwordResetLinkMinutes: 15,
+    });
   });
 
   it('refuses state-changing requests without the CSRF token', async () => {
@@ -119,5 +173,52 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
 
     const newLoginResponse = await testServer.createClient().login('asha.rao@example.com', newPassword);
     assert.equal(newLoginResponse.status, 200);
+  });
+
+  it('keeps a session after the browser closes only when asked to remember the device', async () => {
+    const email = 'remy@example.com';
+    await createSignedInClient(testServer, { name: 'Remy Dsouza', email });
+    const send = (path, body, headers = {}) =>
+      fetch(`${testServer.baseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: TEST_APP_ORIGIN, ...headers },
+        body: JSON.stringify(body),
+      });
+    // Max-Age of each session cookie; null for a browser-session cookie.
+    const cookieLifetimes = (response) =>
+      response.headers.getSetCookie().map((line) => {
+        const maxAge = /;\s*max-age=(\d+)/i.exec(line)?.[1];
+        return maxAge === undefined ? null : Number(maxAge);
+      });
+    const rememberedSeconds = 30 * 24 * 60 * 60;
+    const lastsAboutThirtyDays = (seconds) => seconds > rememberedSeconds - 60 && seconds <= rememberedSeconds;
+
+    const plain = await send('/api/auth/login', { email, password: STRONG_PASSWORD });
+    assert.equal(plain.status, 200);
+    assert.deepEqual(cookieLifetimes(plain), [null, null], 'deleted when the browser closes');
+
+    const remembered = await send('/api/auth/login', { email, password: STRONG_PASSWORD, rememberDevice: true });
+    assert.equal(remembered.status, 200);
+    assert.ok(cookieLifetimes(remembered).every(lastsAboutThirtyDays), String(cookieLifetimes(remembered)));
+
+    const notABoolean = await send('/api/auth/login', { email, password: STRONG_PASSWORD, rememberDevice: 'true' });
+    assert.equal(notABoolean.status, 400);
+    assert.deepEqual((await notABoolean.json()).error.details, [
+      { field: 'rememberDevice', message: VALIDATION_MESSAGES.REMEMBER_DEVICE_MUST_BE_BOOLEAN },
+    ]);
+
+    // Changing the password renews the session; a remembered one stays remembered.
+    const { csrfToken } = (await remembered.json()).data;
+    const cookies = remembered.headers
+      .getSetCookie()
+      .map((line) => line.split(';')[0])
+      .join('; ');
+    const changed = await send(
+      '/api/auth/password',
+      { currentPassword: STRONG_PASSWORD, newPassword: 'Third#Pass2028' },
+      { Cookie: cookies, 'X-CSRF-Token': csrfToken },
+    );
+    assert.equal(changed.status, 200);
+    assert.ok(cookieLifetimes(changed).every(lastsAboutThirtyDays), String(cookieLifetimes(changed)));
   });
 });

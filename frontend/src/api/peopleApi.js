@@ -52,5 +52,5 @@ export const requestEmployeeImportResults = (importJobId, callerSignal) =>
 
 export const requestInvitationPreview = (token, callerSignal) =>
   getData(`/api/invitations/${encode(token)}`, callerSignal);
-export const requestInvitationAcceptance = (token, password) =>
-  postData(`/api/invitations/${encode(token)}/accept`, { password });
+export const requestInvitationAcceptance = (token, { password, confirmPassword, acceptTerms }) =>
+  postData(`/api/invitations/${encode(token)}/accept`, { password, confirmPassword, acceptTerms });

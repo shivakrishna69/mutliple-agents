@@ -22,6 +22,7 @@ export function toCompanySettingsSummary(settings) {
     shortCode: settings.shortCode,
     emailDomain: settings.emailDomain,
     logoUrl: settings.logoUrl,
+    ...toCompanyContactLinks(settings),
     brandColors: { primary: settings.brandColors.primary, accent: settings.brandColors.accent },
     timeZone: settings.timeZone,
     employeeIdDigits: settings.employeeIdDigits,
@@ -41,12 +42,25 @@ export function toPresenceSettings(settings) {
   };
 }
 
-/** What anyone may see, signed in or not: the sign-in page shows the company's name and logo. */
+/** Where people reach the company and read what they agree to; null when not set. */
+function toCompanyContactLinks(settings) {
+  return {
+    supportEmail: settings.supportEmail ?? null,
+    termsUrl: settings.termsUrl ?? null,
+    privacyUrl: settings.privacyUrl ?? null,
+  };
+}
+
+/**
+ * What anyone may see, signed in or not: the sign-in pages show the company's name and logo, its
+ * support address, and links to its terms and privacy policy.
+ */
 export function toCompanyBranding(settings) {
   return {
     name: settings.name,
     shortCode: settings.shortCode,
     logoUrl: settings.logoUrl,
+    ...toCompanyContactLinks(settings),
     brandColors: { primary: settings.brandColors.primary, accent: settings.brandColors.accent },
   };
 }

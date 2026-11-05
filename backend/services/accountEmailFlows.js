@@ -26,7 +26,7 @@ import User, { ACCOUNT_STATUSES, ROLES } from '../models/User.js';
 import { ACCOUNT_TOKEN_PURPOSES } from '../models/AccountToken.js';
 import { ACCOUNT_EMAIL_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { ACCOUNT_EMAIL_SETTINGS, ACCOUNT_LINK_PATHS } from '../constants/validation.js';
+import { ACCOUNT_EMAIL_SETTINGS, ACCOUNT_LINK_PATHS, TERMS_VERSION } from '../constants/validation.js';
 import { logger } from '../utils/logger.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 import {
@@ -36,6 +36,8 @@ import {
   buildVerificationEmail,
 } from './accountEmails.js';
 import {
+  ACCOUNT_CODE_OUTCOMES,
+  consumeAccountCode,
   consumeAccountToken,
   findUsableAccountToken,
   issueAccountToken,
@@ -48,6 +50,7 @@ export const ACCOUNT_FLOW_ERROR_CODES = Object.freeze({
   EMAIL_UNAVAILABLE: 'EMAIL_UNAVAILABLE',
   EMAIL_COOLDOWN: 'EMAIL_COOLDOWN',
   VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
+  VERIFICATION_CODE_INVALID: 'VERIFICATION_CODE_INVALID',
   RESET_LINK_INVALID: 'RESET_LINK_INVALID',
 });
 
@@ -79,6 +82,8 @@ const settings = ACCOUNT_EMAIL_SETTINGS;
 const linkFailure = (code, message) => new AccountFlowError(HTTP_STATUS.BAD_REQUEST, code, message);
 const invalidVerificationLink = () =>
   linkFailure(ACCOUNT_FLOW_ERROR_CODES.VERIFICATION_LINK_INVALID, ACCOUNT_EMAIL_MESSAGES.VERIFICATION_LINK_INVALID);
+const invalidVerificationCode = () =>
+  linkFailure(ACCOUNT_FLOW_ERROR_CODES.VERIFICATION_CODE_INVALID, ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
 const invalidResetLink = () =>
   linkFailure(ACCOUNT_FLOW_ERROR_CODES.RESET_LINK_INVALID, ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
 
@@ -114,15 +119,18 @@ async function deliver(user, message, kind) {
 }
 
 async function sendVerificationLink(user, { companyName, appPublicUrl }) {
-  const { rawToken } = await issueAccountToken(
+  const { rawToken, code } = await issueAccountToken(
     user._id,
     ACCOUNT_TOKEN_PURPOSES.EMAIL_VERIFICATION,
     settings.EMAIL_VERIFICATION_VALIDITY_MS,
+    new Date(),
+    { codeDigits: settings.VERIFICATION_CODE_DIGITS },
   );
   const message = buildVerificationEmail({
     name: user.name,
     companyName,
     verificationUrl: tokenUrl(appPublicUrl, ACCOUNT_LINK_PATHS.EMAIL_VERIFICATION, rawToken),
+    verificationCode: code,
     validityMs: settings.EMAIL_VERIFICATION_VALIDITY_MS,
   });
   await deliver(user, message, 'email_verification');
@@ -132,14 +140,14 @@ async function sendVerificationLink(user, { companyName, appPublicUrl }) {
  * A new unverified account, or the unverified account with this email taken over by the new
  * signup; or, when the email belongs to any other account, that account untouched.
  */
-async function createOrReplaceUnverifiedAccount({ name, email, password, role }) {
+async function createOrReplaceUnverifiedAccount({ email, password, details }) {
   // Two passes: when a signup for the same new address creates it between our lookup and insert,
   // the second pass finds it.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const existing = await User.findOne({ email });
     if (!existing) {
       try {
-        const created = await User.create({ name, email, password, role, status: ACCOUNT_STATUSES.UNVERIFIED });
+        const created = await User.create({ ...details, email, password, status: ACCOUNT_STATUSES.UNVERIFIED });
         return { outcome: SIGNUP_OUTCOMES.CREATED, user: created };
       } catch (creationError) {
         if (!(isDuplicateKeyError(creationError) && creationError.keyPattern?.email)) throw creationError;
@@ -151,7 +159,7 @@ async function createOrReplaceUnverifiedAccount({ name, email, password, role })
     }
     // Earlier links first: none of them may confirm the account with the new password.
     await revokeAccountTokens(existing._id);
-    existing.set({ name, password, role });
+    existing.set({ ...details, password });
     await existing.save();
     return { outcome: SIGNUP_OUTCOMES.REPLACED_UNVERIFIED, user: existing };
   }
@@ -159,19 +167,40 @@ async function createOrReplaceUnverifiedAccount({ name, email, password, role })
 }
 
 /**
- * POST /api/auth/signup. Input already validated and normalised.
- * @param {{ name: string, email: string, password: string, bootstrapAdminEmail: string|null,
+ * POST /api/auth/signup. Input already validated and normalised (validators/authValidators.js).
+ * @param {{ firstName: string, lastName: string, name: string, email: string, phoneNumber: string,
+ *   password: string, bootstrapAdminEmail: string|null,
  *   emailContext: { companyName: string, appPublicUrl: string } }} signup
  * @returns {Promise<{ outcome: string, userId: string }>}  for the audit log only
  */
-export async function registerAccount({ name, email, password, bootstrapAdminEmail, emailContext }) {
+export async function registerAccount({
+  firstName,
+  lastName,
+  name,
+  email,
+  phoneNumber,
+  password,
+  bootstrapAdminEmail,
+  emailContext,
+}) {
   assertMailAvailable();
   await claimCooldownOrThrow(EMAIL_COOLDOWN_CHANNELS.EMAIL_VERIFICATION, email);
 
   // Every self-registered account is a customer, except the deployment's configured first admin
   // (BOOTSTRAP_ADMIN_EMAIL), which must confirm its email like everyone else.
   const role = bootstrapAdminEmail && email === bootstrapAdminEmail ? ROLES.ADMIN : ROLES.CUSTOMER;
-  const { outcome, user } = await createOrReplaceUnverifiedAccount({ name, email, password, role });
+  // The signup's own details; they also replace those of an unconfirmed account with this address.
+  const details = {
+    firstName,
+    lastName,
+    name,
+    phoneNumber,
+    phoneVerifiedAt: null,
+    role,
+    termsVersion: TERMS_VERSION,
+    termsAcceptedAt: new Date(),
+  };
+  const { outcome, user } = await createOrReplaceUnverifiedAccount({ email, password, details });
 
   if (outcome !== SIGNUP_OUTCOMES.ALREADY_REGISTERED) {
     await sendVerificationLink(user, emailContext);
@@ -209,12 +238,38 @@ export async function resendVerification({ email, emailContext }) {
 export async function verifyEmail(rawToken, now = new Date()) {
   const userId = await consumeAccountToken(rawToken, ACCOUNT_TOKEN_PURPOSES.EMAIL_VERIFICATION, now);
   if (!userId) throw invalidVerificationLink();
+  return activateVerifiedAccount(userId, now, invalidVerificationLink);
+}
+
+/**
+ * POST /api/auth/verify-email with { email, code }: the code from the confirmation email, typed in
+ * instead of opening its link. A wrong code, an unknown address and an account with nothing to
+ * confirm all get the same answer; wrong codes count towards VERIFICATION_CODE_MAX_ATTEMPTS.
+ * @returns {Promise<object>}  the User document
+ */
+export async function verifyEmailWithCode({ email, code }, now = new Date()) {
+  const user = await User.findOne({ email, status: ACCOUNT_STATUSES.UNVERIFIED }).select('_id').lean();
+  const outcome = user
+    ? await consumeAccountCode(
+        user._id,
+        ACCOUNT_TOKEN_PURPOSES.EMAIL_VERIFICATION,
+        code,
+        settings.VERIFICATION_CODE_MAX_ATTEMPTS,
+        now,
+      )
+    : ACCOUNT_CODE_OUTCOMES.NONE;
+  if (outcome !== ACCOUNT_CODE_OUTCOMES.USED) throw invalidVerificationCode();
+  return activateVerifiedAccount(user._id, now, invalidVerificationCode);
+}
+
+/** The confirmed account becomes active; its other links are revoked. */
+async function activateVerifiedAccount(userId, now, invalidError) {
   const user = await User.findOneAndUpdate(
     { _id: userId, status: ACCOUNT_STATUSES.UNVERIFIED },
     { $set: { status: ACCOUNT_STATUSES.ACTIVE, emailVerifiedAt: now } },
     { new: true },
   );
-  if (!user) throw invalidVerificationLink();
+  if (!user) throw invalidError();
   await revokeAccountTokens(userId);
   return user;
 }

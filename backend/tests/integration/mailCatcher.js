@@ -15,6 +15,8 @@ import { simpleParser } from 'mailparser';
 import { SMTPServer } from 'smtp-server';
 
 const DEFAULT_WAIT_MS = 10_000;
+/** A sender hanging up mid-conversation: expected when a test server stops, not a test failure. */
+const CLIENT_DISCONNECT_CODES = new Set(['ECONNRESET', 'EPIPE']);
 
 function listen(server, port) {
   return new Promise((resolve, reject) => {
@@ -53,6 +55,12 @@ export async function startMailCatcher({ httpPort } = {}) {
         })
         .catch(callback);
     },
+  });
+  // The backend's pooled mail connections may be cut when a test server stops. smtp-server reports
+  // that as an 'error' event, which with no listener would crash the test run after every test passed.
+  smtpServer.on('error', (connectionError) => {
+    if (CLIENT_DISCONNECT_CODES.has(connectionError.code)) return;
+    console.error('Test mail inbox error:', connectionError);
   });
   const smtpPort = await listen(smtpServer.server, 0);
 

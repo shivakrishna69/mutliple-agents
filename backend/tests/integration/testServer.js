@@ -37,6 +37,8 @@ export const TEST_APP_ORIGIN = 'http://localhost:5173';
 export const TEST_ADMIN_EMAIL = 'admin@example.com';
 export const STRONG_PASSWORD = 'Valid#Pass2026';
 export const TEST_MAIL_FROM = 'Test HR <hr@test.example>';
+/** An Indian mobile number as people type it; the backend stores it as +919876543210. */
+export const TEST_PHONE_NUMBER = '98765 43210';
 
 /** Host variables the child needs to run at all; nothing application-specific is inherited. */
 const INHERITED_ENVIRONMENT_KEYS = ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'TEMP', 'TMP', 'HOME', 'USERPROFILE'];
@@ -267,8 +269,22 @@ export class TestClient {
     return this.request('POST', requestPath, { body: form });
   }
 
-  signup(name, email, password = STRONG_PASSWORD) {
-    return this.post('/api/auth/signup', { name, email, password });
+  /**
+   * Signs up with everything the signup form asks for. `name` is split into first and last name
+   * (one word gets the last name "Tester"); `overrides` replace any field.
+   */
+  signup(name, email, password = STRONG_PASSWORD, overrides = {}) {
+    const [firstName, ...otherNames] = name.split(' ');
+    return this.post('/api/auth/signup', {
+      firstName,
+      lastName: otherNames.join(' ') || 'Tester',
+      email,
+      phoneNumber: TEST_PHONE_NUMBER,
+      password,
+      confirmPassword: password,
+      acceptTerms: true,
+      ...overrides,
+    });
   }
 
   login(email, password = STRONG_PASSWORD) {

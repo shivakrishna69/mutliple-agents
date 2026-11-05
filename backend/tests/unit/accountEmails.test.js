@@ -37,16 +37,19 @@ describe('describeDuration', () => {
 });
 
 describe('account emails', () => {
-  it('asks to confirm the address, with a link that works once for the stated time', () => {
+  it('asks to confirm the address with a code or a link, both working once for the stated time', () => {
     const email = buildVerificationEmail({
       name: HOSTILE_TEXT,
       companyName: 'Acme',
       verificationUrl: LINK,
+      verificationCode: '042917',
       validityMs: 24 * 60 * 60 * 1000,
     });
     assertSafeAndLinked(email, LINK);
-    assert.equal(email.subject, 'Confirm your email for Acme');
-    assert.match(email.text, /expires in 24 hours/);
+    assert.equal(email.subject, '042917 is your Acme confirmation code');
+    assert.match(email.text, /: 042917$/m);
+    assert.ok(email.html.includes('>042917</p>'), 'the code is shown in the HTML version');
+    assert.match(email.text, /expire in 24 hours/);
   });
 
   it('offers a password reset that expires, and says what to do if it was not asked for', () => {
