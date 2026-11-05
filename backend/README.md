@@ -65,26 +65,38 @@ scripts/         operational scripts
 
 ## Signup, email confirmation and password reset
 
-Signing up creates an **unverified** account and emails a confirmation link; the account cannot sign
-in until the link is opened (`services/accountEmailFlows.js`, `controllers/accountEmailController.js`).
+Signing up creates an **unverified** account and emails a 6-digit code and a confirmation link; the
+account cannot sign in until one of them is used (`services/accountEmailFlows.js`,
+`controllers/accountEmailController.js`).
 
 | Endpoint | What it does |
 |---|---|
-| `POST /api/auth/signup` `{ name, email, password }` | 202 "check your email"; no session yet |
-| `POST /api/auth/verify-email` `{ token }` | confirms the email and signs in (200, with the session) |
-| `POST /api/auth/verify-email/resend` `{ email }` | a new confirmation link |
-| `POST /api/auth/password/forgot` `{ email }` | a reset link for an active account (a confirmation link for an unverified one) |
+| `POST /api/auth/signup` `{ firstName, lastName, email, phoneNumber, password, confirmPassword, acceptTerms }` | 202 "check your email" with `resendAfterSeconds` and `codeDigits`; no session yet. The phone is stored in E.164 (Indian numbers by default; not verified yet), with the terms version and time agreed to |
+| `POST /api/auth/verify-email` `{ token }` or `{ email, code }` | confirms the email and signs in (200, with the session) |
+| `POST /api/auth/verify-email/resend` `{ email }` | a new code and link |
+| `POST /api/auth/login` `{ email, password, rememberDevice }` | signs in; with `rememberDevice` the cookies last `REMEMBERED_SESSION_DAYS` (default 30), otherwise they end with the browser |
+| `POST /api/auth/password/forgot` `{ email }` | a reset link for an active account (a confirmation email for an unverified one); answers with `linkValidMinutes` |
 | `GET /api/auth/password/reset/:token` | whether a reset link still works, and until when |
-| `POST /api/auth/password/reset` `{ token, password }` | new password; every session ends; the owner is emailed |
+| `POST /api/auth/password/reset` `{ token, password, confirmPassword }` | new password; every session ends; the owner is emailed |
+| `GET /api/auth/password-policy` | the password rules (each check's label and pattern) and the strength meter's levels, so screens show the server's own rules |
+| `GET /api/auth/options` | `rememberedSessionDays`, `verificationCodeDigits`, `passwordResetLinkMinutes` for the screens' wording |
+
+The signed-out screens also read `GET /api/company/branding`, which includes the company's
+`supportEmail`, `termsUrl` and `privacyUrl` (set by the admin). The invitation preview
+(`GET /api/invitations/:token`) names the inviter and the employee ID, and accepting it takes
+`{ password, confirmPassword, acceptTerms }`. Every password form's repeat is checked on the server
+(`PASSWORDS_DO_NOT_MATCH`).
 
 - **Messages come from the server.** Every answer carries a `message` from `constants/messages.js`,
   and errors a stable `code`: `EMAIL_NOT_VERIFIED` (403 at login, right password only),
-  `VERIFICATION_LINK_INVALID` / `RESET_LINK_INVALID` (400), `EMAIL_COOLDOWN` (429, with
+  `VERIFICATION_LINK_INVALID` / `VERIFICATION_CODE_INVALID` / `RESET_LINK_INVALID` (400), `EMAIL_COOLDOWN` (429, with
   `Retry-After` and `error.context.retryAfterSeconds`), `EMAIL_UNAVAILABLE` (503, no SMTP).
   Screens show these texts; they do not write their own.
 - **Links** are 32 random bytes; only their SHA-256 is stored (`models/AccountToken.js`). A link works
-  once, expires (confirmation 24 h, reset 1 h: `ACCOUNT_EMAIL_SETTINGS`), and issuing one revokes
+  once, expires (confirmation 24 h, reset 15 minutes: `ACCOUNT_EMAIL_SETTINGS`), and issuing one revokes
   the account's earlier ones, so only the newest works.
+- **Codes** are stored as an HMAC keyed from `JWT_SECRET`, never in plain text, and share the link's
+  expiry. Five wrong codes end that code (and its link); asking for a new email gives a fresh one.
 - **Nothing reveals which emails are registered.** Signup, resend and forgot answer alike for every
   address; signing up with a registered one emails its owner instead.
 - **Unconfirmed accounts can be taken over** by a new signup (its earlier links are revoked first)
