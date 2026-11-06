@@ -295,3 +295,11 @@ export function ArrowLeftIcon(iconProps) {
     </OutlineIcon>
   );
 }
+
+export function ChevronDownIcon(iconProps) {
+  return (
+    <OutlineIcon {...iconProps}>
+      <path d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+    </OutlineIcon>
+  );
+}

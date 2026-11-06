@@ -9,8 +9,11 @@
  *
  * `trailingControl` renders inside the input's right edge (e.g. the password visibility toggle);
  * the input gets matching right padding so text never runs under it. `leadingIcon` (decorative)
- * renders inside the left edge the same way.
+ * renders inside the left edge the same way. `appearance` picks the look: "default" for the
+ * signed-in pages, "auth" for the signed-out screens' design (constants/formStyles.js).
  */
+
+import { FIELD_APPEARANCES } from '../constants/formStyles.js';
 
 export default function FormField({
   fieldId,
@@ -21,23 +24,27 @@ export default function FormField({
   autoCompleteHint,
   inputRef,
   placeholder,
+  inputMode,
+  maxLength,
   describedByIds = [],
   trailingControl = null,
   leadingIcon = null,
+  appearance = 'default',
   onFieldChange,
   onFieldBlur,
   children,
 }) {
+  const look = FIELD_APPEARANCES[appearance];
   const errorMessageId = `${fieldId}-error`;
   const ariaDescribedBy =
     [errorMessage ? errorMessageId : null, ...describedByIds].filter(Boolean).join(' ') || undefined;
 
   return (
     <div>
-      <label htmlFor={fieldId} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={fieldId} className={look.label}>
         {label}
       </label>
-      <div className="relative mt-1.5">
+      <div className={`relative ${look.gap}`}>
         {leadingIcon && (
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
             {leadingIcon}
@@ -50,28 +57,24 @@ export default function FormField({
           ref={inputRef}
           value={fieldValue}
           placeholder={placeholder}
+          inputMode={inputMode}
+          maxLength={maxLength}
           onChange={onFieldChange}
           onBlur={onFieldBlur}
           autoComplete={autoCompleteHint}
           aria-invalid={errorMessage ? 'true' : 'false'}
           aria-describedby={ariaDescribedBy}
           className={[
-            'block w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition',
-            'placeholder:text-slate-400 focus:outline-none focus:ring-4',
-            'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
-            trailingControl ? 'pr-11' : '',
-            leadingIcon ? 'pl-11' : '',
-            errorMessage
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-              : 'border-slate-200 hover:border-slate-300 focus:border-brand-500 focus:ring-brand-100',
+            look.input,
+            trailingControl ? look.trailingPadding : '',
+            leadingIcon ? look.leadingPadding : '',
+            errorMessage ? look.invalid : look.valid,
           ].join(' ')}
         />
-        {trailingControl && (
-          <div className="absolute inset-y-0 right-0 flex items-center pr-1.5">{trailingControl}</div>
-        )}
+        {trailingControl && <div className="absolute inset-y-0 right-0 flex items-center pr-2">{trailingControl}</div>}
       </div>
       {errorMessage && (
-        <p id={errorMessageId} className="mt-1.5 text-sm text-red-600">
+        <p id={errorMessageId} className={look.error}>
           {errorMessage}
         </p>
       )}

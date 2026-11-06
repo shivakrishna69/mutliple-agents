@@ -39,6 +39,8 @@ export const STRONG_PASSWORD = 'Valid#Pass2026';
 export const TEST_MAIL_FROM = 'Test HR <hr@test.example>';
 /** An Indian mobile number as people type it; the backend stores it as +919876543210. */
 export const TEST_PHONE_NUMBER = '98765 43210';
+export const TEST_BIRTH_DATE = '1990-05-17';
+export const TEST_GENDER = 'prefer_not_to_say';
 
 /** Host variables the child needs to run at all; nothing application-specific is inherited. */
 const INHERITED_ENVIRONMENT_KEYS = ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'TEMP', 'TMP', 'HOME', 'USERPROFILE'];
@@ -280,6 +282,8 @@ export class TestClient {
       lastName: otherNames.join(' ') || 'Tester',
       email,
       phoneNumber: TEST_PHONE_NUMBER,
+      dateOfBirth: TEST_BIRTH_DATE,
+      gender: TEST_GENDER,
       password,
       confirmPassword: password,
       acceptTerms: true,

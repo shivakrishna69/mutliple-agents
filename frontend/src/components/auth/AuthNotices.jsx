@@ -10,10 +10,10 @@ export function SuccessNotice({ children }) {
   return (
     <div
       role="status"
-      className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"
+      className="flex items-start gap-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/90 px-3.5 py-2.5 text-[13px] leading-relaxed text-emerald-900"
     >
       <svg
-        className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
+        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
         viewBox="0 0 20 20"
         fill="currentColor"
         aria-hidden="true"
@@ -29,15 +29,11 @@ export function SuccessNotice({ children }) {
   );
 }
 
-/**
- * @param {{ fieldId: string, checked: boolean, onChange: (checked: boolean) => void,
- *   children: React.ReactNode, errorMessage?: string|null }} props
- */
 export function CheckboxField({ fieldId, checked, onChange, children, errorMessage = null }) {
   const errorId = `${fieldId}-error`;
   return (
     <div>
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         <input
           id={fieldId}
           name={fieldId}
@@ -46,14 +42,14 @@ export function CheckboxField({ fieldId, checked, onChange, children, errorMessa
           onChange={(changeEvent) => onChange(changeEvent.target.checked)}
           aria-invalid={errorMessage ? 'true' : 'false'}
           aria-describedby={errorMessage ? errorId : undefined}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 accent-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded-[5px] border-slate-300 accent-brand-600 focus-visible:ring-2 focus-visible:ring-brand-500"
         />
-        <label htmlFor={fieldId} className="text-sm leading-relaxed text-slate-600">
+        <label htmlFor={fieldId} className="cursor-pointer text-sm leading-snug text-slate-600">
           {children}
         </label>
       </div>
       {errorMessage && (
-        <p id={errorId} className="mt-1.5 text-sm text-red-600">
+        <p id={errorId} className="mt-1.5 text-[13px] text-red-600">
           {errorMessage}
         </p>
       )}

@@ -29,9 +29,9 @@ export function useCountdown(initialSeconds = 0) {
   return { secondsLeft, start };
 }
 
-/** 45 -> "0:45", 125 -> "2:05". */
+/** 45 -> "00:45", 125 -> "02:05" (as in the sign-in designs). */
 export function formatCountdown(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }

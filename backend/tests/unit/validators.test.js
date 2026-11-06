@@ -53,6 +53,8 @@ describe('validateRegistrationInput', () => {
     lastName: 'Rao',
     email: 'asha.rao@example.com',
     phoneNumber: '98765 43210',
+    dateOfBirth: '1994-03-21',
+    gender: 'female',
     password: STRONG_PASSWORD,
     confirmPassword: STRONG_PASSWORD,
     acceptTerms: true,
@@ -73,8 +75,8 @@ describe('validateRegistrationInput', () => {
       name: 'Asha Rao',
       email: 'asha.rao@example.com',
       phoneNumber: '+919876543210',
-      dateOfBirth: null,
-      gender: null,
+      dateOfBirth: new Date('1994-03-21T00:00:00.000Z'),
+      gender: 'female',
       password: STRONG_PASSWORD,
     });
   });
@@ -90,17 +92,20 @@ describe('validateRegistrationInput', () => {
     assert.equal(result.sanitizedInput.gender, 'female');
   });
 
-  it('accepts a signup without date of birth and gender while they are not required, and checks them when sent', () => {
-    assert.equal(validateRegistrationInput(validSignup, { now }).isValid, true);
+  const { dateOfBirth: _leftOutBirthDate, gender: _leftOutGender, ...withoutBirthDateAndGender } = validSignup;
+  const optional = { now, requireBirthDateAndGender: false };
+
+  it('accepts a signup without date of birth and gender when they are not required, and checks them when sent', () => {
+    assert.equal(validateRegistrationInput(withoutBirthDateAndGender, optional).isValid, true);
     const sentWrong = validateRegistrationInput(
-      { ...validSignup, dateOfBirth: '1994-02-30', gender: 'other' },
-      { now },
+      { ...withoutBirthDateAndGender, dateOfBirth: '1994-02-30', gender: 'other' },
+      optional,
     );
     assert.deepEqual(fieldsOf(sentWrong).sort(), ['dateOfBirth', 'gender']);
   });
 
-  it('asks for date of birth and gender once they are required', () => {
-    const result = validateRegistrationInput(validSignup, required);
+  it('asks for date of birth and gender when they are required (the default)', () => {
+    const result = validateRegistrationInput(withoutBirthDateAndGender, { now });
     assert.deepEqual(
       result.validationErrors.filter((error) => ['dateOfBirth', 'gender'].includes(error.field)),
       [
@@ -167,8 +172,10 @@ describe('validateRegistrationInput', () => {
     assert.deepEqual(fieldsOf(result).sort(), [
       'acceptTerms',
       'confirmPassword',
+      'dateOfBirth',
       'email',
       'firstName',
+      'gender',
       'lastName',
       'password',
       'phoneNumber',

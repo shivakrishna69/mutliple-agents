@@ -1,150 +1,181 @@
 /**
  * The frame of every signed-out screen (sign in, sign up, check your email, forgot and reset
- * password, invitation):
+ * password, the confirmation link, the invitation), as in the sign-in designs:
  *
- *   top bar      logo and company name; Sign in / Register; Support (when the company set an address)
- *   lg and up    [ hero panel: headline and artwork | the screen's own content ]
- *   below lg     the content only, under the top bar
- *   footer       © year and company name; terms and privacy links when the company set them
+ *   page       soft blue light with a fine dot grid, exactly one screen high (h-dvh): nothing on
+ *              the page scrolls
+ *   card       a rounded light card holding, side by side on large screens,
+ *     left     the showcase: animated artwork, "Back to Home" (the company website, when set) and a
+ *              glass caption with slides, dots and arrows
+ *     right    the screen: logo (or the screen's own header), title, description, content, footer;
+ *              `surface="panel"` sets it on a white inner panel (the forgot-password design)
+ *   small      the showcase is hidden and the screen fills the card
  *
- * The company's name, logo, support address and links come from the server
- * (hooks/usePublicAuthSettings.js); until they arrive the product's own name and logo are shown.
- * Only UI labels are written here; every message a screen shows comes from the API.
+ * Sizes and spacing scale with the window height (clamp on vh), so every screen fits from a small
+ * laptop up. Only a screen taller than a very short window scrolls, inside its own column.
+ *
+ * Inside the frame the brand colour is the design's blue (.auth-theme in index.css). The company's
+ * name, logo and links come from the server (hooks/usePublicAuthSettings.js); only UI labels are
+ * written here, and every message a screen shows comes from the API.
  */
 
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
 import BrandMark from '../BrandMark.jsx';
-import { QuestionIcon } from '../Icons.jsx';
-import { APP_FULL_NAME } from '../../constants/app.js';
-import { DEFAULT_AUTH_HERO } from '../../constants/authScreens.js';
-import { ROUTE_PATHS } from '../../constants/routes.js';
+import { ArrowLeftIcon, ArrowRightIcon } from '../Icons.jsx';
+import { AUTH_SLIDE_INTERVAL_MS } from '../../constants/authScreens.js';
 import AuthArtwork from './AuthArtwork.jsx';
 
-const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70';
+const glassButton = `inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white backdrop-blur-md transition hover:bg-white/15 ${focusRing}`;
 
-function CompanyLogo({ branding }) {
+/** The company's logo when it has set one, else the product's. */
+export function CompanyLogo({ branding }) {
   if (branding?.logoUrl) {
-    return <img src={branding.logoUrl} alt="" className="h-9 w-auto max-w-[9rem] object-contain" />;
+    return <img src={branding.logoUrl} alt={branding.name} className="h-10 w-auto max-w-[10rem] object-contain" />;
   }
   return <BrandMark size="md" />;
 }
 
-function TopBar({ branding, activeLink }) {
-  const navLink = (to, label, isPrimary) =>
-    isPrimary ? (
-      <Link
-        to={to}
-        className={`rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-500 ${focusRing}`}
-      >
-        {label}
-      </Link>
-    ) : (
-      <Link
-        to={to}
-        className={`rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 ${focusRing}`}
-      >
-        {label}
-      </Link>
-    );
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+function SlideCaption({ slides }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const slideCount = slides.length;
+
+  useEffect(() => {
+    if (isPaused || slideCount < 2 || prefersReducedMotion()) return undefined;
+    const timer = setInterval(() => setActiveIndex((index) => (index + 1) % slideCount), AUTH_SLIDE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [isPaused, slideCount]);
+
+  const show = (index) => setActiveIndex((index + slideCount) % slideCount);
+  const slide = slides[activeIndex];
 
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <Link to={ROUTE_PATHS.LOGIN} className={`flex min-w-0 items-center gap-3 rounded-lg ${focusRing}`}>
-          <CompanyLogo branding={branding} />
-          <span className="hidden truncate text-lg font-semibold tracking-tight text-slate-900 sm:block">
-            {branding?.name ?? APP_FULL_NAME}
-          </span>
-        </Link>
-        <nav aria-label="Account" className="flex shrink-0 items-center gap-1 sm:gap-2">
-          {navLink(ROUTE_PATHS.LOGIN, 'Sign in', activeLink === 'login')}
-          {navLink(ROUTE_PATHS.SIGNUP, 'Register', activeLink === 'signup')}
-          {branding?.supportEmail && (
-            <a
-              href={`mailto:${branding.supportEmail}`}
-              className={`ml-1 hidden items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 sm:flex ${focusRing}`}
-            >
-              <QuestionIcon className="h-5 w-5" />
-              Support
-            </a>
-          )}
-        </nav>
+    <div
+      className="absolute inset-x-[clamp(1rem,2.2vh,1.75rem)] bottom-[clamp(1rem,2.2vh,1.75rem)] rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-white/[0.10] to-white/[0.03] p-[clamp(1.25rem,3vh,2rem)] shadow-2xl shadow-black/40 backdrop-blur-xl"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocus={() => setIsPaused(true)}
+      onBlur={() => setIsPaused(false)}
+    >
+      <div key={activeIndex} className="auth-rise" aria-live={isPaused ? 'polite' : 'off'}>
+        <h2 className="font-display text-[clamp(1.15rem,2.9vh,1.75rem)] leading-[1.3] tracking-[-0.01em] text-white">
+          {slide.title}
+        </h2>
+        <p className="mt-[clamp(0.5rem,1.4vh,0.9rem)] text-[clamp(0.875rem,1.9vh,1.05rem)] leading-relaxed text-white/75">
+          {slide.text}
+        </p>
       </div>
-    </header>
+      <div className="mt-[clamp(1rem,3.4vh,2.25rem)] flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {slides.map((candidate, index) => (
+            <button
+              key={candidate.title}
+              type="button"
+              onClick={() => show(index)}
+              aria-label={`Show slide ${index + 1} of ${slideCount}`}
+              aria-current={index === activeIndex}
+              className={`h-1.5 rounded-full transition-all duration-500 ${focusRing} ${
+                index === activeIndex ? 'w-7 bg-white' : 'w-1.5 bg-white/35 hover:bg-white/60'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => show(activeIndex - 1)}
+            aria-label="Previous slide"
+            className={`h-10 w-10 ${glassButton}`}
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => show(activeIndex + 1)}
+            aria-label="Next slide"
+            className={`h-10 w-10 ${glassButton}`}
+          >
+            <ArrowRightIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function HeroPanel({ hero }) {
+function Showcase({ branding, slides }) {
   return (
     <section
+      aria-roledescription="carousel"
       aria-label="About the workspace"
-      className="relative hidden flex-col justify-between gap-10 overflow-hidden border-r border-slate-200 bg-slate-50 px-10 py-12 lg:flex lg:w-1/2 xl:px-16"
+      className="relative hidden shrink-0 overflow-hidden rounded-[1.6rem] bg-[#020617] shadow-xl shadow-slate-900/20 lg:block lg:w-[45%] xl:w-[46%]"
     >
-      <div className="max-w-xl">
-        <p className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold tracking-wide text-brand-700 uppercase">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-500" aria-hidden="true" />
-          {hero.kicker}
-        </p>
-        <h2 className="mt-6 text-4xl leading-tight font-bold tracking-tight text-slate-900 xl:text-5xl">
-          {hero.title} <span className="text-brand-600">{hero.accent}</span>
-        </h2>
-        <p className="mt-5 text-lg leading-relaxed text-slate-600">{hero.description}</p>
-      </div>
       <AuthArtwork />
+      {branding?.websiteUrl && (
+        <a
+          href={branding.websiteUrl}
+          className={`absolute top-[clamp(1rem,2.6vh,1.75rem)] left-[clamp(1rem,2.6vh,1.75rem)] gap-2 px-4 py-2 text-sm font-medium ${glassButton}`}
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          Back to Home
+        </a>
+      )}
+      <SlideCaption slides={slides} />
     </section>
   );
 }
 
-function Footer({ branding }) {
-  const companyName = branding?.name ?? APP_FULL_NAME;
-  const footerLink = (href, label) => (
-    <a href={href} className={`rounded hover:text-slate-700 ${focusRing}`}>
-      {label}
-    </a>
-  );
-  return (
-    <footer className="border-t border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p>
-          © {new Date().getFullYear()} {companyName}. All rights reserved.
-        </p>
-        <div className="flex gap-4">
-          {branding?.termsUrl && footerLink(branding.termsUrl, 'Terms of service')}
-          {branding?.privacyUrl && footerLink(branding.privacyUrl, 'Privacy policy')}
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 /**
- * @param {{ branding: object|null, title: string, description?: React.ReactNode, hero?: object,
- *   activeLink?: 'login'|'signup', children: React.ReactNode, footer?: React.ReactNode }} props
+ * @param {{ branding: object|null, slides: ReadonlyArray<{ title: string, text: string }>,
+ *   title: React.ReactNode, description?: React.ReactNode, icon?: React.ReactNode,
+ *   header?: React.ReactNode, footer?: React.ReactNode, surface?: 'card'|'panel',
+ *   children: React.ReactNode }} props
+ *   header replaces the logo row at the top of the screen; icon sits above the title
  */
 export default function AuthShell({
   branding,
+  slides,
   title,
   description,
-  hero = DEFAULT_AUTH_HERO,
-  activeLink,
-  children,
+  icon,
+  header,
   footer,
+  surface = 'card',
+  children,
 }) {
+  const panelClasses =
+    surface === 'panel'
+      ? 'rounded-[1.6rem] bg-white shadow-xl shadow-blue-900/[0.06] ring-1 ring-slate-900/[0.04]'
+      : '';
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <TopBar branding={branding} activeLink={activeLink} />
-      <div className="flex flex-1">
-        <HeroPanel hero={hero} />
-        <main className="flex flex-1 flex-col justify-center px-4 py-10 sm:px-8 lg:px-12 xl:px-20">
-          <div className="mx-auto w-full max-w-lg">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
-            {description && <div className="mt-2 text-sm leading-relaxed text-slate-500">{description}</div>}
-            <div className="mt-8">{children}</div>
-            {footer && <div className="mt-8 text-center text-sm text-slate-600">{footer}</div>}
+    <div className="auth-theme auth-backdrop flex h-dvh w-full overflow-hidden p-2 font-sans text-slate-900 sm:p-4 lg:p-[clamp(0.75rem,3vh,2.25rem)]">
+      <div className="mx-auto flex h-full w-full max-w-[1480px] gap-[clamp(0.75rem,1.6vw,1.75rem)] rounded-[2rem] bg-[#f1f4fb]/95 p-[clamp(0.5rem,1.6vh,1.1rem)] shadow-[0_40px_90px_-40px_rgba(30,58,138,0.45)] ring-1 ring-white/80">
+        <Showcase branding={branding} slides={slides} />
+        <main className={`flex min-w-0 flex-1 flex-col overflow-y-auto ${panelClasses}`}>
+          <div className="mx-auto flex min-h-full w-full max-w-[34rem] flex-col px-5 py-[clamp(1rem,3vh,2.25rem)] sm:px-8">
+            <header className="flex min-h-10 items-center justify-between gap-4">
+              {header ?? <CompanyLogo branding={branding} />}
+            </header>
+            <div className="auth-rise my-auto py-[clamp(0.75rem,2.6vh,2rem)]">
+              {icon && <div className="mb-[clamp(0.75rem,2.2vh,1.5rem)]">{icon}</div>}
+              <h1 className="font-display text-[clamp(1.35rem,3.4vh,2.05rem)] leading-[1.25] tracking-[-0.015em] text-slate-900">
+                {title}
+              </h1>
+              {description && (
+                <div className="mt-[clamp(0.25rem,1vh,0.6rem)] text-[clamp(0.875rem,1.95vh,1.05rem)] leading-relaxed text-slate-500">
+                  {description}
+                </div>
+              )}
+              <div className="mt-[clamp(1rem,3.2vh,2rem)]">{children}</div>
+            </div>
+            {footer && <footer className="text-center text-sm text-slate-500">{footer}</footer>}
           </div>
         </main>
       </div>
-      <Footer branding={branding} />
     </div>
   );
 }

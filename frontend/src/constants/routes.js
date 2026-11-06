@@ -7,6 +7,7 @@ export const ROUTE_PATHS = Object.freeze({
   CHECK_EMAIL: '/check-email',
   VERIFY_EMAIL: '/verify-email/:token',
   FORGOT_PASSWORD: '/forgot-password',
+  RESET_PASSWORD_WITH_CODE: '/reset-password',
   RESET_PASSWORD: '/reset-password/:token',
   DASHBOARD: '/dashboard',
   // Support console for staff (admins and agents) only.

@@ -34,6 +34,7 @@ export const AUTH_ERROR_CODES = Object.freeze({
   VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
   VERIFICATION_CODE_INVALID: 'VERIFICATION_CODE_INVALID',
   RESET_LINK_INVALID: 'RESET_LINK_INVALID',
+  RESET_CODE_INVALID: 'RESET_CODE_INVALID',
 });
 
 /** A request whose answer is `{ message, data }`; resolves to `{ message, ...data }`. */
@@ -102,10 +103,14 @@ export function requestResetLinkStatus(token, { signal } = {}) {
   return sendForMessage('GET', `${AUTH_ENDPOINTS.RESET_PASSWORD}/${encodeURIComponent(token)}`, { signal });
 }
 
-/** Sets a new password with a reset link. Resolves to `{ message }`; nobody is signed in. */
-export function requestPasswordReset({ token, password, confirmPassword }, { signal } = {}) {
+/**
+ * Sets a new password with the reset email's link (`{ token }`) or its code (`{ email, code }`).
+ * Resolves to `{ message }`; nobody is signed in.
+ */
+export function requestPasswordReset({ token, email, code, password, confirmPassword }, { signal } = {}) {
+  const proof = token ? { token } : { email, code };
   return sendForMessage('POST', AUTH_ENDPOINTS.RESET_PASSWORD, {
-    requestPayload: { token, password, confirmPassword },
+    requestPayload: { ...proof, password, confirmPassword },
     signal,
   });
 }

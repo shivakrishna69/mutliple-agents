@@ -51,7 +51,7 @@ test('HR invites a new joiner, then imports more from a CSV', async ({ page, bro
   // The terms must be agreed to: the server refuses the activation otherwise, under the checkbox.
   await joinerPage.getByRole('button', { name: 'Activate my account' }).click();
   await expect(joinerPage.locator('#acceptTerms-error')).toBeVisible();
-  await joinerPage.getByRole('checkbox', { name: /I agree to/ }).check();
+  await joinerPage.getByRole('checkbox', { name: /I accepted all terms/ }).check();
   await joinerPage.getByRole('button', { name: 'Activate my account' }).click();
 
   await expect(joinerPage).toHaveURL(/\/dashboard$/);

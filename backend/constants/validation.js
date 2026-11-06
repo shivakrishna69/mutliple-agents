@@ -49,15 +49,14 @@ export const GENDERS = Object.freeze({
 /**
  * Date of birth and gender at signup.
  *
- *   BIRTH_DATE_AND_GENDER_REQUIRED  false while the live sign-up screen does not ask for them yet:
- *                                   they are checked and stored when sent. Turned on together with
- *                                   the screen that sends them.
+ *   BIRTH_DATE_AND_GENDER_REQUIRED  whether a signup must give both (the sign-up screen asks for
+ *                                   them). Either way, they are checked and stored when sent.
  *   MINIMUM_AGE_YEARS               the youngest a person may be to create an account
  *   MAXIMUM_AGE_YEARS               older than this is taken for a typing mistake
  *   BIRTH_DATE_PATTERN              how the date is sent: YYYY-MM-DD (what a date input gives)
  */
 export const SIGNUP_PROFILE_SETTINGS = Object.freeze({
-  BIRTH_DATE_AND_GENDER_REQUIRED: false,
+  BIRTH_DATE_AND_GENDER_REQUIRED: true,
   MINIMUM_AGE_YEARS: 18,
   MAXIMUM_AGE_YEARS: 120,
   BIRTH_DATE_PATTERN: /^\d{4}-\d{2}-\d{2}$/,

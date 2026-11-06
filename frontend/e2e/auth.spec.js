@@ -1,7 +1,8 @@
 /**
- * The signed-out screens against the real backend: sign up, confirm the email with the code or the
- * link, sign in, and reset a forgotten password. Every message checked is the backend's own
- * constant, so a wording change on the server cannot silently break what the screens show.
+ * The signed-out screens against the real backend: sign up (with the phone country, date of birth
+ * and gender), confirm the email with the code or the link, sign in, and reset a forgotten
+ * password with the emailed code. Every message checked is the backend's own constant, so a
+ * wording change on the server cannot silently break what the screens show.
  */
 
 import { expect, test } from '@playwright/test';
@@ -14,20 +15,25 @@ const NEW_PASSWORD = 'Fresh#Pass2027';
 
 async function signUpThroughForm(page, { firstName, lastName, email }) {
   await page.goto('/signup');
-  await page.getByLabel('First name').fill(firstName);
-  await page.getByLabel('Last name').fill(lastName);
-  await page.getByLabel('Work email address').fill(email);
-  await page.getByLabel('Phone number').fill('98765 43210');
+  await page.getByLabel('First Name').fill(firstName);
+  await page.getByLabel('Last Name').fill(lastName);
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  // The country picker starts on the server's default country (India).
+  await expect(page.getByRole('button', { name: /Country: India, \+91/ })).toBeVisible();
+  await page.getByLabel('Phone Number').fill('98765 43210');
+  await page.getByLabel('Date of Birth').fill('03211994');
+  await expect(page.getByLabel('Date of Birth')).toHaveValue('03/21/1994');
+  await page.getByLabel('Gender').selectOption({ label: 'Prefer not to say' });
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await page.getByLabel('Confirm password').fill(PASSWORD);
-  await page.getByRole('checkbox', { name: /I agree to/ }).check();
-  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByLabel('Confirm Password').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /I accepted all terms/ }).check();
+  await page.getByRole('button', { name: 'Create Account' }).click();
   await expect(page).toHaveURL(/\/check-email\?email=/);
   await expect(page.getByRole('status')).toHaveText(ACCOUNT_EMAIL_MESSAGES.SIGNUP_CHECK_EMAIL);
 }
 
 async function typeCode(page, code) {
-  const boxes = page.getByRole('group', { name: 'Confirmation code' }).getByRole('textbox');
+  const boxes = page.getByRole('group', { name: 'Verification Code' }).getByRole('textbox');
   await expect(boxes).toHaveCount(code.length);
   await boxes.first().click();
   await page.keyboard.type(code);
@@ -42,11 +48,11 @@ test('a new customer signs up, confirms with the emailed code, sees their worksp
   const code = await emailedCode('priya.nair@example.com');
   const wrongCode = code.replace(/\d$/, (digit) => String((Number(digit) + 1) % 10));
   await typeCode(page, wrongCode);
-  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await page.getByRole('button', { name: 'Verify & Continue' }).click();
   await expect(page.getByRole('alert')).toContainText(ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
 
   await typeCode(page, code);
-  await page.getByRole('button', { name: 'Verify and continue' }).click();
+  await page.getByRole('button', { name: 'Verify & Continue' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Priya');
   await expect(mainNavigation(page).getByRole('link', { name: 'Support chat' })).toBeVisible();
@@ -60,15 +66,24 @@ test('a new customer signs up, confirms with the emailed code, sees their worksp
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test('signing in before confirming leads to "check your email", and the emailed link confirms', async ({ page }) => {
+test('the sign-up form shows the server’s message under each field it refuses', async ({ page }) => {
+  await page.goto('/signup');
+  await page.getByRole('button', { name: 'Create Account' }).click();
+  await expect(page.locator('#dateOfBirth-error')).toBeVisible();
+  await expect(page.locator('#gender-error')).toBeVisible();
+  await expect(page.locator('#phoneNumber-error')).toBeVisible();
+  await expect(page.locator('#acceptTerms-error')).toBeVisible();
+});
+
+test('signing in before confirming leads to "verify your email", and the emailed link confirms', async ({ page }) => {
   await signUpThroughForm(page, { firstName: 'Rahul', lastName: 'Verma', email: 'rahul.verma@example.com' });
   // The resend button waits out the server's cooldown.
-  await expect(page.getByText(/^Resend in/)).toBeVisible();
+  await expect(page.getByText(/Resend in \d\d:\d\d/)).toBeVisible();
 
   await page.goto('/login');
-  await page.getByLabel('Work email address').fill('rahul.verma@example.com');
+  await page.getByLabel('Work Email').fill('rahul.verma@example.com');
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page).toHaveURL(/\/check-email\?email=rahul\.verma%40example\.com$/);
   await expect(page.getByRole('status')).toHaveText(ACCOUNT_EMAIL_MESSAGES.EMAIL_NOT_VERIFIED);
 
@@ -83,28 +98,35 @@ test('signing in before confirming leads to "check your email", and the emailed 
   await expect(page.getByRole('alert')).toContainText(ACCOUNT_EMAIL_MESSAGES.VERIFICATION_LINK_INVALID);
 });
 
-test('a forgotten password is reset from the emailed link, which then stops working', async ({ page }) => {
+test('a forgotten password is reset with the emailed code, which also expires the emailed link', async ({ page }) => {
   const { email } = RESET_ACCOUNT;
   await page.goto('/login');
   await page.getByRole('link', { name: 'Forgot password?' }).click();
   await expect(page).toHaveURL(/\/forgot-password$/);
   // The address changes before the page does (the router keeps the sign-in page on screen while
-  // this one loads, and both have a "Work email address" field), so wait for this page's heading.
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forgot your password?');
+  // this one loads), so wait for this page's heading before typing.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forgot Password?');
   const emailsBefore = await inboxCount(email);
-  await page.getByLabel('Work email address').fill(email);
-  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await page.getByLabel('Registered Email').fill(email);
+  await page.getByRole('button', { name: 'Send Verification Code' }).click();
+
+  await expect(page).toHaveURL(/\/reset-password\?email=/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reset Your Password');
   await expect(page.getByRole('status')).toHaveText(ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_REQUESTED);
   await expect.poll(() => inboxCount(email)).toBeGreaterThan(emailsBefore);
 
+  const code = await emailedCode(email);
   const resetLink = await emailedLink(email, '/reset-password');
-  await page.goto(resetLink);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Choose a new password');
-  await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
-  await page.getByLabel('Confirm new password').fill(NEW_PASSWORD);
-  await page.getByRole('button', { name: 'Change password' }).click();
+  await typeCode(page, code);
+  await page.getByLabel('New Password', { exact: true }).fill(NEW_PASSWORD);
+  await page.getByLabel('Confirm New Password').fill(NEW_PASSWORD);
+  await page.getByRole('button', { name: 'Reset Password & Continue' }).click();
+
+  // On to sign in, with the server's message.
+  await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('status')).toHaveText(ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_DONE);
 
+  // The link from the same email stopped working the moment the code was used.
   await page.goto(resetLink);
   await expect(page.getByRole('alert')).toContainText(ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
 
@@ -115,9 +137,9 @@ test('a forgotten password is reset from the emailed link, which then stops work
 test('a wrong password shows an error and keeps the user on the sign-in page', async ({ page }) => {
   await page.goto('/login');
   // An unknown email gets the same message as a wrong password, and spends no real account's login budget.
-  await page.getByLabel('Work email address').fill('nobody@example.com');
+  await page.getByLabel('Work Email').fill('nobody@example.com');
   await page.getByLabel('Password', { exact: true }).fill('Wrong#Pass2026');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign In' }).click();
 
   await expect(page.getByRole('alert')).toContainText('Sign-in failed');
   await expect(page.getByRole('alert')).toContainText(AUTH_MESSAGES.INVALID_CREDENTIALS);
