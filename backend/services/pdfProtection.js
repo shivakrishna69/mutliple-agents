@@ -8,8 +8,10 @@
  *                    copying text out are not
  *
  * qpdf works on files, so the PDF goes through a private temporary folder that is always removed.
- * The passwords are passed in an argument file (qpdf's @file), never on the command line, where
- * any other process on the server could read them. The executable is QPDF_PATH (config).
+ * The job is described in a JSON job file (qpdf --job-json-file, qpdf 10.6 and later): every setting
+ * is named, so no qpdf version can read the arguments differently, and the passwords never appear
+ * on the command line, where any other process on the server could read them. The executable is
+ * QPDF_PATH (config).
  */
 
 import { execFile } from 'node:child_process';
@@ -37,7 +39,7 @@ export class PdfProtectionError extends Error {
 
 /**
  * Why qpdf failed, for the logs: not found, timed out, or its exit code and first error line. The
- * passwords are only ever in the argument file, and qpdf's messages name files, not passwords.
+ * passwords are only ever in the job file, and qpdf's messages name files, not passwords.
  */
 function describeQpdfFailure(qpdfError) {
   if (qpdfError.code === 'ENOENT') return 'qpdf not found';
@@ -70,25 +72,21 @@ export async function protectPdfWithPassword(pdf, userPassword, { qpdfPath }) {
   try {
     const inputPath = path.join(workFolder, 'input.pdf');
     const outputPath = path.join(workFolder, 'output.pdf');
-    const argumentsPath = path.join(workFolder, 'arguments');
+    const jobPath = path.join(workFolder, 'job.json');
     await writeFile(inputPath, pdf, { mode: PRIVATE_FILE_MODE });
-    // One argument per line (qpdf's @file format). The positional form "--encrypt <user> <owner>
-    // <bits>" works in every qpdf version (Debian ships 11.x, which lacks --user-password=).
-    const qpdfArguments = [
-      inputPath,
-      '--encrypt',
-      userPassword,
-      randomBytes(OWNER_PASSWORD_BYTES).toString('hex'),
-      String(OFFER_LETTER_PROTECTION.KEY_LENGTH_BITS),
-      '--print=full',
-      '--modify=none',
-      '--extract=n',
-      '--',
-      outputPath,
-    ];
-    await writeFile(argumentsPath, `${qpdfArguments.join('\n')}\n`, { mode: PRIVATE_FILE_MODE });
+    // qpdf's job JSON: the key length is the name of its group ("256bit"), which holds the permissions.
+    const job = {
+      inputFile: inputPath,
+      outputFile: outputPath,
+      encrypt: {
+        userPassword,
+        ownerPassword: randomBytes(OWNER_PASSWORD_BYTES).toString('hex'),
+        [`${OFFER_LETTER_PROTECTION.KEY_LENGTH_BITS}bit`]: { print: 'full', modify: 'none', extract: 'n' },
+      },
+    };
+    await writeFile(jobPath, JSON.stringify(job), { mode: PRIVATE_FILE_MODE });
     try {
-      await runFile(qpdfPath, [`@${argumentsPath}`], { timeout: OFFER_LETTER_PROTECTION.QPDF_TIMEOUT_MS });
+      await runFile(qpdfPath, [`--job-json-file=${jobPath}`], { timeout: OFFER_LETTER_PROTECTION.QPDF_TIMEOUT_MS });
     } catch (qpdfError) {
       // qpdf exits with 3 when it succeeded but noted warnings about the input.
       if (qpdfError.code !== QPDF_EXIT_SUCCESS_WITH_WARNINGS) {

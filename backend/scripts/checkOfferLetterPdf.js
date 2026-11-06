@@ -35,6 +35,8 @@ async function main() {
   const offerLetters = loadOfferLetterConfig();
   initPdfRenderer(pdfBrowser);
   initOfferLetters(offerLetters);
+  const { stdout: qpdfVersion } = await runFile(offerLetters.qpdfPath, ['--version']);
+  console.log(`using ${qpdfVersion.split('\n')[0]}`);
 
   const structure = computeCtcStructure(
     {
