@@ -24,6 +24,10 @@ test('an employee asks for leave, the manager approves it and declines a change'
 
   // --- The employee asks for a day of Casual Leave ------------------------------------------------
   await signIn(page, LEAVE_EMPLOYEE.email);
+  // Their dashboard is their own day: leave balance, requests, payslip; no support or HR figures.
+  await expect(page.getByText('Leave balance', { exact: true })).toBeVisible();
+  await expect(page.getByText('My pending requests', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recent conversations' })).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Leave' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Leave' })).toBeVisible();
   // Employees see their role as Employee, though the account role is still "customer".

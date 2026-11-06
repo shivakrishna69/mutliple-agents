@@ -53,10 +53,42 @@ const PAGES_BY_ROLE = {
   ],
 };
 
+/**
+ * What each role's dashboard shows (the server sends only the sections a role may see), and what
+ * it must not show. Checked right after signing in, which lands on the dashboard.
+ */
+const DASHBOARD_BY_ROLE = {
+  admin: {
+    shows: ['Recent conversations', 'Intelligence pulse', 'Connected services', 'Upcoming holidays'],
+    hides: [],
+  },
+  hr: {
+    shows: ['Headcount by department', 'Upcoming holidays'],
+    hides: ['Recent conversations', 'Connected services'],
+  },
+  customer: {
+    shows: ['Need a hand? We reply in seconds.'],
+    hides: ['Recent conversations', 'Headcount by department'],
+  },
+};
+
 for (const [role, pagePaths] of Object.entries(PAGES_BY_ROLE)) {
   test(`every ${role} page loads without errors`, async ({ page }) => {
+    // Up to 16 pages in one test (admin), each waiting for its data.
+    test.setTimeout(60_000);
     const problems = watchForPageProblems(page);
     await signIn(page, ACCOUNTS[role].email);
+    for (const heading of DASHBOARD_BY_ROLE[role].shows) {
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    }
+    for (const heading of DASHBOARD_BY_ROLE[role].hides) {
+      await expect(page.getByRole('heading', { name: heading })).toHaveCount(0);
+    }
+    if (role === 'admin') {
+      // The services' real state: the test backend's database answers.
+      const database = page.getByRole('listitem').filter({ hasText: 'Database' });
+      await expect(database.getByText('Operational')).toBeVisible();
+    }
     for (const pagePath of pagePaths) {
       await page.goto(pagePath);
       await expect(page, `${role} should stay on ${pagePath}`).toHaveURL(new RegExp(`${pagePath}$`));
