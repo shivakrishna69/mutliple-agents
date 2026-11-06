@@ -5,9 +5,9 @@ import { MAIL_INBOX_URL, PASSWORD } from './environment.js';
 /** Signs in through the login form and waits for the dashboard. */
 export async function signIn(page, email, password = PASSWORD) {
   await page.goto('/login');
-  await page.getByLabel('Work email address').fill(email);
+  await page.getByLabel('Work Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
