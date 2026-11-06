@@ -33,6 +33,7 @@ import OnboardingDraft, { DISPATCHABLE_STATUSES, DRAFT_STATUSES } from '../model
 import OnboardingSettings, { ONBOARDING_SETTINGS_KEY } from '../models/OnboardingSettings.js';
 import User from '../models/User.js';
 import { PayrollInputError } from '../utils/payrollCalculator.js';
+import { logger } from '../utils/logger.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 import { getCompanySettings } from './companySettings.js';
 import { CtcStructureError, computeCtcStructure } from './ctcStructure.js';
@@ -186,13 +187,23 @@ async function letterFor(offer, structure, settings, issuedOn) {
   };
 }
 
-/** Renders a letter, turning a renderer or qpdf problem into 503 PDF_UNAVAILABLE. */
+/**
+ * Renders a letter, turning a renderer or qpdf problem into 503 PDF_UNAVAILABLE. The cause goes to
+ * the log (never to the client), so whoever runs the server can see what to fix.
+ */
 async function renderLetter(letter, options) {
   if (!isOfferLetterRenderingAvailable()) throw pdfUnavailable();
   try {
     return await renderOfferLetter(letter, options);
   } catch (renderError) {
-    if (renderError instanceof PdfRenderError || renderError instanceof PdfProtectionError) throw pdfUnavailable();
+    if (renderError instanceof PdfRenderError || renderError instanceof PdfProtectionError) {
+      logger.error('Offer letter could not be produced', {
+        stage: renderError instanceof PdfProtectionError ? 'protect' : 'render',
+        preview: options.preview,
+        reason: renderError instanceof PdfProtectionError ? renderError.reason : renderError.message,
+      });
+      throw pdfUnavailable();
+    }
     throw renderError;
   }
 }

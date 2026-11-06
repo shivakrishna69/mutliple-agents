@@ -35,6 +35,19 @@ export class PdfProtectionError extends Error {
   }
 }
 
+/**
+ * Why qpdf failed, for the logs: not found, timed out, or its exit code and first error line. The
+ * passwords are only ever in the argument file, and qpdf's messages name files, not passwords.
+ */
+function describeQpdfFailure(qpdfError) {
+  if (qpdfError.code === 'ENOENT') return 'qpdf not found';
+  if (qpdfError.killed) return `qpdf timed out after ${OFFER_LETTER_PROTECTION.QPDF_TIMEOUT_MS} ms`;
+  const firstErrorLine = String(qpdfError.stderr ?? '')
+    .split('\n')
+    .find((line) => line.trim());
+  return `qpdf exited with ${qpdfError.code}${firstErrorLine ? `: ${firstErrorLine.trim()}` : ''}`;
+}
+
 /** True when the qpdf at `qpdfPath` answers --version. */
 export async function isQpdfAvailable(qpdfPath) {
   try {
@@ -79,7 +92,7 @@ export async function protectPdfWithPassword(pdf, userPassword, { qpdfPath }) {
     } catch (qpdfError) {
       // qpdf exits with 3 when it succeeded but noted warnings about the input.
       if (qpdfError.code !== QPDF_EXIT_SUCCESS_WITH_WARNINGS) {
-        throw new PdfProtectionError(qpdfError.code === 'ENOENT' ? 'qpdf not found' : 'qpdf failed');
+        throw new PdfProtectionError(describeQpdfFailure(qpdfError));
       }
     }
     return await readFile(outputPath);

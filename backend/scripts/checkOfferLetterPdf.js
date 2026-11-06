@@ -91,7 +91,8 @@ try {
   await main();
   console.log('offer letters: OK');
 } catch (checkError) {
-  console.error(`offer letters: FAILED - ${checkError.message}`);
+  // A qpdf failure carries its cause in `reason` (services/pdfProtection.js).
+  console.error(`offer letters: FAILED - ${checkError.reason ?? checkError.message}`);
   process.exitCode = 1;
 } finally {
   await closePdfRenderer();

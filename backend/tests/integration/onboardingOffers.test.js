@@ -55,6 +55,13 @@ if (process.env.CI === 'true' && pdfReason && !mongoReason) {
   throw new Error(`The offer letter tests cannot run in CI: ${pdfReason}`);
 }
 
+const SERVER_LOG_TAIL_CHARACTERS = 4_000;
+/** The response body and the end of the server's log, so a failed letter shows its cause. */
+const explain = (testServer, ...responses) =>
+  `${JSON.stringify(responses.map((response) => response.body))}
+server log:
+${testServer.output().slice(-SERVER_LOG_TAIL_CHARACTERS)}`;
+
 /** A joining date 30 days ahead, as YYYY-MM-DD (offers must join within a year). */
 const joiningIn = (days) => new Date(Date.now() + days * DAY_MS).toISOString().slice(0, 10);
 
@@ -313,7 +320,7 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
       ...offerBody(departmentId),
       includePreview: true,
     });
-    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.status, 200, explain(testServer, response));
     const { mediaType, base64 } = response.body.data.preview;
     assert.equal(mediaType, 'application/pdf');
     const pdf = Buffer.from(base64, 'base64');
@@ -364,11 +371,7 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     // Two presses at the same moment: one sends, the other is refused.
     const dispatchUrl = `/api/hr/onboarding/drafts/${draft.id}/dispatch`;
     const outcomes = await Promise.all([hrClient.post(dispatchUrl, {}), hrClient.post(dispatchUrl, {})]);
-    assert.deepEqual(
-      outcomes.map((outcome) => outcome.status).sort(),
-      [200, 409],
-      JSON.stringify(outcomes.map((o) => o.body)),
-    );
+    assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [200, 409], explain(testServer, ...outcomes));
     const sent = outcomes.find((outcome) => outcome.status === 200).body;
     assert.equal(sent.message, ONBOARDING_MESSAGES.DISPATCHED);
     assert.equal(sent.data.draft.status, 'DISPATCHED');
@@ -421,7 +424,8 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     });
     const late = await createDraft(hrClient, departmentId, { email: 'too.late@example.com' });
     for (const draft of [onTime, late]) {
-      assert.equal((await hrClient.post(`/api/hr/onboarding/drafts/${draft.id}/dispatch`, {})).status, 200);
+      const sent = await hrClient.post(`/api/hr/onboarding/drafts/${draft.id}/dispatch`, {});
+      assert.equal(sent.status, 200, explain(testServer, sent));
     }
     const invitations = testServer.database.collection('employeeinvitations');
     const tokenOf = async (address) =>
@@ -469,13 +473,13 @@ describe('onboarding offers: a failed email', { skip: pdfReason ?? false }, () =
   it('keeps the employee it created and resends through the same invitation', async () => {
     const draft = await createDraft(hrClient, departmentId, { email: 'retry@example.com' });
     const first = await hrClient.post(`/api/hr/onboarding/drafts/${draft.id}/dispatch`, {});
-    assert.equal(first.status, 202, JSON.stringify(first.body));
+    assert.equal(first.status, 202, explain(testServer, first));
     assert.equal(first.body.message, ONBOARDING_MESSAGES.DISPATCH_EMAIL_FAILED);
     assert.equal(first.body.data.draft.status, 'DISPATCH_FAILED');
     const employeeCode = first.body.data.draft.dispatch.employeeCode;
 
     const second = await hrClient.post(`/api/hr/onboarding/drafts/${draft.id}/dispatch`, {});
-    assert.equal(second.status, 202);
+    assert.equal(second.status, 202, explain(testServer, second));
     assert.equal(second.body.data.draft.dispatch.employeeCode, employeeCode);
     assert.equal(second.body.data.draft.dispatch.attempts, 2);
     const database = testServer.database;

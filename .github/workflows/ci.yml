@@ -80,6 +80,16 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      # Renders and locks a sample letter with the runner's Chrome and qpdf before the tests, so a
+      # broken PDF toolchain fails here with its cause shown on the run's summary page.
+      - name: Check offer letter PDFs on the runner
+        run: |
+          if ! check_output=$(node scripts/checkOfferLetterPdf.js 2>&1); then
+            echo "$check_output"
+            echo "::error title=Offer letter PDFs::$(echo "$check_output" | grep -m1 'offer letters: FAILED' || echo 'the check stopped without a result; see the log')"
+            exit 1
+          fi
+          echo "$check_output"
       - run: npm test
 
   offer-letter-pdfs:
