@@ -42,7 +42,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 
 | File | Covers |
 |---|---|
-| `e2e/auth.spec.js` | Sign-up with the emailed code (a wrong code refused first), sign-out and the session ending on the server; a sign-in before confirming leads to "check your email" and the emailed link confirms, once; forgot and reset password, the link working once; wrong password; redirect to sign-in |
+| `e2e/auth.spec.js` | Sign-up with the phone country picker, date of birth and gender, confirmed with the emailed code (a wrong code refused first); the server's message under each refused field; sign-out and the session ending on the server; a sign-in before confirming leads to "verify your email" and the emailed link confirms, once; forgot password with the emailed code, which also expires the emailed link; wrong password; redirect to sign-in |
 | `e2e/roles.spec.js` | What admin, HR and customers see; the admin changes the employee ID format and email domain; admin-only addresses redirect customers |
 | `e2e/onboarding.spec.js` | HR invites a joiner (who gets an employee ID), who activates the account from the link (after agreeing to the terms); the link works once; HR imports a CSV with a new department, a manager, their report and a bad row, starts it, sees every row's outcome and downloads the results |
 | `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
@@ -65,17 +65,31 @@ src/components/       AppShell (role-aware sidebar), RouteGuards, ui.jsx design 
                       (workplace/: departments, offices, holidays, base offices; people/: the CSV import;
                       leave/: my leave, calendar, approvals and leave administration, the tabs of
                       pages/LeaveCenter.jsx)
-src/components/auth/  the signed-out screens' shell (company logo, support and terms links), password
-                      strength meter built from the server's policy, code boxes, notices
+src/components/auth/  the signed-out screens (sign in, sign up, verify email, forgot and reset password,
+                      invitation): AuthShell (one screen high, no page scroll; showcase panel with
+                      code-drawn animated artwork and a slide caption), the sign-up fields (phone
+                      with country picker, mm/dd/yyyy date, select), code entry with resend, the
+                      compact strength bar built from the server's policy, notices. Inside the shell
+                      the brand colour is blue (.auth-theme in index.css); signed-in pages keep orange
 src/hooks/            useApiResource (load/abort/error), useAuthRequest (a submit with the server's field
-                      errors), usePublicAuthSettings (branding, auth options, password policy; loaded
+                      errors), usePublicAuthSettings (branding, auth options with the signup choices, password policy; loaded
                       once), useCountdown, useSocket, useAgentTelemetry
 src/pages/            one file per screen
-src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels
-src/utils/            dates in the browser's time zone, CSV downloads
+src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels,
+                      the signed-out screens' slides (authScreens.js) and field styles (formStyles.js)
+src/utils/            dates in the browser's time zone, CSV downloads, dates of birth (mm/dd/yyyy <-> YYYY-MM-DD)
 public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
 src/validation/       client-side form checks (the backend validates again); the signed-out screens check
                       nothing themselves and show the server's messages
 ```
 
 Route guards only steer navigation; the backend authorises every request.
+
+## Fonts and flags
+
+Served with the app, so no font or image request leaves the site:
+
+- **Plus Jakarta Sans** (text) and **Michroma** (headings, `font-display`), both SIL Open Font
+  License 1.1, from `@fontsource` packages imported in `src/index.css`.
+- Country flags for the phone picker: `country-flag-icons` (MIT), one small SVG per country,
+  loaded only when shown.
