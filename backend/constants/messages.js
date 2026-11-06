@@ -126,9 +126,10 @@ export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
     'This code is not correct or has expired. Check the latest email we sent, or ask for a new code',
   EMAIL_NOT_VERIFIED:
     'Confirm your email address first: enter the code or open the link we sent you, or ask for a new one',
-  PASSWORD_RESET_REQUESTED: `If this address has an account, a link to reset the password is on its way. It works for ${ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000} minutes`,
+  PASSWORD_RESET_REQUESTED: `If this address has an account, a code and a link to reset the password are on their way. They work for ${ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000} minutes`,
   RESET_LINK_VALID: 'This password reset link is valid',
   RESET_LINK_INVALID: 'This password reset link is not valid or has expired. Ask for a new one',
+  RESET_CODE_INVALID: 'This code is not correct or has expired. Check the latest email we sent, or ask for a new code',
   PASSWORD_RESET_DONE: 'Your password has been changed and every device signed out. Sign in with your new password',
   EMAIL_COOLDOWN: 'An email was sent to this address a moment ago. Please wait before asking for another',
   EMAIL_UNAVAILABLE:

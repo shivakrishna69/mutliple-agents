@@ -124,3 +124,15 @@ export function tokenFromEmail(message, pathPrefix) {
   if (!match) throw new Error(`No ${pathPrefix} link in the email "${message.subject}"`);
   return match[1];
 }
+
+/**
+ * The emailed code (confirmation or password reset): the `digits`-digit number ending a line of the
+ * text ("...: 123456"), which the subject also leads with.
+ * @param {{ text: string, subject: string }} message
+ * @param {number} digits
+ */
+export function codeFromEmail(message, digits) {
+  const code = message.text.match(new RegExp(`: (\\d{${digits}})$`, 'm'))?.[1];
+  if (!code || !message.subject.startsWith(code)) throw new Error(`No code in the email "${message.subject}"`);
+  return code;
+}

@@ -340,6 +340,24 @@ export function validateEmailRequestInput(requestBody) {
 
 const VERIFICATION_CODE_PATTERN = new RegExp(`^\\d{${ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS}}$`);
 
+/** True when a body names an email and code rather than a link token ({ token } wins when both are sent). */
+const usesEmailedCode = ({ token, email, code }) => token === undefined && (email !== undefined || code !== undefined);
+
+/**
+ * The address and the emailed code, for the screens that take the code instead of the link.
+ * Problems are added to `validationErrors`.
+ * @returns {{ email: string, code: string }|null}
+ */
+function readEmailAndCode(email, code, validationErrors) {
+  const emailError = checkEmailAddress(email);
+  if (emailError) validationErrors.push({ field: 'email', message: emailError });
+  const trimmedCode = typeof code === 'string' ? code.trim() : null;
+  if (trimmedCode === null || !VERIFICATION_CODE_PATTERN.test(trimmedCode)) {
+    validationErrors.push({ field: 'code', message: VALIDATION_MESSAGES.VERIFICATION_CODE_FORMAT });
+  }
+  return emailError || trimmedCode === null ? null : { email: normalizeEmail(email), code: trimmedCode };
+}
+
 /**
  * Validates POST /verify-email: either { token } (the emailed link) or { email, code } (the code from
  * the same email, typed in). Without a token, both email and code are required.
@@ -348,7 +366,7 @@ const VERIFICATION_CODE_PATTERN = new RegExp(`^\\d{${ACCOUNT_EMAIL_SETTINGS.VERI
 export function validateVerifyEmailInput(requestBody) {
   if (!isPlainObject(requestBody)) return notAnObject();
   const { token, email, code } = requestBody;
-  if (token !== undefined || (email === undefined && code === undefined)) {
+  if (!usesEmailedCode(requestBody)) {
     const tokenError = checkLinkToken(token);
     if (tokenError) {
       return { isValid: false, validationErrors: [{ field: 'token', message: tokenError }], sanitizedInput: null };
@@ -357,36 +375,33 @@ export function validateVerifyEmailInput(requestBody) {
   }
 
   const validationErrors = [];
-  const emailError = checkEmailAddress(email);
-  if (emailError) validationErrors.push({ field: 'email', message: emailError });
-  const trimmedCode = typeof code === 'string' ? code.trim() : null;
-  if (trimmedCode === null || !VERIFICATION_CODE_PATTERN.test(trimmedCode)) {
-    validationErrors.push({ field: 'code', message: VALIDATION_MESSAGES.VERIFICATION_CODE_FORMAT });
-  }
+  const emailAndCode = readEmailAndCode(email, code, validationErrors);
   if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
-  return { isValid: true, validationErrors: [], sanitizedInput: { email: normalizeEmail(email), code: trimmedCode } };
+  return { isValid: true, validationErrors: [], sanitizedInput: emailAndCode };
 }
 
 /**
- * Validates POST /password/reset: { token, password, confirmPassword }. The new password must meet
- * every signup rule; it is checked before the link is used up, so a weak password does not waste
- * the link.
+ * Validates POST /password/reset: { token, password, confirmPassword } (the emailed link), or
+ * { email, code, password, confirmPassword } (the emailed code). The new password must meet every
+ * signup rule; it is checked before the link or code is used up, so a weak password wastes neither.
  */
 export function validatePasswordResetInput(requestBody) {
   if (!isPlainObject(requestBody)) return notAnObject();
   const validationErrors = [];
-  const tokenError = checkLinkToken(requestBody.token);
-  if (tokenError) validationErrors.push({ field: 'token', message: tokenError });
+  let proof;
+  if (usesEmailedCode(requestBody)) {
+    proof = readEmailAndCode(requestBody.email, requestBody.code, validationErrors);
+  } else {
+    const tokenError = checkLinkToken(requestBody.token);
+    if (tokenError) validationErrors.push({ field: 'token', message: tokenError });
+    proof = { token: requestBody.token };
+  }
   const passwordError = checkNewPassword(requestBody.password);
   if (passwordError) validationErrors.push({ field: 'password', message: passwordError });
   const confirmationError = checkPasswordConfirmation(requestBody.password, requestBody.confirmPassword);
   if (confirmationError) validationErrors.push({ field: 'confirmPassword', message: confirmationError });
   if (validationErrors.length > 0) return { isValid: false, validationErrors, sanitizedInput: null };
-  return {
-    isValid: true,
-    validationErrors: [],
-    sanitizedInput: { token: requestBody.token, password: requestBody.password },
-  };
+  return { isValid: true, validationErrors: [], sanitizedInput: { ...proof, password: requestBody.password } };
 }
 
 /**
