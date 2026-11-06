@@ -69,6 +69,7 @@ export class InvitationError extends Error {
 export const INVITATION_DISPLAY_STATUSES = Object.freeze(['pending', 'expired', 'accepted', 'revoked']);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const INVITATION_VALIDITY_MS = INVITATION_LIMITS.VALIDITY_DAYS * DAY_MS;
 
 /** Roles each inviter role may grant. */
 export function invitableRolesFor(inviterRole) {
@@ -158,10 +159,10 @@ async function assertDraftReferences(profileDraft) {
 // Delivery
 // =================================================================================================
 
-async function deliverInvitation(invitation, rawToken, { inviterName, companyName, companyEmail, appPublicUrl }) {
-  const inviteUrl = `${appPublicUrl}/invite/${rawToken}`;
+/** The standard invitation email (services/invitationEmail.js). */
+async function composeInvitationEmail({ invitation, inviteUrl, inviterName, companyName, companyEmail }) {
   const department = await Department.findById(invitation.profileDraft.departmentId).select('name').lean();
-  const email = buildInvitationEmail({
+  return buildInvitationEmail({
     inviteeName: invitation.name,
     inviterName,
     companyName,
@@ -172,6 +173,16 @@ async function deliverInvitation(invitation, rawToken, { inviterName, companyNam
     inviteUrl,
     expiresAt: invitation.expiresAt,
   });
+}
+
+/**
+ * Sends the invitation and records how it went. `composeEmail` builds the message from the
+ * invitation, its link and the context (default: the standard invitation email); it may return
+ * `attachments` (an offer letter, for one).
+ */
+async function deliverInvitation(invitation, rawToken, context, composeEmail = composeInvitationEmail) {
+  const inviteUrl = `${context.appPublicUrl}/invite/${rawToken}`;
+  const email = await composeEmail({ invitation, inviteUrl, ...context });
   const { outcome } = await sendMail({ to: invitation.email, ...email });
   invitation.lastDelivery = { outcome, at: new Date() };
   await invitation.save();
@@ -184,9 +195,19 @@ async function deliverInvitation(invitation, rawToken, { inviterName, companyNam
 // =================================================================================================
 
 /**
- * @param {{ inviter: { id: string, name: string, role: string }, input: object, appContext: { companyName: string, appPublicUrl: string } }} request
+ * @param {{ inviter: { id: string, name: string, role: string }, input: object,
+ *   appContext: { companyName: string, appPublicUrl: string }, validityMs?: number,
+ *   composeEmail?: Function }} request
+ *   validityMs: how long the link works (default INVITATION_LIMITS.VALIDITY_DAYS); composeEmail:
+ *   the email to send instead of the standard invitation (see deliverInvitation)
  */
-export async function createInvitation({ inviter, input, appContext }) {
+export async function createInvitation({
+  inviter,
+  input,
+  appContext,
+  validityMs = INVITATION_VALIDITY_MS,
+  composeEmail = composeInvitationEmail,
+}) {
   if (!invitableRolesFor(inviter.role).includes(input.role)) {
     throw new InvitationError(403, 'ROLE_NOT_ALLOWED', 'You cannot invite someone with this role');
   }
@@ -233,7 +254,7 @@ export async function createInvitation({ inviter, input, appContext }) {
       invitedUserId: provisioned.user._id,
       employeeCode: provisioned.profile.employeeCode,
       tokenHash,
-      expiresAt: new Date(now.getTime() + INVITATION_LIMITS.VALIDITY_DAYS * DAY_MS),
+      expiresAt: new Date(now.getTime() + validityMs),
       invitedByUserId: inviter.id,
       lastSentAt: now,
       lastDelivery: { outcome: MAIL_OUTCOMES.NOT_CONFIGURED, at: now },
@@ -249,11 +270,12 @@ export async function createInvitation({ inviter, input, appContext }) {
       );
     throw creationError;
   }
-  const delivery = await deliverInvitation(invitation, rawToken, {
-    inviterName: inviter.name,
-    companyEmail: provisioned.user.companyEmail,
-    ...appContext,
-  });
+  const delivery = await deliverInvitation(
+    invitation,
+    rawToken,
+    { inviterName: inviter.name, companyEmail: provisioned.user.companyEmail, ...appContext },
+    composeEmail,
+  );
   return { invitation, delivery };
 }
 
@@ -276,8 +298,17 @@ async function assertInviteeStillInvited(invitation) {
     throw new InvitationError(409, 'EMAIL_ALREADY_REGISTERED', 'Someone with this email already has an account');
 }
 
-/** New link (old links stop working), fresh expiry, email sent again. Pending or expired only. */
-export async function resendInvitation({ invitationId, inviter, appContext }) {
+/**
+ * New link (old links stop working), fresh expiry, email sent again. Pending or expired only.
+ * `validityMs` and `composeEmail` as for createInvitation.
+ */
+export async function resendInvitation({
+  invitationId,
+  inviter,
+  appContext,
+  validityMs = INVITATION_VALIDITY_MS,
+  composeEmail = composeInvitationEmail,
+}) {
   const invitation = await EmployeeInvitation.findById(invitationId).select('+tokenHash');
   if (!invitation) throw new InvitationError(404, 'INVITATION_NOT_FOUND', 'Invitation not found');
   if (invitation.status !== INVITATION_STATUSES.PENDING)
@@ -289,17 +320,22 @@ export async function resendInvitation({ invitationId, inviter, appContext }) {
   const { rawToken, tokenHash } = createSecureToken();
   const now = new Date();
   invitation.tokenHash = tokenHash;
-  invitation.expiresAt = new Date(now.getTime() + INVITATION_LIMITS.VALIDITY_DAYS * DAY_MS);
+  invitation.expiresAt = new Date(now.getTime() + validityMs);
   invitation.sendCount += 1;
   invitation.lastSentAt = now;
   const invitee = invitation.invitedUserId
     ? await User.findById(invitation.invitedUserId).select('companyEmail').lean()
     : null;
-  const delivery = await deliverInvitation(invitation, rawToken, {
-    inviterName: inviter.name,
-    companyEmail: invitee?.companyEmail ?? null,
-    ...appContext,
-  });
+  const delivery = await deliverInvitation(
+    invitation,
+    rawToken,
+    {
+      inviterName: inviter.name,
+      companyEmail: invitee?.companyEmail ?? null,
+      ...appContext,
+    },
+    composeEmail,
+  );
   return { invitation, delivery };
 }
 

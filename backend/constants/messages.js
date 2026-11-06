@@ -51,6 +51,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_REGULARIZATION_MESSAGES: 'Too many attendance correction messages. Please wait a minute and try again',
   TOO_MANY_TAX_ESTIMATES: 'Too many tax estimates. Please wait a minute and try again',
   TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
+  TOO_MANY_OFFER_CALCULATIONS: 'Too many offer calculations in a short time. Please wait a minute and try again',
+  TOO_MANY_OFFER_DISPATCHES: 'Too many offers sent in a short time. Please wait a few minutes and try again',
   TOO_MANY_VERIFICATIONS: 'Too many verification requests. Please wait a minute and try again',
   TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',

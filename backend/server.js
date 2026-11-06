@@ -43,6 +43,7 @@ import invitationRoutes from './routes/invitationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
+import onboardingRoutes from './routes/onboardingRoutes.js';
 import okrRoutes from './routes/okrRoutes.js';
 import workCalendarRoutes from './routes/workCalendarRoutes.js';
 import officeRoutes from './routes/officeRoutes.js';
@@ -151,6 +152,8 @@ export function createApp(config) {
   // The dashboard, in sections by role, and the services' health (admins)
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/system', systemRoutes);
+  // Onboarding offers: salary structure, offer letters, review and dispatch (HR and admins)
+  app.use('/api/hr/onboarding', onboardingRoutes);
   // OKRs: company goals, team objectives, key results, milestones
   app.use('/api/okrs', okrRoutes);
   // Holidays and day classification per office (HR edits, employees read).

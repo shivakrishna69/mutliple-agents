@@ -168,6 +168,20 @@ export const payslipGenerationRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_PAYSLIP_GENERATIONS,
 });
 
+export const offerCalculationRateLimitByUser = createRateLimiter({
+  limiterName: 'offer_calculations_per_user',
+  ...RATE_LIMITS.OFFER_CALCULATIONS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OFFER_CALCULATIONS,
+});
+
+export const offerDispatchRateLimitByUser = createRateLimiter({
+  limiterName: 'offer_dispatches_per_user',
+  ...RATE_LIMITS.OFFER_DISPATCHES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OFFER_DISPATCHES,
+});
+
 export const payslipVerificationRateLimitByClientIp = createRateLimiter({
   limiterName: 'payslip_verifications_per_ip',
   ...RATE_LIMITS.PAYSLIP_VERIFICATIONS_PER_CLIENT_IP,

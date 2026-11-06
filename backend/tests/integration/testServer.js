@@ -194,7 +194,17 @@ export async function startTestServer({
     throw startupError;
   }
 
-  return { baseUrl, database, mongoUri, internalApiKey, mailbox, createClient: () => new TestClient(baseUrl), stop };
+  return {
+    baseUrl,
+    database,
+    mongoUri,
+    internalApiKey,
+    mailbox,
+    createClient: () => new TestClient(baseUrl),
+    // The server's recent log output (the last 20,000 characters), e.g. to find audit events.
+    output: () => capturedOutput,
+    stop,
+  };
 }
 
 /** A browser-like client: stores cookies from Set-Cookie and sends the CSRF token on writes. */

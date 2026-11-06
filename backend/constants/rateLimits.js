@@ -38,6 +38,9 @@ export const RATE_LIMITS = Object.freeze({
   TAX_ESTIMATES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
   // Payslip generation renders a PDF in a browser; a month's run for a team stays within this.
   PAYSLIP_GENERATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // Offer calculations (each preview renders a PDF) and dispatches (each sends an email).
+  OFFER_CALCULATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
+  OFFER_DISPATCHES_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 30 }),
   // Public verification: enough for a verifier, too few to scan the ID space.
   PAYSLIP_VERIFICATIONS_PER_CLIENT_IP: Object.freeze({ windowMs: 60 * 1000, maxRequests: 20 }),
   // OKR writes: progress sliders can fire often (clients should debounce); this stops runaway loops.

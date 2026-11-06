@@ -32,7 +32,8 @@ function listen(server, port) {
  *   close: () => Promise<void> }>}
  */
 export async function startMailCatcher({ httpPort } = {}) {
-  /** @type {{ to: string[], from: string, subject: string, text: string, html: string }[]} */
+  /** @type {{ to: string[], from: string, subject: string, text: string, html: string,
+   *   attachments: { filename: string, contentType: string, content: Buffer }[] }[]} */
   const messages = [];
   const listeners = new Set();
 
@@ -49,6 +50,11 @@ export async function startMailCatcher({ httpPort } = {}) {
             subject: parsed.subject ?? '',
             text: parsed.text ?? '',
             html: typeof parsed.html === 'string' ? parsed.html : '',
+            attachments: (parsed.attachments ?? []).map(({ filename, contentType, content }) => ({
+              filename,
+              contentType,
+              content,
+            })),
           });
           for (const notify of listeners) notify();
           callback();
