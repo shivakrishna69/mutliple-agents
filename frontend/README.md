@@ -61,7 +61,8 @@ On failure, `playwright-report/` and `test-results/` hold screenshots and traces
 src/App.jsx           route table (workforce pages are lazy-loaded)
 src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors
 src/auth/             AuthContext: session state and CSRF token
-src/components/       AppShell (role-aware sidebar), RouteGuards, ui.jsx design primitives, feature panels
+src/components/       AppShell (dark role-aware sidebar, top bar with breadcrumb and, for admins, the
+                      services' state), RouteGuards, ui.jsx design primitives, feature panels
                       (workplace/: departments, offices, holidays, base offices; people/: the CSV import;
                       leave/: my leave, calendar, approvals and leave administration, the tabs of
                       pages/LeaveCenter.jsx)
@@ -69,21 +70,32 @@ src/components/auth/  the signed-out screens (sign in, sign up, verify email, fo
                       invitation): AuthShell (one screen high, no page scroll; showcase panel with
                       code-drawn animated artwork and a slide caption), the sign-up fields (phone
                       with country picker, mm/dd/yyyy date, select), code entry with resend, the
-                      compact strength bar built from the server's policy, notices. Inside the shell
-                      the brand colour is blue (.auth-theme in index.css); signed-in pages keep orange
+                      compact strength bar built from the server's policy, notices
+src/components/dashboard/  the Overview page's parts, from GET /api/dashboard/overview (sections by role)
+                      and /api/system/health: stat cards, recent conversations, intelligence pulse
+                      with the activity chart (plain SVG), console, team & roles, connected services,
+                      the people row, headcount, holidays, the employee's own day, the customer view
 src/hooks/            useApiResource (load/abort/error), useAuthRequest (a submit with the server's field
                       errors), usePublicAuthSettings (branding, auth options with the signup choices, password policy; loaded
-                      once), useCountdown, useSocket, useAgentTelemetry
+                      once), useSystemHealth (admins; one check shared by the top bar and the dashboard),
+                      useCountdown, useSocket, useAgentTelemetry
 src/pages/            one file per screen
 src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels,
-                      the signed-out screens' slides (authScreens.js) and field styles (formStyles.js)
-src/utils/            dates in the browser's time zone, CSV downloads, dates of birth (mm/dd/yyyy <-> YYYY-MM-DD)
+                      the signed-out screens' slides (authScreens.js), field styles (formStyles.js) and
+                      the dashboard's status labels and tones (dashboardDisplay.js)
+src/utils/            dates in the browser's time zone, CSV downloads, dates of birth (mm/dd/yyyy <-> YYYY-MM-DD),
+                      the dashboard's numbers (shares, durations; "—" when there is nothing to measure)
 public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
 src/validation/       client-side form checks (the backend validates again); the signed-out screens check
                       nothing themselves and show the server's messages
 ```
 
 Route guards only steer navigation; the backend authorises every request.
+
+## Theme
+
+The brand colour is blue #1F5BFF everywhere (the `--color-brand-*` tokens in `src/index.css`); the NSK
+logo keeps its own colours.
 
 ## Fonts and flags
 

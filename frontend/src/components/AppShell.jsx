@@ -1,8 +1,10 @@
 /**
- * Layout for every signed-in page: a sidebar with the pages this user's role can open, the
- * signed-in user's card with sign-out, and the page content to the right.
+ * Layout for every signed-in page, in the dashboard design: a dark sidebar with the pages this
+ * user's role can open (grouped, the current one a blue pill) and the signed-in user's card with
+ * sign-out; a top bar with where you are (company › page), the services' state for administrators
+ * (hooks/useSystemHealth.js) and the user's initials; and the page content.
  *
- *   lg and up:  fixed dark sidebar (w-64) | scrollable content column
+ *   lg and up:  fixed dark sidebar (w-72) | top bar over a scrollable content column
  *   below lg:   top bar with a menu button that opens the same sidebar as a drawer
  *
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
@@ -16,7 +18,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import { ApiError } from '../api/httpClient.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
@@ -40,8 +42,12 @@ import {
   UserCircleIcon,
   UsersIcon,
 } from './Icons.jsx';
+import { SERVICE_STATE_TONES } from '../constants/dashboardDisplay.js';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
+import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
+import { useSystemHealth } from '../hooks/useSystemHealth.js';
+import { initialsOf } from '../utils/dashboardFormat.js';
 
 /** Sidebar entries, grouped into sections. `isVisibleTo(role)` decides who sees each one. */
 const NAVIGATION_SECTIONS = Object.freeze([
@@ -119,26 +125,26 @@ const NAVIGATION_SECTIONS = Object.freeze([
   },
 ]);
 
-/** "Ada Lovelace" -> "AL"; a single word gives one letter. */
-function computeInitials(fullName) {
-  const nameParts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
-  const initials =
-    nameParts.length > 1 ? nameParts[0][0] + nameParts[nameParts.length - 1][0] : (nameParts[0]?.[0] ?? '?');
-  return initials.toUpperCase();
+/** The sidebar label of the page at `pathname` (the longest matching path), for the top bar. */
+function pageLabelOf(pathname) {
+  const match = NAVIGATION_SECTIONS.flatMap((section) => section.items)
+    .filter((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
+    .sort((first, second) => second.path.length - first.path.length)[0];
+  return match?.label ?? null;
 }
 
 function SidebarNavigation({ userRole, onNavigate }) {
   return (
-    <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-3 py-6 scroll-thin">
+    <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-4 py-6 scroll-thin">
       {NAVIGATION_SECTIONS.map((navigationSection) => {
         const visibleItems = navigationSection.items.filter((navigationItem) => navigationItem.isVisibleTo(userRole));
         if (visibleItems.length === 0) return null;
         return (
           <div key={navigationSection.sectionTitle}>
-            <p className="px-3 text-[0.68rem] font-semibold tracking-wider text-slate-500 uppercase">
+            <p className="px-3 text-[0.7rem] font-semibold tracking-[0.12em] text-slate-400 uppercase">
               {navigationSection.sectionTitle}
             </p>
-            <ul className="mt-2 space-y-1">
+            <ul className="mt-2.5 space-y-1">
               {visibleItems.map(({ label, path, Icon }) => (
                 <li key={path}>
                   <NavLink
@@ -146,18 +152,18 @@ function SidebarNavigation({ userRole, onNavigate }) {
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [
-                        'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
+                        'group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[15px] font-medium transition',
                         'focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none',
                         isActive
-                          ? 'bg-gradient-to-r from-brand-500/20 to-brand-600/10 text-white ring-1 ring-brand-400/30 ring-inset'
-                          : 'text-slate-400 hover:bg-white/5 hover:text-white',
+                          ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30'
+                          : 'text-slate-300 hover:bg-white/[0.06] hover:text-white',
                       ].join(' ')
                     }
                   >
                     {({ isActive }) => (
                       <>
                         <Icon
-                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300'}`}
+                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}
                         />
                         {label}
                       </>
@@ -173,21 +179,24 @@ function SidebarNavigation({ userRole, onNavigate }) {
   );
 }
 
-function UserCard({ currentUser, isSigningOut, onSignOut }) {
+function UserCard({ currentUser, companyName, isSigningOut, onSignOut }) {
   return (
-    <div className="border-t border-white/10 p-3">
-      <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+    <div className="p-4">
+      <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/[0.06]">
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white"
           aria-hidden="true"
         >
-          {computeInitials(currentUser.name)}
+          {initialsOf(currentUser.name)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">{currentUser.name}</p>
-          <div className="mt-0.5 flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold text-white">{currentUser.name}</p>
             <RoleBadge role={currentUser.role} tone="dark" />
           </div>
+          <p className="mt-0.5 truncate text-xs text-slate-400" title={currentUser.email}>
+            {companyName ?? currentUser.email}
+          </p>
         </div>
         <button
           type="button"
@@ -201,28 +210,70 @@ function UserCard({ currentUser, isSigningOut, onSignOut }) {
           <SignOutIcon className="h-5 w-5" />
         </button>
       </div>
-      <p className="mt-2 truncate px-1 text-xs text-slate-500" title={currentUser.email}>
-        {currentUser.email}
-      </p>
     </div>
   );
 }
 
-function SidebarContents({ currentUser, isSigningOut, onSignOut, onNavigate, closeButton = null }) {
+function SidebarContents({ currentUser, companyName, isSigningOut, onSignOut, onNavigate, closeButton = null }) {
   return (
-    <div className="flex h-full flex-col bg-neutral-950">
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-5">
+    <div className="flex h-full flex-col bg-[#23272e]">
+      <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/[0.06] px-6">
         <BrandMark tone="light" />
         {closeButton}
       </div>
       <SidebarNavigation userRole={currentUser.role} onNavigate={onNavigate} />
-      <UserCard currentUser={currentUser} isSigningOut={isSigningOut} onSignOut={onSignOut} />
+      <UserCard currentUser={currentUser} companyName={companyName} isSigningOut={isSigningOut} onSignOut={onSignOut} />
     </div>
+  );
+}
+
+/** "Systems live" while every configured service is operational, otherwise the overall state. */
+function SystemsPill({ health }) {
+  if (!health) return null;
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+      <span className={`h-2 w-2 rounded-full ${SERVICE_STATE_TONES[health.overall].dotClassName}`} aria-hidden="true" />
+      {health.overall === 'operational' ? 'Systems live' : `Systems: ${health.overallLabel}`}
+    </span>
+  );
+}
+
+function TopBar({ companyName, pageLabel, currentUser, health }) {
+  return (
+    <header className="hidden h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200/70 bg-white/80 px-8 backdrop-blur lg:flex">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3 text-sm">
+        {companyName && <span className="truncate text-slate-500">{companyName}</span>}
+        {companyName && pageLabel && (
+          <span className="text-slate-300" aria-hidden="true">
+            ›
+          </span>
+        )}
+        {pageLabel && (
+          <span className="truncate font-semibold text-slate-900" aria-current="page">
+            {pageLabel}
+          </span>
+        )}
+      </nav>
+      <div className="flex shrink-0 items-center gap-3">
+        <SystemsPill health={health} />
+        <span
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"
+          title={currentUser.name}
+          aria-hidden="true"
+        >
+          {initialsOf(currentUser.name)}
+        </span>
+      </div>
+    </header>
   );
 }
 
 export default function AppShell() {
   const { currentUser, signOut } = useAuth();
+  const { pathname } = useLocation();
+  const { branding } = usePublicAuthSettings();
+  const health = useSystemHealth(currentUser.role === USER_ROLES.ADMIN);
+  const companyName = branding?.name ?? null;
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(null);
@@ -256,10 +307,15 @@ export default function AppShell() {
   const closeMobileNav = () => setIsMobileNavOpen(false);
 
   return (
-    <div className="h-dvh bg-slate-50">
+    <div className="h-dvh bg-[#f5f7fb]">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
-        <SidebarContents currentUser={currentUser} isSigningOut={isSigningOut} onSignOut={handleSignOut} />
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 lg:block">
+        <SidebarContents
+          currentUser={currentUser}
+          companyName={companyName}
+          isSigningOut={isSigningOut}
+          onSignOut={handleSignOut}
+        />
       </aside>
 
       {/* Mobile drawer */}
@@ -274,6 +330,7 @@ export default function AppShell() {
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
             <SidebarContents
               currentUser={currentUser}
+              companyName={companyName}
               isSigningOut={isSigningOut}
               onSignOut={handleSignOut}
               onNavigate={closeMobileNav}
@@ -292,7 +349,14 @@ export default function AppShell() {
         </div>
       )}
 
-      <div className="flex h-dvh flex-col lg:pl-64">
+      <div className="flex h-dvh flex-col lg:pl-72">
+        <TopBar
+          companyName={companyName}
+          pageLabel={pageLabelOf(pathname)}
+          currentUser={currentUser}
+          health={health.data}
+        />
+
         {/* Mobile top bar */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:hidden">
           <button
