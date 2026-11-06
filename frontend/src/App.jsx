@@ -86,6 +86,7 @@ export default function App() {
         {/* Emailed links work whether or not someone is signed in on this browser. */}
         <Route path={ROUTE_PATHS.VERIFY_EMAIL} element={<VerifyEmailLink />} />
         <Route path={ROUTE_PATHS.RESET_PASSWORD} element={<ResetPassword />} />
+        <Route path={ROUTE_PATHS.RESET_PASSWORD_WITH_CODE} element={<ResetPassword />} />
 
         <Route element={<PublicOnlyRoute />}>
           <Route path={ROUTE_PATHS.LOGIN} element={<Login />} />

@@ -71,7 +71,13 @@ export default function VerificationCodeInput({
   }
 
   return (
-    <div role="group" aria-labelledby={labelId} aria-describedby={describedBy} className="flex gap-2 sm:gap-3">
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      aria-describedby={describedBy}
+      className="grid gap-[clamp(0.5rem,1.1vw,0.9rem)]"
+      style={{ gridTemplateColumns: `repeat(${length}, minmax(0, 1fr))` }}
+    >
       {digits.map((digit, index) => (
         <input
           // The boxes never reorder, so their position is a stable key.
@@ -94,11 +100,11 @@ export default function VerificationCodeInput({
           onPaste={(pasteEvent) => handlePaste(index, pasteEvent)}
           onFocus={(focusEvent) => focusEvent.target.select()}
           className={[
-            'h-14 w-full min-w-0 rounded-xl border bg-white text-center text-xl font-semibold text-slate-900 shadow-sm transition sm:h-16 sm:text-2xl',
+            'h-[clamp(3rem,7vh,4.25rem)] w-full min-w-0 rounded-2xl border bg-white text-center text-[clamp(1.25rem,2.8vh,1.6rem)] font-semibold text-slate-900 shadow-[0_2px_6px_-2px_rgba(15,23,42,0.08)] transition',
             'focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-100',
             hasError
               ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-              : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100',
+              : 'border-slate-200/90 focus:border-brand-500 focus:ring-brand-100 focus:ring-[3px]',
           ].join(' ')}
         />
       ))}
