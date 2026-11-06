@@ -41,6 +41,9 @@ export const RATE_LIMITS = Object.freeze({
   // Offer calculations (each preview renders a PDF) and dispatches (each sends an email).
   OFFER_CALCULATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
   OFFER_DISPATCHES_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 30 }),
+  // Knowledge base uploads (each is read and indexed in the background) and other changes.
+  KNOWLEDGE_UPLOADS_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 60 }),
+  KNOWLEDGE_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Public verification: enough for a verifier, too few to scan the ID space.
   PAYSLIP_VERIFICATIONS_PER_CLIENT_IP: Object.freeze({ windowMs: 60 * 1000, maxRequests: 20 }),
   // OKR writes: progress sliders can fire often (clients should debounce); this stops runaway loops.

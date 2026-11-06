@@ -8,6 +8,8 @@
  *                               without a slug, one is made from the name
  *   PATCH  /:departmentId       change one, including isActive (send version); renaming keeps the slug
  *   DELETE /:departmentId       remove one nothing refers to (otherwise deactivate it)
+ *   /:departmentId/agent/...    the department's knowledge base (routes/departmentKnowledgeRoutes.js),
+ *                               for its head, its knowledge lead and administrators
  */
 
 import { Router } from 'express';
@@ -20,6 +22,7 @@ import {
 } from '../controllers/departmentController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { workplaceSetupWriteRateLimitByUser } from '../middleware/rateLimiter.js';
+import departmentKnowledgeRouter from './departmentKnowledgeRoutes.js';
 
 const departmentRouter = Router();
 
@@ -27,6 +30,7 @@ departmentRouter.use(protect, (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });
+departmentRouter.use('/:departmentId/agent', departmentKnowledgeRouter);
 departmentRouter.get('/', getDepartments);
 departmentRouter.get('/:departmentId', getDepartmentById);
 departmentRouter.post('/', workplaceSetupWriteRateLimitByUser, postDepartment);
