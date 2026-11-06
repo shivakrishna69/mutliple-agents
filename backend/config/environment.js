@@ -122,15 +122,47 @@ function loadS3StorageConfig(env, envPrefix) {
 const PDF_BROWSER_CHANNELS = Object.freeze(['chrome', 'chrome-beta', 'msedge', 'msedge-beta', 'chromium']);
 
 /**
+ * The Chromium build that renders PDFs (payslips, offer letters; services/pdfGenerationService.js):
+ *   PDF_BROWSER_EXECUTABLE_PATH   path to a Chromium/Chrome/Edge executable, or
+ *   PDF_BROWSER_CHANNEL           an installed branded channel (PDF_BROWSER_CHANNELS)
+ * Null when neither is set: documents report themselves as unavailable and everything else works.
+ */
+function loadPdfBrowserConfig() {
+  const executablePath = (process.env.PDF_BROWSER_EXECUTABLE_PATH ?? '').trim() || null;
+  const channel = (process.env.PDF_BROWSER_CHANNEL ?? '').trim() || null;
+  if (!executablePath && !channel) return null;
+  if (channel && !PDF_BROWSER_CHANNELS.includes(channel)) {
+    throw new Error(`PDF_BROWSER_CHANNEL must be one of ${PDF_BROWSER_CHANNELS.join(', ')}`);
+  }
+  return { executablePath, channel: executablePath ? null : channel };
+}
+
+/**
+ * Offer letters (services/offerLetterGenerator.js):
+ *   QPDF_PATH                    the qpdf executable that password-protects final letters
+ *                                (default "qpdf", found on the PATH)
+ *   COMPANY_LEGAL_NAME,          printed in the letter head when set (the company's name from its
+ *   COMPANY_REGISTERED_ADDRESS   settings otherwise; the address is then left out)
+ */
+function loadOfferLetterConfig() {
+  const qpdfPath = (process.env.QPDF_PATH ?? '').trim() || 'qpdf';
+  return {
+    qpdfPath,
+    legalName: (process.env.COMPANY_LEGAL_NAME ?? '').trim() || null,
+    registeredAddress: (process.env.COMPANY_REGISTERED_ADDRESS ?? '').trim() || null,
+  };
+}
+
+/**
  * Payslip generation settings (services/payslipService.js). Disabled (null) unless
  * PAYSLIP_S3_BUCKET is set; when it is, everything a payslip needs must be configured:
  *   COMPANY_LEGAL_NAME, COMPANY_REGISTERED_ADDRESS   printed in the payslip header
  *   COMPANY_BRAND_COLOR                              optional "#RRGGBB" accent (default #c75000)
  *   PAYSLIP_SIGNING_SECRET                           HMAC key for verification IDs (≥ 32 chars)
  *   PAYSLIP_VERIFICATION_BASE_URL                    optional public URL printed next to the ID
- *   PDF_BROWSER_EXECUTABLE_PATH | PDF_BROWSER_CHANNEL  the Chromium build that renders PDFs
+ *   PDF_BROWSER_EXECUTABLE_PATH | PDF_BROWSER_CHANNEL  the Chromium build (loadPdfBrowserConfig)
  */
-function loadPayslipConfig(env) {
+function loadPayslipConfig(env, pdfBrowser) {
   const storage = loadS3StorageConfig(env, 'PAYSLIP');
   if (!storage) return null;
 
@@ -164,13 +196,8 @@ function loadPayslipConfig(env) {
     }
   }
 
-  const browserExecutablePath = (process.env.PDF_BROWSER_EXECUTABLE_PATH ?? '').trim() || null;
-  const browserChannel = (process.env.PDF_BROWSER_CHANNEL ?? '').trim() || null;
-  if (!browserExecutablePath && !browserChannel) {
+  if (!pdfBrowser) {
     throw new Error('PDF_BROWSER_EXECUTABLE_PATH or PDF_BROWSER_CHANNEL is required when PAYSLIP_S3_BUCKET is set');
-  }
-  if (browserChannel && !PDF_BROWSER_CHANNELS.includes(browserChannel)) {
-    throw new Error(`PDF_BROWSER_CHANNEL must be one of ${PDF_BROWSER_CHANNELS.join(', ')}`);
   }
 
   return {
@@ -178,7 +205,7 @@ function loadPayslipConfig(env) {
     signingSecret,
     verificationBaseUrl,
     company: { legalName: companyLegalName, registeredAddress: companyRegisteredAddress, brandColor },
-    pdfBrowser: { executablePath: browserExecutablePath, channel: browserExecutablePath ? null : browserChannel },
+    pdfBrowser,
   };
 }
 
@@ -338,7 +365,8 @@ export function loadConfig() {
   // Optional. Employee document vault storage; null disables the vault.
   const vaultStorage = loadS3StorageConfig(env, 'VAULT');
   // Optional. Payslip PDF generation and storage; null disables it.
-  const payslips = loadPayslipConfig(env);
+  const pdfBrowser = loadPdfBrowserConfig();
+  const payslips = loadPayslipConfig(env, pdfBrowser);
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')
@@ -354,6 +382,8 @@ export function loadConfig() {
     employeeImport: { emailsPerMinute: importEmailsPerMinute },
     vaultStorage,
     payslips,
+    pdfBrowser,
+    offerLetters: loadOfferLetterConfig(),
     bootstrapAdminEmail,
     trustProxyHops,
     port: Number(process.env.PORT ?? 5000),

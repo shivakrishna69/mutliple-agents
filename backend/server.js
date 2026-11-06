@@ -53,6 +53,8 @@ import departmentRoutes from './routes/departmentRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
+import { initPdfRenderer } from './services/pdfGenerationService.js';
+import { initOfferLetters } from './services/offerLetterGenerator.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { configureAccountCodeKey } from './services/accountTokens.js';
 import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
@@ -213,6 +215,8 @@ async function start() {
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);
+    initPdfRenderer(config.pdfBrowser);
+    initOfferLetters(config.offerLetters);
     initPayslipServices(config.payslips);
     initMailService(config.mail);
     configureAccountCodeKey(config.jwtSecret);
