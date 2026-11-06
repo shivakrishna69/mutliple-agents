@@ -204,7 +204,11 @@ async function docxBlocks(content) {
 
 // --- Markdown and plain text ----------------------------------------------------------------------
 
-const decodeUtf8 = (content) => content.toString('utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+const decodeUtf8 = (content) =>
+  content
+    .toString('utf8')
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n?/g, '\n');
 
 function markdownBlocks(source) {
   const blocks = [];
