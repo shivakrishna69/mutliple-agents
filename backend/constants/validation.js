@@ -535,6 +535,8 @@ export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
   CHUNK_TARGET_CHARS: 1_200,
   CHUNK_MAX_CHARS: 1_800,
   CHUNK_OVERLAP_CHARS: 200,
+  // A heading kept with a chunk is cut to this length (the AI service accepts up to 500 characters).
+  HEADING_MAX_CHARS: 300,
   // Chunks sent to the AI service per indexing request: at most about 30 KB of text, well inside
   // the 1 MB request cap of services/aiServiceClient.js. Embedding 32 chunks of the largest size
   // took about 5 s on a desktop CPU, so 16 keeps a request within AI_SERVICE_TIMEOUT_MS on a small

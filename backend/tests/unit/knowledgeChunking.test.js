@@ -155,6 +155,12 @@ describe('chunkBlocks', () => {
     }
   });
 
+  it('keeps headings within their length limit', () => {
+    const longHeading = 'H'.repeat(KNOWLEDGE_BASE_SETTINGS.HEADING_MAX_CHARS + 50);
+    const [chunk] = chunkBlocks([heading(1, longHeading), paragraph('Under a very long heading.')]);
+    assert.equal(chunk.headingPath[0].length, KNOWLEDGE_BASE_SETTINGS.HEADING_MAX_CHARS);
+  });
+
   it('gives no chunks for a document with only headings', () => {
     assert.deepEqual(chunkBlocks([heading(1, 'Empty'), heading(2, 'Still empty')]), []);
   });

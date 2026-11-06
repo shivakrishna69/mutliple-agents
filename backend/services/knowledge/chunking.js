@@ -4,7 +4,7 @@
  * own chunks instead of adding new ones.
  *
  *   - A chunk belongs to one section: it never spans a heading or a PDF page, so every chunk can say
- *     where it came from (headingPath, page).
+ *     where it came from (headingPath, page). Headings are kept up to HEADING_MAX_CHARS.
  *   - Paragraphs are packed together up to targetChars. A longer paragraph is split between its
  *     sentences, a sentence longer than maxChars between words, and a word longer than maxChars
  *     (a URL, a hash) is cut. No chunk is longer than maxChars.
@@ -82,7 +82,7 @@ function sectionsOf(blocks) {
   for (const block of blocks) {
     if (block.type === 'heading') {
       while (headings.length && headings[headings.length - 1].level >= block.level) headings.pop();
-      headings.push({ level: block.level, text: block.text });
+      headings.push({ level: block.level, text: block.text.slice(0, KNOWLEDGE_BASE_SETTINGS.HEADING_MAX_CHARS) });
       current = null;
       continue;
     }
