@@ -13,6 +13,14 @@ API for any change.
   tools over the backend's internal leave API, and may prepare a draft the employee reviews and
   sends themselves. It never sends, approves or changes leave; the backend names the employee and
   checks any draft again. Needs `BACKEND_INTERNAL_URL`.
+- **Department knowledge index** (`POST /ai/knowledge/chunks`, `POST /ai/knowledge/documents/remove`,
+  app/knowledge/): the backend's ingestion worker sends each knowledge base document's chunks in
+  batches; they are embedded on the CPU with fastembed (`BAAI/bge-small-en-v1.5`, MIT, 384
+  dimensions; no text leaves the server) and stored in Qdrant, one point per chunk with its company,
+  department, agent, document, access level, headings and page. Indexing a document again overwrites
+  its chunks; removing evicts all of them. Searches (for the department agents to come) always
+  filter on one department. 503 when `QDRANT_URL` is not set or Qdrant cannot be reached; the
+  backend retries.
 - **Agent telemetry**: node, model and tool timings are posted to the backend for the admin console;
   conversation content is never included.
 
@@ -27,6 +35,13 @@ curl http://localhost:8000/health
 
 From inside the container the backend on your machine is `http://host.docker.internal:5000`.
 After changing code, rebuild the image and recreate the container.
+
+The knowledge index needs Qdrant: `docker compose up` (repository root) runs one, or start one with
+`docker run -d -p 6333:6333 -e QDRANT__SERVICE__API_KEY=<key> qdrant/qdrant:v1.20.0` and set
+`QDRANT_URL` and `QDRANT_API_KEY` (the same key, 32+ characters). The image carries the embedding
+model, downloaded and checked against app/knowledge/embedding_model.sha256 while it is built, so the
+service never downloads anything (`EMBEDDING_OFFLINE=true`, required in production). It adds about
+450 MB to the image and about 300 MB of memory once loaded.
 
 ## Tests
 
@@ -54,6 +69,9 @@ docker run --rm -v "$PWD/app:/src/app:ro" -v "$PWD/tests:/src/tests:ro" -v "$PWD
 | `test_attendance_agent.py` | The evidence rule, date resolution, and full regularization conversations, including prompt injection |
 | `test_leave_assistant.py` | Tools scoped to the backend's employee, pricing and drafting without sending, refusals and mistakes returned to the model, bounded rounds, guarded replies, the endpoint's statuses |
 | `test_api.py` | Internal API key, 422 shape, 503 without Groq, 504 on timeout |
+| `test_knowledge_api.py` | The knowledge endpoints: internal key, every malformed batch refused before embedding, 503 without Qdrant |
+| `test_knowledge_unit.py` | Stable point ids, headings in the embedded text, Qdrant and offline-model settings |
+| `test_knowledge_index.py` | Against a real Qdrant and the real model (`TEST_QDRANT_URL`, `TEST_QDRANT_API_KEY`; skipped without, required in CI): collection and indexes created once even by two instances at once, overwrite, remove, department isolation, the closest chunk answering a question |
 | `test_config.py` | Unsafe settings (simulated tools or plain HTTP in production, short keys) stop the service |
 
 `tests/fakes.py` holds the scripted chat model and in-memory attendance systems used in place of
@@ -68,6 +86,8 @@ app/graph.py             LangGraph topology (supervisor ↔ workers loop)
 app/nodes/               supervisor, workers (+ tools), attendance agent, leave assistant
 app/guards/              output guardrails
 app/services/            client for the backend internal API
+app/knowledge/           department knowledge index: endpoints, embeddings (fastembed), Qdrant store,
+                         the build-time model download and its checksums
 app/telemetry.py         LangChain callback → batched telemetry events
 app/config.py            settings, validated at startup
 ```

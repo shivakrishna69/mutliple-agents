@@ -20,6 +20,8 @@ missing or weak secrets (e.g. `JWT_SECRET`, `AI_SERVICE_API_KEY` shorter than 32
 | `npm start` | production start |
 | `npm run set-role -- <email> <admin\|agent\|hr\|customer>` | recovery tool to change a role directly in the database |
 | `npm run send-test-message` | sends a signed test message to the inbound webhook |
+| `node scripts/reindexKnowledge.js [departmentId]` | puts knowledge base documents back in the queue to be indexed again (after Qdrant lost its data, or the embedding or chunking changed) |
+| `node scripts/checkOfferLetterPdf.js` | renders and locks a sample offer letter, to check this machine's Chromium and qpdf |
 | `npm test` | unit and integration tests (integration needs MongoDB; see [tests/README.md](tests/README.md)) |
 | `npm run lint` / `npm run format:check` | ESLint and Prettier checks |
 
@@ -58,6 +60,7 @@ scripts/         operational scripts
 | `/api/org` | org chart and reporting lines | staff |
 | `/api/company` | company name, short code, mail domain, logo, colours, time zone, employee ID digits | public branding / HR read / admin change |
 | `/api/departments` | departments with head counts: add, change, deactivate, remove unused | HR, admin |
+| `/api/departments/:departmentId/agent` | the department's knowledge base: agent settings, documents (upload, list, delete) | the department's head and knowledge lead, admin |
 | `/api/people`, `/api/invitations` | onboarding by email invitation | HR, admin / public token |
 | `/api/hr/onboarding` | offers: CTC structure, offer letter preview, drafts reviewed before they are sent, dispatch with a locked letter and a 48-hour activation link | HR, admin |
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
@@ -198,6 +201,57 @@ HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
   `PDF_UNAVAILABLE` (503). The production image installs both (`WITH_PDF_BROWSER=true`, set in
   `docker-compose.prod.yml`). `node scripts/checkOfferLetterPdf.js` renders and locks a sample
   letter and checks the password, which is how CI tests the production image.
+
+## Department knowledge bases
+
+Each department has an AI agent (models/DepartmentAgent.js) and a knowledge base of documents its
+lead uploads (models/AgentDocument.js). The API is `/api/departments/:departmentId/agent`
+(routes/departmentKnowledgeRoutes.js); everything behind it goes through
+services/knowledge/knowledgeBaseService.js, and a test (tests/unit/knowledgeBoundary.test.js) keeps
+every other module away from the file store, chunks and vectors.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /settings` | the agent: name, instructions (`systemPrompt`), `ACTIVE`/`PAUSED`, lead, limits, whether the caller may change the lead, `version`. Created on first use, named "<department> Department Agent", with the department head as lead |
+| `PATCH /settings` `{ name?, systemPrompt?, status?, managedBy?, version }` | changes them; `managedBy` (a user id, or null) only by an admin or the head, and only to an active employee of the department |
+| `GET /documents` | the documents, newest first: name, type, size, status, the reason a document failed, chunk count, who uploaded it |
+| `POST /documents` (multipart, field `file`) | 202 with the document (`UPLOADED`); it is read and indexed in the background |
+| `DELETE /documents/:docId` | evicts its chunks from the index, then deletes the stored file and the record |
+
+**Who may use it** (services/knowledge/knowledgeAccess.js): administrators in every department; the
+department head (`Department.departmentHeadId`) in their own; the knowledge lead (`managedBy`) in
+theirs. Everyone else gets 403 on every endpoint, HR included, and the refusal is audited. A scope
+middleware (middleware/departmentKnowledgeScope.js) loads the department and these rights once;
+handlers act only on that department, so a document of another department is "not found". An
+inactive department answers 409.
+
+**Uploads** (at most 10 MB; `KNOWLEDGE_BASE_SETTINGS` in constants/validation.js holds every limit):
+
+- The type comes from the content (services/knowledge/fileTypes.js): PDF, Word (.docx, checked as a
+  real Word zip, at most 50 MB unpacked), Markdown and plain text (strict UTF-8). The extension must
+  agree; what the browser declared is ignored. Refusals: 415 `UNSUPPORTED_FILE_TYPE` /
+  `EXTENSION_MISMATCH`, 413, 400 `EMPTY_FILE`; 409 `DUPLICATE_DOCUMENT` (same file in the
+  department), `DOCUMENT_LIMIT_REACHED` (200 per department), `AGENT_PAUSED`. Nothing is stored
+  for a refused upload, and a refused user's upload is never read.
+- The file is kept in MongoDB GridFS (bucket `knowledgeFiles`, services/knowledge/fileStore.js) with
+  its SHA-256, checked again whenever it is read.
+
+**Processing** (services/knowledge/ingestionRunner.js), on the same durable queue as employee imports
+(services/durableQueue.js: BullMQ with `REDIS_URL`, in the backend process without; a sweep every
+30 s resumes waiting and abandoned documents):
+
+1. A worker claims the document with a lease (`PROCESSING`), so it is processed once.
+2. Its text is read in a separate thread, stopped after 60 s or 256 MB (pdfjs-dist, mammoth;
+   services/knowledge/extractionThread.js). Encrypted and scanned PDFs are refused: there is no OCR.
+3. It is split into chunks (services/knowledge/chunking.js): within one heading and one PDF page, about
+   1,200 characters, never more than 1,800, overlapping the previous chunk.
+4. Its old chunks are evicted and the new ones sent to the AI service's index in batches of 16, with
+   `{ companyId, departmentId, agentId, documentId, accessLevel: "DEPARTMENT" }`, headings and page.
+5. `READY` with the chunk count; or `FAILED` with a reason the lead can act on
+   (`KNOWLEDGE_MESSAGES.PROCESSING_FAILURES`). An unreachable index is retried, 3 attempts in all.
+
+A document deleted or taken over while it is processed ends without stray chunks. A delete while the
+index is down answers 503 and leaves the document `DELETING` until it is deleted again.
 
 ## Leave balances
 
