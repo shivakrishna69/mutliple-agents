@@ -59,13 +59,14 @@ export async function protectPdfWithPassword(pdf, userPassword, { qpdfPath }) {
     const outputPath = path.join(workFolder, 'output.pdf');
     const argumentsPath = path.join(workFolder, 'arguments');
     await writeFile(inputPath, pdf, { mode: PRIVATE_FILE_MODE });
-    // One argument per line (qpdf's @file format).
+    // One argument per line (qpdf's @file format). The positional form "--encrypt <user> <owner>
+    // <bits>" works in every qpdf version (Debian ships 11.x, which lacks --user-password=).
     const qpdfArguments = [
       inputPath,
       '--encrypt',
-      `--user-password=${userPassword}`,
-      `--owner-password=${randomBytes(OWNER_PASSWORD_BYTES).toString('hex')}`,
-      `--bits=${OFFER_LETTER_PROTECTION.KEY_LENGTH_BITS}`,
+      userPassword,
+      randomBytes(OWNER_PASSWORD_BYTES).toString('hex'),
+      String(OFFER_LETTER_PROTECTION.KEY_LENGTH_BITS),
       '--print=full',
       '--modify=none',
       '--extract=n',
