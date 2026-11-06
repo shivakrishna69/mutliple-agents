@@ -77,8 +77,31 @@ services:
       # Development rules: the backend is reached over plain HTTP inside the compose network.
       APP_ENV: development
       BACKEND_INTERNAL_URL: http://backend:5000
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+    depends_on:
+      qdrant:
+        condition: service_started
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # The department knowledge index (see docker-compose.prod.yml). Not published: only the AI service
+  # reaches it.
+  qdrant:
+    image: qdrant/qdrant:v1.20.0-unprivileged
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?set QDRANT_API_KEY (at least 32 characters) in your shell or a .env file next to this one}
+      QDRANT__TELEMETRY_DISABLED: "true"
+      QDRANT__LOG_LEVEL: WARN
+    volumes:
+      - qdrant-data:/qdrant/storage
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /qdrant/snapshots:uid=1000,gid=1000
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
@@ -107,3 +130,4 @@ services:
 
 volumes:
   mongo-data:
+  qdrant-data:

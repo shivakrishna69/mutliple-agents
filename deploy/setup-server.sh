@@ -173,6 +173,10 @@ ACME_EMAIL=${NSK_ACME_EMAIL:-}
 MONGO_ROOT_USERNAME=nsk
 MONGO_ROOT_PASSWORD=$(random_hex 24)
 REDIS_PASSWORD=$(random_hex 24)"
+# The generated settings (the Qdrant key...), also added to a stack.env written by an older version.
+# shellcheck source=deploy/stack-settings.sh
+source "$APP_DIR/deploy/stack-settings.sh"
+ensure_generated_stack_settings "$CONFIG_DIR/stack.env"
 
 ai_service_api_key="$(random_hex 32)"
 if [[ ! -e "$CONFIG_DIR/backend.env" ]]; then

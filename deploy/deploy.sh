@@ -57,6 +57,11 @@ main() {
   previous="$(git rev-parse HEAD)"
   log "deploying ${target:0:12} (running ${previous:0:12})"
   git checkout --quiet --force --detach "$target"
+  # Settings this release generates on the server (the Qdrant key...), from the version just checked
+  # out, so a release that needs a new one brings it along. Existing values are never changed.
+  # shellcheck source=deploy/stack-settings.sh
+  source "$APP_DIR/deploy/stack-settings.sh"
+  ensure_generated_stack_settings "$STACK_ENV_FILE"
 
   if ! start_stack; then
     log "the new version did not become healthy; recent logs:"
