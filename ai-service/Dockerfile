@@ -10,9 +10,11 @@
 # Two stages:
 #   builder  creates a virtualenv and installs requirements.txt into it. pip's download cache
 #            lives in a BuildKit cache mount, so it speeds up rebuilds without ever being written
-#            into an image layer.
-#   runtime  starts again from the slim base and copies only the virtualenv and the application
-#            code. No compilers, pip cache, or build files reach the final image.
+#            into an image layer. It then downloads the knowledge embedding model and checks every
+#            file against app/knowledge/embedding_model.sha256 (the build fails on any difference).
+#   runtime  starts again from the slim base and copies only the virtualenv, the model and the
+#            application code. No compilers, pip cache, or build files reach the final image, and
+#            the service never downloads anything at run time (EMBEDDING_OFFLINE).
 #
 # Secrets are never baked in: .dockerignore admits only requirements.txt and app/, so .env cannot
 # enter the build context. Configuration (GROQ_API_KEY, AI_SERVICE_API_KEY, ...) is supplied at
@@ -39,6 +41,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
     && pip install -r /tmp/requirements.txt
 
+# The embedding model (about 65 MB), in a layer of its own that is rebuilt only when the model's
+# pinned files change. Only the download script and what it imports are copied for it.
+COPY app/__init__.py /build/app/__init__.py
+COPY app/knowledge/__init__.py app/knowledge/constants.py app/knowledge/download_model.py \
+     app/knowledge/embedding_model.sha256 /build/app/knowledge/
+# The download writes some metadata readable by root only; the service runs as appuser, so every
+# file is made readable (and nothing writable) for everyone.
+RUN cd /build && python -m app.knowledge.download_model /opt/models \
+    && chmod -R a+rX,go-w /opt/models
+
 # ------------------------------------------------------------------------------------------------
 # Stage 2: runtime
 # ------------------------------------------------------------------------------------------------
@@ -54,7 +66,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:${PATH}" \
-    APP_ENV=production
+    APP_ENV=production \
+    EMBEDDING_CACHE_DIR=/opt/models \
+    EMBEDDING_OFFLINE=true \
+    HF_HUB_OFFLINE=1
 
 # Dedicated unprivileged system account with a fixed UID/GID, so orchestrators can enforce
 # runAsNonRoot / runAsUser policies. No login shell and no home directory.
@@ -69,6 +84,7 @@ WORKDIR /app
 # its own code or libraries even if compromised. /app itself is handed to appuser as the spec
 # requires, but nothing in it needs to be writable at run time.
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/models /opt/models
 COPY app/ /app/app/
 RUN chown appuser:appuser /app
 
