@@ -29,7 +29,7 @@ import mongoose from 'mongoose';
 import { startMailCatcher, tokenFromEmail } from './mailCatcher.js';
 
 const SERVER_ENTRY_PATH = fileURLToPath(new URL('../../server.js', import.meta.url));
-const MONGO_BASE_URL = (process.env.TEST_MONGO_URL ?? 'mongodb://127.0.0.1:27017').replace(/\/+$/, '');
+export const MONGO_BASE_URL = (process.env.TEST_MONGO_URL ?? 'mongodb://127.0.0.1:27017').replace(/\/+$/, '');
 // A ceiling, not a delay: a server alone starts in about 5 s, but many suites start theirs at once.
 const STARTUP_TIMEOUT_MS = 60_000;
 
