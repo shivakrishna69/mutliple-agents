@@ -518,6 +518,23 @@ export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
     'text/markdown': 'md',
     'text/plain': 'txt',
   }),
+  // A .docx is a zip: its parts may hold at most this much once unpacked, in at most this many
+  // entries, so a small "zip bomb" cannot exhaust the server's memory.
+  DOCX_MAX_UNPACKED_BYTES: 50 * 1024 * 1024,
+  DOCX_MAX_ENTRIES: 2_000,
+  // Bounds on the work one document may cause: pages read from a PDF, and text kept from any file.
+  PDF_MAX_PAGES: 1_000,
+  EXTRACTED_TEXT_MAX_CHARS: 5_000_000,
+  // Reading a file runs in its own thread (services/knowledge/extractionThread.js), stopped when it
+  // takes longer than this or needs more memory, so a hostile file cannot stall or exhaust the API.
+  EXTRACTION_TIMEOUT_MS: 60_000,
+  EXTRACTION_MAX_HEAP_MB: 256,
+  // Chunks: about this long (a few paragraphs), never longer than CHUNK_MAX_CHARS (within the
+  // embedding model's 512-token input), each starting with the end of the previous one in the
+  // same section, so a sentence cut at a boundary is still found whole.
+  CHUNK_TARGET_CHARS: 1_200,
+  CHUNK_MAX_CHARS: 1_800,
+  CHUNK_OVERLAP_CHARS: 200,
   ORIGINAL_NAME_MAX_LENGTH: 255,
   MAX_DOCUMENTS_PER_DEPARTMENT: 200,
   MAX_CHUNKS_PER_DOCUMENT: 2_000,
