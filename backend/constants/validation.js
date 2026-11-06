@@ -22,10 +22,11 @@ export const USER_FIELD_LIMITS = Object.freeze({
 /**
  * Phone numbers are stored in international (E.164) form: "+", the country code, then the number,
  * 8 to 15 digits in all. A number typed without a country code is read as a national number of
- * DEFAULT_COUNTRY_CODE (utils/phoneNumbers.js).
+ * the country picked beside it, DEFAULT_COUNTRY when none is (utils/phoneNumbers.js).
  */
 export const PHONE_SETTINGS = Object.freeze({
-  DEFAULT_COUNTRY_CODE: '91',
+  // ISO 3166-1 alpha-2: the country the sign-up screen's picker starts on.
+  DEFAULT_COUNTRY: 'IN',
   E164_PATTERN: /^\+[1-9]\d{7,14}$/,
   // What a person may type: digits, spaces, dashes, dots, brackets and a leading + or 00.
   MAX_INPUT_LENGTH: 25,
@@ -36,6 +37,31 @@ export const PHONE_SETTINGS = Object.freeze({
  * change; each account keeps the version it accepted (User.termsVersion).
  */
 export const TERMS_VERSION = 1;
+
+/** What a person may give as their gender at signup (labels: constants/messages.js GENDER_LABELS). */
+export const GENDERS = Object.freeze({
+  MALE: 'male',
+  FEMALE: 'female',
+  NON_BINARY: 'non_binary',
+  PREFER_NOT_TO_SAY: 'prefer_not_to_say',
+});
+
+/**
+ * Date of birth and gender at signup.
+ *
+ *   BIRTH_DATE_AND_GENDER_REQUIRED  false while the live sign-up screen does not ask for them yet:
+ *                                   they are checked and stored when sent. Turned on together with
+ *                                   the screen that sends them.
+ *   MINIMUM_AGE_YEARS               the youngest a person may be to create an account
+ *   MAXIMUM_AGE_YEARS               older than this is taken for a typing mistake
+ *   BIRTH_DATE_PATTERN              how the date is sent: YYYY-MM-DD (what a date input gives)
+ */
+export const SIGNUP_PROFILE_SETTINGS = Object.freeze({
+  BIRTH_DATE_AND_GENDER_REQUIRED: false,
+  MINIMUM_AGE_YEARS: 18,
+  MAXIMUM_AGE_YEARS: 120,
+  BIRTH_DATE_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
+});
 
 /**
  * Links emailed to account owners (services/accountEmailFlows.js):

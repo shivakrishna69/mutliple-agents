@@ -52,6 +52,7 @@ export const ACCOUNT_FLOW_ERROR_CODES = Object.freeze({
   VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
   VERIFICATION_CODE_INVALID: 'VERIFICATION_CODE_INVALID',
   RESET_LINK_INVALID: 'RESET_LINK_INVALID',
+  RESET_CODE_INVALID: 'RESET_CODE_INVALID',
 });
 
 /** What registerAccount did, for the audit log; the caller's answer is the same in every case. */
@@ -86,6 +87,8 @@ const invalidVerificationCode = () =>
   linkFailure(ACCOUNT_FLOW_ERROR_CODES.VERIFICATION_CODE_INVALID, ACCOUNT_EMAIL_MESSAGES.VERIFICATION_CODE_INVALID);
 const invalidResetLink = () =>
   linkFailure(ACCOUNT_FLOW_ERROR_CODES.RESET_LINK_INVALID, ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
+const invalidResetCode = () =>
+  linkFailure(ACCOUNT_FLOW_ERROR_CODES.RESET_CODE_INVALID, ACCOUNT_EMAIL_MESSAGES.RESET_CODE_INVALID);
 
 function assertMailAvailable() {
   if (!isMailConfigured()) {
@@ -169,7 +172,7 @@ async function createOrReplaceUnverifiedAccount({ email, password, details }) {
 /**
  * POST /api/auth/signup. Input already validated and normalised (validators/authValidators.js).
  * @param {{ firstName: string, lastName: string, name: string, email: string, phoneNumber: string,
- *   password: string, bootstrapAdminEmail: string|null,
+ *   dateOfBirth: Date|null, gender: string|null, password: string, bootstrapAdminEmail: string|null,
  *   emailContext: { companyName: string, appPublicUrl: string } }} signup
  * @returns {Promise<{ outcome: string, userId: string }>}  for the audit log only
  */
@@ -179,6 +182,8 @@ export async function registerAccount({
   name,
   email,
   phoneNumber,
+  dateOfBirth,
+  gender,
   password,
   bootstrapAdminEmail,
   emailContext,
@@ -196,6 +201,8 @@ export async function registerAccount({
     name,
     phoneNumber,
     phoneVerifiedAt: null,
+    dateOfBirth,
+    gender,
     role,
     termsVersion: TERMS_VERSION,
     termsAcceptedAt: new Date(),
@@ -290,15 +297,19 @@ export async function requestPasswordReset({ email, emailContext }) {
   if (user?.status !== ACCOUNT_STATUSES.ACTIVE) return { userId: null, sent: null };
 
   const { companyName, appPublicUrl } = emailContext;
-  const { rawToken } = await issueAccountToken(
+  // One record holds both the link and the code, so using either one uses up the other.
+  const { rawToken, code } = await issueAccountToken(
     user._id,
     ACCOUNT_TOKEN_PURPOSES.PASSWORD_RESET,
     settings.PASSWORD_RESET_VALIDITY_MS,
+    new Date(),
+    { codeDigits: settings.VERIFICATION_CODE_DIGITS },
   );
   const message = buildPasswordResetEmail({
     name: user.name,
     companyName,
     resetUrl: tokenUrl(appPublicUrl, ACCOUNT_LINK_PATHS.PASSWORD_RESET, rawToken),
+    resetCode: code,
     validityMs: settings.PASSWORD_RESET_VALIDITY_MS,
   });
   await deliver(user, message, 'password_reset');
@@ -316,14 +327,41 @@ export async function checkPasswordResetLink(rawToken, now = new Date()) {
 }
 
 /**
- * POST /api/auth/password/reset. The password has already passed the signup rules.
+ * POST /api/auth/password/reset { token, ... }. The password has already passed the signup rules.
  * @returns {Promise<object>}  the User document
  */
 export async function resetPassword({ rawToken, password, emailContext }, now = new Date()) {
   const userId = await consumeAccountToken(rawToken, ACCOUNT_TOKEN_PURPOSES.PASSWORD_RESET, now);
   if (!userId) throw invalidResetLink();
+  return setNewPassword({ userId, password, emailContext, now, invalidError: invalidResetLink });
+}
+
+/**
+ * POST /api/auth/password/reset { email, code, ... }: the code from the reset email instead of its
+ * link. A wrong code is counted; the wrong code that reaches VERIFICATION_CODE_MAX_ATTEMPTS
+ * cancels the code and its link. An address without an active account gets the same answer as a
+ * wrong code, so this does not reveal which addresses are registered.
+ * @returns {Promise<object>}  the User document
+ */
+export async function resetPasswordWithCode({ email, code, password, emailContext }, now = new Date()) {
+  const account = await User.findOne({ email, status: ACCOUNT_STATUSES.ACTIVE }).select('_id').lean();
+  const outcome = account
+    ? await consumeAccountCode(
+        account._id,
+        ACCOUNT_TOKEN_PURPOSES.PASSWORD_RESET,
+        code,
+        settings.VERIFICATION_CODE_MAX_ATTEMPTS,
+        now,
+      )
+    : ACCOUNT_CODE_OUTCOMES.NONE;
+  if (outcome !== ACCOUNT_CODE_OUTCOMES.USED) throw invalidResetCode();
+  return setNewPassword({ userId: account._id, password, emailContext, now, invalidError: invalidResetCode });
+}
+
+/** The new password; every session and every other account link ends, and the owner is told. */
+async function setNewPassword({ userId, password, emailContext, now, invalidError }) {
   const user = await User.findOne({ _id: userId, status: ACCOUNT_STATUSES.ACTIVE });
-  if (!user) throw invalidResetLink();
+  if (!user) throw invalidError();
 
   // Sessions issued before passwordChangedAt are rejected (services/sessionAuthenticator.js).
   user.set({ password, passwordChangedAt: now });

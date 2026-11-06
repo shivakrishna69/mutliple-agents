@@ -7,12 +7,14 @@
  *   POST /api/auth/verify-email   { token } or { email, code }       200: confirmed and signed in
  *   POST /api/auth/password/forgot        { email }                  202: a reset link if there is an account
  *   GET  /api/auth/password/reset/:token                             200: the link works (and until when)
- *   POST /api/auth/password/reset         { token, password }        200: changed, every device signed out
+ *   POST /api/auth/password/reset   { token, password, confirmPassword } or
+ *                                   { email, code, password, confirmPassword }  200: changed, every device signed out
  *
  * Errors carry a stable `code` (sendCodedError) for the screens to branch on:
  *   400 VERIFICATION_LINK_INVALID / RESET_LINK_INVALID   unknown, used, revoked or expired link
- *   400 VERIFICATION_CODE_INVALID   wrong or expired code (or nothing to confirm for that email);
- *                                   too many wrong codes cancel the code and its link
+ *   400 VERIFICATION_CODE_INVALID / RESET_CODE_INVALID   wrong or expired code (or nothing to
+ *                                   confirm or reset for that email); too many wrong codes cancel the
+ *                                   code and its link. A code and its link are one: using either uses up both
  *   429 EMAIL_COOLDOWN   an email went to this address less than a minute ago; the wait is in the
  *                        Retry-After header and in error.context.retryAfterSeconds
  *   503 EMAIL_UNAVAILABLE   the server has no email configured
@@ -31,6 +33,7 @@ import {
   requestPasswordReset,
   resendVerification,
   resetPassword,
+  resetPasswordWithCode,
   verifyEmail,
   verifyEmailWithCode,
 } from '../services/accountEmailFlows.js';
@@ -196,15 +199,19 @@ export const describePasswordResetLink = accountEmailHandler('password_reset_che
 export const applyPasswordReset = accountEmailHandler('password_reset', async (req, res) => {
   const validation = validatePasswordResetInput(req.body);
   if (!validation.isValid) return sendValidationFailure(req, res, validation);
-  const { token, password } = validation.sanitizedInput;
+  const { token, email, code, password } = validation.sanitizedInput;
+  const emailContext = await emailContextOf(req);
 
-  const user = await resetPassword({ rawToken: token, password, emailContext: await emailContextOf(req) });
+  const user = token
+    ? await resetPassword({ rawToken: token, password, emailContext })
+    : await resetPasswordWithCode({ email, code, password, emailContext });
   const userId = user._id.toString();
   disconnectUserSockets(userId, SOCKET_ERROR_CODES.PASSWORD_CHANGED);
   recordAuditEvent(req, {
     category: AUDIT_CATEGORY,
     action: 'password_reset',
     outcome: AUDIT_OUTCOMES.ALLOWED,
+    resetWith: token ? 'link' : 'code',
     userId,
   });
   logger.info('Password reset', { requestId: req.id, userId });

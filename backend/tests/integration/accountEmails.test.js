@@ -16,7 +16,7 @@ import {
 import { ACCOUNT_EMAIL_SETTINGS, ACCOUNT_LINK_PATHS } from '../../constants/validation.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../../models/EmployeeProfile.js';
 import { insertDepartment, invitationTokenFrom } from './fixtures.js';
-import { tokenFromEmail } from './mailCatcher.js';
+import { codeFromEmail, tokenFromEmail } from './mailCatcher.js';
 import {
   createSignedInClient,
   endEmailCooldowns,
@@ -207,11 +207,7 @@ describe('confirming with the code from the email', { skip: skipReason ?? false 
 
   /** The code in the newest confirmation email to `email` (waits for the `count`th email). */
   async function latestCode(email, count = 1) {
-    const message = (await testServer.mailbox.waitForMessages(email, count)).at(-1);
-    const code = message.text.match(new RegExp(`: (\\d{${CODE_DIGITS}})$`, 'm'))?.[1];
-    assert.ok(code, `no code in "${message.subject}"`);
-    assert.ok(message.subject.startsWith(code), 'the subject leads with the code');
-    return code;
+    return codeFromEmail((await testServer.mailbox.waitForMessages(email, count)).at(-1), CODE_DIGITS);
   }
 
   const confirmWithCode = (client, email, code) => client.post('/api/auth/verify-email', { email, code });
@@ -354,7 +350,7 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     // 1: the signup confirmation; 2: the reset link.
     resetToken = await latestResetToken('priya@example.com', 2);
     const [, resetEmail] = testServer.mailbox.messagesTo('priya@example.com');
-    assert.match(resetEmail.text, /expires in 15 minutes/);
+    assert.match(resetEmail.text, /expire in 15 minutes/);
 
     const check = await testServer.createClient().get(`/api/auth/password/reset/${resetToken}`);
     assert.equal(check.status, 200);
@@ -450,6 +446,149 @@ describe('resetting a forgotten password', { skip: skipReason ?? false }, () => 
     const messages = await testServer.mailbox.waitForMessages('noor@example.com', 2);
     assert.ok(messages.every((message) => message.text.includes(ACCOUNT_LINK_PATHS.EMAIL_VERIFICATION)));
     assert.ok(messages.every((message) => !message.text.includes(ACCOUNT_LINK_PATHS.PASSWORD_RESET)));
+  });
+});
+
+describe('resetting a password with the code from the email', { skip: skipReason ?? false }, () => {
+  let testServer;
+  const CODE_DIGITS = ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS;
+  const MAX_ATTEMPTS = ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_MAX_ATTEMPTS;
+
+  /** Asks for a reset, and returns the code and link token of the email it sends (the newest). */
+  async function requestReset(email) {
+    await endEmailCooldowns(testServer);
+    const before = testServer.mailbox.messagesTo(email).length;
+    assert.equal((await testServer.createClient().post('/api/auth/password/forgot', { email })).status, 202);
+    const resetEmail = (await testServer.mailbox.waitForMessages(email, before + 1)).at(-1);
+    return {
+      code: codeFromEmail(resetEmail, CODE_DIGITS),
+      token: tokenFromEmail(resetEmail, ACCOUNT_LINK_PATHS.PASSWORD_RESET),
+      resetEmail,
+    };
+  }
+
+  const resetWithCode = (email, code, password = NEW_PASSWORD) =>
+    testServer.createClient().post('/api/auth/password/reset', { email, code, password, confirmPassword: password });
+  const resetWithLink = (token, password = NEW_PASSWORD) =>
+    testServer.createClient().post('/api/auth/password/reset', { token, password, confirmPassword: password });
+  const checkLink = (token) => testServer.createClient().get(`/api/auth/password/reset/${token}`);
+  const wrongCodeFor = (code) => String((Number(code) + 1) % 10 ** CODE_DIGITS).padStart(CODE_DIGITS, '0');
+  const assertCodeRefused = (response) =>
+    assertCodedError(response, 400, 'RESET_CODE_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_CODE_INVALID);
+  const assertLinkRefused = (response) =>
+    assertCodedError(response, 400, 'RESET_LINK_INVALID', ACCOUNT_EMAIL_MESSAGES.RESET_LINK_INVALID);
+
+  // Each group starts its own server: together they use more emailed codes and links from one IP
+  // than the per-IP limit (RATE_LIMITS.ACCOUNT_LINK_USES_PER_CLIENT_IP) allows in a window.
+  const useOwnServer = () => {
+    before(async () => {
+      testServer = await startTestServer();
+    });
+    after(async () => {
+      await testServer?.stop();
+    });
+  };
+
+  describe('using the code', () => {
+    useOwnServer();
+
+    it('emails a code and a link together, and the code sets the new password and ends every session', async () => {
+      const signedIn = await createSignedInClient(testServer, { name: 'Arjun Das', email: 'arjun@example.com' });
+      const { code, resetEmail } = await requestReset('arjun@example.com');
+      assert.match(resetEmail.subject, new RegExp(`^${code} is your .+ password reset code$`));
+      assert.match(resetEmail.text, /The code and the link work once and expire in 15 minutes/);
+
+      const reset = await resetWithCode('Arjun@Example.com', ` ${code} `);
+      assert.equal(reset.status, 200, JSON.stringify(reset.body));
+      assert.equal(reset.body.message, ACCOUNT_EMAIL_MESSAGES.PASSWORD_RESET_DONE);
+      assert.equal((await signedIn.get('/api/auth/me')).status, 401, 'existing sessions end');
+      assert.equal((await testServer.createClient().login('arjun@example.com', NEW_PASSWORD)).status, 200);
+    });
+
+    it('expires the link the moment the code is used, and the code cannot be used twice', async () => {
+      await createSignedInClient(testServer, { name: 'Bela Roy', email: 'bela@example.com' });
+      const { code, token } = await requestReset('bela@example.com');
+      assert.equal((await resetWithCode('bela@example.com', code)).status, 200);
+
+      assertLinkRefused(await checkLink(token));
+      assertLinkRefused(await resetWithLink(token, 'Other#Pass2027'));
+      assertCodeRefused(await resetWithCode('bela@example.com', code, 'Other#Pass2027'));
+      assert.equal((await testServer.createClient().login('bela@example.com', NEW_PASSWORD)).status, 200);
+    });
+
+    it('expires the code the moment the link is used', async () => {
+      await createSignedInClient(testServer, { name: 'Chen Wu', email: 'chen@example.com' });
+      const { code, token } = await requestReset('chen@example.com');
+      assert.equal((await resetWithLink(token)).status, 200);
+      assertCodeRefused(await resetWithCode('chen@example.com', code, 'Other#Pass2027'));
+    });
+  });
+
+  describe('wrong codes and bad input', () => {
+    useOwnServer();
+
+    it(`invalidates both the code and the link after ${MAX_ATTEMPTS} wrong codes`, async () => {
+      await createSignedInClient(testServer, { name: 'Dina Shah', email: 'dina@example.com' });
+      const { code, token } = await requestReset('dina@example.com');
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+        assertCodeRefused(await resetWithCode('dina@example.com', wrongCodeFor(code)));
+      }
+      assertCodeRefused(await resetWithCode('dina@example.com', code));
+      assertLinkRefused(await checkLink(token));
+      assertLinkRefused(await resetWithLink(token));
+      assert.equal((await testServer.createClient().login('dina@example.com', STRONG_PASSWORD)).status, 200);
+    });
+
+    it('keeps the code and link working after fewer wrong codes than the limit', async () => {
+      await createSignedInClient(testServer, { name: 'Eli Moss', email: 'eli@example.com' });
+      const { code } = await requestReset('eli@example.com');
+      for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt += 1) {
+        assertCodeRefused(await resetWithCode('eli@example.com', wrongCodeFor(code)));
+      }
+      assert.equal((await resetWithCode('eli@example.com', code)).status, 200);
+    });
+
+    it('keeps only the newest code working', async () => {
+      await createSignedInClient(testServer, { name: 'Fay Lim', email: 'fay@example.com' });
+      const older = await requestReset('fay@example.com');
+      const newer = await requestReset('fay@example.com');
+      assertCodeRefused(await resetWithCode('fay@example.com', older.code));
+      assertLinkRefused(await checkLink(older.token));
+      assert.equal((await resetWithCode('fay@example.com', newer.code)).status, 200);
+    });
+
+    it('answers an unknown or unconfirmed address like a wrong code', async () => {
+      assertCodeRefused(await resetWithCode('nobody@example.com', '123456'));
+      assert.equal((await testServer.createClient().signup('Gia Paul', 'gia@example.com')).status, 202);
+      const confirmationCode = codeFromEmail(
+        (await testServer.mailbox.waitForMessages('gia@example.com', 1)).at(-1),
+        CODE_DIGITS,
+      );
+      // A confirmation code is not a reset code.
+      assertCodeRefused(await resetWithCode('gia@example.com', confirmationCode));
+    });
+
+    it('checks the code form and the new password before using the code up', async () => {
+      await createSignedInClient(testServer, { name: 'Hari Iyer', email: 'hari@example.com' });
+      const { code } = await requestReset('hari@example.com');
+      const badForm = await resetWithCode('hari@example.com', '12ab');
+      assert.deepEqual(badForm.body.error.details, [
+        { field: 'code', message: VALIDATION_MESSAGES.VERIFICATION_CODE_FORMAT },
+      ]);
+      const weak = await resetWithCode('hari@example.com', code, 'short');
+      assert.deepEqual(weak.body.error.details, [
+        { field: 'password', message: VALIDATION_MESSAGES.PASSWORD_TOO_SHORT },
+      ]);
+      const noEmail = await testServer
+        .createClient()
+        .post('/api/auth/password/reset', { code, password: NEW_PASSWORD, confirmPassword: NEW_PASSWORD });
+      assert.deepEqual(noEmail.body.error.details, [{ field: 'email', message: VALIDATION_MESSAGES.EMAIL_REQUIRED }]);
+      assert.equal(
+        (await resetWithCode('hari@example.com', code)).status,
+        200,
+        'refused tries did not use the code up',
+      );
+    });
   });
 });
 

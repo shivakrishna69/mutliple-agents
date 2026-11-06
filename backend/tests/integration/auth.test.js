@@ -56,6 +56,23 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     assert.equal(stored.phoneVerifiedAt, null);
     assert.equal(stored.termsVersion, TERMS_VERSION);
     assert.ok(stored.termsAcceptedAt instanceof Date);
+    // The sign-up screen live today sends no date of birth or gender, and must keep working.
+    assert.equal(stored.dateOfBirth, null);
+    assert.equal(stored.gender, null);
+  });
+
+  it('stores the date of birth, gender and a phone number of the picked country', async () => {
+    const signup = await testServer.createClient().signup('Maya Iyer', 'maya.iyer@example.com', STRONG_PASSWORD, {
+      phoneCountry: 'GB',
+      phoneNumber: '020 7946 0958',
+      dateOfBirth: '1992-07-14',
+      gender: 'prefer_not_to_say',
+    });
+    assert.equal(signup.status, 202, JSON.stringify(signup.body));
+    const stored = await testServer.database.collection('users').findOne({ email: 'maya.iyer@example.com' });
+    assert.equal(stored.phoneNumber, '+442079460958');
+    assert.equal(stored.dateOfBirth.toISOString(), '1992-07-14T00:00:00.000Z');
+    assert.equal(stored.gender, 'prefer_not_to_say');
   });
 
   it('names every missing or unusable signup field, with messages from the server', async () => {
@@ -122,14 +139,28 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     assert.equal(strengthLevels.at(-1).level, 'strong');
   });
 
-  it('tells the sign-in screens the numbers they state, as configured', async () => {
+  it('tells the sign-in screens the numbers they state and the choices they offer, as configured', async () => {
     const response = await testServer.createClient().get('/api/auth/options');
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body.data, {
+    const { phoneCountries, ...settings } = response.body.data;
+    assert.deepEqual(settings, {
       rememberedSessionDays: 30,
       verificationCodeDigits: 6,
       passwordResetLinkMinutes: 15,
+      birthDateAndGenderRequired: false,
+      minimumSignupAgeYears: 18,
+      genders: [
+        { value: 'male', label: 'Male' },
+        { value: 'female', label: 'Female' },
+        { value: 'non_binary', label: 'Non-binary' },
+        { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+      ],
+      defaultPhoneCountry: 'IN',
     });
+    assert.deepEqual(
+      phoneCountries.find((country) => country.code === 'IN'),
+      { code: 'IN', name: 'India', callingCode: '91' },
+    );
   });
 
   it('refuses state-changing requests without the CSRF token', async () => {

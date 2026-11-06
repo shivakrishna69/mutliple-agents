@@ -1,43 +1,66 @@
 /**
- * Reading a phone number as people type it into international (E.164) form, e.g. "+919876543210".
+ * Phone numbers as people type them, read into international (E.164) form, e.g. "+919876543210",
+ * and the list of countries the sign-up screen's picker offers.
  *
- *   "+91 98765 43210", "0091-9876543210"   international: kept, with its own country code
- *   "98765 43210", "09876543210"           a national number of PHONE_SETTINGS.DEFAULT_COUNTRY_CODE
- *   "919876543210"                         the default country code without "+"
+ *   "+91 98765 43210", "0091-9876543210"   written with a country code: that country, whatever was picked
+ *   "98765 43210", "09876543210"           a national number of the picked country (India by default)
+ *   "919876543210"                         the picked country's code without "+"
  *
- * National numbers are recognised for the default country India: 10 digits starting 6-9 (mobile
- * numbers), optionally after a trunk "0". Anything else must be written with its country code.
- * The result is checked against PHONE_SETTINGS.E164_PATTERN.
+ * Whether a number can exist is decided by libphonenumber-js with its full metadata (number
+ * lengths and prefixes per country), so landlines and every country's numbers are read correctly.
+ * Before that, the typed text must look like a phone number: digits, spaces, dashes, dots and
+ * brackets, with at most one "+" before every digit, and no longer than PHONE_SETTINGS.MAX_INPUT_LENGTH.
  */
+
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js/max';
 
 import { PHONE_SETTINGS } from '../constants/validation.js';
 
 const ALLOWED_INPUT = /^[+\d\s().-]+$/;
-const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+const SUPPORTED_COUNTRIES = new Set(getCountries());
+
+/** True for a two-letter country code (ISO 3166-1 alpha-2, e.g. "IN") that phone numbers are known for. */
+export function isSupportedPhoneCountry(countryCode) {
+  return typeof countryCode === 'string' && SUPPORTED_COUNTRIES.has(countryCode);
+}
 
 /**
  * @param {unknown} rawPhoneNumber
- * @returns {string|null}  the E.164 form, or null when it is not a phone number we can read
+ * @param {string} [countryCode]  the country picked beside the number (default PHONE_SETTINGS.DEFAULT_COUNTRY)
+ * @returns {string|null}  the E.164 form, or null when it is not a phone number that can exist
  */
-export function normalizePhoneNumber(rawPhoneNumber) {
-  if (typeof rawPhoneNumber !== 'string') return null;
+export function normalizePhoneNumber(rawPhoneNumber, countryCode = PHONE_SETTINGS.DEFAULT_COUNTRY) {
+  if (typeof rawPhoneNumber !== 'string' || !isSupportedPhoneCountry(countryCode)) return null;
   const typed = rawPhoneNumber.trim();
   if (typed.length === 0 || typed.length > PHONE_SETTINGS.MAX_INPUT_LENGTH || !ALLOWED_INPUT.test(typed)) return null;
   // A "+" is only meaningful once, before every digit (an opening bracket may come first: "(+91)").
   const plusIndex = typed.indexOf('+');
-  const hasPlus = plusIndex !== -1;
-  if (hasPlus && (typed.indexOf('+', plusIndex + 1) !== -1 || !/^[\s(]*$/.test(typed.slice(0, plusIndex)))) return null;
+  if (plusIndex !== -1 && (typed.indexOf('+', plusIndex + 1) !== -1 || !/^[\s(]*$/.test(typed.slice(0, plusIndex)))) {
+    return null;
+  }
 
-  const digits = typed.replace(/\D/g, '');
-  let international;
-  if (hasPlus) international = digits;
-  else if (digits.startsWith('00')) international = digits.slice(2);
-  else if (PHONE_SETTINGS.DEFAULT_COUNTRY_CODE === '91' && INDIAN_MOBILE.test(digits)) international = `91${digits}`;
-  else if (PHONE_SETTINGS.DEFAULT_COUNTRY_CODE === '91' && /^0[6-9]\d{9}$/.test(digits))
-    international = `91${digits.slice(1)}`;
-  else if (digits.startsWith(PHONE_SETTINGS.DEFAULT_COUNTRY_CODE)) international = digits;
-  else return null;
+  const parsed = parsePhoneNumberFromString(typed, countryCode);
+  if (!parsed?.isValid()) return null;
+  return PHONE_SETTINGS.E164_PATTERN.test(parsed.number) ? parsed.number : null;
+}
 
-  const normalized = `+${international}`;
-  return PHONE_SETTINGS.E164_PATTERN.test(normalized) ? normalized : null;
+let phoneCountries = null;
+
+/**
+ * Every country a number can be picked for, by English name: `{ code: 'IN', name: 'India',
+ * callingCode: '91' }`. Names come from the runtime's own region names (Intl.DisplayNames).
+ * @returns {ReadonlyArray<{ code: string, name: string, callingCode: string }>}
+ */
+export function listPhoneCountries() {
+  if (!phoneCountries) {
+    const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    phoneCountries = Object.freeze(
+      [...SUPPORTED_COUNTRIES]
+        .map((code) =>
+          Object.freeze({ code, name: regionNames.of(code) ?? code, callingCode: getCountryCallingCode(code) }),
+        )
+        .sort((first, second) => first.name.localeCompare(second.name, 'en')),
+    );
+  }
+  return phoneCountries;
 }

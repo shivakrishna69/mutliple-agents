@@ -18,6 +18,12 @@ export function describeDuration(durationMs) {
   return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
+/** An emailed code, shown large under its label, to type on the screen that asks for it. */
+function codeBlockHtml(label, code) {
+  return `<p style="margin:0 0 6px;font-size:13px;color:${EMAIL_THEME.MUTED_TEXT}">${escapeHtml(label)}</p>
+<p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:.3em;color:${EMAIL_THEME.TEXT}">${escapeHtml(code)}</p>`;
+}
+
 /**
  * The code is shown large to type on the "check your email" page; the link does the same in one
  * click. Both work once and expire together.
@@ -40,14 +46,12 @@ export function buildVerificationEmail({ name, companyName, verificationUrl, ver
     `The code and the link work once and expire in ${validity}.`,
     footerText,
   ].join('\n');
-  const codeHtml = `<p style="margin:0 0 6px;font-size:13px;color:${EMAIL_THEME.MUTED_TEXT}">Your confirmation code</p>
-<p style="margin:0 0 24px;font-size:32px;font-weight:700;letter-spacing:.3em;color:${EMAIL_THEME.TEXT}">${escapeHtml(verificationCode)}</p>`;
   const html = renderEmailLayout({
     companyName,
     heading: 'Confirm your email address',
     bodyHtml: `${paragraph(`Hi ${escapeHtml(name)},`)}${paragraph(
       `Enter this code on the confirmation page to finish creating your <strong>${escapeHtml(companyName)}</strong> account, or use the button below.`,
-    )}${codeHtml}`,
+    )}${codeBlockHtml('Your confirmation code', verificationCode)}`,
     action: {
       label: 'Confirm my email',
       url: verificationUrl,
@@ -59,35 +63,39 @@ export function buildVerificationEmail({ name, companyName, verificationUrl, ver
 }
 
 /**
- * @param {{ name: string, companyName: string, resetUrl: string, validityMs: number }} details
+ * The code is typed on the reset screen; the link opens that screen ready to choose a password.
+ * Both are one record: using either one uses up the other, and they expire together.
+ * @param {{ name: string, companyName: string, resetUrl: string, resetCode: string, validityMs: number }} details
  * @returns {{ subject: string, html: string, text: string }}
  */
-export function buildPasswordResetEmail({ name, companyName, resetUrl, validityMs }) {
+export function buildPasswordResetEmail({ name, companyName, resetUrl, resetCode, validityMs }) {
   const validity = describeDuration(validityMs);
   const footerText = "If you didn't ask to reset your password, ignore this email: your password stays as it is.";
   const text = [
     `Hi ${name},`,
     '',
-    `Someone asked to reset the password of your ${companyName} account. Choose a new password here:`,
+    `Someone asked to reset the password of your ${companyName} account. Your code to reset it: ${resetCode}`,
+    '',
+    'Or choose a new password here:',
     resetUrl,
     '',
-    `This link works once and expires in ${validity}.`,
+    `The code and the link work once and expire in ${validity}.`,
     footerText,
   ].join('\n');
   const html = renderEmailLayout({
     companyName,
     heading: 'Reset your password',
     bodyHtml: `${paragraph(`Hi ${escapeHtml(name)},`)}${paragraph(
-      `Someone asked to reset the password of your <strong>${escapeHtml(companyName)}</strong> account. If it was you, choose a new password.`,
-    )}`,
+      `Someone asked to reset the password of your <strong>${escapeHtml(companyName)}</strong> account. If it was you, enter this code on the reset page, or use the button below.`,
+    )}${codeBlockHtml('Your password reset code', resetCode)}`,
     action: {
       label: 'Choose a new password',
       url: resetUrl,
-      noteHtml: `This link works once and expires in ${escapeHtml(validity)}.`,
+      noteHtml: `The code and the link work once and expire in ${escapeHtml(validity)}.`,
     },
     footerText,
   });
-  return { subject: `Reset your ${companyName} password`, html, text };
+  return { subject: `${resetCode} is your ${companyName} password reset code`, html, text };
 }
 
 /**

@@ -25,7 +25,7 @@
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { EMAIL_PATTERN, PHONE_SETTINGS, USER_FIELD_LIMITS } from '../constants/validation.js';
+import { EMAIL_PATTERN, GENDERS, PHONE_SETTINGS, USER_FIELD_LIMITS } from '../constants/validation.js';
 import { invalidateOrgHierarchyCache } from '../services/orgHierarchyCache.js';
 
 /** Allowed values for `role`. Import this instead of repeating the strings in route code. */
@@ -152,6 +152,14 @@ const userSchema = new mongoose.Schema(
       },
     },
     phoneVerifiedAt: { type: Date, default: null },
+    // As given at signup (validators/authValidators.js). Midnight UTC of the day: a calendar date,
+    // not a moment. Null for accounts created another way or before signup asked for it.
+    dateOfBirth: { type: Date, default: null },
+    gender: {
+      type: String,
+      enum: { values: [...Object.values(GENDERS), null], message: 'Gender "{VALUE}" is not valid' },
+      default: null,
+    },
     // The terms of service and privacy policy the person agreed to at signup, and when.
     termsVersion: { type: Number, default: null },
     termsAcceptedAt: { type: Date, default: null },

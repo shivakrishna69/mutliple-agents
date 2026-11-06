@@ -52,16 +52,20 @@ describe('account emails', () => {
     assert.match(email.text, /expire in 24 hours/);
   });
 
-  it('offers a password reset that expires, and says what to do if it was not asked for', () => {
+  it('offers a password reset code and link that expire together, and says what to do if it was not asked for', () => {
     const resetUrl = 'https://hr.example.com/reset-password/xyz';
     const email = buildPasswordResetEmail({
       name: HOSTILE_TEXT,
       companyName: 'Acme',
       resetUrl,
+      resetCode: '204816',
       validityMs: 60 * 60 * 1000,
     });
     assertSafeAndLinked(email, resetUrl);
-    assert.match(email.text, /expires in 1 hour/);
+    assert.equal(email.subject, '204816 is your Acme password reset code');
+    assert.match(email.text, /Your code to reset it: 204816$/m);
+    assert.match(email.html, />204816</);
+    assert.match(email.text, /The code and the link work once and expire in 1 hour/);
     assert.match(email.text, /didn't ask/);
   });
 

@@ -10,6 +10,8 @@
  *   supportEmail       where the sign-in pages' "Support" and "Contact HR" links write to; null hides them
  *   termsUrl, privacyUrl  the company's terms of service and privacy policy (https or /...), linked
  *                      where people agree to them at signup; null shows the agreement without links
+ *   websiteUrl         the company's own website (https or /...), where the sign-in pages' "Back to
+ *                      Home" leads; null hides it
  *   brandColors        primary and accent colours as #RRGGBB
  *   timeZone           the company's IANA time zone, for company-wide dates and new offices
  *   employeeIdDigits   how many digits employee IDs are padded to (NSK0001 is 4)
@@ -43,6 +45,7 @@ export const DEFAULT_COMPANY_SETTINGS = Object.freeze({
   supportEmail: null,
   termsUrl: null,
   privacyUrl: null,
+  websiteUrl: null,
   brandColors: Object.freeze({ primary: '#c75000', accent: '#282828' }),
   timeZone: 'Asia/Kolkata',
   employeeIdDigits: 4,
@@ -132,6 +135,7 @@ const companySettingsSchema = new mongoose.Schema(
     },
     termsUrl: linkField(DEFAULT_COMPANY_SETTINGS.termsUrl, 'Terms of service address'),
     privacyUrl: linkField(DEFAULT_COMPANY_SETTINGS.privacyUrl, 'Privacy policy address'),
+    websiteUrl: linkField(DEFAULT_COMPANY_SETTINGS.websiteUrl, 'Website address'),
     brandColors: {
       primary: colorField(DEFAULT_COMPANY_SETTINGS.brandColors.primary),
       accent: colorField(DEFAULT_COMPANY_SETTINGS.brandColors.accent),
