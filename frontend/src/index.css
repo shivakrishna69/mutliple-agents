@@ -1,9 +1,17 @@
 @import 'tailwindcss';
+/*
+ * Fonts, served with the app (no font request leaves the site), both SIL Open Font License:
+ * Plus Jakarta Sans for text, Michroma (wide, geometric) for headings (font-display).
+ */
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource/michroma/latin-400.css';
 
-/* Design tokens. Inter is loaded in index.html; the system stack is the fallback. */
+/* Design tokens. The system stack is the fallback while the font loads. */
 @theme {
   --font-sans:
-    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-display: 'Michroma', 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
 
   /* NSK brand: orange #C75000 (the logo bar and tagline) at 600, and its tints and shades. */
   --color-brand-50: #fff4ec;
@@ -19,12 +27,99 @@
   --color-brand-950: #3d1602;
 }
 
-html {
-  font-feature-settings: 'cv11', 'ss01';
-}
-
 /* Thin, unobtrusive scrollbars inside panes. */
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: rgb(203 213 225) transparent;
+}
+
+/*
+ * The signed-out screens (components/auth/AuthShell.jsx) in the sign-in design's blue #1F5BFF.
+ * Tailwind's brand-* utilities read these variables, so redefining them here turns every brand
+ * colour inside .auth-theme blue while the signed-in pages keep the NSK orange.
+ */
+.auth-theme {
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dde7ff;
+  --color-brand-200: #c0d2ff;
+  --color-brand-300: #94b2ff;
+  --color-brand-400: #6189ff;
+  --color-brand-500: #3a6bff;
+  --color-brand-600: #1f5bff;
+  --color-brand-700: #1747db;
+  --color-brand-800: #173bb0;
+  --color-brand-900: #18378a;
+  --color-brand-950: #132254;
+}
+
+/* The page behind the sign-in card: soft blue light and a fine dot grid. */
+.auth-backdrop {
+  background-color: #dfe6fb;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgb(79 104 186 / 0.28) 1px, transparent 0),
+    radial-gradient(60rem 40rem at 0% 0%, rgb(199 210 254 / 0.9), transparent 70%),
+    radial-gradient(55rem 45rem at 100% 100%, rgb(147 172 255 / 0.75), transparent 70%);
+  background-size:
+    22px 22px,
+    100% 100%,
+    100% 100%;
+}
+
+/* The showcase artwork: ribbons drift slowly, light runs along the fine lines, sparks twinkle. */
+@keyframes auth-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(-1.6%, 1.2%, 0) rotate(-1.2deg);
+  }
+}
+@keyframes auth-shimmer {
+  to {
+    stroke-dashoffset: -1200;
+  }
+}
+@keyframes auth-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+/* A caption slide, and each screen's content, arriving. */
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.auth-drift {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auth-drift 18s ease-in-out infinite;
+}
+.auth-shimmer {
+  stroke-dasharray: 140 1060;
+  animation: auth-shimmer 9s linear infinite;
+}
+.auth-twinkle {
+  animation: auth-twinkle 4s ease-in-out infinite;
+}
+.auth-rise {
+  animation: auth-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-drift,
+  .auth-shimmer,
+  .auth-twinkle,
+  .auth-rise {
+    animation: none;
+  }
 }
