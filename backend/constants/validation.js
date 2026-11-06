@@ -499,3 +499,34 @@ export const OFFER_LETTER_PROTECTION = Object.freeze({
   PASSWORD_FORMAT_LABEL: 'DDMMYYYY',
   QPDF_TIMEOUT_MS: 30_000,
 });
+
+/**
+ * Department knowledge bases (models/DepartmentAgent.js, models/AgentDocument.js,
+ * services/knowledge/*): what a department lead may upload and how documents are processed.
+ */
+export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
+  AGENT_NAME_MAX_LENGTH: 120,
+  // Department instructions for the agent; long enough for detailed guidelines, short enough to
+  // leave most of the model's context for the department's documents.
+  SYSTEM_PROMPT_MAX_LENGTH: 4_000,
+  MAX_FILE_BYTES: 10 * 1024 * 1024,
+  // The file types a knowledge base accepts: media type → extension. The type is decided from the
+  // file's content (services/knowledge/fileTypes.js), never from what the browser declared.
+  FILE_TYPES: Object.freeze({
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'text/markdown': 'md',
+    'text/plain': 'txt',
+  }),
+  ORIGINAL_NAME_MAX_LENGTH: 255,
+  MAX_DOCUMENTS_PER_DEPARTMENT: 200,
+  MAX_CHUNKS_PER_DOCUMENT: 2_000,
+  // A failed document keeps this much of the reason, for the lead to read.
+  ERROR_MESSAGE_MAX_LENGTH: 500,
+  // A worker holds a document for this long while it processes it; a stopped worker's document
+  // is picked up again by the sweep once its lease runs out.
+  LEASE_MS: 5 * 60 * 1000,
+  SWEEP_INTERVAL_MS: 30 * 1000,
+  // Processing attempts before a document is marked FAILED.
+  MAX_ATTEMPTS: 3,
+});
