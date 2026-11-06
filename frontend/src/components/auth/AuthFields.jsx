@@ -180,7 +180,7 @@ export function PhoneNumberField({
       {/*
         The list is drawn on the page itself (a portal into <body>), not inside the form: the form's
         entrance animation leaves a transform on it, and a transformed ancestor would make the
-        list's fixed position relative to the form instead of the window. auth-theme keeps it blue.
+        list's fixed position relative to the form instead of the window.
       */}
       {isOpen &&
         position &&
@@ -188,7 +188,7 @@ export function PhoneNumberField({
           <div
             data-country-list={listId}
             style={position}
-            className="auth-theme z-50 overflow-hidden rounded-xl border border-slate-200 bg-white font-sans shadow-2xl shadow-blue-900/15"
+            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white font-sans shadow-2xl shadow-blue-900/15"
           >
             <div className="flex items-center gap-2 border-b border-slate-100 px-3">
               <SearchIcon className="h-4 w-4 text-slate-400" />

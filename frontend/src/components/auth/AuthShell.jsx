@@ -14,9 +14,8 @@
  * Sizes and spacing scale with the window height (clamp on vh), so every screen fits from a small
  * laptop up. Only a screen taller than a very short window scrolls, inside its own column.
  *
- * Inside the frame the brand colour is the design's blue (.auth-theme in index.css). The company's
- * name, logo and links come from the server (hooks/usePublicAuthSettings.js); only UI labels are
- * written here, and every message a screen shows comes from the API.
+ * The company's name, logo and links come from the server (hooks/usePublicAuthSettings.js); only
+ * UI labels are written here, and every message a screen shows comes from the API.
  */
 
 import { useEffect, useState } from 'react';
@@ -152,7 +151,7 @@ export default function AuthShell({
       ? 'rounded-[1.6rem] bg-white shadow-xl shadow-blue-900/[0.06] ring-1 ring-slate-900/[0.04]'
       : '';
   return (
-    <div className="auth-theme auth-backdrop flex h-dvh w-full overflow-hidden p-2 font-sans text-slate-900 sm:p-4 lg:p-[clamp(0.75rem,3vh,2.25rem)]">
+    <div className="auth-backdrop flex h-dvh w-full overflow-hidden p-2 font-sans text-slate-900 sm:p-4 lg:p-[clamp(0.75rem,3vh,2.25rem)]">
       <div className="mx-auto flex h-full w-full max-w-[1480px] gap-[clamp(0.75rem,1.6vw,1.75rem)] rounded-[2rem] bg-[#f1f4fb]/95 p-[clamp(0.5rem,1.6vh,1.1rem)] shadow-[0_40px_90px_-40px_rgba(30,58,138,0.45)] ring-1 ring-white/80">
         <Showcase branding={branding} slides={slides} />
         <main className={`flex min-w-0 flex-1 flex-col overflow-y-auto ${panelClasses}`}>

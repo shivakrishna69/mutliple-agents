@@ -13,32 +13,7 @@
     sans-serif;
   --font-display: 'Michroma', 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
 
-  /* NSK brand: orange #C75000 (the logo bar and tagline) at 600, and its tints and shades. */
-  --color-brand-50: #fff4ec;
-  --color-brand-100: #ffe5d1;
-  --color-brand-200: #ffc7a1;
-  --color-brand-300: #ffa066;
-  --color-brand-400: #f57a2e;
-  --color-brand-500: #e2620e;
-  --color-brand-600: #c75000;
-  --color-brand-700: #a54200;
-  --color-brand-800: #843604;
-  --color-brand-900: #6b2e08;
-  --color-brand-950: #3d1602;
-}
-
-/* Thin, unobtrusive scrollbars inside panes. */
-.scroll-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgb(203 213 225) transparent;
-}
-
-/*
- * The signed-out screens (components/auth/AuthShell.jsx) in the sign-in design's blue #1F5BFF.
- * Tailwind's brand-* utilities read these variables, so redefining them here turns every brand
- * colour inside .auth-theme blue while the signed-in pages keep the NSK orange.
- */
-.auth-theme {
+  /* Brand: the design's blue #1F5BFF at 600, and its tints and shades. The NSK logo keeps its own colours. */
   --color-brand-50: #eef3ff;
   --color-brand-100: #dde7ff;
   --color-brand-200: #c0d2ff;
@@ -50,6 +25,12 @@
   --color-brand-800: #173bb0;
   --color-brand-900: #18378a;
   --color-brand-950: #132254;
+}
+
+/* Thin, unobtrusive scrollbars inside panes. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
 }
 
 /* The page behind the sign-in card: soft blue light and a fine dot grid. */
