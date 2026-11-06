@@ -106,6 +106,17 @@ export const HRA_CITY_ALIASES = Object.freeze({
   'new delhi': 'delhi',
 });
 
+/** A city as the HRA rules know it: trimmed, lower-case, with its official name for old names. */
+export function normalizeHraCity(cityName) {
+  const cityKey = cityName.trim().toLowerCase();
+  return HRA_CITY_ALIASES[cityKey] ?? cityKey;
+}
+
+/** True for the 8 cities where HRA is 50% of salary (HRA_FIFTY_PERCENT_CITIES); any spelling above. */
+export function isHraFiftyPercentCity(cityName) {
+  return HRA_FIFTY_PERCENT_CITIES.includes(normalizeHraCity(cityName));
+}
+
 /** EPF statutory wage ceiling over time (monthly wages, basic + DA). */
 export const EPF_WAGE_CEILING_SCHEDULE = Object.freeze([
   Object.freeze({ effectiveFrom: '2014-09-01', monthlyCeiling: 15_000 }),
@@ -117,8 +128,16 @@ export const ESI_RULES = Object.freeze({
   monthlyWageCeiling: 21_000,
   monthlyWageCeilingForPersonsWithDisability: 25_000,
   employeeRateBasisPoints: 75, // 0.75%
+  employerRateBasisPoints: 325, // 3.25% (ESI (Central) Rules, r.51, from 1 July 2019)
   exemptAverageDailyWage: 176,
 });
+
+/**
+ * Gratuity (Code on Social Security, 2020, s.53; formerly Payment of Gratuity Act, 1972, s.4(2)):
+ * 15 days' wages for each completed year, a month counted as 26 working days, so the yearly accrual
+ * is 15/26 of a month's basic + DA, i.e. 15/(26 × 12) ≈ 4.81% of annual basic.
+ */
+export const GRATUITY_RULES = Object.freeze({ daysWagesPerYear: 15, workingDaysPerMonth: 26 });
 
 export const PROFESSIONAL_TAX_STATES = Object.freeze({ KARNATAKA: 'KA', MAHARASHTRA: 'MH', NONE: 'NONE' });
 export const PROFESSIONAL_TAX_ANNUAL_CAP = 2_500;
