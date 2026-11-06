@@ -44,6 +44,7 @@ describe('company settings', { skip: skipReason ?? false }, () => {
       supportEmail: null,
       termsUrl: null,
       privacyUrl: null,
+      websiteUrl: null,
       brandColors: { primary: '#c75000', accent: '#282828' },
       timeZone: 'Asia/Kolkata',
       employeeIdDigits: 4,
@@ -59,6 +60,7 @@ describe('company settings', { skip: skipReason ?? false }, () => {
       supportEmail: null,
       termsUrl: null,
       privacyUrl: null,
+      websiteUrl: null,
       brandColors: { primary: '#c75000', accent: '#282828' },
     });
   });
@@ -126,12 +128,13 @@ describe('company settings', { skip: skipReason ?? false }, () => {
     assert.equal(siteRelativeLogo.status, 200, JSON.stringify(siteRelativeLogo.body));
   });
 
-  it('shows the sign-in pages where to get help and what people agree to, once an administrator sets them', async () => {
+  it('shows the sign-in pages where to get help, what people agree to and the company website, once an administrator sets them', async () => {
     const { version } = await readSettings();
     const refused = await adminClient.patch('/api/company/settings', {
       supportEmail: 'not an email',
       termsUrl: 'http://insecure.example.com/terms',
       privacyUrl: 'javascript:alert(1)',
+      websiteUrl: '//evil.example.com',
       version,
     });
     assert.equal(refused.status, 400);
@@ -139,12 +142,14 @@ describe('company settings', { skip: skipReason ?? false }, () => {
       'privacyUrl',
       'supportEmail',
       'termsUrl',
+      'websiteUrl',
     ]);
 
     const set = await adminClient.patch('/api/company/settings', {
       supportEmail: ' HR-Help@KayConceptIndia.in ',
       termsUrl: 'https://kayconceptindia.in/terms',
       privacyUrl: '/legal/privacy',
+      websiteUrl: 'https://kayconceptindia.in',
       version,
     });
     assert.equal(set.status, 200, JSON.stringify(set.body));
@@ -152,5 +157,6 @@ describe('company settings', { skip: skipReason ?? false }, () => {
     assert.equal(branding.supportEmail, 'hr-help@kayconceptindia.in');
     assert.equal(branding.termsUrl, 'https://kayconceptindia.in/terms');
     assert.equal(branding.privacyUrl, '/legal/privacy');
+    assert.equal(branding.websiteUrl, 'https://kayconceptindia.in');
   });
 });

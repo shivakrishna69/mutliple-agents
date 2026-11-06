@@ -48,12 +48,13 @@ function toCompanyContactLinks(settings) {
     supportEmail: settings.supportEmail ?? null,
     termsUrl: settings.termsUrl ?? null,
     privacyUrl: settings.privacyUrl ?? null,
+    websiteUrl: settings.websiteUrl ?? null,
   };
 }
 
 /**
  * What anyone may see, signed in or not: the sign-in pages show the company's name and logo, its
- * support address, and links to its terms and privacy policy.
+ * support address, links to its terms and privacy policy, and its own website ("Back to Home").
  */
 export function toCompanyBranding(settings) {
   return {

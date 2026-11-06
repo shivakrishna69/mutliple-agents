@@ -21,6 +21,7 @@ const SETTINGS_FIELDS = Object.freeze([
   'supportEmail',
   'termsUrl',
   'privacyUrl',
+  'websiteUrl',
   'brandColors',
   'timeZone',
   'employeeIdDigits',
