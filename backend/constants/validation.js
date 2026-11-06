@@ -535,6 +535,9 @@ export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
   CHUNK_TARGET_CHARS: 1_200,
   CHUNK_MAX_CHARS: 1_800,
   CHUNK_OVERLAP_CHARS: 200,
+  // Chunks sent to the AI service per indexing request: at most about 60 KB of text, well inside
+  // the 1 MB request cap of services/aiServiceClient.js, and quick to embed on a CPU.
+  INDEX_BATCH_SIZE: 32,
   ORIGINAL_NAME_MAX_LENGTH: 255,
   MAX_DOCUMENTS_PER_DEPARTMENT: 200,
   MAX_CHUNKS_PER_DOCUMENT: 2_000,

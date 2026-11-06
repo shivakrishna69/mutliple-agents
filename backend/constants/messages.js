@@ -7,6 +7,7 @@
 import {
   ACCOUNT_EMAIL_SETTINGS,
   GENDERS,
+  KNOWLEDGE_BASE_SETTINGS,
   MESSAGE_FIELD_LIMITS,
   ONBOARDING_SETTINGS,
   SIGNUP_PROFILE_SETTINGS,
@@ -639,4 +640,24 @@ export const ONBOARDING_MESSAGES = Object.freeze({
     'This CTC is too low for the company salary policy: Basic, HRA and employer contributions already exceed it',
   INPUT_INVALID: 'Some details need fixing',
   PREVIEW_WATERMARK: 'DRAFT – NOT AN OFFER',
+});
+
+/** Department knowledge bases (/api/departments/:departmentId/agent, services/knowledge/*). */
+export const KNOWLEDGE_MESSAGES = Object.freeze({
+  // Template for a new agent's name: the department's name, then this.
+  DEFAULT_AGENT_NAME_SUFFIX: 'Department Agent',
+  // Why a document could not be added to the knowledge base, as the lead reads it on the document.
+  PROCESSING_FAILURES: Object.freeze({
+    ENCRYPTED: 'This PDF is password-protected. Upload a copy without a password',
+    CORRUPT: 'This file could not be read. It may be damaged; try saving it again and uploading the new copy',
+    NO_TEXT:
+      'No text was found in this file. Scanned documents are not supported yet: upload a version with selectable text',
+    TOO_MANY_PAGES: `This PDF has more than ${KNOWLEDGE_BASE_SETTINGS.PDF_MAX_PAGES} pages. Split it into smaller files`,
+    TOO_MUCH_TEXT: 'This file holds more text than one document may. Split it into smaller files',
+    TOO_MANY_CHUNKS: 'This file holds more text than one document may. Split it into smaller files',
+    TIMED_OUT: 'This file took too long to read. Split it into smaller files, or save it again and retry',
+    OUT_OF_MEMORY: 'This file is too complex to read. Split it into smaller files, or save it again and retry',
+    FILE_MISSING: 'The stored copy of this file is missing or damaged. Delete it and upload it again',
+    INDEX_UNAVAILABLE: 'The knowledge index could not be reached after several attempts. Try again later',
+  }),
 });
