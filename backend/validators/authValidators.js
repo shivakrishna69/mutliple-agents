@@ -15,11 +15,14 @@
 import {
   ACCOUNT_EMAIL_SETTINGS,
   EMAIL_PATTERN,
+  GENDERS,
   PASSWORD_STRENGTH_RULES,
+  PHONE_SETTINGS,
+  SIGNUP_PROFILE_SETTINGS,
   USER_FIELD_LIMITS,
 } from '../constants/validation.js';
 import { PASSWORD_RULE_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
-import { normalizePhoneNumber } from '../utils/phoneNumbers.js';
+import { isSupportedPhoneCountry, normalizePhoneNumber } from '../utils/phoneNumbers.js';
 
 /** True when `requestBody` is a plain JSON object (not undefined, null, or an array). */
 function isPlainObject(requestBody) {
@@ -145,20 +148,72 @@ function checkNamePart(rawValue, maxLength, messages) {
   return rawValue.trim().length > maxLength ? messages.tooLong : null;
 }
 
+const GENDER_VALUES = new Set(Object.values(GENDERS));
+
+/** "YYYY-MM-DD" years before `now`'s calendar date (UTC); 29 February falls back to 28 February. */
+function yearsBefore(now, years) {
+  const date = new Date(Date.UTC(now.getUTCFullYear() - years, now.getUTCMonth(), now.getUTCDate()));
+  if (date.getUTCMonth() !== now.getUTCMonth()) date.setUTCDate(0);
+  return date;
+}
+
 /**
- * Validates POST /signup: { firstName, lastName, email, phoneNumber, password, acceptTerms }, with
- * the same limits as the User model, the password strength rules, a phone number we can read
- * (utils/phoneNumbers.js) and the terms accepted (acceptTerms must be exactly true).
+ * A date of birth sent as "YYYY-MM-DD": a real calendar date, at least MINIMUM_AGE_YEARS and at
+ * most MAXIMUM_AGE_YEARS before today (UTC).
+ * @returns {{ error: string|null, date: Date|null }}  the date at midnight UTC
+ */
+function readBirthDate(rawValue, isRequired, now) {
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return { error: isRequired ? VALIDATION_MESSAGES.BIRTH_DATE_REQUIRED : null, date: null };
+  }
+  if (typeof rawValue !== 'string' || !SIGNUP_PROFILE_SETTINGS.BIRTH_DATE_PATTERN.test(rawValue)) {
+    return { error: VALIDATION_MESSAGES.BIRTH_DATE_INVALID, date: null };
+  }
+  const date = new Date(`${rawValue}T00:00:00.000Z`);
+  // "2001-02-30" parses as 2 March; a real date reads back as itself.
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== rawValue) {
+    return { error: VALIDATION_MESSAGES.BIRTH_DATE_INVALID, date: null };
+  }
+  if (date > yearsBefore(now, SIGNUP_PROFILE_SETTINGS.MINIMUM_AGE_YEARS)) {
+    return { error: VALIDATION_MESSAGES.BIRTH_DATE_TOO_YOUNG, date: null };
+  }
+  if (date < yearsBefore(now, SIGNUP_PROFILE_SETTINGS.MAXIMUM_AGE_YEARS)) {
+    return { error: VALIDATION_MESSAGES.BIRTH_DATE_TOO_OLD, date: null };
+  }
+  return { error: null, date };
+}
+
+/** @returns {{ error: string|null, gender: string|null }} one of GENDERS, or null when not given */
+function readGender(rawValue, isRequired) {
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return { error: isRequired ? VALIDATION_MESSAGES.GENDER_REQUIRED : null, gender: null };
+  }
+  return GENDER_VALUES.has(rawValue)
+    ? { error: null, gender: rawValue }
+    : { error: VALIDATION_MESSAGES.GENDER_INVALID, gender: null };
+}
+
+/**
+ * Validates POST /signup: { firstName, lastName, email, phoneCountry, phoneNumber, dateOfBirth,
+ * gender, password, confirmPassword, acceptTerms }, with the same limits as the User model, the
+ * password strength rules, a phone number that can exist in the picked country (phoneCountry, an
+ * ISO code; PHONE_SETTINGS.DEFAULT_COUNTRY when left out; utils/phoneNumbers.js), a date of birth
+ * and gender (required once SIGNUP_PROFILE_SETTINGS.BIRTH_DATE_AND_GENDER_REQUIRED is on; checked
+ * whenever sent) and the terms accepted (acceptTerms must be exactly true).
  * The password is not trimmed: leading or trailing spaces are part of what the user typed.
  *
  * This is the authoritative check for password strength. The User model cannot enforce it,
  * because after the first save the field holds a bcrypt hash rather than the password, so any
  * code path that creates users must pass its input through this validator first.
  */
-export function validateRegistrationInput(requestBody) {
+export function validateRegistrationInput(
+  requestBody,
+  { now = new Date(), requireBirthDateAndGender = SIGNUP_PROFILE_SETTINGS.BIRTH_DATE_AND_GENDER_REQUIRED } = {},
+) {
   if (!isPlainObject(requestBody)) return notAnObject();
 
   const { firstName, lastName, email, phoneNumber, password, confirmPassword, acceptTerms } = requestBody;
+  const { phoneCountry = PHONE_SETTINGS.DEFAULT_COUNTRY, dateOfBirth, gender } = requestBody;
   const validationErrors = [];
   const fail = (field, message) => validationErrors.push({ field, message });
 
@@ -183,9 +238,16 @@ export function validateRegistrationInput(requestBody) {
     VALIDATION_MESSAGES.PHONE_REQUIRED,
     VALIDATION_MESSAGES.PHONE_MUST_BE_STRING,
   );
-  const normalizedPhone = phoneError ? null : normalizePhoneNumber(phoneNumber);
+  const countryIsKnown = isSupportedPhoneCountry(phoneCountry);
+  if (!countryIsKnown) fail('phoneCountry', VALIDATION_MESSAGES.PHONE_COUNTRY_INVALID);
+  const normalizedPhone = phoneError || !countryIsKnown ? null : normalizePhoneNumber(phoneNumber, phoneCountry);
   if (phoneError) fail('phoneNumber', phoneError);
-  else if (!normalizedPhone) fail('phoneNumber', VALIDATION_MESSAGES.PHONE_INVALID);
+  else if (countryIsKnown && !normalizedPhone) fail('phoneNumber', VALIDATION_MESSAGES.PHONE_INVALID);
+
+  const birthDate = readBirthDate(dateOfBirth, requireBirthDateAndGender, now);
+  if (birthDate.error) fail('dateOfBirth', birthDate.error);
+  const genderChoice = readGender(gender, requireBirthDateAndGender);
+  if (genderChoice.error) fail('gender', genderChoice.error);
 
   const passwordError = checkNewPassword(password);
   if (passwordError) fail('password', passwordError);
@@ -207,6 +269,8 @@ export function validateRegistrationInput(requestBody) {
       name: `${trimmedFirstName} ${trimmedLastName}`,
       email: normalizeEmail(email),
       phoneNumber: normalizedPhone,
+      dateOfBirth: birthDate.date,
+      gender: genderChoice.gender,
       password,
     },
   };

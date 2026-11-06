@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { VALIDATION_MESSAGES } from '../../constants/messages.js';
 
 import {
   checkNewPassword,
@@ -72,8 +73,85 @@ describe('validateRegistrationInput', () => {
       name: 'Asha Rao',
       email: 'asha.rao@example.com',
       phoneNumber: '+919876543210',
+      dateOfBirth: null,
+      gender: null,
       password: STRONG_PASSWORD,
     });
+  });
+
+  // A fixed "today", so ages do not depend on when the tests run.
+  const now = new Date('2026-11-06T10:00:00Z');
+  const required = { now, requireBirthDateAndGender: true };
+
+  it('stores the date of birth as midnight UTC of that day, and the gender', () => {
+    const result = validateRegistrationInput({ ...validSignup, dateOfBirth: '1994-03-21', gender: 'female' }, required);
+    assert.equal(result.isValid, true, JSON.stringify(result.validationErrors));
+    assert.equal(result.sanitizedInput.dateOfBirth.toISOString(), '1994-03-21T00:00:00.000Z');
+    assert.equal(result.sanitizedInput.gender, 'female');
+  });
+
+  it('accepts a signup without date of birth and gender while they are not required, and checks them when sent', () => {
+    assert.equal(validateRegistrationInput(validSignup, { now }).isValid, true);
+    const sentWrong = validateRegistrationInput(
+      { ...validSignup, dateOfBirth: '1994-02-30', gender: 'other' },
+      { now },
+    );
+    assert.deepEqual(fieldsOf(sentWrong).sort(), ['dateOfBirth', 'gender']);
+  });
+
+  it('asks for date of birth and gender once they are required', () => {
+    const result = validateRegistrationInput(validSignup, required);
+    assert.deepEqual(
+      result.validationErrors.filter((error) => ['dateOfBirth', 'gender'].includes(error.field)),
+      [
+        { field: 'dateOfBirth', message: VALIDATION_MESSAGES.BIRTH_DATE_REQUIRED },
+        { field: 'gender', message: VALIDATION_MESSAGES.GENDER_REQUIRED },
+      ],
+    );
+  });
+
+  it('accepts someone on their 18th birthday, and not a day younger', () => {
+    const birthday = (dateOfBirth) =>
+      validateRegistrationInput({ ...validSignup, dateOfBirth, gender: 'male' }, required).validationErrors;
+    assert.deepEqual(birthday('2008-11-06'), []);
+    assert.deepEqual(birthday('2008-11-07'), [
+      { field: 'dateOfBirth', message: VALIDATION_MESSAGES.BIRTH_DATE_TOO_YOUNG },
+    ]);
+    assert.deepEqual(birthday('1906-11-05'), [
+      { field: 'dateOfBirth', message: VALIDATION_MESSAGES.BIRTH_DATE_TOO_OLD },
+    ]);
+  });
+
+  it('refuses dates that are not real calendar dates, and genders that are not in the list', () => {
+    for (const dateOfBirth of [
+      '1994-02-30',
+      '1994-13-01',
+      '21/03/1994',
+      '1994-3-21',
+      '1994-03-21T00:00:00Z',
+      19940321,
+      { $gt: '' },
+    ]) {
+      assert.deepEqual(
+        fieldsOf(validateRegistrationInput({ ...validSignup, dateOfBirth, gender: 'male' }, required)),
+        ['dateOfBirth'],
+        JSON.stringify(dateOfBirth),
+      );
+    }
+    for (const gender of ['Male', 'other', 1, { $ne: null }]) {
+      assert.deepEqual(
+        fieldsOf(validateRegistrationInput({ ...validSignup, dateOfBirth: '1994-03-21', gender }, required)),
+        ['gender'],
+        JSON.stringify(gender),
+      );
+    }
+  });
+
+  it('reads the phone number as one of the picked country, and refuses a country it does not know', () => {
+    const american = validateRegistrationInput({ ...validSignup, phoneCountry: 'US', phoneNumber: '(415) 555-2671' });
+    assert.equal(american.sanitizedInput.phoneNumber, '+14155552671');
+    const unknown = validateRegistrationInput({ ...validSignup, phoneCountry: 'XX' });
+    assert.deepEqual(fieldsOf(unknown), ['phoneCountry']);
   });
 
   it('reports every failing field at once', () => {

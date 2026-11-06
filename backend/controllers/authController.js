@@ -27,6 +27,7 @@ import {
   ACCOUNT_EMAIL_MESSAGES,
   ACCOUNT_MESSAGES,
   AUTH_MESSAGES,
+  GENDER_LABELS,
   SESSION_MESSAGES,
   VALIDATION_MESSAGES,
 } from '../constants/messages.js';
@@ -45,7 +46,8 @@ import { logger } from '../utils/logger.js';
 import { validateChangePasswordInput, validateLoginInput } from '../validators/authValidators.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 import { describePasswordPolicy } from '../services/passwordPolicy.js';
-import { ACCOUNT_EMAIL_SETTINGS } from '../constants/validation.js';
+import { ACCOUNT_EMAIL_SETTINGS, PHONE_SETTINGS, SIGNUP_PROFILE_SETTINGS } from '../constants/validation.js';
+import { listPhoneCountries } from '../utils/phoneNumbers.js';
 
 /** Both answers change only with a deployment, so browsers may reuse them for a while. */
 const PUBLIC_AUTH_SETTINGS_CACHE_SECONDS = 300;
@@ -64,8 +66,10 @@ export function getPasswordPolicy(req, res) {
 /**
  * GET /api/auth/options   (public)
  *
- * The numbers the sign-in screens state, as this server is configured: how long "remember this
- * device" lasts, how many digits the emailed code has, how long a reset link works.
+ * What the sign-in screens state or offer, as this server is configured: how long "remember this
+ * device" lasts, how many digits the emailed codes have (confirmation and password reset), how long
+ * a reset code and link work; at signup, whether date of birth and gender are required, the minimum
+ * age, the gender choices (in order), and the phone country picker's countries and starting country.
  */
 export function getAuthOptions(req, res) {
   res.set('Cache-Control', `public, max-age=${PUBLIC_AUTH_SETTINGS_CACHE_SECONDS}`);
@@ -73,6 +77,11 @@ export function getAuthOptions(req, res) {
     rememberedSessionDays: req.app.locals.config.rememberedSessionDays,
     verificationCodeDigits: ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS,
     passwordResetLinkMinutes: ACCOUNT_EMAIL_SETTINGS.PASSWORD_RESET_VALIDITY_MS / 60_000,
+    birthDateAndGenderRequired: SIGNUP_PROFILE_SETTINGS.BIRTH_DATE_AND_GENDER_REQUIRED,
+    minimumSignupAgeYears: SIGNUP_PROFILE_SETTINGS.MINIMUM_AGE_YEARS,
+    genders: Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label })),
+    defaultPhoneCountry: PHONE_SETTINGS.DEFAULT_COUNTRY,
+    phoneCountries: listPhoneCountries(),
   });
 }
 

@@ -169,7 +169,7 @@ async function createOrReplaceUnverifiedAccount({ email, password, details }) {
 /**
  * POST /api/auth/signup. Input already validated and normalised (validators/authValidators.js).
  * @param {{ firstName: string, lastName: string, name: string, email: string, phoneNumber: string,
- *   password: string, bootstrapAdminEmail: string|null,
+ *   dateOfBirth: Date|null, gender: string|null, password: string, bootstrapAdminEmail: string|null,
  *   emailContext: { companyName: string, appPublicUrl: string } }} signup
  * @returns {Promise<{ outcome: string, userId: string }>}  for the audit log only
  */
@@ -179,6 +179,8 @@ export async function registerAccount({
   name,
   email,
   phoneNumber,
+  dateOfBirth,
+  gender,
   password,
   bootstrapAdminEmail,
   emailContext,
@@ -196,6 +198,8 @@ export async function registerAccount({
     name,
     phoneNumber,
     phoneVerifiedAt: null,
+    dateOfBirth,
+    gender,
     role,
     termsVersion: TERMS_VERSION,
     termsAcceptedAt: new Date(),

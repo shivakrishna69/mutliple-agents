@@ -4,7 +4,14 @@
  * is reviewed in one place and the frontend can rely on stable text.
  */
 
-import { ACCOUNT_EMAIL_SETTINGS, MESSAGE_FIELD_LIMITS, USER_FIELD_LIMITS, WEBHOOK_FIELD_LIMITS } from './validation.js';
+import {
+  ACCOUNT_EMAIL_SETTINGS,
+  GENDERS,
+  MESSAGE_FIELD_LIMITS,
+  SIGNUP_PROFILE_SETTINGS,
+  USER_FIELD_LIMITS,
+  WEBHOOK_FIELD_LIMITS,
+} from './validation.js';
 
 export const AUTH_MESSAGES = Object.freeze({
   REGISTRATION_SUCCESSFUL: 'Account created successfully',
@@ -84,8 +91,14 @@ export const VALIDATION_MESSAGES = Object.freeze({
   LAST_NAME_TOO_LONG: `Last name must be at most ${USER_FIELD_LIMITS.FAMILY_NAME_MAX_LENGTH} characters`,
   PHONE_REQUIRED: 'Phone number is required',
   PHONE_MUST_BE_STRING: 'Phone number must be text',
-  PHONE_INVALID:
-    'Enter a valid phone number: a 10-digit Indian mobile number, or the number with its country code (e.g. +44 20 7946 0958)',
+  PHONE_INVALID: 'Enter a valid phone number for the country you picked, or the number with its country code',
+  PHONE_COUNTRY_INVALID: 'Pick the country of your phone number from the list',
+  BIRTH_DATE_REQUIRED: 'Date of birth is required',
+  BIRTH_DATE_INVALID: 'Enter your date of birth as a real date',
+  BIRTH_DATE_TOO_YOUNG: `You must be at least ${SIGNUP_PROFILE_SETTINGS.MINIMUM_AGE_YEARS} years old to create an account`,
+  BIRTH_DATE_TOO_OLD: 'Check your date of birth: it is too far in the past',
+  GENDER_REQUIRED: 'Select your gender',
+  GENDER_INVALID: 'Select your gender from the list',
   TERMS_NOT_ACCEPTED: 'Please accept the terms of service and privacy policy to continue',
   VERIFICATION_CODE_FORMAT: `Enter the ${ACCOUNT_EMAIL_SETTINGS.VERIFICATION_CODE_DIGITS}-digit code from the email`,
   CONFIRM_PASSWORD_REQUIRED: 'Type the password again to confirm it',
@@ -533,6 +546,14 @@ export const PASSWORD_RULE_MESSAGES = Object.freeze({
   lowercaseLetter: 'Password must contain at least one lowercase letter (a-z)',
   digit: 'Password must contain at least one number (0-9)',
   specialCharacter: 'Password must contain at least one special character',
+});
+
+/** The gender choices the sign-up screen lists, in this order (GET /api/auth/options). */
+export const GENDER_LABELS = Object.freeze({
+  [GENDERS.MALE]: 'Male',
+  [GENDERS.FEMALE]: 'Female',
+  [GENDERS.NON_BINARY]: 'Non-binary',
+  [GENDERS.PREFER_NOT_TO_SAY]: 'Prefer not to say',
 });
 
 /** The password checklist the signup and reset screens show (GET /api/auth/password-policy). */
