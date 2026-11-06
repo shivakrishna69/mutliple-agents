@@ -23,6 +23,7 @@ import {
   initKnowledgeIngestionQueue,
 } from '../../services/knowledge/ingestionQueue.js';
 import { runIngestion } from '../../services/knowledge/ingestionRunner.js';
+import { requeueKnowledgeDocuments } from '../../services/knowledge/knowledgeBaseService.js';
 import { buildDocx, buildPdf } from '../fixtures/knowledgeFiles.js';
 import { startStandInKnowledgeIndex } from './standInKnowledgeIndex.js';
 import { MONGO_BASE_URL, mongoUnavailableReason } from './testServer.js';
@@ -301,6 +302,45 @@ describe('knowledge ingestion', { skip: mongoReason ?? false }, () => {
     const chunks = index.chunksOf(document._id);
     assert.equal(chunks.has(999), false);
     assert.equal(chunks.size, (await AgentDocument.findById(document._id)).chunkCount);
+  });
+
+  it('indexes documents again after the index lost them, per department or everywhere, leaving work in progress alone', async () => {
+    const ready = await uploadDocument(Buffer.from('Rebuilt after a loss.\n', 'utf8'), { originalName: 'Rebuild.md' });
+    await runIngestion(ready._id.toString(), context());
+    const otherDepartment = new mongoose.Types.ObjectId();
+    const elsewhere = await uploadDocument(Buffer.from('Another department.\n', 'utf8'), {
+      originalName: 'Elsewhere.md',
+      departmentId: otherDepartment,
+    });
+    await runIngestion(elsewhere._id.toString(), context());
+    const deleting = await uploadDocument(Buffer.from('On its way out.\n', 'utf8'), {
+      originalName: 'Leaving.md',
+      status: DOCUMENT_STATUSES.DELETING,
+    });
+    index.chunksOf(ready._id).clear();
+
+    assert.ok((await requeueKnowledgeDocuments({ departmentId: departmentId.toString() })) >= 1);
+    const requeued = await AgentDocument.findById(ready._id).lean();
+    assert.equal(requeued.status, DOCUMENT_STATUSES.UPLOADED);
+    assert.equal(requeued.attempts, 0);
+    assert.equal(
+      (await AgentDocument.findById(elsewhere._id)).status,
+      DOCUMENT_STATUSES.READY,
+      'other department untouched',
+    );
+    assert.equal(
+      (await AgentDocument.findById(deleting._id)).status,
+      DOCUMENT_STATUSES.DELETING,
+      'a delete is never undone',
+    );
+
+    await runIngestion(ready._id.toString(), context());
+    assert.equal((await AgentDocument.findById(ready._id)).status, DOCUMENT_STATUSES.READY);
+    assert.equal(index.chunksOf(ready._id).size, 1, 'chunks rebuilt');
+
+    await requeueKnowledgeDocuments();
+    assert.equal((await AgentDocument.findById(elsewhere._id)).status, DOCUMENT_STATUSES.UPLOADED, 'every department');
+    await runIngestion(elsewhere._id.toString(), context());
   });
 
   describe('the queue in this process', () => {

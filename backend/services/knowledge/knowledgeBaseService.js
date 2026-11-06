@@ -13,6 +13,9 @@
  *   uploadKnowledgeDocument(scope, ...)      POST /documents: checks, stores, queues; 202
  *   deleteKnowledgeDocument(scope, ...)      DELETE /documents/:docId: chunks evicted, then the
  *                                            file, then the record; safe to repeat
+ *   requeueKnowledgeDocuments(...)           puts documents back in the queue to be read and indexed
+ *                                            again (scripts/reindexKnowledge.js), e.g. after the
+ *                                            vector index lost its data
  */
 
 import { createHash } from 'node:crypto';
@@ -286,4 +289,29 @@ export async function deleteKnowledgeDocument({ department }, documentId, callCo
   await knowledgeFileStore.deleteFile(document.fileKey);
   await AgentDocument.deleteOne({ _id: document._id });
   return { id: document._id.toString(), chunksRemoved: document.chunkCount };
+}
+
+/** Statuses a document can be indexed again from: done, or failed. Never one being processed or deleted. */
+const REQUEUEABLE_STATUSES = Object.freeze([DOCUMENT_STATUSES.READY, DOCUMENT_STATUSES.FAILED]);
+
+/**
+ * Marks READY and FAILED documents UPLOADED again, with fresh attempts, so the ingestion sweep reads
+ * and indexes them again (each run first evicts the document's old chunks). Documents being
+ * processed or deleted are left alone.
+ * @param {{ departmentId?: string|null }} [filter]  one department, or all of them
+ * @returns {Promise<number>} documents requeued
+ */
+export async function requeueKnowledgeDocuments({ departmentId = null } = {}) {
+  const { modifiedCount } = await AgentDocument.updateMany(
+    { status: { $in: REQUEUEABLE_STATUSES }, ...(departmentId ? { departmentId } : {}) },
+    {
+      $set: {
+        status: DOCUMENT_STATUSES.UPLOADED,
+        attempts: 0,
+        errorMessage: null,
+        lease: { owner: null, until: null },
+      },
+    },
+  );
+  return modifiedCount;
 }
