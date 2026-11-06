@@ -400,3 +400,39 @@ export const EMPLOYEE_IMPORT_LIMITS = Object.freeze({
   // Files checked but never started are deleted sooner.
   UNCONFIRMED_RETENTION_DAYS: 7,
 });
+
+/**
+ * The dashboard (GET /api/dashboard/overview, services/dashboardOverview.js).
+ *
+ *   RANGES                     the periods it can show: today so far, or the last 7 or 30 days
+ *                              including today, in the company's time zone
+ *   FIRST_RESPONSE_TARGET_MS   a first reply within this counts as on target ("replies within target")
+ *   RECENT_CONVERSATIONS       how many of the latest conversations it lists
+ *   UPCOMING_HOLIDAYS          how many coming holidays it lists, looking ahead HOLIDAY_LOOKAHEAD_DAYS
+ *   TOP_LEAVE_BALANCES         how many of an employee's leave balances it shows
+ *   NEW_ACCOUNTS_DAYS          "new this week": accounts created in this many days
+ */
+export const DASHBOARD_SETTINGS = Object.freeze({
+  RANGES: Object.freeze({ TODAY: 'today', LAST_7_DAYS: '7d', LAST_30_DAYS: '30d' }),
+  RANGE_DAYS: Object.freeze({ today: 1, '7d': 7, '30d': 30 }),
+  FIRST_RESPONSE_TARGET_MS: 60 * 1000,
+  RECENT_CONVERSATIONS: 5,
+  UPCOMING_HOLIDAYS: 3,
+  HOLIDAY_LOOKAHEAD_DAYS: 365,
+  TOP_LEAVE_BALANCES: 3,
+  NEW_ACCOUNTS_DAYS: 7,
+});
+
+/**
+ * The service health check (GET /api/system/health, services/systemHealth.js).
+ *
+ *   AI_SERVICE_TIMEOUT_MS  how long the AI service's /health may take before it counts as down
+ *   EMAIL_CHECK_CACHE_MS   how long an SMTP check is reused, so the page does not connect to the
+ *                          mail provider on every load
+ *   SLOW_RESPONSE_MS       an answer slower than this marks the service as degraded
+ */
+export const SYSTEM_HEALTH_SETTINGS = Object.freeze({
+  AI_SERVICE_TIMEOUT_MS: 2000,
+  EMAIL_CHECK_CACHE_MS: 5 * 60 * 1000,
+  SLOW_RESPONSE_MS: 1500,
+});

@@ -163,6 +163,22 @@ export async function closeCacheStore() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Which cache is in use and whether it answers, for the health check: Redis is pinged; the
+ * in-memory fallback always answers. `kind` is null before the cache is initialised.
+ * @returns {Promise<{ kind: 'redis'|'memory'|null, reachable: boolean }>}
+ */
+export async function checkCacheStore() {
+  if (!activeBackend) return { kind: null, reachable: false };
+  if (activeBackend.kind === 'memory') return { kind: 'memory', reachable: true };
+  try {
+    await withTimeout('ping', activeBackend.client.ping());
+    return { kind: 'redis', reachable: true };
+  } catch {
+    return { kind: 'redis', reachable: false };
+  }
+}
+
+/**
  * Reads and parses a JSON value. Returns null on a miss, an expired key, a corrupt value, an
  * uninitialised cache, or any Redis failure.
  */

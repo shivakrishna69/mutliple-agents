@@ -41,6 +41,8 @@ import payrollRoutes from './routes/payrollRoutes.js';
 import peopleRoutes from './routes/peopleRoutes.js';
 import invitationRoutes from './routes/invitationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import systemRoutes from './routes/systemRoutes.js';
 import okrRoutes from './routes/okrRoutes.js';
 import workCalendarRoutes from './routes/workCalendarRoutes.js';
 import officeRoutes from './routes/officeRoutes.js';
@@ -144,6 +146,9 @@ export function createApp(config) {
   app.use('/api/invitations', invitationRoutes);
   // Workforce analytics: attrition and burnout risk (HR and admins)
   app.use('/api/analytics', analyticsRoutes);
+  // The dashboard, in sections by role, and the services' health (admins)
+  app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/system', systemRoutes);
   // OKRs: company goals, team objectives, key results, milestones
   app.use('/api/okrs', okrRoutes);
   // Holidays and day classification per office (HR edits, employees read).

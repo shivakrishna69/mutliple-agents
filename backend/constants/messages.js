@@ -573,3 +573,38 @@ export const PASSWORD_STRENGTH_LABELS = Object.freeze({
   good: 'Good',
   strong: 'Strong',
 });
+
+/** The dashboard (controllers/dashboardController.js). */
+export const DASHBOARD_MESSAGES = Object.freeze({
+  OVERVIEW_RETRIEVED: 'Dashboard',
+  RANGE_INVALID: 'Choose today, the last 7 days or the last 30 days',
+});
+
+/** The dashboard's range picker, in order (GET /api/dashboard/overview `ranges`). */
+export const DASHBOARD_RANGE_LABELS = Object.freeze({
+  today: 'Today',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+});
+
+/** The service health check (controllers/systemController.js). */
+export const SYSTEM_HEALTH_MESSAGES = Object.freeze({
+  RETRIEVED: 'Service health',
+  ADMIN_ONLY: 'Only administrators can see the health of the services',
+});
+
+/** What each checked service is called on the dashboard's "Connected services" card. */
+export const SYSTEM_SERVICE_LABELS = Object.freeze({
+  aiService: 'AI service',
+  email: 'Email delivery',
+  database: 'Database',
+  cache: 'Cache',
+});
+
+/** How each service's state reads, and what not being set up means for it. */
+export const SYSTEM_STATUS_LABELS = Object.freeze({
+  operational: 'Operational',
+  degraded: 'Slow',
+  down: 'Down',
+  not_configured: 'Not set up',
+});
