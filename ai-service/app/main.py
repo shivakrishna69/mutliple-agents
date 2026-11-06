@@ -13,6 +13,10 @@ Endpoints
                       One employee message for the attendance regularization sub-agent
                       (RegularizationTurnInput -> RegularizationTurnResponse). Same key. 503 when
                       the LLM or BACKEND_INTERNAL_URL is not configured, 504 on the turn deadline.
+    POST /ai/knowledge/chunks, POST /ai/knowledge/documents/remove
+                      The department knowledge index (app/knowledge/router.py): store a batch of a
+                      document's chunks, or evict a document's chunks. Same key. 503 when QDRANT_URL
+                      is not set or the index cannot be reached.
 
 Request lifecycle for POST /ai/process
     1. Middleware assigns/propagates X-Request-Id and logs the request when it completes.
@@ -64,6 +68,8 @@ from app.agent import (
     RegularizationUnavailableError,
 )
 from app.config import ConfigurationError, Settings
+from app.knowledge.router import knowledge_router
+from app.knowledge.service import KnowledgeService, KnowledgeUnavailableError
 from app.logging_config import configure_logging
 from app.nodes.leave_assistant import LeaveAssistantInput, LeaveAssistantResponse
 from app.schemas import (
@@ -147,6 +153,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     agent_runtime = AgentRuntime(settings)
     application.state.agent_runtime = agent_runtime
     agent_runtime.start()
+    knowledge_service = KnowledgeService(settings)
+    application.state.knowledge_service = knowledge_service
+    knowledge_service.start()
     eviction_task = asyncio.create_task(run_thread_eviction_loop(agent_runtime), name="thread-eviction")
 
     if agent_runtime.is_llm_configured:
@@ -165,6 +174,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         except asyncio.CancelledError:
             pass
         await agent_runtime.aclose()
+        await knowledge_service.aclose()
         logger.info("ai-service stopped")
 
 
@@ -224,6 +234,18 @@ async def handle_service_error(request: Request, service_error: ServiceError) ->
         status_code=service_error.status_code,
         content=build_error_body(request, service_error.message),
         headers=service_error.headers,
+    )
+
+
+@app.exception_handler(KnowledgeUnavailableError)
+async def handle_knowledge_unavailable(request: Request, unavailable_error: KnowledgeUnavailableError) -> JSONResponse:
+    logger.error(
+        "Knowledge index unavailable",
+        extra={"requestId": getattr(request.state, "request_id", None), "reason": unavailable_error.reason},
+    )
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=build_error_body(request, "Knowledge index unavailable"),
     )
 
 
@@ -314,6 +336,7 @@ async def health(request: Request) -> JSONResponse:
             if agent_runtime.is_regularization_configured
             else "not_configured",
             "model": agent_runtime.model_name,
+            "knowledgeIndex": "configured" if request.app.state.knowledge_service.is_configured else "not_configured",
             "trackedThreads": agent_runtime.thread_registry.tracked_thread_count,
         },
     )
@@ -495,3 +518,10 @@ async def answer_leave_question(turn_input: LeaveAssistantInput, request: Reques
         },
     )
     return LeaveAssistantResponse(reply=result.reply, draft=result.draft, tools_used=result.tools_used)
+
+
+app.include_router(
+    knowledge_router,
+    dependencies=[Depends(require_internal_api_key)],
+    responses={status_code: {"model": ErrorResponse} for status_code in (401, 422, 500, 503)},
+)

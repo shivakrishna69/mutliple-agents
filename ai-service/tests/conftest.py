@@ -24,5 +24,9 @@ os.environ.update(
         "LLM_REASONING_EFFORT": "low",
         "LLM_REQUEST_TIMEOUT_SECONDS": "8",
         "AI_PROCESS_TIMEOUT_SECONDS": "18",
+        # The knowledge index is off unless a test turns it on (tests/test_knowledge_index.py).
+        "QDRANT_URL": "",
+        "QDRANT_API_KEY": "",
+        "EMBEDDING_OFFLINE": "false",
     }
 )
