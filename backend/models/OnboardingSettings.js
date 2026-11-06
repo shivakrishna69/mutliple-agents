@@ -34,7 +34,10 @@ const optionalText = (label, defaultValue) => ({
   type: String,
   trim: true,
   default: defaultValue,
-  maxlength: [TERM_LIMITS.SIGNATORY_MAX_LENGTH, `${label} must be at most ${TERM_LIMITS.SIGNATORY_MAX_LENGTH} characters`],
+  maxlength: [
+    TERM_LIMITS.SIGNATORY_MAX_LENGTH,
+    `${label} must be at most ${TERM_LIMITS.SIGNATORY_MAX_LENGTH} characters`,
+  ],
 });
 
 const onboardingSettingsSchema = new mongoose.Schema(
@@ -79,7 +82,10 @@ const onboardingSettingsSchema = new mongoose.Schema(
           {
             type: String,
             trim: true,
-            maxlength: [TERM_LIMITS.CLAUSE_MAX_LENGTH, `Each clause must be at most ${TERM_LIMITS.CLAUSE_MAX_LENGTH} characters`],
+            maxlength: [
+              TERM_LIMITS.CLAUSE_MAX_LENGTH,
+              `Each clause must be at most ${TERM_LIMITS.CLAUSE_MAX_LENGTH} characters`,
+            ],
           },
         ],
         default: () => [...TERMS.additionalClauses],

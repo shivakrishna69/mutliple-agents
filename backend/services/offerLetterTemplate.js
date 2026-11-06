@@ -24,6 +24,7 @@
  */
 
 import { escapeHtml } from '../utils/html.js';
+import { splitAnnual } from './ctcStructure.js';
 import { brandMarkSvg } from './payslipHtmlTemplate.js';
 
 const moneyFormatter = new Intl.NumberFormat('en-IN', {
@@ -51,10 +52,7 @@ function sectionRow(label) {
 
 function compensationTable(structure) {
   const { earnings, employerContributions: employer, employeeDeductions: employee, takeHome } = structure;
-  const ctcSplit = {
-    annual: structure.annualCtc,
-    monthly: Math.floor(structure.annualCtc / 12),
-  };
+  const ctcSplit = splitAnnual(structure.annualCtc);
   const optionalRow = (label, split) => (split.annual > 0 ? moneyRow(label, split) : '');
   return `<table class="money">
     <thead><tr><th>Component</th><th class="amount">Monthly</th><th class="amount">Annual</th></tr></thead>
@@ -87,7 +85,16 @@ function compensationTable(structure) {
  *   structure: object, terms: object, issuedOn: Date, validUntil: Date, watermark: string|null }} letter
  * @returns {string} complete HTML document
  */
-export function compileOfferLetterHtml({ company, candidate, position, structure, terms, issuedOn, validUntil, watermark }) {
+export function compileOfferLetterHtml({
+  company,
+  candidate,
+  position,
+  structure,
+  terms,
+  issuedOn,
+  validUntil,
+  watermark,
+}) {
   const companyName = company.legalName ?? company.name;
   const firstName = candidate.name.split(/\s+/)[0];
   const clauses = terms.additionalClauses.map((clause) => `<li>${escapeHtml(clause)}</li>`).join('');

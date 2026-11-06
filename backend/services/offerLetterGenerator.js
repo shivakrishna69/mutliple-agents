@@ -46,6 +46,11 @@ export function offerLetterPassword(dateOfBirth) {
   return `${day}${month}${year}`;
 }
 
+/** The HTML a letter is printed from: a preview carries ONBOARDING_MESSAGES.PREVIEW_WATERMARK, a final letter none. */
+export function offerLetterHtml(letter, { preview }) {
+  return compileOfferLetterHtml({ ...letter, watermark: preview ? ONBOARDING_MESSAGES.PREVIEW_WATERMARK : null });
+}
+
 async function collect(stream) {
   const chunks = [];
   for await (const chunk of stream) chunks.push(chunk);
@@ -58,8 +63,7 @@ async function collect(stream) {
  * @returns {Promise<{ pdf: Buffer, sha256: string }>}
  */
 export async function renderOfferLetter(letter, { preview, dateOfBirth }) {
-  const html = compileOfferLetterHtml({ ...letter, watermark: preview ? ONBOARDING_MESSAGES.PREVIEW_WATERMARK : null });
-  const rendered = await collect(await renderHtmlToPdfStream(html));
+  const rendered = await collect(await renderHtmlToPdfStream(offerLetterHtml(letter, { preview })));
   const pdf = preview
     ? rendered
     : await protectPdfWithPassword(rendered, offerLetterPassword(dateOfBirth), {

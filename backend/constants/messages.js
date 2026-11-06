@@ -632,8 +632,7 @@ export const ONBOARDING_MESSAGES = Object.freeze({
   DISPATCHED: `Offer sent. The candidate has ${ONBOARDING_SETTINGS.ACTIVATION_VALIDITY_HOURS} hours to activate their account`,
   DISPATCH_IN_PROGRESS: 'This offer is already being sent',
   DISPATCH_NOT_ALLOWED: 'Only drafts waiting for review, or whose sending failed, can be sent',
-  DISPATCH_EMAIL_FAILED:
-    'The employee record was created, but the offer email could not be sent. Try sending it again',
+  DISPATCH_EMAIL_FAILED: 'The employee record was created, but the offer email could not be sent. Try sending it again',
   SIGNATORY_MISSING: 'Set the offer letter signatory in the onboarding settings before sending offers',
   PDF_UNAVAILABLE: 'Offer letters cannot be produced on this server right now. Contact your administrator',
   CTC_TOO_LOW:
