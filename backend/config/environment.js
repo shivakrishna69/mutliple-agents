@@ -127,7 +127,7 @@ const PDF_BROWSER_CHANNELS = Object.freeze(['chrome', 'chrome-beta', 'msedge', '
  *   PDF_BROWSER_CHANNEL           an installed branded channel (PDF_BROWSER_CHANNELS)
  * Null when neither is set: documents report themselves as unavailable and everything else works.
  */
-function loadPdfBrowserConfig() {
+export function loadPdfBrowserConfig() {
   const executablePath = (process.env.PDF_BROWSER_EXECUTABLE_PATH ?? '').trim() || null;
   const channel = (process.env.PDF_BROWSER_CHANNEL ?? '').trim() || null;
   if (!executablePath && !channel) return null;
@@ -144,7 +144,7 @@ function loadPdfBrowserConfig() {
  *   COMPANY_LEGAL_NAME,          printed in the letter head when set (the company's name from its
  *   COMPANY_REGISTERED_ADDRESS   settings otherwise; the address is then left out)
  */
-function loadOfferLetterConfig() {
+export function loadOfferLetterConfig() {
   const qpdfPath = (process.env.QPDF_PATH ?? '').trim() || 'qpdf';
   return {
     qpdfPath,

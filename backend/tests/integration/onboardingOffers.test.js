@@ -6,7 +6,8 @@
  * failed email retried without a second employee.
  *
  * The PDF tests need a Chromium (PDF_BROWSER_CHANNEL or PDF_BROWSER_EXECUTABLE_PATH, as for the
- * server) and qpdf (QPDF_PATH, default "qpdf"); without them those tests are skipped and say why.
+ * server) and qpdf (QPDF_PATH, default "qpdf"); without them those tests are skipped and say why,
+ * except in CI (CI=true), where a missing tool fails the run instead of hiding the tests.
  */
 
 import { execFile } from 'node:child_process';
@@ -50,6 +51,9 @@ const pdfReason =
     : (await isQpdfAvailable(qpdfPath))
       ? null
       : `qpdf not found at "${qpdfPath}": install qpdf or set QPDF_PATH`);
+if (process.env.CI === 'true' && pdfReason && !mongoReason) {
+  throw new Error(`The offer letter tests cannot run in CI: ${pdfReason}`);
+}
 
 /** A joining date 30 days ahead, as YYYY-MM-DD (offers must join within a year). */
 const joiningIn = (days) => new Date(Date.now() + days * DAY_MS).toISOString().slice(0, 10);

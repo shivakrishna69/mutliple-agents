@@ -51,7 +51,11 @@ services:
       retries: 20
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # Chromium and qpdf for payslips and offer letters (backend/Dockerfile).
+        WITH_PDF_BROWSER: "true"
     restart: unless-stopped
     env_file:
       - path: ${BACKEND_ENV_FILE:-/etc/nsk/backend.env}
@@ -67,12 +71,16 @@ services:
       COOKIE_SECURE: "true"
       # Caddy, then nginx in the frontend container.
       TRUST_PROXY_HOPS: "2"
+      # Installed in the image by WITH_PDF_BROWSER; qpdf is on the PATH (QPDF_PATH defaults to "qpdf").
+      PDF_BROWSER_EXECUTABLE_PATH: /usr/bin/chromium
     depends_on:
       mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
     read_only: true
+    # Chromium's profile and qpdf's working files: private, in memory, gone on restart.
+    tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 

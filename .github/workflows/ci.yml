@@ -62,6 +62,9 @@ jobs:
       CI: "true"
       TEST_MONGO_URL: mongodb://127.0.0.1:27017
       TEST_REDIS_URL: redis://127.0.0.1:6379
+      # Offer letter tests: the runner's Google Chrome renders PDFs, qpdf (installed below) locks them.
+      PDF_BROWSER_CHANNEL: chrome
+      QPDF_PATH: qpdf
     defaults:
       run:
         working-directory: backend
@@ -72,10 +75,26 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+      - name: Install qpdf
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends qpdf && qpdf --version
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
+
+  offer-letter-pdfs:
+    name: Offer letter PDFs (production image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the backend image with its PDF tools, as production does
+        run: docker build --build-arg WITH_PDF_BROWSER=true --tag nsk-backend-pdf ./backend
+      - name: Render and lock a sample letter inside it, under the production restrictions
+        run: |
+          docker run --rm --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+            --env PDF_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium --env LOG_LEVEL=error \
+            --entrypoint node nsk-backend-pdf scripts/checkOfferLetterPdf.js
 
   frontend:
     name: Frontend (Node ${{ matrix.node-version }})

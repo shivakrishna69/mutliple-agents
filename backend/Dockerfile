@@ -3,7 +3,7 @@
 # Production image for the backend (Node.js + Express + Socket.IO).
 #
 # Build:  docker build -t nsk-backend ./backend
-#         docker build --build-arg WITH_PDF_BROWSER=true -t nsk-backend ./backend   (payslip PDFs)
+#         docker build --build-arg WITH_PDF_BROWSER=true -t nsk-backend ./backend   (payslip and offer letter PDFs)
 # Run:    docker run -p 5000:5000 --env-file backend/.env --read-only --cap-drop ALL nsk-backend
 #
 # Configuration comes only from the environment at run time; .dockerignore keeps .env files out of
@@ -28,18 +28,23 @@ LABEL org.opencontainers.image.title="backend" \
       org.opencontainers.image.description="NSK API: auth, HR and support business rules, real-time events" \
       org.opencontainers.image.source="https://github.com/shivakrishna69/mutliple-agents"
 
-# Payslip PDFs are rendered by a headless Chromium (services/pdfGenerationService.js). It adds a few
-# hundred MB, so it is only installed on request; without it, payslip generation reports itself as
-# not configured and everything else works.
+# Payslips and offer letters are rendered by a headless Chromium (services/pdfGenerationService.js),
+# and final offer letters are password-protected with qpdf (services/pdfProtection.js). Chromium adds
+# a few hundred MB, so these tools are only installed on request; without them, payslips and offer
+# letters report themselves as unavailable and everything else works.
 ARG WITH_PDF_BROWSER=false
 RUN if [ "${WITH_PDF_BROWSER}" = "true" ]; then \
       apt-get update \
-      && apt-get install --yes --no-install-recommends chromium fonts-dejavu-core \
+      && apt-get install --yes --no-install-recommends chromium fonts-dejavu-core qpdf \
       && rm -rf /var/lib/apt/lists/*; \
     fi
 
 ENV NODE_ENV=production \
-    PORT=5000
+    PORT=5000 \
+    # Chromium keeps its config and crash-report folders here; the rest of the filesystem is
+    # read-only in production (docker-compose.prod.yml mounts /tmp in memory).
+    XDG_CONFIG_HOME=/tmp/.config \
+    XDG_CACHE_HOME=/tmp/.cache
 
 # Unprivileged account with a fixed UID, matching the ai-service image.
 ARG APP_UID=10001
