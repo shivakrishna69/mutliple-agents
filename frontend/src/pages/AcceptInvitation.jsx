@@ -18,7 +18,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { requestInvitationAcceptance, requestInvitationPreview } from '../api/peopleApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
-import { BuildingIcon, LockIcon, QuestionIcon, UserCircleIcon } from '../components/Icons.jsx';
+import { BuildingIcon, QuestionIcon, UserCircleIcon } from '../components/Icons.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import SubmitButton from '../components/SubmitButton.jsx';
 import { LoadingBlock, formatDate } from '../components/ui.jsx';
@@ -26,7 +26,8 @@ import AuthShell from '../components/auth/AuthShell.jsx';
 import { CheckboxField } from '../components/auth/AuthNotices.jsx';
 import PasswordStrength from '../components/auth/PasswordStrength.jsx';
 import TermsAgreement from '../components/auth/TermsAgreement.jsx';
-import { INVITATION_HERO } from '../constants/authScreens.js';
+import { AUTH_SLIDES } from '../constants/authScreens.js';
+import { AUTH_LINK_CLASS } from '../constants/formStyles.js';
 import { BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { useApiResource } from '../hooks/useApiResource.js';
@@ -34,8 +35,7 @@ import { useAuthRequest } from '../hooks/useAuthRequest.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 
 const PASSWORD_REQUIREMENTS_ID = 'invite-password-requirements';
-const linkClass =
-  'rounded font-semibold text-brand-600 hover:text-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+const stack = 'space-y-[clamp(0.75rem,2vh,1.2rem)]';
 
 const initialsOf = (name) =>
   name
@@ -48,10 +48,10 @@ const initialsOf = (name) =>
 function InvitationCard({ invitation }) {
   const role = [invitation.designation, invitation.departmentName].filter(Boolean).join(', ');
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-start gap-4">
+    <div className="mb-[clamp(0.75rem,2.2vh,1.4rem)] rounded-2xl border border-slate-200/80 bg-white p-[clamp(0.75rem,1.8vh,1rem)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex items-start gap-3.5">
         <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-lg font-semibold text-brand-700"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-base font-semibold text-white"
           aria-hidden="true"
         >
           {initialsOf(invitation.name)}
@@ -59,7 +59,7 @@ function InvitationCard({ invitation }) {
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-slate-900">{invitation.name}</p>
           <p className="truncate text-sm text-slate-600">{invitation.email}</p>
-          <ul className="mt-2 space-y-1 text-xs text-slate-500">
+          <ul className="mt-1.5 space-y-0.5 text-xs text-slate-500">
             <li className="flex items-center gap-1.5">
               <BuildingIcon className="h-4 w-4" />
               <span>
@@ -77,7 +77,7 @@ function InvitationCard({ invitation }) {
           </ul>
         </div>
       </div>
-      <p className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
+      <p className="mt-2.5 border-t border-slate-100 pt-2.5 text-xs text-slate-500">
         This link works until {formatDate(invitation.expiresAt)}.
       </p>
     </div>
@@ -106,7 +106,7 @@ export default function AcceptInvitation() {
   const signInFooter = (
     <>
       Already activated?{' '}
-      <Link to={ROUTE_PATHS.LOGIN} className={linkClass}>
+      <Link to={ROUTE_PATHS.LOGIN} className={AUTH_LINK_CLASS}>
         Sign in
       </Link>
     </>
@@ -114,7 +114,7 @@ export default function AcceptInvitation() {
 
   if (preview.isLoading && !preview.data) {
     return (
-      <AuthShell branding={branding} hero={INVITATION_HERO} title="Opening your invitation">
+      <AuthShell branding={branding} slides={AUTH_SLIDES.INVITATION} title="Opening your invitation">
         <LoadingBlock />
       </AuthShell>
     );
@@ -122,7 +122,12 @@ export default function AcceptInvitation() {
 
   if (preview.error) {
     return (
-      <AuthShell branding={branding} hero={INVITATION_HERO} title="This invitation can't be used" footer={signInFooter}>
+      <AuthShell
+        branding={branding}
+        slides={AUTH_SLIDES.INVITATION}
+        title="This invitation can't be used"
+        footer={signInFooter}
+      >
         <ErrorBanner title={BANNER_TITLES.LINK_NOT_USABLE} message={preview.error.message} />
       </AuthShell>
     );
@@ -132,13 +137,13 @@ export default function AcceptInvitation() {
   return (
     <AuthShell
       branding={branding}
-      hero={INVITATION_HERO}
+      slides={AUTH_SLIDES.INVITATION}
       title={`Welcome, ${invitation.name.split(' ')[0]}!`}
-      description="Set your password to activate your account."
+      description="Set your password to activate your account"
       footer={signInFooter}
     >
       <InvitationCard invitation={invitation} />
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <form onSubmit={handleSubmit} noValidate className={stack}>
         {error && (
           <ErrorBanner
             title={BANNER_TITLES.REQUEST_FAILED}
@@ -147,9 +152,10 @@ export default function AcceptInvitation() {
             onDismiss={clearError}
           />
         )}
-        <fieldset disabled={isSubmitting} className="space-y-5">
+        <fieldset disabled={isSubmitting} className={stack}>
           <div>
             <PasswordField
+              appearance="auth"
               fieldId="password"
               label="Password"
               placeholder="Create a strong password"
@@ -157,19 +163,18 @@ export default function AcceptInvitation() {
               errorMessage={fieldErrors.password}
               autoCompleteHint="new-password"
               describedByIds={passwordPolicy ? [PASSWORD_REQUIREMENTS_ID] : []}
-              leadingIcon={<LockIcon className="h-5 w-5" />}
               onFieldChange={(changeEvent) => setPassword(changeEvent.target.value)}
             />
             <PasswordStrength password={password} passwordPolicy={passwordPolicy} listId={PASSWORD_REQUIREMENTS_ID} />
           </div>
           <PasswordField
+            appearance="auth"
             fieldId="confirmPassword"
             label="Confirm password"
-            placeholder="Re-enter your password"
+            placeholder="Repeat password"
             fieldValue={confirmPassword}
             errorMessage={fieldErrors.confirmPassword}
             autoCompleteHint="new-password"
-            leadingIcon={<LockIcon className="h-5 w-5" />}
             onFieldChange={(changeEvent) => setConfirmPassword(changeEvent.target.value)}
           />
           <CheckboxField
@@ -181,15 +186,20 @@ export default function AcceptInvitation() {
             <TermsAgreement branding={{ ...branding, name: invitation.companyName }} />
           </CheckboxField>
         </fieldset>
-        <SubmitButton isSubmitting={isSubmitting} idleLabel="Activate my account" loadingLabel="Activating…" />
+        <SubmitButton
+          appearance="auth"
+          isSubmitting={isSubmitting}
+          idleLabel="Activate my account"
+          loadingLabel="Activating…"
+        />
       </form>
       {branding?.supportEmail && (
-        <div className="mt-6 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div className="mt-[clamp(0.75rem,2vh,1.25rem)] flex items-center justify-between gap-3 text-sm text-slate-500">
           <span className="flex items-center gap-2">
             <QuestionIcon className="h-5 w-5 text-slate-400" />
             Having trouble with this invitation?
           </span>
-          <a href={`mailto:${branding.supportEmail}`} className={linkClass}>
+          <a href={`mailto:${branding.supportEmail}`} className={AUTH_LINK_CLASS}>
             Contact HR
           </a>
         </div>

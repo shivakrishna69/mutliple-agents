@@ -1,5 +1,5 @@
 /**
- * "Check your email": type the code from the confirmation email, or ask for a new email.
+ * "Verify your email": type the code from the confirmation email, or ask for a new email.
  *
  * Arrives from signup or sign-in with ?email= and, in the navigation state, the server's message
  * (notice), the code length and how long until another email may be asked for. Opened directly,
@@ -18,26 +18,24 @@ import { AUTH_ERROR_CODES, requestEmailConfirmation, requestVerificationEmail } 
 import { useAuth } from '../auth/AuthContext.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import FormField from '../components/FormField.jsx';
-import { ArrowLeftIcon, MailIcon } from '../components/Icons.jsx';
+import { MailIcon } from '../components/Icons.jsx';
 import SubmitButton from '../components/SubmitButton.jsx';
+import { CodeEntry } from '../components/auth/AuthFields.jsx';
 import AuthShell from '../components/auth/AuthShell.jsx';
 import { SuccessNotice } from '../components/auth/AuthNotices.jsx';
-import VerificationCodeInput from '../components/auth/VerificationCodeInput.jsx';
+import { AUTH_SLIDES } from '../constants/authScreens.js';
+import { AUTH_LINK_CLASS } from '../constants/formStyles.js';
 import { BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
-import { formatCountdown, useCountdown } from '../hooks/useCountdown.js';
+import { useCountdown } from '../hooks/useCountdown.js';
 import { useAuthRequest } from '../hooks/useAuthRequest.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 
-const CODE_LABEL_ID = 'verification-code-label';
 const MAIL_APPS = Object.freeze([
   { label: 'Open Gmail', href: 'https://mail.google.com/' },
   { label: 'Open Outlook', href: 'https://outlook.live.com/mail/' },
 ]);
-const secondaryButtonClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60';
-const linkClass =
-  'rounded font-semibold text-brand-600 hover:text-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+const stack = 'space-y-[clamp(0.85rem,2.2vh,1.3rem)]';
 
 export default function CheckEmail() {
   const navigate = useNavigate();
@@ -49,15 +47,16 @@ export default function CheckEmail() {
   const resend = useAuthRequest();
   const countdown = useCountdown(arrival?.resendAfterSeconds ?? 0);
 
-  const [email, setEmail] = useState(searchParams.get('email') ?? '');
+  const knownEmail = searchParams.get('email') ?? '';
+  const [email, setEmail] = useState(knownEmail);
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState(arrival?.notice ?? null);
   const codeDigits = options?.verificationCodeDigits ?? arrival?.codeDigits ?? null;
-  const knowsAddress = Boolean(searchParams.get('email'));
 
   async function handleConfirm(submitEvent) {
     submitEvent.preventDefault();
     setNotice(null);
+    resend.clearError();
     const confirmed = await confirmation.run((signal) => requestEmailConfirmation({ email, code }, { signal }));
     if (!confirmed) {
       setCode('');
@@ -69,6 +68,7 @@ export default function CheckEmail() {
 
   async function handleResend() {
     setNotice(null);
+    confirmation.clearError();
     let refusal = null;
     const sent = await resend.run(async (signal) => {
       try {
@@ -88,30 +88,38 @@ export default function CheckEmail() {
   }
 
   const error = confirmation.error ?? resend.error;
-  const isBusy = confirmation.isSubmitting || resend.isSubmitting;
 
   return (
     <AuthShell
       branding={branding}
-      title="Check your email"
+      slides={AUTH_SLIDES.VERIFY_EMAIL}
+      title="Verify Your Email"
       description={
-        knowsAddress ? (
+        knownEmail ? (
           <>
-            We sent a code and a confirmation link to{' '}
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-800">{email}</span>
+            Enter the {codeDigits ?? 6}-digit code sent to{' '}
+            <strong className="font-semibold text-slate-900">{knownEmail}</strong> to finish setting up your account.
           </>
         ) : (
           'Enter the address you signed up with and the code from the email.'
         )
       }
       footer={
-        <Link to={ROUTE_PATHS.LOGIN} className={`inline-flex items-center gap-1.5 ${linkClass}`}>
-          <ArrowLeftIcon className="h-4 w-4" />
-          Back to sign in
-        </Link>
+        <>
+          Wrong email address?{' '}
+          <Link to={ROUTE_PATHS.SIGNUP} className={AUTH_LINK_CLASS}>
+            Sign up again
+          </Link>
+          <span className="mx-2 text-slate-300" aria-hidden="true">
+            ·
+          </span>
+          <Link to={ROUTE_PATHS.LOGIN} className={AUTH_LINK_CLASS}>
+            Back to Sign In
+          </Link>
+        </>
       }
     >
-      <form onSubmit={handleConfirm} noValidate className="space-y-6">
+      <form onSubmit={handleConfirm} noValidate className={stack}>
         {notice && <SuccessNotice>{notice}</SuccessNotice>}
         {error && (
           <ErrorBanner
@@ -124,13 +132,14 @@ export default function CheckEmail() {
             }}
           />
         )}
-        <fieldset disabled={isBusy} className="space-y-6">
-          {!knowsAddress && (
+        <fieldset disabled={confirmation.isSubmitting} className={stack}>
+          {!knownEmail && (
             <FormField
+              appearance="auth"
               fieldId="email"
-              label="Email address"
+              label="Email"
               inputType="email"
-              placeholder="you@company.com"
+              placeholder="example@gmail.com"
               fieldValue={email}
               errorMessage={confirmation.fieldErrors.email ?? resend.fieldErrors.email}
               autoCompleteHint="email"
@@ -139,61 +148,39 @@ export default function CheckEmail() {
             />
           )}
           {codeDigits && (
-            <div>
-              <p id={CODE_LABEL_ID} className="mb-2 text-sm font-medium text-slate-700">
-                Confirmation code
-              </p>
-              <VerificationCodeInput
-                length={codeDigits}
-                value={code}
-                onChange={setCode}
-                labelId={CODE_LABEL_ID}
-                hasError={Boolean(confirmation.fieldErrors.code || confirmation.error)}
-                describedBy={confirmation.fieldErrors.code ? 'verification-code-error' : undefined}
-                autoFocus={knowsAddress}
-              />
-              {confirmation.fieldErrors.code && (
-                <p id="verification-code-error" className="mt-2 text-sm text-red-600">
-                  {confirmation.fieldErrors.code}
-                </p>
-              )}
-            </div>
+            <CodeEntry
+              label="Verification Code"
+              length={codeDigits}
+              value={code}
+              onChange={setCode}
+              errorMessage={confirmation.fieldErrors.code}
+              hasError={Boolean(confirmation.error)}
+              secondsLeft={countdown.secondsLeft}
+              onResend={handleResend}
+              isResending={resend.isSubmitting}
+              autoFocus={Boolean(knownEmail)}
+            />
           )}
         </fieldset>
-
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          <span>Didn&apos;t get the email?</span>
-          {countdown.secondsLeft > 0 ? (
-            <span aria-live="polite">
-              Resend in <span className="font-semibold text-brand-700">{formatCountdown(countdown.secondsLeft)}</span>
-            </span>
-          ) : (
-            <button type="button" onClick={handleResend} disabled={isBusy} className={linkClass}>
-              Resend email
-            </button>
-          )}
-        </div>
-
         <SubmitButton
+          appearance="auth"
           isSubmitting={confirmation.isSubmitting}
-          idleLabel="Verify and continue"
+          idleLabel="Verify & Continue"
           loadingLabel="Verifying…"
         />
-
         <div className="grid grid-cols-2 gap-3">
           {MAIL_APPS.map((mailApp) => (
-            <a key={mailApp.href} href={mailApp.href} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
+            <a
+              key={mailApp.href}
+              href={mailApp.href}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+            >
               {mailApp.label}
             </a>
           ))}
         </div>
-
-        <p className="text-center text-sm text-slate-600">
-          Wrong email address?{' '}
-          <Link to={ROUTE_PATHS.SIGNUP} className={linkClass}>
-            Sign up again
-          </Link>
-        </p>
       </form>
     </AuthShell>
   );

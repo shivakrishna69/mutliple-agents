@@ -1,15 +1,15 @@
 /**
- * Register: POST /api/auth/signup { firstName, lastName, email, phoneNumber, password,
- * confirmPassword, acceptTerms }.
+ * Register: POST /api/auth/signup { firstName, lastName, email, phoneCountry, phoneNumber,
+ * dateOfBirth, gender, password, confirmPassword, acceptTerms }.
  *
- *   202  the account waits for its email to be confirmed: on to "check your email" with the
+ *   202  the account waits for its email to be confirmed: on to "verify your email" with the
  *        server's message, the address, the code length and when another email may be asked for
  *   400  the server's message for each field, under that field
  *   429  (another email a moment ago, or too many signups from this network) the server's message
  *
- * The page checks nothing itself: the strength meter and checklist come from the server's password
- * policy, and only the server decides what is acceptable. The terms link to the company's own
- * documents when it has set them (company branding).
+ * The page checks nothing itself: only the server decides what is acceptable. The phone countries,
+ * the starting country, the gender choices and the minimum age come from the server
+ * (GET /api/auth/options); the date of birth is typed as mm/dd/yyyy and sent as YYYY-MM-DD.
  */
 
 import { useState } from 'react';
@@ -17,38 +17,44 @@ import { Link, useNavigate } from 'react-router';
 import { requestSignup } from '../api/authApi.js';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import FormField from '../components/FormField.jsx';
-import { LockIcon, MailIcon, PhoneIcon, UserCircleIcon } from '../components/Icons.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import SubmitButton from '../components/SubmitButton.jsx';
+import { BirthDateField, PhoneNumberField, SelectField } from '../components/auth/AuthFields.jsx';
 import AuthShell from '../components/auth/AuthShell.jsx';
 import { CheckboxField } from '../components/auth/AuthNotices.jsx';
-import PasswordStrength from '../components/auth/PasswordStrength.jsx';
 import TermsAgreement from '../components/auth/TermsAgreement.jsx';
+import { AUTH_SLIDES } from '../constants/authScreens.js';
+import { AUTH_LINK_CLASS } from '../constants/formStyles.js';
 import { BANNER_TITLES } from '../constants/messages.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { useAuthRequest } from '../hooks/useAuthRequest.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
-
-const PASSWORD_REQUIREMENTS_ID = 'signup-password-requirements';
+import { toIsoBirthDate } from '../utils/birthDates.js';
 
 const INITIAL_VALUES = Object.freeze({
   firstName: '',
   lastName: '',
   email: '',
+  phoneCountry: null,
   phoneNumber: '',
+  dateOfBirth: '',
+  gender: '',
   password: '',
   confirmPassword: '',
 });
 
+const fieldGap = 'gap-x-[clamp(0.75rem,1.2vw,1.1rem)] gap-y-[clamp(0.6rem,1.7vh,1rem)]';
+
 export default function Signup() {
   const navigate = useNavigate();
-  const { branding, passwordPolicy } = usePublicAuthSettings();
+  const { branding, options } = usePublicAuthSettings();
   const { run, isSubmitting, error, fieldErrors, clearError } = useAuthRequest();
   const [values, setValues] = useState(INITIAL_VALUES);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const phoneCountry = values.phoneCountry ?? options?.defaultPhoneCountry ?? '';
 
-  const updateField = (changeEvent) =>
-    setValues((previous) => ({ ...previous, [changeEvent.target.name]: changeEvent.target.value }));
+  const setValue = (field) => (value) => setValues((previous) => ({ ...previous, [field]: value }));
+  const updateField = (changeEvent) => setValue(changeEvent.target.name)(changeEvent.target.value);
 
   async function handleSubmit(submitEvent) {
     submitEvent.preventDefault();
@@ -58,7 +64,10 @@ export default function Signup() {
           firstName: values.firstName,
           lastName: values.lastName,
           email: values.email,
+          phoneCountry: phoneCountry || undefined,
           phoneNumber: values.phoneNumber,
+          dateOfBirth: toIsoBirthDate(values.dateOfBirth),
+          gender: values.gender,
           password: values.password,
           confirmPassword: values.confirmPassword,
           acceptTerms,
@@ -78,6 +87,7 @@ export default function Signup() {
 
   const textField = (fieldId, label, props) => (
     <FormField
+      appearance="auth"
       fieldId={fieldId}
       label={label}
       fieldValue={values[fieldId]}
@@ -90,22 +100,19 @@ export default function Signup() {
   return (
     <AuthShell
       branding={branding}
-      activeLink="signup"
-      title="Create your account"
-      description="We will email you a code to confirm your address."
+      slides={AUTH_SLIDES.SIGN_UP}
+      title="Create your Account"
+      description="Create your account to get started"
       footer={
         <>
           Already have an account?{' '}
-          <Link
-            to={ROUTE_PATHS.LOGIN}
-            className="rounded font-semibold text-brand-600 hover:text-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          >
+          <Link to={ROUTE_PATHS.LOGIN} className={AUTH_LINK_CLASS}>
             Sign in
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-[clamp(0.8rem,2.2vh,1.3rem)]">
         {error && (
           <ErrorBanner
             title={BANNER_TITLES.SIGNUP_FAILED}
@@ -114,69 +121,79 @@ export default function Signup() {
             onDismiss={clearError}
           />
         )}
-        <fieldset disabled={isSubmitting} className="space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2">
-            {textField('firstName', 'First name', {
-              placeholder: 'Jane',
-              autoCompleteHint: 'given-name',
-              leadingIcon: <UserCircleIcon className="h-5 w-5" />,
-            })}
-            {textField('lastName', 'Last name', {
-              placeholder: 'Cooper',
-              autoCompleteHint: 'family-name',
-              leadingIcon: <UserCircleIcon className="h-5 w-5" />,
-            })}
-          </div>
-          {textField('email', 'Work email address', {
+        <fieldset disabled={isSubmitting} className={`grid sm:grid-cols-2 ${fieldGap}`}>
+          {textField('firstName', 'First Name', { placeholder: 'First name', autoCompleteHint: 'given-name' })}
+          {textField('lastName', 'Last Name', { placeholder: 'Last name', autoCompleteHint: 'family-name' })}
+          {textField('email', 'Email', {
             inputType: 'email',
-            placeholder: 'you@company.com',
+            placeholder: 'example@gmail.com',
             autoCompleteHint: 'email',
-            leadingIcon: <MailIcon className="h-5 w-5" />,
           })}
-          {textField('phoneNumber', 'Phone number', {
-            inputType: 'tel',
-            placeholder: '98765 43210',
-            autoCompleteHint: 'tel',
-            leadingIcon: <PhoneIcon className="h-5 w-5" />,
-          })}
-          <div>
-            <PasswordField
-              fieldId="password"
-              label="Password"
-              placeholder="Create a strong password"
-              fieldValue={values.password}
-              errorMessage={fieldErrors.password}
-              autoCompleteHint="new-password"
-              describedByIds={passwordPolicy ? [PASSWORD_REQUIREMENTS_ID] : []}
-              leadingIcon={<LockIcon className="h-5 w-5" />}
-              onFieldChange={updateField}
-            />
-            <PasswordStrength
-              password={values.password}
-              passwordPolicy={passwordPolicy}
-              listId={PASSWORD_REQUIREMENTS_ID}
-            />
-          </div>
+          <PhoneNumberField
+            fieldId="phoneNumber"
+            label="Phone Number"
+            countries={options?.phoneCountries ?? []}
+            countryCode={phoneCountry}
+            onCountryChange={setValue('phoneCountry')}
+            value={values.phoneNumber}
+            onChange={setValue('phoneNumber')}
+            errorMessage={fieldErrors.phoneNumber}
+            countryErrorMessage={fieldErrors.phoneCountry}
+          />
+          <BirthDateField
+            fieldId="dateOfBirth"
+            label="Date of Birth"
+            value={values.dateOfBirth}
+            onChange={setValue('dateOfBirth')}
+            minimumAgeYears={options?.minimumSignupAgeYears}
+            errorMessage={fieldErrors.dateOfBirth}
+          />
+          <SelectField
+            fieldId="gender"
+            label="Gender"
+            placeholder="Select gender"
+            choices={options?.genders ?? []}
+            value={values.gender}
+            onChange={setValue('gender')}
+            errorMessage={fieldErrors.gender}
+          />
           <PasswordField
+            appearance="auth"
+            fieldId="password"
+            label="Password"
+            placeholder="Minimum 8 characters"
+            fieldValue={values.password}
+            errorMessage={fieldErrors.password}
+            autoCompleteHint="new-password"
+            onFieldChange={updateField}
+          />
+          <PasswordField
+            appearance="auth"
             fieldId="confirmPassword"
-            label="Confirm password"
-            placeholder="Re-enter your password"
+            label="Confirm Password"
+            placeholder="Confirm password"
             fieldValue={values.confirmPassword}
             errorMessage={fieldErrors.confirmPassword}
             autoCompleteHint="new-password"
-            leadingIcon={<LockIcon className="h-5 w-5" />}
             onFieldChange={updateField}
           />
-          <CheckboxField
-            fieldId="acceptTerms"
-            checked={acceptTerms}
-            onChange={setAcceptTerms}
-            errorMessage={fieldErrors.acceptTerms}
-          >
-            <TermsAgreement branding={branding} />
-          </CheckboxField>
+          <div className="sm:col-span-2">
+            <CheckboxField
+              fieldId="acceptTerms"
+              checked={acceptTerms}
+              onChange={setAcceptTerms}
+              errorMessage={fieldErrors.acceptTerms}
+            >
+              <TermsAgreement branding={branding} />
+            </CheckboxField>
+          </div>
         </fieldset>
-        <SubmitButton isSubmitting={isSubmitting} idleLabel="Create account" loadingLabel="Creating account…" />
+        <SubmitButton
+          appearance="auth"
+          isSubmitting={isSubmitting}
+          idleLabel="Create Account"
+          loadingLabel="Creating account…"
+        />
       </form>
     </AuthShell>
   );
