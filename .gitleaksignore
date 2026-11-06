@@ -1,0 +1,6 @@
+# Findings that are not secrets, by gitleaks fingerprint (commit:file:rule:line). Each entry names
+# one exact past occurrence; anything new is still reported.
+#
+# A deliberately wrong placeholder key in a test of the internal API key check; the test now builds
+# it at run time (ai-service/tests/test_knowledge_api.py, WRONG_KEY).
+409da6d4c576d58a1ec784d6482365b8af482000:ai-service/tests/test_knowledge_api.py:generic-api-key:42

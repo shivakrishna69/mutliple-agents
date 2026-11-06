@@ -14,6 +14,8 @@ from app.main import app
 from tests.conftest import TEST_INTERNAL_API_KEY
 
 AUTHORISED = {"X-Internal-Api-Key": TEST_INTERNAL_API_KEY}
+# A wrong key of the right length, built here so no key-like text sits in the source.
+WRONG_KEY = "x" * len(TEST_INTERNAL_API_KEY)
 DOCUMENT_ID = "65f1a2b3c4d5e6f708192a3b"
 VALID_BATCH = {
     "company_id": "65f1a2b3c4d5e6f708192a00",
@@ -39,7 +41,7 @@ def with_chunks(chunks):
 
 
 @pytest.mark.parametrize("path", ["/ai/knowledge/chunks", "/ai/knowledge/documents/remove"])
-@pytest.mark.parametrize("headers", [{}, {"X-Internal-Api-Key": "wrong-key-of-the-same-length-0123456789"}])
+@pytest.mark.parametrize("headers", [{}, {"X-Internal-Api-Key": WRONG_KEY}])
 def test_knowledge_endpoints_require_the_internal_api_key(client, path, headers):
     response = client.post(path, json=VALID_BATCH, headers=headers)
     assert response.status_code == 401
