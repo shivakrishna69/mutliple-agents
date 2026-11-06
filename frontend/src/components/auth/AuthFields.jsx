@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AUTH_LINK_CLASS, FIELD_APPEARANCES } from '../../constants/formStyles.js';
 import { formatCountdown } from '../../hooks/useCountdown.js';
 import VerificationCodeInput from './VerificationCodeInput.jsx';
@@ -176,49 +177,57 @@ export function PhoneNumberField({
       </div>
       <FieldError id={errorId} message={shownError} />
 
-      {isOpen && position && (
-        <div
-          data-country-list={listId}
-          style={position}
-          className="auth-rise z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-blue-900/15"
-        >
-          <div className="flex items-center gap-2 border-b border-slate-100 px-3">
-            <SearchIcon className="h-4 w-4 text-slate-400" />
-            <input
-              ref={searchRef}
-              type="search"
-              value={search}
-              onChange={(changeEvent) => setSearch(changeEvent.target.value)}
-              onKeyDown={(keyEvent) => {
-                if (keyEvent.key === 'Enter' && matches[0]) {
-                  keyEvent.preventDefault();
-                  choose(matches[0].code);
-                }
-              }}
-              placeholder="Search country or code"
-              aria-label="Search countries"
-              className="h-10 w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
-            />
-          </div>
-          <ul id={listId} role="listbox" aria-label="Countries" className="max-h-60 overflow-y-auto py-1">
-            {matches.map((candidate) => (
-              <li key={candidate.code} role="option" aria-selected={candidate.code === countryCode}>
-                <button
-                  type="button"
-                  onClick={() => choose(candidate.code)}
-                  className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-brand-50 focus-visible:bg-brand-50 focus-visible:outline-none ${
-                    candidate.code === countryCode ? 'font-semibold text-brand-700' : 'text-slate-700'
-                  }`}
-                >
-                  <Flag code={candidate.code} />
-                  <span className="flex-1 truncate">{candidate.name}</span>
-                  <span className="text-slate-400 tabular-nums">+{candidate.callingCode}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/*
+        The list is drawn on the page itself (a portal into <body>), not inside the form: the form's
+        entrance animation leaves a transform on it, and a transformed ancestor would make the
+        list's fixed position relative to the form instead of the window. auth-theme keeps it blue.
+      */}
+      {isOpen &&
+        position &&
+        createPortal(
+          <div
+            data-country-list={listId}
+            style={position}
+            className="auth-theme z-50 overflow-hidden rounded-xl border border-slate-200 bg-white font-sans shadow-2xl shadow-blue-900/15"
+          >
+            <div className="flex items-center gap-2 border-b border-slate-100 px-3">
+              <SearchIcon className="h-4 w-4 text-slate-400" />
+              <input
+                ref={searchRef}
+                type="search"
+                value={search}
+                onChange={(changeEvent) => setSearch(changeEvent.target.value)}
+                onKeyDown={(keyEvent) => {
+                  if (keyEvent.key === 'Enter' && matches[0]) {
+                    keyEvent.preventDefault();
+                    choose(matches[0].code);
+                  }
+                }}
+                placeholder="Search country or code"
+                aria-label="Search countries"
+                className="h-10 w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+              />
+            </div>
+            <ul id={listId} role="listbox" aria-label="Countries" className="max-h-60 overflow-y-auto py-1">
+              {matches.map((candidate) => (
+                <li key={candidate.code} role="option" aria-selected={candidate.code === countryCode}>
+                  <button
+                    type="button"
+                    onClick={() => choose(candidate.code)}
+                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-brand-50 focus-visible:bg-brand-50 focus-visible:outline-none ${
+                      candidate.code === countryCode ? 'font-semibold text-brand-700' : 'text-slate-700'
+                    }`}
+                  >
+                    <Flag code={candidate.code} />
+                    <span className="flex-1 truncate">{candidate.name}</span>
+                    <span className="text-slate-400 tabular-nums">+{candidate.callingCode}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
