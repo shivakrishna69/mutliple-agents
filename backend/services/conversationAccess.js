@@ -20,6 +20,17 @@ export function isStaffRole(role) {
   return STAFF_ROLES.includes(role);
 }
 
+/** MongoDB filter for the conversations a user may list (mirrors canUserAccessConversation). */
+export function buildVisibleConversationFilter(user) {
+  if (user.role === ROLES.ADMIN) return {};
+  if (user.role === ROLES.AGENT) {
+    return {
+      $or: [{ assignedAgentId: user.id }, { status: CONVERSATION_STATUS.ESCALATED_TO_HUMAN, assignedAgentId: null }],
+    };
+  }
+  return { customerId: user.id };
+}
+
 /**
  * @param {{ id: string, role: string }} user  Public profile (req.user / socket.data.user).
  * @param {{ customerId: unknown, assignedAgentId: unknown, status: string }} conversationAccessFields

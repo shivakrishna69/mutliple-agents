@@ -191,3 +191,16 @@ export function zonedLocalTimeToInstant(calendarDate, localTime, timeZone) {
     roundTrip.calendarDate === calendarDate && roundTrip.minutesSinceMidnight === hours * 60 + minutes;
   return isExactRoundTrip ? instant : null;
 }
+
+/**
+ * The first instant of `calendarDate` in `timeZone`: local midnight, or 01:00 where a
+ * daylight-saving change skips midnight.
+ * @param {string} calendarDate  "YYYY-MM-DD"
+ * @param {string} timeZone      IANA zone
+ * @returns {Date}
+ */
+export function localDayStart(calendarDate, timeZone) {
+  return (
+    zonedLocalTimeToInstant(calendarDate, '00:00', timeZone) ?? zonedLocalTimeToInstant(calendarDate, '01:00', timeZone)
+  );
+}

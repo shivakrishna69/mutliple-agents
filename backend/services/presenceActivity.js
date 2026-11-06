@@ -15,7 +15,12 @@ import { PRESENCE_MESSAGES } from '../constants/messages.js';
 import PresenceDaySummary from '../models/PresenceDaySummary.js';
 import PresenceInterval from '../models/PresenceInterval.js';
 import { addDaysToCalendarDate } from '../utils/calendarDates.js';
-import { readOfficeLocalClock, workedMinutesBetween, zonedLocalTimeToInstant } from './attendancePolicy.js';
+import {
+  localDayStart,
+  readOfficeLocalClock,
+  workedMinutesBetween,
+  zonedLocalTimeToInstant,
+} from './attendancePolicy.js';
 import { loadAttendanceDays, TODAY_STATUSES } from './attendanceToday.js';
 import { loadCurrentPresence, PRESENCE_STATUSES } from './presence.js';
 import { summarizePresenceDay } from './presenceMetrics.js';
@@ -38,10 +43,7 @@ const timeZoneOf = (person, companyTimeZone) => person.office?.timeZone ?? compa
 
 /** The day's first and next day's first instant in the zone (01:00 where midnight is skipped). */
 function dayBounds(date, timeZone) {
-  const startOf = (calendarDate) =>
-    zonedLocalTimeToInstant(calendarDate, '00:00', timeZone) ??
-    zonedLocalTimeToInstant(calendarDate, '01:00', timeZone);
-  return { dayStart: startOf(date), dayEnd: startOf(addDaysToCalendarDate(date, 1)) };
+  return { dayStart: localDayStart(date, timeZone), dayEnd: localDayStart(addDaysToCalendarDate(date, 1), timeZone) };
 }
 
 /**
