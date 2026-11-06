@@ -1,7 +1,8 @@
 /**
  * Signup with email confirmation, and password reset (rules in services/accountEmailFlows.js).
  *
- *   POST /api/auth/signup   { firstName, lastName, email, phoneNumber, password, acceptTerms }
+ *   POST /api/auth/signup   { firstName, lastName, email, phoneCountry, phoneNumber, dateOfBirth, gender,
+ *                             password, confirmPassword, acceptTerms }
  *                                                                  202: check your email
  *   POST /api/auth/verify-email/resend    { email }                  202: a new link if one is due
  *   POST /api/auth/verify-email   { token } or { email, code }       200: confirmed and signed in

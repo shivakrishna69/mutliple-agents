@@ -56,9 +56,8 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     assert.equal(stored.phoneVerifiedAt, null);
     assert.equal(stored.termsVersion, TERMS_VERSION);
     assert.ok(stored.termsAcceptedAt instanceof Date);
-    // The sign-up screen live today sends no date of birth or gender, and must keep working.
-    assert.equal(stored.dateOfBirth, null);
-    assert.equal(stored.gender, null);
+    assert.equal(stored.dateOfBirth.toISOString(), '1990-05-17T00:00:00.000Z');
+    assert.equal(stored.gender, 'prefer_not_to_say');
   });
 
   it('stores the date of birth, gender and a phone number of the picked country', async () => {
@@ -83,6 +82,8 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
       lastName: VALIDATION_MESSAGES.LAST_NAME_REQUIRED,
       email: VALIDATION_MESSAGES.EMAIL_REQUIRED,
       phoneNumber: VALIDATION_MESSAGES.PHONE_REQUIRED,
+      dateOfBirth: VALIDATION_MESSAGES.BIRTH_DATE_REQUIRED,
+      gender: VALIDATION_MESSAGES.GENDER_REQUIRED,
       password: VALIDATION_MESSAGES.PASSWORD_REQUIRED,
       confirmPassword: VALIDATION_MESSAGES.CONFIRM_PASSWORD_REQUIRED,
       acceptTerms: VALIDATION_MESSAGES.TERMS_NOT_ACCEPTED,
@@ -147,7 +148,7 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
       rememberedSessionDays: 30,
       verificationCodeDigits: 6,
       passwordResetLinkMinutes: 15,
-      birthDateAndGenderRequired: false,
+      birthDateAndGenderRequired: true,
       minimumSignupAgeYears: 18,
       genders: [
         { value: 'male', label: 'Male' },
