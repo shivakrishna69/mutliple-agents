@@ -51,6 +51,8 @@ scripts/         operational scripts
 | `/api/presence` | my presence setup and notice, who is available/away/offline now, daily active hours | everyone (own) / managers / HR |
 | `/api/payroll` | tax estimates, payslips, public payslip verification | employees / HR |
 | `/api/analytics` | workforce attrition and burnout | HR, admin |
+| `/api/dashboard` | the dashboard, in sections by role | signed in (sections by role) |
+| `/api/system` | the health of the AI service, email, database and cache | admin |
 | `/api/okrs` | objectives, key results, milestones | employees with a profile |
 | `/api/vault` | employee documents | owner / HR / admin |
 | `/api/org` | org chart and reporting lines | staff |
@@ -62,6 +64,32 @@ scripts/         operational scripts
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
 | `/api/leave` | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export | HR, admin manage / employees their own / reporting managers decide their team's requests |
 | `/api/internal` | calls from the AI service | internal API key |
+
+## Dashboard and service health
+
+`GET /api/dashboard/overview?range=today|7d|30d` (default `today`) returns the signed-in person's
+dashboard in sections. Each section is built only for the roles allowed to see it; the others are
+`null` (`services/dashboardOverview.js`):
+
+| Section | Roles | Contents |
+|---|---|---|
+| `people` | HR, admin | attendance today (same counts as `/api/attendance/today`), presence now (`null` when switched off), leave requests and changes the viewer can decide, attendance corrections pending, headcount by department and joiners this month, the next 3 holidays |
+| `support` | admin, agent | the queue now (waiting for an agent, assigned to you, with agents, with the AI); over the conversations opened in the range: share handled by the AI alone, escalation share, average first response, share within the target (`DASHBOARD_SETTINGS.FIRST_RESPONSE_TARGET_MS`, 60 s), median AI reply time; the change from the same stretch of the previous period; AI and agent replies per local hour (today) or day; the newest conversations the viewer may see |
+| `accounts` | admin | accounts per role, new in the last 7 days, unconfirmed |
+| `me` | anyone with an employee profile | today's attendance and punch, leave balances, pending leave requests, latest payslip, next holiday |
+
+- **Ranges are in the company's time zone** (`services/dashboardRange.js`): "today" starts at the
+  company's midnight even while the server's UTC date is still yesterday, and the chart groups
+  replies by local hour or day.
+- **Nothing is estimated.** A figure with nothing to measure is `null`; shares are fractions 0..1,
+  durations whole milliseconds. AI replies are `ai_supervisor` and `ai_worker` messages, agent
+  replies `human_agent`.
+
+`GET /api/system/health` (admins only) checks the AI service (`/health` within 2 s; 503 means
+degraded), email (an SMTP check, reused for 5 minutes), the database (ping) and the cache (Redis ping
+or in-memory). Each is `operational`, `degraded`, `down` or `not_configured`, with its response
+time; `overall` is down when the database is. Only states and timings are returned, never hosts,
+addresses or error texts.
 
 ## Signup, email confirmation and password reset
 
