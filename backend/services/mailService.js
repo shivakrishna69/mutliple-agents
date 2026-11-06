@@ -69,6 +69,25 @@ export async function sendMail({ to, subject, html, text }) {
   }
 }
 
+/**
+ * Whether the mail server accepts a connection and (when set) our login, for the health check.
+ * Opens one SMTP connection: callers cache the answer (services/systemHealth.js). Never throws.
+ * @returns {Promise<{ configured: boolean, reachable: boolean }>}
+ */
+export async function checkMailConnection() {
+  if (!mailTransport) return { configured: false, reachable: false };
+  try {
+    await mailTransport.verify();
+    return { configured: true, reachable: true };
+  } catch (verifyError) {
+    logger.warn('Email server check failed', {
+      code: verifyError.code ?? null,
+      responseCode: verifyError.responseCode ?? null,
+    });
+    return { configured: true, reachable: false };
+  }
+}
+
 export function closeMailService() {
   mailTransport?.close();
   mailTransport = null;

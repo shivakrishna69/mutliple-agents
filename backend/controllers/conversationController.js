@@ -28,7 +28,11 @@ import Message, { SENDER_TYPE } from '../models/Message.js';
 import User, { ROLES } from '../models/User.js';
 import { CONVERSATION_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { canUserAccessConversation, isStaffRole } from '../services/conversationAccess.js';
+import {
+  buildVisibleConversationFilter,
+  canUserAccessConversation,
+  isStaffRole,
+} from '../services/conversationAccess.js';
 import { publishMessage, touchConversation, updateConversationWithRetry } from '../services/conversationState.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { logger } from '../utils/logger.js';
@@ -52,17 +56,6 @@ const CONVERSATION_ACCESS_FIELDS = '_id customerId assignedAgentId status curren
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** MongoDB filter for the conversations a user may list (mirrors canUserAccessConversation). */
-function buildVisibleConversationFilter(user) {
-  if (user.role === ROLES.ADMIN) return {};
-  if (user.role === ROLES.AGENT) {
-    return {
-      $or: [{ assignedAgentId: user.id }, { status: CONVERSATION_STATUS.ESCALATED_TO_HUMAN, assignedAgentId: null }],
-    };
-  }
-  return { customerId: user.id };
-}
 
 function toCustomerSummary(customerRecord) {
   return customerRecord
