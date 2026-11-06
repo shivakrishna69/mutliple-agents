@@ -101,6 +101,15 @@ class Settings:
     # where customers would receive invented ledger and log data as fact.
     simulated_tools_enabled: bool
 
+    # Department knowledge index (app/knowledge/). None disables it: its endpoints answer 503.
+    qdrant_url: str | None
+    qdrant_api_key: str | None
+    qdrant_timeout_seconds: int
+    # Where the embedding model is kept; EMBEDDING_OFFLINE forbids downloading it at run time
+    # (required in production, where the image carries the model).
+    embedding_cache_dir: str | None
+    embedding_offline: bool
+
     # Conversation memory bounds (see agent.ThreadRegistry).
     max_context_messages: int
     thread_idle_ttl_seconds: int
@@ -171,6 +180,24 @@ class Settings:
             raise ConfigurationError("AGENT_TELEMETRY_ENABLED requires BACKEND_INTERNAL_URL")
         agent_telemetry_enabled = backend_internal_url is not None and agent_telemetry_setting != "false"
 
+        qdrant_url = os.getenv("QDRANT_URL", "").strip().rstrip("/") or None
+        qdrant_api_key = os.getenv("QDRANT_API_KEY", "").strip() or None
+        if qdrant_url is not None:
+            if not qdrant_url.startswith(("http://", "https://")):
+                raise ConfigurationError("QDRANT_URL must start with http:// or https://")
+            if qdrant_api_key is None or len(qdrant_api_key) < MIN_SECRET_LENGTH:
+                raise ConfigurationError(
+                    f"QDRANT_API_KEY is required with QDRANT_URL and must be at least {MIN_SECRET_LENGTH} characters"
+                )
+        embedding_offline_setting = os.getenv("EMBEDDING_OFFLINE", "").strip().lower()
+        if embedding_offline_setting not in {"", "true", "false"}:
+            raise ConfigurationError('EMBEDDING_OFFLINE must be "true" or "false"')
+        embedding_offline = embedding_offline_setting == "true"
+        if environment == "production" and qdrant_url is not None and not embedding_offline:
+            raise ConfigurationError(
+                "EMBEDDING_OFFLINE must be true in production: the embedding model is built into the image"
+            )
+
         return cls(
             environment=environment,
             log_level=log_level,
@@ -192,4 +219,9 @@ class Settings:
             thread_idle_ttl_seconds=_read_int("THREAD_IDLE_TTL_SECONDS", 7200, 60, 7 * 24 * 3600),
             max_tracked_threads=_read_int("MAX_TRACKED_THREADS", 1000, 1, 100_000),
             compact_thread_after_turns=_read_int("COMPACT_THREAD_AFTER_TURNS", 10, 1, 1000),
+            qdrant_url=qdrant_url,
+            qdrant_api_key=qdrant_api_key,
+            qdrant_timeout_seconds=_read_int("QDRANT_TIMEOUT_SECONDS", 10, 1, 60),
+            embedding_cache_dir=os.getenv("EMBEDDING_CACHE_DIR", "").strip() or None,
+            embedding_offline=embedding_offline,
         )

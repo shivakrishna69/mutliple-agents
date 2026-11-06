@@ -173,11 +173,31 @@ jobs:
     name: AI service
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # For tests/test_knowledge_index.py: the same Qdrant version as the compose files.
+      qdrant:
+        image: qdrant/qdrant:v1.20.0
+        ports:
+          - 6333:6333
+        env:
+          QDRANT__SERVICE__API_KEY: ci-only-qdrant-key-0123456789abcdef
+          QDRANT__TELEMETRY_DISABLED: "true"
+    env:
+      # The knowledge index tests fail instead of skipping when Qdrant is unreachable in CI.
+      CI: "true"
+      TEST_QDRANT_URL: http://127.0.0.1:6333
+      TEST_QDRANT_API_KEY: ci-only-qdrant-key-0123456789abcdef
+      TEST_EMBEDDING_CACHE_DIR: ${{ github.workspace }}/.embedding-model
     defaults:
       run:
         working-directory: ai-service
     steps:
       - uses: actions/checkout@v4
+      # The embedding model (about 65 MB) is downloaded once per version of its pinned files.
+      - uses: actions/cache@v4
+        with:
+          path: .embedding-model
+          key: embedding-model-${{ hashFiles('ai-service/app/knowledge/embedding_model.sha256') }}
       - uses: actions/setup-python@v5
         with:
           # Same version as the Docker image (python:3.11-slim).
@@ -214,6 +234,8 @@ jobs:
             echo "MAIL_FROM=CI <ci@example.com>"
           } > "$BACKEND_ENV_FILE"
           touch "$AI_SERVICE_ENV_FILE"
+          # Compose passes it to Qdrant and the AI service.
+          echo "QDRANT_API_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - run: docker compose --profile mail config --quiet
       # The AI service is left out: without a Groq key it reports itself unhealthy by design, and
       # nothing the web stack needs depends on it.
@@ -281,7 +303,8 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' APP_DOMAIN=ci.example.com ACME_EMAIL=ci@example.com MONGO_ROOT_USERNAME=nsk \
-            "MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)" "REDIS_PASSWORD=$(openssl rand -hex 24)" > "$STACK_ENV_FILE"
+            "MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)" "REDIS_PASSWORD=$(openssl rand -hex 24)" \
+            "QDRANT_API_KEY=$(openssl rand -hex 32)" > "$STACK_ENV_FILE"
           touch "$BACKEND_ENV_FILE" "$AI_SERVICE_ENV_FILE"
           docker compose -f docker-compose.prod.yml --env-file "$STACK_ENV_FILE" config --quiet
       - name: Check the Caddy configuration

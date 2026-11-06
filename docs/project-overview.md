@@ -315,7 +315,7 @@ Testing approach used so far: end-to-end scripts against an isolated backend and
 - No separate **employee** role (employees use `customer`).
 - Rate limiter and caches are **in-memory**: Redis is needed before running more than one backend instance.
 - Vault and payslip PDFs need **S3** configured; signup and password reset need **SMTP** (without it they answer 503), and invitations need it to send real email.
-- No retrieval (vector) store yet; the telemetry console already displays retrieval confidence when one is added.
+- Department knowledge bases are indexed (Qdrant), but no agent answers from them yet; the telemetry console already displays retrieval confidence for when one does.
 
 ---
 
@@ -328,7 +328,7 @@ Testing approach used so far: end-to-end scripts against an isolated backend and
 5. **Smart OKRs**: AI-drafted key results, trajectory forecasts, WhatsApp check-in reminders.
 6. **One-click payroll run** with attendance/leave-linked deductions, automatic payslip delivery, a tax-saving assistant, compliance calendar.
 7. **Onboarding autopilot**: checklists, document requests, buddy assignment, AI-generated offer letters through the existing PDF pipeline.
-8. **"Ask HR" policy assistant** (retrieval over company policies, Redis vector search).
+8. **"Ask HR" policy assistant and department agents** answering from the department knowledge bases (ingestion and the Qdrant index are done).
 9. **Voice attendance via Twilio** for workers without smartphones.
 10. **Attendance fraud detection** (shared devices, impossible GPS jumps, geofence-edge patterns).
 11. **No-code automation rules** ("late 3× in a week → notify manager").

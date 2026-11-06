@@ -79,3 +79,4 @@ desktop.ini
 
 # Local demo-data seeding (placeholder data, not part of the product)
 backend/scripts/seedDemoData.js
+.embedding-model/

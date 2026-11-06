@@ -7,18 +7,22 @@ AWS (EC2) and Oracle Cloud.
 
 ```
 browser ──https──► Caddy (certificates) ──► nginx (the web app) ──► backend ──► MongoDB, Redis
-                                                                       ▲
-                                                     AI service ───────┘ (over https, inside the server)
+                                                                       ▲   │
+                                                     AI service ───────┘◄──┘ (inside the server)
+                                                         │
+                                                         ▼
+                                                      Qdrant (department knowledge index)
 ```
 
 | File | What it is |
 |---|---|
-| `docker-compose.prod.yml` | the production stack: MongoDB and Redis with passwords, backend, AI service, web app, Caddy |
+| `docker-compose.prod.yml` | the production stack: MongoDB and Redis with passwords, Qdrant with an API key, backend, AI service, web app, Caddy |
 | `deploy/Caddyfile` | HTTPS for your domain with a free Let's Encrypt certificate |
 | `deploy/setup-server.sh` | prepares a fresh server once |
 | `deploy/deploy.sh` | deploys one commit; starts the previous one again if the new one is not healthy |
 | `deploy/auto-deploy.sh` | runs on the server every 2 minutes: deploys a new commit of `main` once CI has passed on it |
 | `deploy/backup-mongo.sh` | the nightly database backup |
+| `deploy/stack-settings.sh` | the settings generated on the server (the Qdrant key), added to `stack.env` by the setup script and by every deploy, never changed once there |
 
 Secrets never go into the repository or GitHub: the setup script generates them on the server, in
 `/etc/nsk/`, readable only by the login user. The server pulls new versions itself, so GitHub holds
@@ -48,7 +52,9 @@ The file without `.pub` is private: never share it or commit it.
    only (`<your ip>/32`); HTTP (TCP 80) and HTTPS (TCP 443) from `0.0.0.0/0` and `::/0`.
 3. **EC2 → Launch instance**:
    - Image: Ubuntu Server 24.04 LTS (64-bit Arm for `t4g`, x86 for `t3`)
-   - Type: `t4g.small` (2 GB) is enough for a small company; `t4g.medium` (4 GB) for more people
+   - Type: `t4g.small` (2 GB) runs the stack with the setup script's swap; `t4g.medium` (4 GB) gives room
+     for more people and for indexing knowledge documents (the AI service uses about 300 MB more once
+     its embedding model is loaded, Qdrant about 80 MB plus its data)
    - Key pair and security group: the two above
    - Storage: 30 GB gp3, encrypted
    - Advanced details: credit specification **Standard** (`Unlimited`, the default for T types,
@@ -129,7 +135,7 @@ All commands on the server, as `ubuntu`, from `/opt/nsk`:
 ```
 alias nsk='docker compose -f /opt/nsk/docker-compose.prod.yml --env-file /etc/nsk/stack.env'
 nsk ps                      # what is running, and whether it is healthy
-nsk logs -f backend         # follow a service's log (backend, ai-service, frontend, caddy, mongo)
+nsk logs -f backend         # follow a service's log (backend, ai-service, qdrant, frontend, caddy, mongo)
 nsk restart backend         # restart one service
 deploy/deploy.sh main       # deploy the latest main by hand
 deploy/deploy.sh <commit>   # go back to an earlier commit of main
@@ -138,6 +144,16 @@ deploy/deploy.sh <commit>   # go back to an earlier commit of main
 **Changing settings** (email, Groq key...): edit the file in `/etc/nsk/` (`backend.env`,
 `ai-service.env`), then `nsk up -d` to restart with them. `backend/.env.example` and
 `ai-service/.env.example` list every setting.
+
+**Department knowledge bases** need nothing to set up: Qdrant runs in the stack, reachable only inside it (no published port), used by
+the AI service, with the key `QDRANT_API_KEY` from `/etc/nsk/stack.env`, generated on the server.
+A server set up before Qdrant was added gets the key on its next deploy (`deploy/stack-settings.sh`),
+except for the first deploy of that version, which the previous `deploy.sh` runs: add the key once
+by hand before it, or that deploy fails and the previous version keeps running:
+
+```
+grep -q '^QDRANT_API_KEY=' /etc/nsk/stack.env || echo "QDRANT_API_KEY=$(openssl rand -hex 32)" | sudo tee -a /etc/nsk/stack.env >/dev/null
+```
 
 **Email** (signup confirmation, password reset, invitations, leave notices): set `SMTP_HOST`,
 `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM` in `/etc/nsk/backend.env` (the file has
@@ -149,6 +165,15 @@ Every night at 21:00 UTC the database is dumped to `/var/backups/nsk/` and dumps
 days are deleted. `sudo systemctl start nsk-backup` makes one now; `systemctl list-timers nsk-backup`
 shows the next run. **Copy them off the server too** (for example, download them regularly with
 `scp`): a backup on the same disk is lost with the server.
+
+The knowledge index (Qdrant's `qdrant-data` volume) is not backed up: every chunk can be rebuilt
+from the documents, which are in the database. After restoring a backup, or if Qdrant lost its data,
+index everything again; the backend reads and indexes the documents within a minute or so each:
+
+```
+nsk exec backend node scripts/reindexKnowledge.js            # every department
+nsk exec backend node scripts/reindexKnowledge.js <id>       # one department
+```
 
 To restore one (this replaces the current data):
 
@@ -168,3 +193,8 @@ nsk exec -T mongo mongorestore --username "$MONGO_ROOT_USERNAME" --password "$MO
 - **A merge was not deployed**: `journalctl -u nsk-deploy` says whether it is waiting for CI, CI
   failed, or the deploy failed.
 - **The AI service is unhealthy**: the Groq key in `/etc/nsk/ai-service.env` is missing or wrong.
+- **Knowledge documents stay waiting or fail with "the knowledge index could not be reached"**:
+  `nsk logs ai-service` and `nsk logs qdrant`. Once both are up, re-index the failed ones
+  (`nsk exec backend node scripts/reindexKnowledge.js`).
+- **A deploy failed with "set QDRANT_API_KEY in the stack settings"**: add the key (see
+  Department knowledge bases above) and deploy again.

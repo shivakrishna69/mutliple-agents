@@ -499,3 +499,58 @@ export const OFFER_LETTER_PROTECTION = Object.freeze({
   PASSWORD_FORMAT_LABEL: 'DDMMYYYY',
   QPDF_TIMEOUT_MS: 30_000,
 });
+
+/**
+ * Department knowledge bases (models/DepartmentAgent.js, models/AgentDocument.js,
+ * services/knowledge/*): what a department lead may upload and how documents are processed.
+ */
+export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
+  AGENT_NAME_MAX_LENGTH: 120,
+  // Department instructions for the agent; long enough for detailed guidelines, short enough to
+  // leave most of the model's context for the department's documents.
+  SYSTEM_PROMPT_MAX_LENGTH: 4_000,
+  MAX_FILE_BYTES: 10 * 1024 * 1024,
+  // The file types a knowledge base accepts: media type → extension. The type is decided from the
+  // file's content (services/knowledge/fileTypes.js), never from what the browser declared.
+  FILE_TYPES: Object.freeze({
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'text/markdown': 'md',
+    'text/plain': 'txt',
+  }),
+  // A .docx is a zip: its parts may hold at most this much once unpacked, in at most this many
+  // entries, so a small "zip bomb" cannot exhaust the server's memory.
+  DOCX_MAX_UNPACKED_BYTES: 50 * 1024 * 1024,
+  DOCX_MAX_ENTRIES: 2_000,
+  // Bounds on the work one document may cause: pages read from a PDF, and text kept from any file.
+  PDF_MAX_PAGES: 1_000,
+  EXTRACTED_TEXT_MAX_CHARS: 5_000_000,
+  // Reading a file runs in its own thread (services/knowledge/extractionThread.js), stopped when it
+  // takes longer than this or needs more memory, so a hostile file cannot stall or exhaust the API.
+  EXTRACTION_TIMEOUT_MS: 60_000,
+  EXTRACTION_MAX_HEAP_MB: 256,
+  // Chunks: about this long (a few paragraphs), never longer than CHUNK_MAX_CHARS (within the
+  // embedding model's 512-token input), each starting with the end of the previous one in the
+  // same section, so a sentence cut at a boundary is still found whole.
+  CHUNK_TARGET_CHARS: 1_200,
+  CHUNK_MAX_CHARS: 1_800,
+  CHUNK_OVERLAP_CHARS: 200,
+  // A heading kept with a chunk is cut to this length (the AI service accepts up to 500 characters).
+  HEADING_MAX_CHARS: 300,
+  // Chunks sent to the AI service per indexing request: at most about 30 KB of text, well inside
+  // the 1 MB request cap of services/aiServiceClient.js. Embedding 32 chunks of the largest size
+  // took about 5 s on a desktop CPU, so 16 keeps a request within AI_SERVICE_TIMEOUT_MS on a small
+  // 2-vCPU server.
+  INDEX_BATCH_SIZE: 16,
+  ORIGINAL_NAME_MAX_LENGTH: 255,
+  MAX_DOCUMENTS_PER_DEPARTMENT: 200,
+  MAX_CHUNKS_PER_DOCUMENT: 2_000,
+  // A failed document keeps this much of the reason, for the lead to read.
+  ERROR_MESSAGE_MAX_LENGTH: 500,
+  // A worker holds a document for this long while it processes it; a stopped worker's document
+  // is picked up again by the sweep once its lease runs out.
+  LEASE_MS: 5 * 60 * 1000,
+  SWEEP_INTERVAL_MS: 30 * 1000,
+  // Processing attempts before a document is marked FAILED.
+  MAX_ATTEMPTS: 3,
+});

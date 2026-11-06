@@ -5,12 +5,13 @@
 #   docker compose -f docker-compose.prod.yml --env-file /etc/nsk/stack.env up --detach --build --wait
 #
 # Settings live on the server, outside the checkout, and are never committed:
-#   /etc/nsk/stack.env       APP_DOMAIN, ACME_EMAIL and the database and Redis passwords (used below)
+#   /etc/nsk/stack.env       APP_DOMAIN, ACME_EMAIL, the database and Redis passwords and the Qdrant
+#                            API key (used below)
 #   /etc/nsk/backend.env     the backend's secrets and options (JWT_SECRET, SMTP_*, ...)
 #   /etc/nsk/ai-service.env  the AI service's (AI_SERVICE_API_KEY, GROQ_API_KEY, ...)
 #
-# Only Caddy publishes ports (80 and 443). MongoDB and Redis require passwords and are reachable only
-# inside the compose network. Images are built on the server, so they match its CPU (Oracle's ARM).
+# Only Caddy publishes ports (80 and 443). MongoDB, Redis and Qdrant require passwords or keys and are
+# reachable only inside the compose network. Images are built on the server, so they match its CPU (Oracle's ARM).
 
 name: nsk
 
@@ -96,8 +97,34 @@ services:
       # Production requires https here. APP_DOMAIN resolves to Caddy inside this network (its alias
       # below), so these calls are encrypted and never leave the server.
       BACKEND_INTERNAL_URL: https://${APP_DOMAIN}
+      # The department knowledge index (Qdrant below), reached only inside this network.
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+    depends_on:
+      qdrant:
+        condition: service_started
     read_only: true
     tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # Vector index of the department knowledge bases (ai-service/app/knowledge/). Every chunk can be
+  # rebuilt from the documents in MongoDB, so its data is not part of the database backup. The
+  # image has no shell tools for a health check; the AI service creates its collection on first use
+  # and answers 503 until Qdrant is up, which the backend retries.
+  qdrant:
+    image: qdrant/qdrant:v1.20.0-unprivileged
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?set QDRANT_API_KEY in the stack settings (deploy/setup-server.sh adds it)}
+      QDRANT__TELEMETRY_DISABLED: "true"
+      QDRANT__LOG_LEVEL: WARN
+    volumes:
+      - qdrant-data:/qdrant/storage
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /qdrant/snapshots:uid=1000,gid=1000
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
@@ -139,5 +166,6 @@ services:
 
 volumes:
   mongo-data:
+  qdrant-data:
   caddy-data:
   caddy-config:

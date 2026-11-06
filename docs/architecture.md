@@ -14,19 +14,19 @@ them. For the full feature and API inventory see [project-overview.md](project-o
     │   • all business rules live here               • optional S3 (vault files, payslip PDFs)
     │   • internal API for the AI service            • optional SMTP (invitation emails)
     │
-    │  POST /ai/process, /ai/attendance/regularize   (X-Internal-Api-Key)
+    │  POST /ai/process, /ai/attendance/regularize, /ai/knowledge/...   (X-Internal-Api-Key)
     ▼
  AI service (Python FastAPI + LangGraph + Groq, :8000, runs in Docker)
     │  calls back: POST /api/internal/...   (attendance writes, telemetry events)
-    ▼
- Groq LLM API
+    ├──► Groq LLM API
+    └──► Qdrant (department knowledge index; embeddings made in the AI service, fastembed on the CPU)
 ```
 
 | Service | Owns | Never does |
 |---|---|---|
 | frontend | presentation, navigation, form validation for fast feedback | make authorisation decisions |
 | backend | all data, permissions, business rules, audit log, real-time fan-out | call the LLM directly |
-| ai-service | routing and reasoning over a conversation, tool selection | touch the database |
+| ai-service | routing and reasoning over a conversation, tool selection, the knowledge index (embeddings, Qdrant) | touch the database |
 
 ## Design rules
 
@@ -100,6 +100,19 @@ link is emailed, valid for 7 days and usable once. Accepting it claims the invit
 creates the user and the employee profile, and rolls back if either step fails. Nobody can become an
 admin by invitation, and only admins can invite HR.
 
+### Department knowledge ingestion
+
+A department's head or knowledge lead uploads a document (`POST /api/departments/:id/agent/documents`).
+The backend checks who is asking and the file's real type, keeps the file in MongoDB GridFS and
+answers 202. Its ingestion queue (BullMQ on Redis, or in process) then reads the text in a thread
+with time and memory limits, splits it into chunks that stay within one heading and PDF page, and
+sends them in batches to `POST /ai/knowledge/chunks`. The AI service embeds them
+(`bge-small-en-v1.5`) and stores them in Qdrant with the company, department, agent and document
+ids. The document becomes READY, or FAILED with a reason. A delete evicts the chunks
+(`/ai/knowledge/documents/remove`), then the file and the record. Only
+services/knowledge/knowledgeBaseService.js reaches these internals, enforced by a test, and every
+search filters on one department.
+
 ### Agent telemetry
 
 A LangChain callback handler in the AI service records node, model and tool timings. It posts them
@@ -124,7 +137,10 @@ admin-only `agent-telemetry` Socket.IO room.
 - **Audit log:** sensitive reads and writes are logged with ids and outcomes only (allowed, denied,
   rejected, failed).
 - **Files:** the real type is detected from content, sizes are capped, S3 storage is server-side
-  encrypted, and downloads use short-lived signed URLs.
+  encrypted, and downloads use short-lived signed URLs. Knowledge documents are read in a separate
+  thread with time and memory limits, and their stored copy is checked against its SHA-256.
+- **Knowledge isolation:** only a department's head, its knowledge lead and administrators can see
+  or change its knowledge base; every vector search filters on one department.
 - **Secrets:** they live only in git-ignored `.env` files and are validated at startup.
 
 ## Scaling limits today

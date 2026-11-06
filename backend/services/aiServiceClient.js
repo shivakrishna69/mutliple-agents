@@ -234,7 +234,7 @@ export function requestAiProcessing(aiProcessRequest, { config, requestId }) {
  * @param {{ config: object, requestId: string }} callContext
  * @param {(responseBody: unknown, startedAt: Date) => object} parseResponse  throws invalid_response
  */
-async function postToAiService(path, requestBody, { config, requestId }, parseResponse) {
+export async function postToAiService(path, requestBody, { config, requestId }, parseResponse) {
   const startedAtMs = Date.now();
   // AbortSignal.timeout is a hard deadline for the whole exchange; axios's own `timeout` only
   // measures socket inactivity in Node, which a slowly trickling response would never trip.

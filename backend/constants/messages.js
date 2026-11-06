@@ -7,6 +7,7 @@
 import {
   ACCOUNT_EMAIL_SETTINGS,
   GENDERS,
+  KNOWLEDGE_BASE_SETTINGS,
   MESSAGE_FIELD_LIMITS,
   ONBOARDING_SETTINGS,
   SIGNUP_PROFILE_SETTINGS,
@@ -53,6 +54,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
   TOO_MANY_OFFER_CALCULATIONS: 'Too many offer calculations in a short time. Please wait a minute and try again',
   TOO_MANY_OFFER_DISPATCHES: 'Too many offers sent in a short time. Please wait a few minutes and try again',
+  TOO_MANY_KNOWLEDGE_UPLOADS: 'Too many documents uploaded in a short time. Please wait a few minutes and try again',
+  TOO_MANY_KNOWLEDGE_CHANGES: 'Too many knowledge base changes in a short time. Please wait a moment and try again',
   TOO_MANY_VERIFICATIONS: 'Too many verification requests. Please wait a minute and try again',
   TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
@@ -639,4 +642,51 @@ export const ONBOARDING_MESSAGES = Object.freeze({
     'This CTC is too low for the company salary policy: Basic, HRA and employer contributions already exceed it',
   INPUT_INVALID: 'Some details need fixing',
   PREVIEW_WATERMARK: 'DRAFT – NOT AN OFFER',
+});
+
+/** Department knowledge bases (/api/departments/:departmentId/agent, services/knowledge/*). */
+const KNOWLEDGE_MAX_FILE_MB = KNOWLEDGE_BASE_SETTINGS.MAX_FILE_BYTES / (1024 * 1024);
+
+export const KNOWLEDGE_MESSAGES = Object.freeze({
+  // Template for a new agent's name: the department's name, then this.
+  DEFAULT_AGENT_NAME_SUFFIX: 'Department Agent',
+  SETTINGS_RETRIEVED: 'Knowledge base settings',
+  SETTINGS_UPDATED: 'Knowledge base settings saved',
+  DOCUMENTS_RETRIEVED: 'Knowledge base documents',
+  DOCUMENT_UPLOADED: 'Document uploaded. It is being read and will be ready for the agent shortly',
+  DOCUMENT_DELETED: 'Document removed from the knowledge base',
+  ACCESS_DENIED: "Only this department's head, its knowledge lead and administrators can manage its knowledge base",
+  LEAD_CHANGE_NOT_ALLOWED: "Only an administrator or the department's head can change the knowledge lead",
+  LEAD_NOT_ELIGIBLE: 'The knowledge lead must be an active account of an employee in this department',
+  DEPARTMENT_NOT_FOUND: 'Department not found',
+  DEPARTMENT_INACTIVE: 'This department is inactive. Reactivate it to manage its knowledge base',
+  DOCUMENT_NOT_FOUND: 'Document not found in this knowledge base',
+  AGENT_PAUSED: 'This knowledge base is paused. Resume it in the settings to add documents',
+  DOCUMENT_LIMIT_REACHED: `A knowledge base holds at most ${KNOWLEDGE_BASE_SETTINGS.MAX_DOCUMENTS_PER_DEPARTMENT} documents. Remove some before adding more`,
+  DUPLICATE_DOCUMENT: 'This file is already in the knowledge base',
+  FILE_REQUIRED: 'Attach exactly one file in the "file" field',
+  FILE_TOO_LARGE: `The file is too large (maximum ${KNOWLEDGE_MAX_FILE_MB} MB)`,
+  MULTIPART_REQUIRED: 'Send the upload as multipart/form-data',
+  MALFORMED_UPLOAD: 'The upload could not be read. Try again',
+  EMPTY_FILE: 'The file is empty',
+  UNSUPPORTED_FILE_TYPE: 'Only PDF, Word (.docx), Markdown (.md) and text (.txt) files are accepted',
+  EXTENSION_MISMATCH:
+    "The file's name does not match its content. Save it with the right extension and upload it again",
+  DOCX_TOO_LARGE_UNPACKED: 'This Word document is too large once unpacked. Split it into smaller files',
+  INDEX_UNAVAILABLE: 'The document could not be removed from the knowledge index right now. Try again shortly',
+  INPUT_INVALID: 'Some details need fixing',
+  // Why a document could not be added to the knowledge base, as the lead reads it on the document.
+  PROCESSING_FAILURES: Object.freeze({
+    ENCRYPTED: 'This PDF is password-protected. Upload a copy without a password',
+    CORRUPT: 'This file could not be read. It may be damaged; try saving it again and uploading the new copy',
+    NO_TEXT:
+      'No text was found in this file. Scanned documents are not supported yet: upload a version with selectable text',
+    TOO_MANY_PAGES: `This PDF has more than ${KNOWLEDGE_BASE_SETTINGS.PDF_MAX_PAGES} pages. Split it into smaller files`,
+    TOO_MUCH_TEXT: 'This file holds more text than one document may. Split it into smaller files',
+    TOO_MANY_CHUNKS: 'This file holds more text than one document may. Split it into smaller files',
+    TIMED_OUT: 'This file took too long to read. Split it into smaller files, or save it again and retry',
+    OUT_OF_MEMORY: 'This file is too complex to read. Split it into smaller files, or save it again and retry',
+    FILE_MISSING: 'The stored copy of this file is missing or damaged. Delete it and upload it again',
+    INDEX_UNAVAILABLE: 'The knowledge index could not be reached after several attempts. Try again later',
+  }),
 });

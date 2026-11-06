@@ -16,7 +16,8 @@ An HR portal and AI-first support desk in one platform, built for Indian compani
   payroll and tax (FY 2026-27), signed PDF payslips with public verification, OKRs, workforce
   attrition/burnout analytics, an encrypted document vault, an org chart, email-invitation
   onboarding, and leave management with an AI leave assistant that answers questions and drafts
-  requests the employee sends.
+  requests the employee sends. Each department keeps a knowledge base its head or lead fills with
+  documents, indexed for the department agents (Qdrant, embedded on the server).
 - **Support desk:** customers chat with a multi-agent AI (LangGraph + Groq); a supervisor routes each
   message to billing or technical specialists, and hands off to a human agent when needed.
 - **Admin tooling:** user and role management, an audit log, and a live agent-telemetry console.
@@ -31,6 +32,9 @@ An HR portal and AI-first support desk in one platform, built for Indian compani
                 │  internal API key                  optional: Redis, S3, SMTP
                 ▼
             ai-service (Python / FastAPI / LangGraph, :8000) ──► Groq LLM API
+                │
+                ▼
+            Qdrant (department knowledge index; embeddings made in the AI service)
 ```
 
 The backend owns all data and business rules; the AI service never writes to the database and
@@ -45,7 +49,7 @@ calls the backend's internal API instead. Details: [docs/architecture.md](docs/a
 
 ## Quick start (local development)
 
-**Prerequisites:** Node.js 22.12+ (24 recommended), Docker Desktop, a [Groq](https://console.groq.com) API key.
+**Prerequisites:** Node.js 22.13+ (24 recommended), Docker Desktop, a [Groq](https://console.groq.com) API key.
 
 ```bash
 # 1. Database
@@ -78,18 +82,22 @@ through an emailed link. Locally, `docker compose --profile mail up` adds Mailpi
 every email at http://localhost:8025 (settings in `docker-compose.yml`).
 
 Optional services switch features on when configured: S3 (document vault, payslip PDFs), SMTP
-(signup confirmation, password reset, invitation and leave emails), Redis (multi-instance real-time
-and caching). Without them the app still runs: vault and payslip endpoints answer "unavailable", HR
-gets invitation links to share by hand, real-time runs in memory on one instance, and signup and
-password reset answer "email unavailable" (503).
+(signup confirmation, password reset, invitation and leave emails), Redis (multi-instance real-time,
+caching and the background queues), Qdrant (department knowledge bases; `QDRANT_URL` in
+ai-service/.env). Without them the app still runs: vault and payslip endpoints answer "unavailable", HR
+gets invitation links to share by hand, real-time runs in memory on one instance, signup and
+password reset answer "email unavailable" (503), and uploaded knowledge documents wait until the
+index is reachable.
 
 ## Run the whole stack with Docker Compose
 
 For a demo or a production-like check, one command builds and starts everything (MongoDB, Redis,
-backend, AI service, and the frontend served by nginx):
+Qdrant, backend, AI service, and the frontend served by nginx):
 
 ```bash
-# backend/.env and ai-service/.env as in step 2 above
+# backend/.env and ai-service/.env as in step 2 above, and a key for Qdrant (32+ characters) in a
+# .env file next to docker-compose.yml (git-ignored) or in the shell:
+echo "QDRANT_API_KEY=$(openssl rand -hex 32)" >> .env
 docker compose up --build -d     # open http://localhost:8080
 docker compose logs -f backend   # follow a service's log
 docker compose down              # stop (data is kept in the mongo-data volume)
@@ -123,6 +131,8 @@ by the backend; the frontend only hides what a role cannot use.
 | Payroll tax calculator, payslip PDFs + verification | Done; monthly payroll run not yet |
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
 | Leave management | Done: backend (offices, work calendar, policies and balances, requests and approvals, payroll export); screens done (workplace, leave administration, my leave, calendar, approvals); AI leave assistant done; multi-level approvals (manager, then HR for long leave) done |
+| Onboarding offers (CTC structure, offer letters locked with the date of birth, review before sending) | Done: backend |
+| Department knowledge bases (agent settings, documents read, chunked and indexed in Qdrant, head/lead/admin access) | Done: backend and AI service; screens next |
 | Company settings, departments, employee IDs, bulk employee import | Done: backend (accounts created with the invitation, CSV import in the background); screens (Company for admins, Workplace → Departments, Onboarding → Import from CSV) |
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
