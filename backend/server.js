@@ -59,6 +59,7 @@ import { initOfferLetters } from './services/offerLetterGenerator.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { configureAccountCodeKey } from './services/accountTokens.js';
 import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
+import { closeKnowledgeIngestionQueue, initKnowledgeIngestionQueue } from './services/knowledge/ingestionQueue.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { startAttendanceScheduler, stopAttendanceScheduler } from './services/attendanceScheduler.js';
@@ -258,6 +259,8 @@ async function start() {
     startPresenceJobs();
     // Employee imports: BullMQ on Redis when REDIS_URL is set, in this process otherwise.
     initEmployeeImportQueue(config);
+    // Knowledge base documents: read, chunked and indexed in the background, on the same kind of queue.
+    initKnowledgeIngestionQueue(config);
   });
 
   /**
@@ -281,6 +284,7 @@ async function start() {
       stopAttendanceScheduler();
       stopPresenceJobs();
       await closeEmployeeImportQueue();
+      await closeKnowledgeIngestionQueue();
       await closeSocketServer();
       await closeCacheStore();
       closeVaultStorage();
