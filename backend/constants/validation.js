@@ -436,3 +436,66 @@ export const SYSTEM_HEALTH_SETTINGS = Object.freeze({
   EMAIL_CHECK_CACHE_MS: 5 * 60 * 1000,
   SLOW_RESPONSE_MS: 1500,
 });
+
+/**
+ * Onboarding offers (services/ctcStructure.js, services/offerLetterGenerator.js,
+ * services/onboardingService.js). Rates are basis points (5000 = 50%).
+ *
+ *   ACTIVATION_VALIDITY_HOURS   how long the activation link in a dispatched offer works
+ *   CTC_LIMITS                  the annual CTC an offer may state, in rupees
+ *   DEFAULT_COMPENSATION_POLICY the company's salary structure until HR changes it:
+ *       basicShareBasisPoints           Basic as a share of CTC
+ *       hraFiftyPercentCityBasisPoints  HRA as a share of Basic in the 8 cities of
+ *                                       HRA_FIFTY_PERCENT_CITIES (utils/payroll/rules.js)
+ *       hraOtherCityBasisPoints         HRA as a share of Basic elsewhere
+ *       pfOnFullBasic                   PF on the whole Basic instead of the statutory wage ceiling
+ *       includeGratuityInCtc            gratuity (GRATUITY_RULES) counted inside the CTC
+ *   COMPENSATION_LIMITS         what HR may set those shares to
+ *   DEFAULT_OFFER_TERMS         the offer letter's terms until HR changes them (the signatory must
+ *                               be set before an offer can be dispatched)
+ *   OFFER_TERM_LIMITS           what HR may set the terms to
+ */
+export const ONBOARDING_SETTINGS = Object.freeze({
+  ACTIVATION_VALIDITY_HOURS: 48,
+  CTC_LIMITS: Object.freeze({ MIN: 1_00_000, MAX: 10_00_00_000 }),
+  WORK_CITY_MAX_LENGTH: 100,
+  DRAFT_LIST_LIMIT: 200,
+  DEFAULT_COMPENSATION_POLICY: Object.freeze({
+    basicShareBasisPoints: 5000,
+    hraFiftyPercentCityBasisPoints: 5000,
+    hraOtherCityBasisPoints: 4000,
+    pfOnFullBasic: false,
+    includeGratuityInCtc: false,
+  }),
+  COMPENSATION_LIMITS: Object.freeze({
+    BASIC_SHARE_MIN_BASIS_POINTS: 3000,
+    BASIC_SHARE_MAX_BASIS_POINTS: 7000,
+    HRA_MAX_BASIS_POINTS: 5000,
+  }),
+  DEFAULT_OFFER_TERMS: Object.freeze({
+    probationMonths: 6,
+    noticePeriodDays: 60,
+    weeklyWorkingHours: 40,
+    offerValidityDays: 7,
+    signatoryName: null,
+    signatoryTitle: null,
+    additionalClauses: Object.freeze([]),
+  }),
+  OFFER_TERM_LIMITS: Object.freeze({
+    PROBATION_MONTHS_MAX: 12,
+    NOTICE_PERIOD_DAYS_MAX: 180,
+    WEEKLY_WORKING_HOURS_MAX: 48,
+    OFFER_VALIDITY_DAYS_MAX: 60,
+    SIGNATORY_MAX_LENGTH: 100,
+    CLAUSES_MAX: 10,
+    CLAUSE_MAX_LENGTH: 600,
+  }),
+});
+
+/** Offer letter PDF protection (services/offerLetterGenerator.js): qpdf, AES-256. */
+export const OFFER_LETTER_PROTECTION = Object.freeze({
+  KEY_LENGTH_BITS: 256,
+  // The candidate opens the letter with their date of birth written DDMMYYYY.
+  PASSWORD_FORMAT_LABEL: 'DDMMYYYY',
+  QPDF_TIMEOUT_MS: 30_000,
+});

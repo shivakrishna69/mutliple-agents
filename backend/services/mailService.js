@@ -51,13 +51,14 @@ export function isMailConfigured() {
 
 /**
  * Sends one message. Never throws.
- * @param {{ to: string, subject: string, html: string, text: string }} message
+ * @param {{ to: string, subject: string, html: string, text: string,
+ *   attachments?: { filename: string, content: Buffer, contentType: string }[] }} message
  * @returns {Promise<{ outcome: 'sent'|'not_configured'|'failed' }>}
  */
-export async function sendMail({ to, subject, html, text }) {
+export async function sendMail({ to, subject, html, text, attachments = [] }) {
   if (!mailTransport) return { outcome: MAIL_OUTCOMES.NOT_CONFIGURED };
   try {
-    await mailTransport.sendMail({ from: mailFrom, to, subject, html, text });
+    await mailTransport.sendMail({ from: mailFrom, to, subject, html, text, attachments });
     return { outcome: MAIL_OUTCOMES.SENT };
   } catch (mailError) {
     logger.error('Email delivery failed', {

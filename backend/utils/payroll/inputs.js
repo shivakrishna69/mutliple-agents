@@ -4,10 +4,10 @@
 
 import {
   AGE_CATEGORIES,
-  HRA_CITY_ALIASES,
   PROFESSIONAL_TAX_STATES,
   SUPPORTED_FINANCIAL_YEAR,
   TAX_REGIMES,
+  normalizeHraCity,
 } from './rules.js';
 
 // =================================================================================================
@@ -156,8 +156,7 @@ export function normalizeInputs(salaryStructure, investmentsDeclared, taxRegimeC
     ) {
       fieldErrors.push({ field: 'investmentsDeclared.rentedCity', message: 'must be a city name' });
     } else {
-      const cityKey = investments.rentedCity.trim().toLowerCase();
-      declared.rentedCity = HRA_CITY_ALIASES[cityKey] ?? cityKey;
+      declared.rentedCity = normalizeHraCity(investments.rentedCity);
     }
   }
   if (declared.annualRentPaid > 0 && salary.annualHraReceived > 0 && declared.rentedCity === null) {

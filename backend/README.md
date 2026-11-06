@@ -59,6 +59,7 @@ scripts/         operational scripts
 | `/api/company` | company name, short code, mail domain, logo, colours, time zone, employee ID digits | public branding / HR read / admin change |
 | `/api/departments` | departments with head counts: add, change, deactivate, remove unused | HR, admin |
 | `/api/people`, `/api/invitations` | onboarding by email invitation | HR, admin / public token |
+| `/api/hr/onboarding` | offers: CTC structure, offer letter preview, drafts reviewed before they are sent, dispatch with a locked letter and a 48-hour activation link | HR, admin |
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
 | `/api/employees` | current employees for pickers (invited people included); base office assignment; bulk CSV import | HR, admin |
 | `/api/work-calendar` | holidays and the day-by-day calendar | HR, admin edit / employees read their office |
@@ -165,6 +166,38 @@ Columns (case, spaces and hyphens do not matter): `name`, `personal_email`, `dep
 `designation`, `date_of_joining` are required; `company_email`, `department_name` (for a new
 department), `role` (employee, hr, agent), `manager_email`, `work_type` (Onsite, Hybrid, Remote),
 `employment_status` (Probation, Active) and `office_code` are optional.
+
+## Onboarding offers: CTC structure and offer letters
+
+HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
+`services/onboardingService.js`). Nothing reaches the candidate until a person presses dispatch.
+
+| Endpoint | What it does |
+|---|---|
+| `GET` / `PATCH /settings` | the compensation policy (Basic share, HRA rates by city, PF on full Basic, gratuity in CTC) and offer terms (probation, notice, weekly hours, offer validity, signatory, extra clauses); changes take `version` |
+| `POST /calculate` | the salary structure for an offer; with `includePreview`, a watermarked, unlocked letter (base64). Saves nothing |
+| `POST /create-draft` | saves the offer for review (`PENDING_REVIEW`) with the structure as calculated |
+| `GET /drafts?status=`, `GET` / `PATCH /drafts/:id`, `POST /drafts/:id/cancel` | list, read, change while waiting for review, cancel (`version` required) |
+| `POST /drafts/:id/dispatch` | recalculates and refuses (`DRAFT_FIGURES_CHANGED`) if the figures moved since review, then creates the employee, renders the final letter, locks it and emails it with an activation link valid 48 hours. 200 when sent; 202 when the employee exists but the email failed (dispatch again to resend) |
+
+- **The structure is deterministic** (`services/ctcStructure.js`), in whole rupees: Basic, HRA (by
+  default 50 % in the eight cities of `HRA_FIFTY_PERCENT_CITIES`, 40 % elsewhere; both rates are
+  settings), special allowance, employer PF
+  (12 % up to the wage ceiling in force on the joining date), employer ESI when covered, optional
+  gratuity (15/26 of a month's Basic per year), and the employee's PF, ESI, professional tax (by
+  state) and income tax from the same engine as payslips (`utils/payrollCalculator.js`). Each
+  figure is `{ annual, monthly, annualRemainder }`: 12 × monthly + remainder is exactly the annual
+  figure. Pinned bands and 500 random CTCs are checked in `tests/unit/ctcStructure.test.js`.
+- **Final letters are locked** with the candidate's date of birth as `DDMMYYYY` (AES-256 with qpdf,
+  `services/pdfProtection.js`); they can be printed, not edited or copied from. Previews are never
+  locked and carry `DRAFT – NOT AN OFFER`.
+- **One dispatch at a time:** a draft is claimed atomically, so two clicks cannot send two offers.
+  An offer cannot be sent without a signatory in the settings (`SIGNATORY_MISSING`).
+- **Requirements:** a Chromium (`PDF_BROWSER_EXECUTABLE_PATH` or `PDF_BROWSER_CHANNEL`) and qpdf
+  (`QPDF_PATH`, default `qpdf` on the PATH); without them previews and dispatch answer
+  `PDF_UNAVAILABLE` (503). The production image installs both (`WITH_PDF_BROWSER=true`, set in
+  `docker-compose.prod.yml`). `node scripts/checkOfferLetterPdf.js` renders and locks a sample
+  letter and checks the password, which is how CI tests the production image.
 
 ## Leave balances
 

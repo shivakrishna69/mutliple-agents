@@ -162,7 +162,7 @@ function yearsBefore(now, years) {
  * most MAXIMUM_AGE_YEARS before today (UTC).
  * @returns {{ error: string|null, date: Date|null }}  the date at midnight UTC
  */
-function readBirthDate(rawValue, isRequired, now) {
+export function readBirthDate(rawValue, isRequired, now) {
   if (rawValue === undefined || rawValue === null || rawValue === '') {
     return { error: isRequired ? VALIDATION_MESSAGES.BIRTH_DATE_REQUIRED : null, date: null };
   }
@@ -184,7 +184,7 @@ function readBirthDate(rawValue, isRequired, now) {
 }
 
 /** @returns {{ error: string|null, gender: string|null }} one of GENDERS, or null when not given */
-function readGender(rawValue, isRequired) {
+export function readGender(rawValue, isRequired) {
   if (rawValue === undefined || rawValue === null || rawValue === '') {
     return { error: isRequired ? VALIDATION_MESSAGES.GENDER_REQUIRED : null, gender: null };
   }

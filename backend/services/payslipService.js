@@ -40,7 +40,6 @@ import { buildVerificationId, computePayslipContentHmac, isPayslipContentAuthent
 import {
   PdfRenderError,
   closePdfRenderer,
-  initPdfRenderer,
   isPdfRendererConfigured,
   renderHtmlToPdfStream,
 } from './pdfGenerationService.js';
@@ -79,10 +78,12 @@ export class PayslipGenerationError extends Error {
 /** @type {{ signingSecret: string, verificationBaseUrl: string|null, company: object } | null} */
 let payslipSettings = null;
 
-/** Wires the storage and renderer stages; null disables payslips (routes answer 503). */
+/**
+ * Wires the storage stage; null disables payslips (routes answer 503). The renderer is shared with
+ * other documents and wired by server.js (initPdfRenderer).
+ */
 export function initPayslipServices(payslipConfig) {
   initPayslipStorage(payslipConfig?.storage ?? null);
-  initPdfRenderer(payslipConfig?.pdfBrowser ?? null);
   payslipSettings = payslipConfig
     ? {
         signingSecret: payslipConfig.signingSecret,

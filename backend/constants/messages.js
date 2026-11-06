@@ -8,6 +8,7 @@ import {
   ACCOUNT_EMAIL_SETTINGS,
   GENDERS,
   MESSAGE_FIELD_LIMITS,
+  ONBOARDING_SETTINGS,
   SIGNUP_PROFILE_SETTINGS,
   USER_FIELD_LIMITS,
   WEBHOOK_FIELD_LIMITS,
@@ -50,6 +51,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_REGULARIZATION_MESSAGES: 'Too many attendance correction messages. Please wait a minute and try again',
   TOO_MANY_TAX_ESTIMATES: 'Too many tax estimates. Please wait a minute and try again',
   TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
+  TOO_MANY_OFFER_CALCULATIONS: 'Too many offer calculations in a short time. Please wait a minute and try again',
+  TOO_MANY_OFFER_DISPATCHES: 'Too many offers sent in a short time. Please wait a few minutes and try again',
   TOO_MANY_VERIFICATIONS: 'Too many verification requests. Please wait a minute and try again',
   TOO_MANY_INVITATIONS: 'Too many invitations sent. Please wait a few minutes and try again',
   TOO_MANY_INVITATION_ATTEMPTS: 'Too many attempts. Please wait a few minutes and try again',
@@ -607,4 +610,33 @@ export const SYSTEM_STATUS_LABELS = Object.freeze({
   degraded: 'Slow',
   down: 'Down',
   not_configured: 'Not set up',
+});
+
+/** Onboarding offers (controllers/onboardingController.js). */
+export const ONBOARDING_MESSAGES = Object.freeze({
+  HR_ONLY: 'Only HR and administrators can prepare and send offers',
+  CALCULATED: 'Salary structure',
+  SETTINGS_RETRIEVED: 'Onboarding settings',
+  SETTINGS_UPDATED: 'Onboarding settings saved',
+  SETTINGS_CHANGED_ELSEWHERE: 'Someone else changed these settings a moment ago. Reload to see their changes',
+  DRAFT_CREATED: 'Offer draft saved for review',
+  DRAFTS_RETRIEVED: 'Offer drafts',
+  DRAFT_RETRIEVED: 'Offer draft',
+  DRAFT_UPDATED: 'Offer draft updated',
+  DRAFT_CANCELLED: 'Offer draft cancelled',
+  DRAFT_NOT_FOUND: 'Offer draft not found',
+  DRAFT_NOT_EDITABLE: 'Only drafts waiting for review can be changed',
+  DRAFT_CHANGED_ELSEWHERE: 'Someone else changed this draft a moment ago. Reload to see their changes',
+  DRAFT_FIGURES_CHANGED:
+    'The salary figures have changed since this draft was saved (the policy or the statutory rules changed). Review the new figures and save the draft again',
+  DISPATCHED: `Offer sent. The candidate has ${ONBOARDING_SETTINGS.ACTIVATION_VALIDITY_HOURS} hours to activate their account`,
+  DISPATCH_IN_PROGRESS: 'This offer is already being sent',
+  DISPATCH_NOT_ALLOWED: 'Only drafts waiting for review, or whose sending failed, can be sent',
+  DISPATCH_EMAIL_FAILED: 'The employee record was created, but the offer email could not be sent. Try sending it again',
+  SIGNATORY_MISSING: 'Set the offer letter signatory in the onboarding settings before sending offers',
+  PDF_UNAVAILABLE: 'Offer letters cannot be produced on this server right now. Contact your administrator',
+  CTC_TOO_LOW:
+    'This CTC is too low for the company salary policy: Basic, HRA and employer contributions already exceed it',
+  INPUT_INVALID: 'Some details need fixing',
+  PREVIEW_WATERMARK: 'DRAFT – NOT AN OFFER',
 });

@@ -43,6 +43,7 @@ import invitationRoutes from './routes/invitationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
+import onboardingRoutes from './routes/onboardingRoutes.js';
 import okrRoutes from './routes/okrRoutes.js';
 import workCalendarRoutes from './routes/workCalendarRoutes.js';
 import officeRoutes from './routes/officeRoutes.js';
@@ -53,6 +54,8 @@ import departmentRoutes from './routes/departmentRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
+import { initPdfRenderer } from './services/pdfGenerationService.js';
+import { initOfferLetters } from './services/offerLetterGenerator.js';
 import { closeMailService, initMailService } from './services/mailService.js';
 import { configureAccountCodeKey } from './services/accountTokens.js';
 import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
@@ -149,6 +152,8 @@ export function createApp(config) {
   // The dashboard, in sections by role, and the services' health (admins)
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/system', systemRoutes);
+  // Onboarding offers: salary structure, offer letters, review and dispatch (HR and admins)
+  app.use('/api/hr/onboarding', onboardingRoutes);
   // OKRs: company goals, team objectives, key results, milestones
   app.use('/api/okrs', okrRoutes);
   // Holidays and day classification per office (HR edits, employees read).
@@ -213,6 +218,8 @@ async function start() {
     await ensureBootstrapAdmin(config.bootstrapAdminEmail);
     await initCacheStore(config);
     initVaultStorage(config.vaultStorage);
+    initPdfRenderer(config.pdfBrowser);
+    initOfferLetters(config.offerLetters);
     initPayslipServices(config.payslips);
     initMailService(config.mail);
     configureAccountCodeKey(config.jwtSecret);

@@ -17,7 +17,8 @@ import { applyRate, roundToNearestRupee, roundToPaisa, roundUpToRupee } from './
 // =================================================================================================
 
 /** The EPF wage ceiling in force on a given ISO date. */
-function epfCeilingOn(isoDate) {
+/** The EPF wage ceiling in force on `isoDate` ("YYYY-MM-DD"), from EPF_WAGE_CEILING_SCHEDULE. */
+export function epfCeilingOn(isoDate) {
   let applicableCeiling = EPF_WAGE_CEILING_SCHEDULE[0].monthlyCeiling;
   for (const ceilingPeriod of EPF_WAGE_CEILING_SCHEDULE) {
     if (ceilingPeriod.effectiveFrom <= isoDate) applicableCeiling = ceilingPeriod.monthlyCeiling;

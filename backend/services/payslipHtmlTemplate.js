@@ -52,8 +52,8 @@ const issueTimeFormatter = new Intl.DateTimeFormat('en-IN', {
 });
 const joiningDateFormatter = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 
-/** Inline brand mark (chat-bubble logo), tinted with the company accent colour. */
-function brandMarkSvg(brandColor) {
+/** Inline brand mark (chat-bubble logo), tinted with the company accent colour; shared with offer letters. */
+export function brandMarkSvg(brandColor) {
   return `<svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="${escapeHtml(brandColor)}"/><path d="M14 33V19a5 5 0 0 1 5-5h10a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5h-8.5L14 37z" fill="#ffffff"/></svg>`;
 }
 
