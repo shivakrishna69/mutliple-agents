@@ -29,6 +29,12 @@ const MONDAY = 1;
 /** Today in the office's time zone. */
 const officeToday = () => new Date(Date.now() + OFFICE_TIME_ZONE_OFFSET_MS).toISOString().slice(0, 10);
 
+/** The latest working day (Monday to Friday, the test office's week) on or before `onDate`. */
+function workdayOnOrBefore(onDate) {
+  const daysBack = { [SATURDAY]: 1, [SUNDAY]: 2 }[weekdayOfCalendarDate(onDate)] ?? 0;
+  return addDaysToCalendarDate(onDate, -daysBack);
+}
+
 /** The first `weekday` on or after `fromDate`. */
 function weekdayOnOrAfter(fromDate, weekday) {
   return addDaysToCalendarDate(fromDate, (weekday - weekdayOfCalendarDate(fromDate) + 7) % 7);
@@ -505,7 +511,9 @@ describe('leave requests', { skip: skipReason ?? false }, () => {
     await expectStatus(approve(manager.client, pending), 409, 'REQUEST_NOT_PENDING');
     assert.deepEqual(await plannedBalanceOf(employee), { balanceDays: 5, heldDays: 0, availableDays: 5, used: 0 });
 
-    const started = await submit(employee, { startDate: today, endDate: today });
+    // A working day that has begun: today, or the last working day when today is a weekend.
+    const lastWorkday = workdayOnOrBefore(today);
+    const started = await submit(employee, { startDate: lastWorkday, endDate: lastWorkday });
     await expectStatus(approve(manager.client, started), 200);
     await expectStatus(employee.client.post(`/api/leave/requests/${started.id}/cancel`), 422, 'ALREADY_STARTED');
 
