@@ -144,6 +144,7 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
     assert.equal(settings.permissions.canAssignLead, true);
     assert.equal(settings.limits.maxFileBytes, KNOWLEDGE_BASE_SETTINGS.MAX_FILE_BYTES);
     assert.deepEqual(settings.limits.fileTypes, Object.keys(KNOWLEDGE_BASE_SETTINGS.FILE_TYPES));
+    assert.deepEqual(settings.limits.fileExtensions, ['pdf', 'docx', 'md', 'txt']);
   });
 
   it('refuses everyone else on every endpoint, HR included, audits it, and stores nothing', async () => {

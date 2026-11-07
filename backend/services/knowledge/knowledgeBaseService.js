@@ -137,6 +137,8 @@ export async function toSettingsSummary({ department, agent, access }) {
       maxFileBytes: KNOWLEDGE_BASE_SETTINGS.MAX_FILE_BYTES,
       maxDocuments: KNOWLEDGE_BASE_SETTINGS.MAX_DOCUMENTS_PER_DEPARTMENT,
       fileTypes: Object.keys(KNOWLEDGE_BASE_SETTINGS.FILE_TYPES),
+      // For the file picker: "pdf", "docx", "md", "txt" (the type is still decided from the content).
+      fileExtensions: Object.values(KNOWLEDGE_BASE_SETTINGS.FILE_TYPES),
     },
     permissions: { canAssignLead: access.canAssignLead },
     version: agent.__v,
