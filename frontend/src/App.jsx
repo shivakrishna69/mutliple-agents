@@ -21,6 +21,9 @@
  *   /workplace    -> WorkplaceSetup   HR and admins (departments, offices, holidays, base offices)
  *   /leave        -> LeaveCenter      every role: My leave (index), /leave/calendar, /leave/approvals,
  *                                     and /leave/admin for HR and admins (policies, balances, payroll)
+ *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  admins: Departments & Agents
+ *   /knowledge(/:departmentId)       -> the same pages, for the departments a person heads or leads
+ *                                     (every signed-in user may open it; the backend decides what it shows)
  *
  *   Public, signed in or not:
  *   /verify/payslip -> PayslipVerification
@@ -75,6 +78,14 @@ const LeaveCalendarPanel = lazy(() => import('./components/leave/LeaveCalendarPa
 const ApprovalsPanel = lazy(() => import('./components/leave/ApprovalsPanel.jsx'));
 const LeaveAdministrationPanel = lazy(() => import('./components/leave/LeaveAdministrationPanel.jsx'));
 const WorkplaceSetup = lazy(() => import('./pages/WorkplaceSetup.jsx'));
+const KnowledgeBases = lazy(() => import('./pages/KnowledgeBases.jsx'));
+const KnowledgeBaseDetail = lazy(() => import('./pages/KnowledgeBaseDetail.jsx'));
+
+/** "/admin/knowledge/<id>" from the route pattern, for links from the list to a department. */
+const pathWithDepartment = (pattern) => (departmentId) =>
+  pattern.replace(':departmentId', encodeURIComponent(departmentId));
+const hubDepartmentPath = pathWithDepartment(ROUTE_PATHS.KNOWLEDGE_HUB_DEPARTMENT);
+const myDepartmentPath = pathWithDepartment(ROUTE_PATHS.MY_KNOWLEDGE_DEPARTMENT);
 
 export default function App() {
   return (
@@ -102,6 +113,16 @@ export default function App() {
             <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
             <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />
             <Route path={ROUTE_PATHS.ANALYTICS} element={<AdvancedAnalyticsHub />} />
+            <Route
+              path={ROUTE_PATHS.MY_KNOWLEDGE}
+              element={<KnowledgeBases scope="mine" detailPathOf={myDepartmentPath} />}
+            />
+            <Route
+              path={ROUTE_PATHS.MY_KNOWLEDGE_DEPARTMENT}
+              element={
+                <KnowledgeBaseDetail listPath={ROUTE_PATHS.MY_KNOWLEDGE} listLabel="My department's knowledge base" />
+              }
+            />
             <Route path={ROUTE_PATHS.LEAVE} element={<LeaveCenter />}>
               <Route index element={<MyLeavePanel />} />
               <Route path={ROUTE_PATHS.LEAVE_CALENDAR} element={<LeaveCalendarPanel />} />
@@ -129,6 +150,14 @@ export default function App() {
               <Route path={ROUTE_PATHS.ADMIN_USERS} element={<AdminUsers />} />
               <Route path={ROUTE_PATHS.AGENT_TELEMETRY} element={<AgentTelemetry />} />
               <Route path={ROUTE_PATHS.COMPANY} element={<CompanySettings />} />
+              <Route
+                path={ROUTE_PATHS.KNOWLEDGE_HUB}
+                element={<KnowledgeBases scope="hub" detailPathOf={hubDepartmentPath} />}
+              />
+              <Route
+                path={ROUTE_PATHS.KNOWLEDGE_HUB_DEPARTMENT}
+                element={<KnowledgeBaseDetail listPath={ROUTE_PATHS.KNOWLEDGE_HUB} listLabel="Departments & Agents" />}
+              />
             </Route>
           </Route>
         </Route>
