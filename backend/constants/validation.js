@@ -544,6 +544,9 @@ export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
   INDEX_BATCH_SIZE: 16,
   ORIGINAL_NAME_MAX_LENGTH: 255,
   MAX_DOCUMENTS_PER_DEPARTMENT: 200,
+  // The lead picker (GET /agent/lead-candidates): people listed per request, and the longest search.
+  LEAD_CANDIDATES_LIMIT: 50,
+  LEAD_SEARCH_MAX_LENGTH: 100,
   MAX_CHUNKS_PER_DOCUMENT: 2_000,
   // A failed document keeps this much of the reason, for the lead to read.
   ERROR_MESSAGE_MAX_LENGTH: 500,

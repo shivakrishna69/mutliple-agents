@@ -4,6 +4,11 @@
  * vector index); controllers and other features go through these functions only, and never see
  * file keys, chunks or vectors.
  *
+ *   listManageableKnowledgeBases(user)       GET /api/knowledge-bases: the departments this user may
+ *                                            manage, with their agent and document counts; read only
+ *                                            (an agent that does not exist yet is reported as null,
+ *                                            never created)
+ *   listLeadCandidates(scope, { search })    GET /agent/lead-candidates: who may become the lead
  *   loadKnowledgeScope(user, departmentId)   the department, its agent (created on first use by
  *                                            someone allowed to manage it) and what the user may do;
  *                                            404 / 403 (refused) / 409 (inactive department)
@@ -26,8 +31,8 @@ import { KNOWLEDGE_BASE_SETTINGS } from '../../constants/validation.js';
 import AgentDocument, { DOCUMENT_STATUSES } from '../../models/AgentDocument.js';
 import Department from '../../models/Department.js';
 import DepartmentAgent, { AGENT_STATUSES } from '../../models/DepartmentAgent.js';
-import EmployeeProfile from '../../models/EmployeeProfile.js';
-import User, { ACCOUNT_STATUSES } from '../../models/User.js';
+import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../../models/EmployeeProfile.js';
+import User, { ACCOUNT_STATUSES, ROLES } from '../../models/User.js';
 import { logger } from '../../utils/logger.js';
 import { isDuplicateKeyError } from '../../utils/mongoErrors.js';
 import { sanitizeOriginalFileName } from '../../validators/vaultValidators.js';
@@ -139,15 +144,56 @@ export async function toSettingsSummary({ department, agent, access }) {
   };
 }
 
-/** The lead must be an active account whose employee profile is in this department. */
+/**
+ * Who may lead a department's knowledge base: an active account whose employee profile is in the
+ * department and not terminated. One rule for the lead picker and for saving a lead.
+ * @param {object} departmentId
+ * @param {{ userIds?: string[] }} [only]  restrict to these accounts
+ * @returns {Promise<{ id: string, name: string, email: string, designation: string|null }[]>}
+ */
+async function eligibleLeadsOf(departmentId, { userIds } = {}) {
+  const profiles = await EmployeeProfile.find({
+    'organizationData.departmentId': departmentId,
+    'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
+    ...(userIds ? { userId: { $in: userIds } } : {}),
+  })
+    .select('userId organizationData.designation')
+    .lean();
+  const designationByUser = new Map(
+    profiles.map((profile) => [profile.userId.toString(), profile.organizationData?.designation ?? null]),
+  );
+  const accounts = await User.find({ _id: { $in: [...designationByUser.keys()] }, status: ACCOUNT_STATUSES.ACTIVE })
+    .select('name email')
+    .lean();
+  return accounts.map((account) => ({
+    id: account._id.toString(),
+    name: account.name,
+    email: account.email,
+    designation: designationByUser.get(account._id.toString()),
+  }));
+}
+
 async function assertEligibleLead(userId, department) {
-  const [account, profile] = await Promise.all([
-    User.findById(userId).select('status').lean(),
-    EmployeeProfile.findOne({ userId, 'organizationData.departmentId': department._id }).select('_id').lean(),
-  ]);
-  if (!account || account.status !== ACCOUNT_STATUSES.ACTIVE || !profile) {
-    throw refusal(HTTP_STATUS.BAD_REQUEST, 'LEAD_NOT_ELIGIBLE');
-  }
+  const [eligible] = await eligibleLeadsOf(department._id, { userIds: [userId] });
+  if (!eligible) throw refusal(HTTP_STATUS.BAD_REQUEST, 'LEAD_NOT_ELIGIBLE');
+}
+
+/**
+ * The people who may lead this knowledge base, by name, matching `search` (in the name or email,
+ * ignoring case) when given; at most LEAD_CANDIDATES_LIMIT, with `hasMore` when there are others.
+ */
+export async function listLeadCandidates({ department, agent }, { search = '' } = {}) {
+  const needle = search.trim().toLowerCase();
+  const matching = (await eligibleLeadsOf(department._id))
+    .filter((person) => !needle || `${person.name} ${person.email}`.toLowerCase().includes(needle))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const currentLead = agent.managedBy?.toString() ?? null;
+  return {
+    candidates: matching
+      .slice(0, KNOWLEDGE_BASE_SETTINGS.LEAD_CANDIDATES_LIMIT)
+      .map((person) => ({ ...person, isCurrentLead: person.id === currentLead })),
+    hasMore: matching.length > KNOWLEDGE_BASE_SETTINGS.LEAD_CANDIDATES_LIMIT,
+  };
 }
 
 export async function updateKnowledgeSettings(scope, { changes, version }, actorUserId) {
@@ -314,4 +360,96 @@ export async function requeueKnowledgeDocuments({ departmentId = null } = {}) {
     },
   );
   return modifiedCount;
+}
+
+/** The departments this user heads or leads, or every department for an administrator. */
+async function manageableDepartments(user, ownProfileId) {
+  if (user.role === ROLES.ADMIN) return Department.find({}).sort({ name: 1 }).lean();
+  const ledAgents = await DepartmentAgent.find({ managedBy: user.id }).select('departmentId').lean();
+  const departmentIds = ledAgents.map((agent) => agent.departmentId);
+  return Department.find({
+    $or: [{ _id: { $in: departmentIds } }, ...(ownProfileId ? [{ departmentHeadId: ownProfileId }] : [])],
+  })
+    .sort({ name: 1 })
+    .lean();
+}
+
+/** A department with no documents: every status at 0. */
+const emptyDocumentCounts = () => ({
+  total: 0,
+  byStatus: Object.fromEntries(Object.values(DOCUMENT_STATUSES).map((status) => [status, 0])),
+  lastUploadedAt: null,
+});
+
+/** Document counts per department: { total, byStatus: { UPLOADED: n, ... }, lastUploadedAt }. */
+async function documentCountsOf(departmentIds) {
+  const groups = await AgentDocument.aggregate([
+    { $match: { departmentId: { $in: departmentIds } } },
+    {
+      $group: {
+        _id: { departmentId: '$departmentId', status: '$status' },
+        count: { $sum: 1 },
+        lastUploadedAt: { $max: '$createdAt' },
+      },
+    },
+  ]);
+  const counts = new Map();
+  for (const { _id: key, count, lastUploadedAt } of groups) {
+    const departmentKey = key.departmentId.toString();
+    const entry = counts.get(departmentKey) ?? emptyDocumentCounts();
+    entry.total += count;
+    entry.byStatus[key.status] = count;
+    if (!entry.lastUploadedAt || lastUploadedAt > entry.lastUploadedAt) entry.lastUploadedAt = lastUploadedAt;
+    counts.set(departmentKey, entry);
+  }
+  return counts;
+}
+
+/**
+ * GET /api/knowledge-bases: every department whose knowledge base this user may manage (the same rule
+ * as each department's endpoints), by name. Read only: a department whose agent has not been opened
+ * yet is listed with `agent: null`, and nothing is created.
+ * @param {{ id: string, role: string }} user
+ */
+export async function listManageableKnowledgeBases(user) {
+  const ownProfileId = await findOwnEmployeeProfileId(user.id);
+  const departments = await manageableDepartments(user, ownProfileId);
+  const departmentIds = departments.map((department) => department._id);
+  const [agents, counts] = await Promise.all([
+    DepartmentAgent.find({ departmentId: { $in: departmentIds } }).lean(),
+    documentCountsOf(departmentIds),
+  ]);
+  const agentByDepartment = new Map(agents.map((agent) => [agent.departmentId.toString(), agent]));
+  const users = await userSummaries(agents.map((agent) => agent.managedBy));
+
+  return departments.flatMap((department) => {
+    const agent = agentByDepartment.get(department._id.toString()) ?? null;
+    const access = decideKnowledgeAccess({
+      role: user.role,
+      userId: user.id,
+      ownProfileId,
+      departmentHeadId: department.departmentHeadId,
+      managedBy: agent?.managedBy ?? null,
+    });
+    if (!access.canManage) return [];
+    return [
+      {
+        department: {
+          id: department._id.toString(),
+          name: department.name,
+          code: department.code,
+          isActive: department.isActive,
+        },
+        agent: agent && {
+          id: agent._id.toString(),
+          name: agent.name,
+          status: agent.status,
+          lead: agent.managedBy ? (users.get(agent.managedBy.toString()) ?? null) : null,
+          updatedAt: agent.updatedAt,
+        },
+        documents: counts.get(department._id.toString()) ?? emptyDocumentCounts(),
+        access: { basis: access.basis, canAssignLead: access.canAssignLead },
+      },
+    ];
+  });
 }

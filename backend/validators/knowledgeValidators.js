@@ -4,6 +4,7 @@
  * known fields, their types, and the version an edit is based on.
  */
 
+import { KNOWLEDGE_BASE_SETTINGS } from '../constants/validation.js';
 import { AGENT_STATUSES } from '../models/DepartmentAgent.js';
 import { isValidObjectIdString } from './conversationValidators.js';
 import { bodyNotObjectResult, checkVersion, isPlainObject, pickFields, validationResult } from './requestShape.js';
@@ -31,6 +32,21 @@ export function validateKnowledgeSettingsChanges(requestBody) {
   if (Object.keys(changes).length === 0) validationErrors.push({ field: 'body', message: 'nothing to change' });
   const version = checkVersion(requestBody.version, validationErrors);
   return validationResult(validationErrors, { changes, version });
+}
+
+/** GET /lead-candidates?search=: an optional piece of a name or email. */
+export function validateLeadCandidateQuery(query) {
+  const { search } = query;
+  if (search === undefined) return validationResult([], { search: '' });
+  if (typeof search !== 'string' || search.length > KNOWLEDGE_BASE_SETTINGS.LEAD_SEARCH_MAX_LENGTH) {
+    return validationResult([
+      {
+        field: 'search',
+        message: `must be text of at most ${KNOWLEDGE_BASE_SETTINGS.LEAD_SEARCH_MAX_LENGTH} characters`,
+      },
+    ]);
+  }
+  return validationResult([], { search });
 }
 
 /** The :docId route parameter. */

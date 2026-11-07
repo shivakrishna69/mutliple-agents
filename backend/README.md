@@ -60,7 +60,8 @@ scripts/         operational scripts
 | `/api/org` | org chart and reporting lines | staff |
 | `/api/company` | company name, short code, mail domain, logo, colours, time zone, employee ID digits | public branding / HR read / admin change |
 | `/api/departments` | departments with head counts: add, change, deactivate, remove unused | HR, admin |
-| `/api/departments/:departmentId/agent` | the department's knowledge base: agent settings, documents (upload, list, delete) | the department's head and knowledge lead, admin |
+| `/api/departments/:departmentId/agent` | the department's knowledge base: agent settings, lead picker, documents (upload, list, delete) | the department's head and knowledge lead, admin |
+| `/api/knowledge-bases` | the knowledge bases this user manages, with agent status and document counts (read only) | signed in (each sees only theirs) |
 | `/api/people`, `/api/invitations` | onboarding by email invitation | HR, admin / public token |
 | `/api/hr/onboarding` | offers: CTC structure, offer letter preview, drafts reviewed before they are sent, dispatch with a locked letter and a 48-hour activation link | HR, admin |
 | `/api/offices` | offices: location, time zone, shift, weekly offs | HR, admin |
@@ -212,8 +213,10 @@ every other module away from the file store, chunks and vectors.
 
 | Endpoint | What it does |
 |---|---|
+| `GET /api/knowledge-bases` | every knowledge base the caller may manage (all departments for an admin, inactive ones flagged; the ones a user heads or leads; none for anyone else, as an empty list): department, agent (`null` until someone opens it; this never creates one), lead, document counts by status and the last upload, and the caller's rights |
+| `GET /lead-candidates?search=` | who may become the lead: active accounts of the department's employees who are not terminated, the same rule a saved lead must meet; by name, at most 50 with `hasMore`; `search` matches the name or email as plain text |
 | `GET /settings` | the agent: name, instructions (`systemPrompt`), `ACTIVE`/`PAUSED`, lead, limits, whether the caller may change the lead, `version`. Created on first use, named "<department> Department Agent", with the department head as lead |
-| `PATCH /settings` `{ name?, systemPrompt?, status?, managedBy?, version }` | changes them; `managedBy` (a user id, or null) only by an admin or the head, and only to an active employee of the department |
+| `PATCH /settings` `{ name?, systemPrompt?, status?, managedBy?, version }` | changes them; `managedBy` (a user id, or null) only by an admin or the head, and only to someone the lead picker offers (an active account of a current, not terminated, employee of the department) |
 | `GET /documents` | the documents, newest first: name, type, size, status, the reason a document failed, chunk count, who uploaded it |
 | `POST /documents` (multipart, field `file`) | 202 with the document (`UPLOADED`); it is read and indexed in the background |
 | `DELETE /documents/:docId` | evicts its chunks from the index, then deletes the stored file and the record |

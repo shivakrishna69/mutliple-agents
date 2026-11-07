@@ -51,6 +51,7 @@ import employeeRoutes from './routes/employeeRoutes.js';
 import leaveRoutes from './routes/leaveRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import departmentRoutes from './routes/departmentRoutes.js';
+import knowledgeBaseRoutes from './routes/knowledgeBaseRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
@@ -168,6 +169,8 @@ export function createApp(config) {
   app.use('/api/company', companyRoutes);
   // Departments: HR adds, changes, deactivates and removes them.
   app.use('/api/departments', departmentRoutes);
+  // Department knowledge bases this user manages (each one's own endpoints are under /api/departments).
+  app.use('/api/knowledge-bases', knowledgeBaseRoutes);
   // Presence: my setup and the notice; who is available, away or offline; daily activity.
   app.use('/api/presence', presenceRoutes);
 

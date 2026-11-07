@@ -5,7 +5,10 @@
  * req.knowledgeScope. Every change is audited (category "knowledge") with the department and
  * document ids, never file contents.
  *
+ *   GET    /api/knowledge-bases the departments this user manages (no scope: any signed-in user, who
+ *                               sees only theirs, possibly none)
  *   GET    /settings            the agent's name, instructions, status and lead
+ *   GET    /lead-candidates     who may become the lead (?search= part of a name or email)
  *   PATCH  /settings            change them { name?, systemPrompt?, status?, managedBy?, version }
  *   GET    /documents           the documents, newest first, with their processing status
  *   POST   /documents           upload one file (multipart, field "file"): 202, processed in the background
@@ -18,11 +21,17 @@ import { KNOWLEDGE_AUDIT_CATEGORY } from '../middleware/departmentKnowledgeScope
 import {
   deleteKnowledgeDocument,
   listKnowledgeDocuments,
+  listLeadCandidates,
+  listManageableKnowledgeBases,
   toSettingsSummary,
   updateKnowledgeSettings,
   uploadKnowledgeDocument,
 } from '../services/knowledge/knowledgeBaseService.js';
-import { documentIdErrors, validateKnowledgeSettingsChanges } from '../validators/knowledgeValidators.js';
+import {
+  documentIdErrors,
+  validateKnowledgeSettingsChanges,
+  validateLeadCandidateQuery,
+} from '../validators/knowledgeValidators.js';
 import { createWorkforceHandlerFactory } from './workforceHandler.js';
 
 const knowledgeHandler = createWorkforceHandlerFactory({
@@ -37,6 +46,20 @@ const SCOPED_WRITE = Object.freeze({ requiresWorkforceAdmin: false, isWrite: tru
 const auditScope = (req) => ({
   departmentId: req.knowledgeScope.department._id.toString(),
   accessBasis: req.knowledgeScope.access.basis,
+});
+
+export const getKnowledgeBases = knowledgeHandler('list_knowledge_bases', SCOPED_READ, async (req) => ({
+  message: KNOWLEDGE_MESSAGES.KNOWLEDGE_BASES_RETRIEVED,
+  data: { knowledgeBases: await listManageableKnowledgeBases(req.user) },
+}));
+
+export const getLeadCandidates = knowledgeHandler('list_knowledge_lead_candidates', SCOPED_READ, async (req) => {
+  const validation = validateLeadCandidateQuery(req.query);
+  if (!validation.isValid) return { validationErrors: validation.validationErrors };
+  return {
+    message: KNOWLEDGE_MESSAGES.LEAD_CANDIDATES_RETRIEVED,
+    data: await listLeadCandidates(req.knowledgeScope, validation.sanitizedInput),
+  };
 });
 
 export const getKnowledgeSettings = knowledgeHandler('view_knowledge_settings', SCOPED_READ, async (req) => ({

@@ -13,6 +13,7 @@ import {
   deleteKnowledgeDocumentHandler,
   getKnowledgeDocuments,
   getKnowledgeSettings,
+  getLeadCandidates,
   patchKnowledgeSettings,
   postKnowledgeDocument,
 } from '../controllers/departmentKnowledgeController.js';
@@ -30,6 +31,7 @@ departmentKnowledgeRouter.patch(
   departmentKnowledgeScope,
   patchKnowledgeSettings,
 );
+departmentKnowledgeRouter.get('/lead-candidates', departmentKnowledgeScope, getLeadCandidates);
 departmentKnowledgeRouter.get('/documents', departmentKnowledgeScope, getKnowledgeDocuments);
 departmentKnowledgeRouter.post(
   '/documents',
