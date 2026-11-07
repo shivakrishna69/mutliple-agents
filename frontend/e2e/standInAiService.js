@@ -3,7 +3,9 @@
  * tests). It behaves like the real one where the browser can tell: it reads the employee's real
  * balance through the backend's internal API with the shared key, and drafts a day of Casual Leave
  * for "today" when asked to book. A question containing "unavailable" gets a 503, as when the AI
- * model is down. Other ai-service endpoints are not served.
+ * model is down. It also keeps the department knowledge index the way the backend sees it
+ * (POST /ai/knowledge/chunks, POST /ai/knowledge/documents/remove: counts only, nothing embedded), so
+ * an uploaded document reaches READY. Other ai-service endpoints are not served.
  */
 
 import { createServer } from 'node:http';
@@ -55,6 +57,21 @@ export async function startStandInAiService(backend) {
     };
   }
 
+  // Chunk numbers indexed per document, as the real index would hold them.
+  const indexedChunks = new Map();
+  function knowledgeAnswer(path, body) {
+    if (path === '/ai/knowledge/chunks') {
+      const chunks = indexedChunks.get(body.document_id) ?? new Set();
+      for (const chunk of body.chunks) chunks.add(chunk.chunk_index);
+      indexedChunks.set(body.document_id, chunks);
+      return { status: 200, body: { indexed: body.chunks.length } };
+    }
+    const removed = indexedChunks.get(body.document_id)?.size ?? 0;
+    indexedChunks.delete(body.document_id);
+    return { status: 200, body: { removed } };
+  }
+  const KNOWLEDGE_PATHS = new Set(['/ai/knowledge/chunks', '/ai/knowledge/documents/remove']);
+
   const server = createServer((request, response) => {
     let rawBody = '';
     request.on('data', (chunk) => {
@@ -62,12 +79,16 @@ export async function startStandInAiService(backend) {
     });
     request.on('end', async () => {
       const isLeaveQuestion = request.method === 'POST' && request.url === '/ai/leave/assistant';
+      const isKnowledgeCall = request.method === 'POST' && KNOWLEDGE_PATHS.has(request.url);
       const keyMatches = request.headers['x-internal-api-key'] === backend.internalApiKey();
-      const { status, body } = !isLeaveQuestion
-        ? { status: 404, body: { error: 'Not served by the stand-in' } }
-        : !keyMatches
-          ? { status: 401, body: { error: 'Invalid internal API key' } }
-          : await answer(JSON.parse(rawBody));
+      const { status, body } =
+        !isLeaveQuestion && !isKnowledgeCall
+          ? { status: 404, body: { error: 'Not served by the stand-in' } }
+          : !keyMatches
+            ? { status: 401, body: { error: 'Invalid internal API key' } }
+            : isKnowledgeCall
+              ? knowledgeAnswer(request.url, JSON.parse(rawBody))
+              : await answer(JSON.parse(rawBody));
       response.writeHead(status, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify(body));
     });
