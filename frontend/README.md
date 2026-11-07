@@ -50,6 +50,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | `e2e/leaveApprovalSteps.spec.js` | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved |
 | `e2e/leaveAssistant.spec.js` | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message |
 | `e2e/leaveRequests.spec.js` | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave |
+| `e2e/knowledgeHub.spec.js` | An admin opens Departments & Agents, an agent nobody has set up yet, and saves its instructions; switching to self-service leaves the management page and is remembered after a reload; the department head reaches the knowledge base from self-service, sees those instructions, uploads a document that becomes Ready while the list refreshes itself, sees a disguised file refused with the server's reason, and deletes the document; an employee who leads nothing sees no entry and cannot open the hub; HR switches views without the admin-only hub |
 | `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds a department, deactivates and reactivates it; adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
 
 On failure, `playwright-report/` and `test-results/` hold screenshots and traces
@@ -61,9 +62,11 @@ On failure, `playwright-report/` and `test-results/` hold screenshots and traces
 src/App.jsx           route table (workforce pages are lazy-loaded)
 src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors
 src/auth/             AuthContext: session state and CSRF token
-src/components/       AppShell (dark role-aware sidebar, top bar with breadcrumb and, for admins, the
-                      services' state), RouteGuards, ui.jsx design primitives, feature panels
-                      (workplace/: departments, offices, holidays, base offices; people/: the CSV import;
+src/components/       AppShell (dark role-aware sidebar, top bar with breadcrumb, the portal switcher for
+                      admins and HR and, for admins, the services' state), PortalSwitcher, RouteGuards,
+                      ui.jsx design primitives, feature panels (knowledge/: a department agent's
+                      settings with the lead picker, and its documents with upload, status and delete;
+                      workplace/: departments, offices, holidays, base offices; people/: the CSV import;
                       leave/: my leave, calendar, approvals and leave administration, the tabs of
                       pages/LeaveCenter.jsx)
 src/components/auth/  the signed-out screens (sign in, sign up, verify email, forgot and reset password,
@@ -78,11 +81,13 @@ src/components/dashboard/  the Overview page's parts, from GET /api/dashboard/ov
 src/hooks/            useApiResource (load/abort/error), useAuthRequest (a submit with the server's field
                       errors), usePublicAuthSettings (branding, auth options with the signup choices, password policy; loaded
                       once), useSystemHealth (admins; one check shared by the top bar and the dashboard),
-                      useCountdown, useSocket, useAgentTelemetry
+                      useCountdown, useSocket, useAgentTelemetry, usePortalView (the view an admin or HR
+                      person chose, remembered in this browser)
 src/pages/            one file per screen
 src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels,
                       the signed-out screens' slides (authScreens.js), field styles (formStyles.js) and
-                      the dashboard's status labels and tones (dashboardDisplay.js)
+                      the dashboard's status labels and tones (dashboardDisplay.js), the portal views
+                      (portal.js) and the knowledge base statuses (knowledge.js)
 src/utils/            dates in the browser's time zone, CSV downloads, dates of birth (mm/dd/yyyy <-> YYYY-MM-DD),
                       the dashboard's numbers (shares, durations; "—" when there is nothing to measure)
 public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
@@ -91,6 +96,17 @@ src/validation/       client-side form checks (the backend validates again); the
 ```
 
 Route guards only steer navigation; the backend authorises every request.
+
+**Portal views.** Admins and HR switch, in the top bar (in the menu on small screens), between
+"Employee self-service" (their own pages) and "Admin / Management" (the management tools too; where
+they start). Each sidebar item names the views it belongs to (AppShell.jsx); switching away from a
+page the new view does not include goes to the overview. The choice is a display preference kept in
+this browser, not a permission. Everyone else has one sidebar, as before.
+
+**Department knowledge bases.** Admins open every department's in Management → Departments & Agents
+(`/admin/knowledge`); a department's head or knowledge lead opens theirs from self-service → My
+department's knowledge base (`/knowledge`, shown only to them, from GET /api/knowledge-bases). Both
+lead to the same page, with Settings and Documents tabs (`?tab=documents`).
 
 ## Theme
 

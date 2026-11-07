@@ -132,7 +132,8 @@ by the backend; the frontend only hides what a role cannot use.
 | OKRs, workforce analytics, document vault, org chart, onboarding | Done |
 | Leave management | Done: backend (offices, work calendar, policies and balances, requests and approvals, payroll export); screens done (workplace, leave administration, my leave, calendar, approvals); AI leave assistant done; multi-level approvals (manager, then HR for long leave) done |
 | Onboarding offers (CTC structure, offer letters locked with the date of birth, review before sending) | Done: backend |
-| Department knowledge bases (agent settings, documents read, chunked and indexed in Qdrant, head/lead/admin access) | Done: backend and AI service; screens next |
+| Department knowledge bases (agent settings, documents read, chunked and indexed in Qdrant, head/lead/admin access) | Done: backend, AI service and screens (Departments & Agents for admins, My department's knowledge base for heads and leads) |
+| Portal switcher (admins and HR: Employee self-service or Admin / Management) | Done |
 | Company settings, departments, employee IDs, bulk employee import | Done: backend (accounts created with the invitation, CSV import in the background); screens (Company for admins, Workplace → Departments, Onboarding → Import from CSV) |
 | Linting and formatting | Done |
 | Backend tests | Done (`npm test` in `backend/`) |
