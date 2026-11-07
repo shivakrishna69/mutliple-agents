@@ -7,7 +7,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { KNOWLEDGE_ACCESS_BASIS, decideKnowledgeAccess } from '../../services/knowledge/knowledgeAccess.js';
-import { documentIdErrors, validateKnowledgeSettingsChanges } from '../../validators/knowledgeValidators.js';
+import { KNOWLEDGE_BASE_SETTINGS } from '../../constants/validation.js';
+import {
+  documentIdErrors,
+  validateKnowledgeSettingsChanges,
+  validateLeadCandidateQuery,
+} from '../../validators/knowledgeValidators.js';
 
 const HEAD_PROFILE = '65f1a2b3c4d5e6f708192a01';
 const LEAD_USER = '65f1a2b3c4d5e6f708192a02';
@@ -98,5 +103,18 @@ describe('validateKnowledgeSettingsChanges', () => {
   it('checks the document id parameter', () => {
     assert.equal(documentIdErrors({ docId: '65f1a2b3c4d5e6f708192a3b' }), null);
     assert.deepEqual(documentIdErrors({ docId: '../x' }), [{ field: 'docId', message: 'must be an id' }]);
+  });
+});
+
+describe('validateLeadCandidateQuery', () => {
+  it('takes an optional search text within its length', () => {
+    assert.deepEqual(validateLeadCandidateQuery({}), { isValid: true, sanitizedInput: { search: '' } });
+    assert.deepEqual(validateLeadCandidateQuery({ search: 'asha' }), {
+      isValid: true,
+      sanitizedInput: { search: 'asha' },
+    });
+    const tooLong = 'x'.repeat(KNOWLEDGE_BASE_SETTINGS.LEAD_SEARCH_MAX_LENGTH + 1);
+    assert.equal(validateLeadCandidateQuery({ search: tooLong }).isValid, false);
+    assert.equal(validateLeadCandidateQuery({ search: ['a', 'b'] }).isValid, false, 'a repeated parameter is refused');
   });
 });

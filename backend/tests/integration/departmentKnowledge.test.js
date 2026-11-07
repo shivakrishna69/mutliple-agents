@@ -36,11 +36,14 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
   let engineering;
   let finance;
   let inactive;
+  let legal;
   let head;
   let lead;
   let member;
   let financeHead;
   let financeMember;
+  let leaver;
+  let disabledAccount;
 
   const upload = (client, departmentId, { fileName, content, contentType = 'application/octet-stream' }) =>
     client.upload(`${agentPath(departmentId)}/documents`, { fileName, content, contentType });
@@ -86,6 +89,8 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
     });
     finance = await insertDepartment(testServer.database, { name: 'Finance', code: 'FIN', budgetCode: 'CC-200' });
     inactive = await insertDepartment(testServer.database, { name: 'Archive', code: 'ARC', budgetCode: 'CC-300' });
+    // Never opened: its agent does not exist until someone allowed opens it.
+    legal = await insertDepartment(testServer.database, { name: 'Legal', code: 'LEG', budgetCode: 'CC-500' });
     const onboard = (email, name, departmentId) =>
       onboardEmployee({ testServer, hrClient: hr, email, name, departmentId });
     head = await onboard('hema.head@example.com', 'Hema Head', engineering);
@@ -93,6 +98,8 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
     member = await onboard('mira.member@example.com', 'Mira Member', engineering);
     financeHead = await onboard('farah.finance@example.com', 'Farah Finance', finance);
     financeMember = await onboard('fred.finance@example.com', 'Fred Finance', finance);
+    leaver = await onboard('lena.leaver@example.com', 'Lena Leaver', engineering);
+    disabledAccount = await onboard('dev.disabled@example.com', 'Dev Disabled', engineering);
     const departments = testServer.database.collection('departments');
     const asId = (id) => new testServer.database.base.Types.ObjectId(id);
     await departments.updateOne({ _id: asId(engineering) }, { $set: { departmentHeadId: asId(head.profileId) } });
@@ -101,7 +108,24 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
       { _id: asId(inactive) },
       { $set: { isActive: false, departmentHeadId: asId(head.profileId) } },
     );
+    await testServer.database
+      .collection('employeeprofiles')
+      .updateOne({ _id: asId(leaver.profileId) }, { $set: { 'organizationData.employmentStatus': 'Terminated' } });
+    await testServer.database
+      .collection('users')
+      .updateOne({ _id: asId(disabledAccount.userId) }, { $set: { status: 'disabled' } });
   });
+
+  const knowledgeBasesOf = async (client) => {
+    const response = await client.get('/api/knowledge-bases');
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.message, KNOWLEDGE_MESSAGES.KNOWLEDGE_BASES_RETRIEVED);
+    return response.body.data.knowledgeBases;
+  };
+  const candidatesOf = async (client, departmentId, search) => {
+    const query = search === undefined ? '' : `?search=${encodeURIComponent(search)}`;
+    return client.get(`${agentPath(departmentId)}/lead-candidates${query}`);
+  };
 
   after(async () => {
     await testServer?.stop();
@@ -139,6 +163,7 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
         await client.get(`${agentPath(engineering)}/documents`),
         await upload(client, engineering, { fileName: 'notes.md', content: markdown(`From ${who}`) }),
         await client.request('DELETE', `${agentPath(engineering)}/documents/${someDocument}`),
+        await candidatesOf(client, engineering),
       ];
       for (const response of responses) {
         assert.equal(response.status, 403, `${who}: ${JSON.stringify(response.body)}`);
@@ -149,6 +174,96 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
     assert.equal(await storedFiles(), filesBefore);
     assert.equal(await records(), recordsBefore);
     assert.match(testServer.output(), /"category":"knowledge".*"action":"access_knowledge_base".*"outcome":"denied"/);
+  });
+
+  it('lists every department for an administrator, read only: an agent nobody opened is null and is not created', async () => {
+    const agentsBefore = await testServer.database.collection('departmentagents').countDocuments();
+    const listed = await knowledgeBasesOf(admin);
+    assert.deepEqual(
+      listed.map((entry) => entry.department.code),
+      ['ARC', 'ENG', 'FIN', 'LEG'],
+      'every department, by name, inactive ones included',
+    );
+    const legalEntry = listed.find((entry) => entry.department.code === 'LEG');
+    assert.equal(legalEntry.agent, null);
+    assert.deepEqual(legalEntry.documents, {
+      total: 0,
+      byStatus: { UPLOADED: 0, PROCESSING: 0, READY: 0, FAILED: 0, DELETING: 0 },
+      lastUploadedAt: null,
+    });
+    assert.deepEqual(legalEntry.access, { basis: 'admin', canAssignLead: true });
+    assert.equal(listed.find((entry) => entry.department.code === 'ARC').department.isActive, false);
+    const engineeringEntry = listed.find((entry) => entry.department.code === 'ENG');
+    assert.equal(engineeringEntry.agent.status, 'ACTIVE');
+    assert.equal(engineeringEntry.agent.lead.id, head.userId);
+    assert.equal(await testServer.database.collection('departmentagents').countDocuments(), agentsBefore);
+    assert.equal(legal.length, 24);
+  });
+
+  it('lists only the departments a person heads or leads, and nothing for everyone else', async () => {
+    const asHead = await knowledgeBasesOf(head.client);
+    assert.deepEqual(
+      asHead.map((entry) => [entry.department.code, entry.access.basis]),
+      [
+        ['ARC', 'department_head'],
+        ['ENG', 'department_head'],
+      ],
+    );
+    for (const client of [member.client, hr, supportAgent, customer]) {
+      assert.deepEqual(await knowledgeBasesOf(client), []);
+    }
+    assert.deepEqual(
+      (await knowledgeBasesOf(financeHead.client)).map((entry) => entry.department.code),
+      ['FIN'],
+    );
+  });
+
+  it('offers the active, current employees of the department as leads, and only those', async () => {
+    const response = await candidatesOf(head.client, engineering);
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.message, KNOWLEDGE_MESSAGES.LEAD_CANDIDATES_RETRIEVED);
+    const { candidates, hasMore } = response.body.data;
+    assert.deepEqual(
+      candidates.map((person) => person.email),
+      ['hema.head@example.com', 'lalit.lead@example.com', 'mira.member@example.com'],
+      'by name; no terminated employee, no disabled account, nobody from another department',
+    );
+    assert.equal(hasMore, false);
+    assert.deepEqual(
+      candidates.map((person) => person.isCurrentLead),
+      [true, false, false],
+    );
+    assert.equal(candidates[0].designation, 'Analyst');
+    assert.equal('password' in candidates[0], false);
+
+    const searched = await candidatesOf(head.client, engineering, 'LALIT');
+    assert.deepEqual(
+      searched.body.data.candidates.map((person) => person.email),
+      ['lalit.lead@example.com'],
+    );
+    const byEmail = await candidatesOf(head.client, engineering, 'mira.member@');
+    assert.deepEqual(
+      byEmail.body.data.candidates.map((person) => person.name),
+      ['Mira Member'],
+    );
+    const noMatch = await candidatesOf(head.client, engineering, '.*');
+    assert.deepEqual(noMatch.body.data.candidates, [], 'search is plain text, not a pattern');
+    const tooLong = await candidatesOf(
+      head.client,
+      engineering,
+      'x'.repeat(KNOWLEDGE_BASE_SETTINGS.LEAD_SEARCH_MAX_LENGTH + 1),
+    );
+    assert.equal(tooLong.status, 400);
+
+    const settings = await settingsOf(head.client, engineering);
+    for (const ineligible of [leaver, disabledAccount]) {
+      const refused = await head.client.patch(`${agentPath(engineering)}/settings`, {
+        managedBy: ineligible.userId,
+        version: settings.version,
+      });
+      assert.equal(refused.status, 400, 'the picker and saving a lead follow one rule');
+      assert.equal(refused.body.error.code, 'LEAD_NOT_ELIGIBLE');
+    }
   });
 
   it('lets an administrator manage any department', async () => {
@@ -338,6 +453,27 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
     assert.equal(stillThere.status, 'READY');
   });
 
+  it("counts each department's documents by status, and lists the department for its lead", async () => {
+    const asLead = await knowledgeBasesOf(lead.client);
+    assert.deepEqual(
+      asLead.map((entry) => [entry.department.code, entry.access.basis, entry.access.canAssignLead]),
+      [['ENG', 'knowledge_lead', false]],
+    );
+    const [engineeringEntry] = asLead;
+    const documents = await documentsOf(lead.client, engineering);
+    assert.equal(engineeringEntry.documents.total, documents.length);
+    for (const status of Object.keys(engineeringEntry.documents.byStatus)) {
+      assert.equal(
+        engineeringEntry.documents.byStatus[status],
+        documents.filter((document) => document.status === status).length,
+        status,
+      );
+    }
+    assert.equal(engineeringEntry.agent.lead.id, lead.userId);
+    const financeEntry = (await knowledgeBasesOf(admin)).find((entry) => entry.department.code === 'FIN');
+    assert.equal(financeEntry.documents.total, 1, 'each department counts only its own documents');
+  });
+
   it('deletes a document: its chunks, its stored file and its record; a second delete finds nothing', async () => {
     const created = await upload(lead.client, engineering, {
       fileName: 'Remove me.md',
@@ -411,5 +547,34 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
     });
     assert.equal(refused.status, 409);
     assert.equal(refused.body.error.code, 'DOCUMENT_LIMIT_REACHED');
+  });
+
+  it('lists at most LEAD_CANDIDATES_LIMIT people in the lead picker, and says when there are more', async () => {
+    const asId = (id) => new testServer.database.base.Types.ObjectId(id);
+    const total = KNOWLEDGE_BASE_SETTINGS.LEAD_CANDIDATES_LIMIT + 1;
+    const people = Array.from({ length: total }, (unused, number) => ({
+      _id: new testServer.database.base.Types.ObjectId(),
+      name: `Legal Person ${String(number).padStart(3, '0')}`,
+      email: `legal.person.${number}@example.com`,
+      status: 'active',
+    }));
+    await testServer.database.collection('users').insertMany(people);
+    await testServer.database.collection('employeeprofiles').insertMany(
+      people.map((person) => ({
+        userId: person._id,
+        organizationData: { departmentId: asId(legal), employmentStatus: 'Active', designation: 'Counsel' },
+      })),
+    );
+    const response = await candidatesOf(admin, legal);
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.data.candidates.length, KNOWLEDGE_BASE_SETTINGS.LEAD_CANDIDATES_LIMIT);
+    assert.equal(response.body.data.hasMore, true);
+    assert.equal(response.body.data.candidates[0].name, 'Legal Person 000');
+    const narrowed = await candidatesOf(admin, legal, 'Person 050');
+    assert.deepEqual(
+      narrowed.body.data.candidates.map((person) => person.name),
+      ['Legal Person 050'],
+    );
+    assert.equal(narrowed.body.data.hasMore, false);
   });
 });

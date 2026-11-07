@@ -651,6 +651,8 @@ export const KNOWLEDGE_MESSAGES = Object.freeze({
   // Template for a new agent's name: the department's name, then this.
   DEFAULT_AGENT_NAME_SUFFIX: 'Department Agent',
   SETTINGS_RETRIEVED: 'Knowledge base settings',
+  KNOWLEDGE_BASES_RETRIEVED: 'Knowledge bases you manage',
+  LEAD_CANDIDATES_RETRIEVED: 'People who can lead this knowledge base',
   SETTINGS_UPDATED: 'Knowledge base settings saved',
   DOCUMENTS_RETRIEVED: 'Knowledge base documents',
   DOCUMENT_UPLOADED: 'Document uploaded. It is being read and will be ready for the agent shortly',
