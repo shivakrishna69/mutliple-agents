@@ -41,6 +41,12 @@ export const ROUTE_PATHS = Object.freeze({
   LEAVE_APPROVALS: '/leave/approvals',
   // Leave administration (policies, balances, payroll export), HR and admins.
   LEAVE_ADMIN: '/leave/admin',
+  // Department knowledge bases: every department's for admins (management), and the ones a person
+  // heads or leads (self-service). The same pages; the backend decides what each person sees.
+  KNOWLEDGE_HUB: '/admin/knowledge',
+  KNOWLEDGE_HUB_DEPARTMENT: '/admin/knowledge/:departmentId',
+  MY_KNOWLEDGE: '/knowledge',
+  MY_KNOWLEDGE_DEPARTMENT: '/knowledge/:departmentId',
   // Public page behind the emailed invitation link.
   ACCEPT_INVITATION: '/invite/:token',
 });

@@ -3,7 +3,8 @@
  * database, then creates the accounts and the department the tests use, and onboards employees
  * (HR invites, the employee accepts): one without an office for the workplace test, and a leave
  * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave tests,
- * plus a second employee of that manager with Earned Leave that needs HR's approval too.
+ * plus a second employee of that manager with Earned Leave that needs HR's approval too, and the
+ * department's head, who manages its knowledge base.
  * A stand-in AI service answers the leave assistant (e2e/standInAiService.js). Returns the teardown,
  * which stops the backend and drops the database.
  *
@@ -20,6 +21,8 @@ import {
   DEPARTMENT_NAME,
   EMPLOYEE,
   FRONTEND_ORIGIN,
+  KNOWLEDGE_ADMIN,
+  KNOWLEDGE_HEAD,
   MAIL_INBOX_PORT,
   LEAVE_EMPLOYEE,
   LEAVE_EMPLOYEE_CASUAL_DAYS,
@@ -140,9 +143,13 @@ export default async function globalSetup() {
     throw startupError;
   }
   try {
-    for (const account of [...Object.values(ACCOUNTS), RESET_ACCOUNT]) await signUp(testServer, account);
+    for (const account of [...Object.values(ACCOUNTS), RESET_ACCOUNT, KNOWLEDGE_ADMIN])
+      await signUp(testServer, account);
     // The same change scripts/setUserRole.js makes; the API cannot create HR accounts directly.
     await testServer.database.collection('users').updateOne({ email: ACCOUNTS.hr.email }, { $set: { role: 'hr' } });
+    await testServer.database
+      .collection('users')
+      .updateOne({ email: KNOWLEDGE_ADMIN.email }, { $set: { role: 'admin' } });
     // Set up by the admin: HR's own logins are kept for the tests (5 per account per 15 minutes).
     const adminClient = testServer.createClient();
     await adminClient.login(ACCOUNTS.admin.email, PASSWORD);
@@ -152,6 +159,20 @@ export default async function globalSetup() {
     );
     await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...EMPLOYEE });
     await seedLeaveScenario(testServer, adminClient, department.id);
+    // The department's head, who manages its knowledge base from self-service.
+    const head = await onboardEmployee({
+      testServer,
+      hrClient: adminClient,
+      departmentId: department.id,
+      ...KNOWLEDGE_HEAD,
+    });
+    await expectCreated(
+      adminClient.patch(`/api/departments/${department.id}`, {
+        departmentHeadId: head.profileId,
+        version: department.version,
+      }),
+      'the department head',
+    );
     // The tests read their own emails right away; a person would have waited the minute.
     await endEmailCooldowns(testServer);
   } catch (seedingError) {

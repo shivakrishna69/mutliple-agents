@@ -13,18 +13,26 @@
  * Navigation items are filtered by role here for convenience only; every page is also behind a
  * route guard (RouteGuards.jsx) and every API call is authorised by the backend.
  *
+ * Admins and HR choose a portal view (PortalSwitcher.jsx, hooks/usePortalView.js): "Employee
+ * self-service" keeps their own pages, "Admin / Management" adds the management tools. Each item
+ * names the views it belongs to; for everyone else the sidebar ignores views. "My department's
+ * knowledge base" is shown to people who head or lead a department (GET /api/knowledge-bases).
+ *
  * Sign-out revokes the session on the server first. If that fails, the user stays signed in and
  * sees an error banner, because hiding the failure would leave a valid session on this device.
  */
 
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api/httpClient.js';
+import { requestKnowledgeBases } from '../api/knowledgeApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import BrandMark from './BrandMark.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
+import PortalSwitcher from './PortalSwitcher.jsx';
 import RoleBadge from './RoleBadge.jsx';
 import {
+  BookOpenIcon,
   BuildingIcon,
   CalendarIcon,
   ChartIcon,
@@ -44,54 +52,89 @@ import {
 } from './Icons.jsx';
 import { SERVICE_STATE_TONES } from '../constants/dashboardDisplay.js';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
+import { KNOWLEDGE_ACCESS_BASIS } from '../constants/knowledge.js';
+import { PORTAL_VIEWS } from '../constants/portal.js';
 import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
+import { useApiResource } from '../hooks/useApiResource.js';
+import { usePortalView } from '../hooks/usePortalView.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 import { useSystemHealth } from '../hooks/useSystemHealth.js';
 import { initialsOf } from '../utils/dashboardFormat.js';
 
-/** Sidebar entries, grouped into sections. `isVisibleTo(role)` decides who sees each one. */
+const BOTH_VIEWS = Object.freeze(Object.values(PORTAL_VIEWS));
+const SELF_SERVICE_ONLY = Object.freeze([PORTAL_VIEWS.SELF_SERVICE]);
+const MANAGEMENT_ONLY = Object.freeze([PORTAL_VIEWS.MANAGEMENT]);
+
+/**
+ * Sidebar entries, grouped into sections. `isVisibleTo(role, context)` decides who sees each one
+ * (context: { managesOwnKnowledgeBase }); `views` the portal views it belongs to, for people who switch.
+ */
 const NAVIGATION_SECTIONS = Object.freeze([
   {
     sectionTitle: 'Workspace',
     items: [
-      { label: 'Overview', path: ROUTE_PATHS.DASHBOARD, Icon: HomeIcon, isVisibleTo: () => true },
+      { label: 'Overview', path: ROUTE_PATHS.DASHBOARD, Icon: HomeIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
       {
         label: 'Support chat',
         path: ROUTE_PATHS.SUPPORT,
         Icon: ChatIcon,
+        views: BOTH_VIEWS,
         isVisibleTo: (role) => role === USER_ROLES.CUSTOMER,
       },
       {
         label: 'Support console',
         path: ROUTE_PATHS.CONSOLE,
         Icon: InboxIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => STAFF_ROLES.includes(role),
+      },
+      {
+        label: "My department's knowledge base",
+        path: ROUTE_PATHS.MY_KNOWLEDGE,
+        Icon: BookOpenIcon,
+        views: SELF_SERVICE_ONLY,
+        isVisibleTo: (role, context) => context.managesOwnKnowledgeBase,
       },
     ],
   },
   {
     sectionTitle: 'People',
     items: [
-      { label: 'Attendance', path: ROUTE_PATHS.ATTENDANCE, Icon: MapPinIcon, isVisibleTo: () => true },
-      { label: 'Leave', path: ROUTE_PATHS.LEAVE, Icon: CalendarIcon, isVisibleTo: () => true },
-      { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, isVisibleTo: () => true },
-      { label: 'Analytics hub', path: ROUTE_PATHS.ANALYTICS, Icon: ChartIcon, isVisibleTo: () => true },
+      {
+        label: 'Attendance',
+        path: ROUTE_PATHS.ATTENDANCE,
+        Icon: MapPinIcon,
+        views: BOTH_VIEWS,
+        isVisibleTo: () => true,
+      },
+      { label: 'Leave', path: ROUTE_PATHS.LEAVE, Icon: CalendarIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
+      { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
+      {
+        label: 'Analytics hub',
+        path: ROUTE_PATHS.ANALYTICS,
+        Icon: ChartIcon,
+        views: BOTH_VIEWS,
+        isVisibleTo: () => true,
+      },
       {
         label: 'Organisation',
         path: ROUTE_PATHS.ORGANISATION,
         Icon: SitemapIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => STAFF_ROLES.includes(role),
       },
       {
         label: 'Onboarding',
         path: ROUTE_PATHS.ONBOARDING,
         Icon: UserPlusIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
       },
       {
         label: 'Workplace',
         path: ROUTE_PATHS.WORKPLACE,
         Icon: BuildingIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
       },
     ],
@@ -100,44 +143,68 @@ const NAVIGATION_SECTIONS = Object.freeze([
     sectionTitle: 'Administration',
     items: [
       {
+        label: 'Departments & Agents',
+        path: ROUTE_PATHS.KNOWLEDGE_HUB,
+        Icon: BookOpenIcon,
+        views: MANAGEMENT_ONLY,
+        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+      },
+      {
         label: 'Company',
         path: ROUTE_PATHS.COMPANY,
         Icon: BuildingIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => role === USER_ROLES.ADMIN,
       },
       {
         label: 'Users & roles',
         path: ROUTE_PATHS.ADMIN_USERS,
         Icon: UsersIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => role === USER_ROLES.ADMIN,
       },
       {
         label: 'Agent telemetry',
         path: ROUTE_PATHS.AGENT_TELEMETRY,
         Icon: TerminalIcon,
+        views: MANAGEMENT_ONLY,
         isVisibleTo: (role) => role === USER_ROLES.ADMIN,
       },
     ],
   },
   {
     sectionTitle: 'Settings',
-    items: [{ label: 'Account', path: ROUTE_PATHS.ACCOUNT, Icon: UserCircleIcon, isVisibleTo: () => true }],
+    items: [
+      { label: 'Account', path: ROUTE_PATHS.ACCOUNT, Icon: UserCircleIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
+    ],
   },
 ]);
 
-/** The sidebar label of the page at `pathname` (the longest matching path), for the top bar. */
-function pageLabelOf(pathname) {
-  const match = NAVIGATION_SECTIONS.flatMap((section) => section.items)
-    .filter((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
-    .sort((first, second) => second.path.length - first.path.length)[0];
-  return match?.label ?? null;
+const ALL_NAVIGATION_ITEMS = NAVIGATION_SECTIONS.flatMap((section) => section.items);
+
+/** True when this person sees `item`: their role allows it, and it belongs to their view (if they switch). */
+const isItemVisible = (item, { role, view, context }) =>
+  item.isVisibleTo(role, context) && (view === null || item.views.includes(view));
+
+/** The item for the page at `pathname` (the longest matching path). */
+function itemOfPath(pathname) {
+  return (
+    ALL_NAVIGATION_ITEMS.filter((item) => pathname === item.path || pathname.startsWith(`${item.path}/`)).sort(
+      (first, second) => second.path.length - first.path.length,
+    )[0] ?? null
+  );
 }
 
-function SidebarNavigation({ userRole, onNavigate }) {
+/** The sidebar label of the page at `pathname`, for the top bar. */
+const pageLabelOf = (pathname) => itemOfPath(pathname)?.label ?? null;
+
+function SidebarNavigation({ visibility, onNavigate }) {
   return (
     <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-4 py-6 scroll-thin">
       {NAVIGATION_SECTIONS.map((navigationSection) => {
-        const visibleItems = navigationSection.items.filter((navigationItem) => navigationItem.isVisibleTo(userRole));
+        const visibleItems = navigationSection.items.filter((navigationItem) =>
+          isItemVisible(navigationItem, visibility),
+        );
         if (visibleItems.length === 0) return null;
         return (
           <div key={navigationSection.sectionTitle}>
@@ -214,14 +281,24 @@ function UserCard({ currentUser, companyName, isSigningOut, onSignOut }) {
   );
 }
 
-function SidebarContents({ currentUser, companyName, isSigningOut, onSignOut, onNavigate, closeButton = null }) {
+function SidebarContents({
+  currentUser,
+  companyName,
+  visibility,
+  isSigningOut,
+  onSignOut,
+  onNavigate,
+  switcher = null,
+  closeButton = null,
+}) {
   return (
     <div className="flex h-full flex-col bg-[#23272e]">
       <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/[0.06] px-6">
         <BrandMark tone="light" />
         {closeButton}
       </div>
-      <SidebarNavigation userRole={currentUser.role} onNavigate={onNavigate} />
+      {switcher && <div className="shrink-0 px-4 pt-4">{switcher}</div>}
+      <SidebarNavigation visibility={visibility} onNavigate={onNavigate} />
       <UserCard currentUser={currentUser} companyName={companyName} isSigningOut={isSigningOut} onSignOut={onSignOut} />
     </div>
   );
@@ -238,7 +315,7 @@ function SystemsPill({ health }) {
   );
 }
 
-function TopBar({ companyName, pageLabel, currentUser, health }) {
+function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
   return (
     <header className="hidden h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200/70 bg-white/80 px-8 backdrop-blur lg:flex">
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3 text-sm">
@@ -255,6 +332,7 @@ function TopBar({ companyName, pageLabel, currentUser, health }) {
         )}
       </nav>
       <div className="flex shrink-0 items-center gap-3">
+        {switcher}
         <SystemsPill health={health} />
         <span
           className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"
@@ -271,12 +349,35 @@ function TopBar({ companyName, pageLabel, currentUser, health }) {
 export default function AppShell() {
   const { currentUser, signOut } = useAuth();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { branding } = usePublicAuthSettings();
   const health = useSystemHealth(currentUser.role === USER_ROLES.ADMIN);
   const companyName = branding?.name ?? null;
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(null);
+  const { canSwitch, view, setView } = usePortalView(currentUser);
+  // Whether this person heads or leads a department (for "My department's knowledge base"). A failed
+  // load just leaves the entry out; the page itself is still reachable and reports its own errors.
+  const knowledgeBases = useApiResource((signal) => requestKnowledgeBases(signal), [currentUser.id]);
+  const visibility = {
+    role: currentUser.role,
+    view,
+    context: {
+      managesOwnKnowledgeBase: (knowledgeBases.data?.knowledgeBases ?? []).some(
+        (knowledgeBase) => knowledgeBase.access.basis !== KNOWLEDGE_ACCESS_BASIS.ADMIN,
+      ),
+    },
+  };
+
+  /** Switches the view; a page that is not part of the new view gives way to the overview. */
+  function changeView(nextView) {
+    setView(nextView);
+    const currentItem = itemOfPath(pathname);
+    if (currentItem && !isItemVisible(currentItem, { ...visibility, view: nextView })) {
+      navigate(ROUTE_PATHS.DASHBOARD);
+    }
+  }
 
   // Escape closes the mobile drawer.
   useEffect(() => {
@@ -313,6 +414,7 @@ export default function AppShell() {
         <SidebarContents
           currentUser={currentUser}
           companyName={companyName}
+          visibility={visibility}
           isSigningOut={isSigningOut}
           onSignOut={handleSignOut}
         />
@@ -331,9 +433,13 @@ export default function AppShell() {
             <SidebarContents
               currentUser={currentUser}
               companyName={companyName}
+              visibility={visibility}
               isSigningOut={isSigningOut}
               onSignOut={handleSignOut}
               onNavigate={closeMobileNav}
+              switcher={
+                canSwitch && <PortalSwitcher view={view} onChange={changeView} tone="dark" className="w-full" />
+              }
               closeButton={
                 <button
                   type="button"
@@ -355,6 +461,7 @@ export default function AppShell() {
           pageLabel={pageLabelOf(pathname)}
           currentUser={currentUser}
           health={health.data}
+          switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} />}
         />
 
         {/* Mobile top bar */}

@@ -45,3 +45,15 @@ export const LEAVE_EMPLOYEE_CASUAL_DAYS = 5;
  */
 export const TWO_STEP_EMPLOYEE = Object.freeze({ name: 'Tara Pillai', email: 'tara.pillai@example.com' });
 export const TWO_STEP_EARNED_DAYS = 3;
+
+/**
+ * The head of the department (set by global setup): manages its knowledge base from self-service
+ * ("My department's knowledge base"). An employee account, so no portal switcher.
+ */
+export const KNOWLEDGE_HEAD = Object.freeze({ name: 'Kavya Menon', email: 'kavya.menon@example.com' });
+
+/**
+ * A second administrator for the Departments & Agents test, so its sign-in does not use up the main
+ * admin's (5 sign-ins per account per 15 minutes, which the other specs already use).
+ */
+export const KNOWLEDGE_ADMIN = Object.freeze({ name: 'Kiran Rao', email: 'kiran.rao@example.com' });
