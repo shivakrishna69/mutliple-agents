@@ -38,6 +38,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import ChatConsole from '../components/ChatConsole.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
 import { API_MESSAGES } from '../constants/messages.js';
+import { USER_ROLES } from '../constants/routes.js';
 import { useSocket } from '../hooks/useSocket.js';
 
 /** Delay before reloading the list after a status event for an unlisted conversation (bursts collapse). */
@@ -55,7 +56,7 @@ const STATUS = Object.freeze({
 
 /** Client-side mirror of the backend visibility rule, used only to keep the list current. */
 function isConversationVisibleToUser(statusPayload, currentUser) {
-  if (currentUser.role === 'admin') return true;
+  if (currentUser.role === USER_ROLES.ADMIN) return true;
   if (statusPayload.assignedAgentId) return statusPayload.assignedAgentId === currentUser.id;
   return statusPayload.status === STATUS.ESCALATED_TO_HUMAN;
 }
@@ -321,7 +322,9 @@ export default function AgentConsole() {
         <div>
           <h1 className="text-lg font-bold tracking-tight text-slate-900">Support console</h1>
           <p className="text-xs text-slate-500">
-            {currentUser.role === 'admin' ? 'All conversations' : 'Your conversations and the escalation queue'}
+            {currentUser.role === USER_ROLES.ADMIN
+              ? 'All conversations'
+              : 'Your conversations and the escalation queue'}
           </p>
         </div>
         <span

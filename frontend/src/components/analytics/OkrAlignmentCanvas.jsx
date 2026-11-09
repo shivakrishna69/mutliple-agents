@@ -28,7 +28,6 @@ import {
   requestWorkforceRisk,
 } from '../../api/workforceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { WORKFORCE_ADMIN_ROLES } from '../../constants/routes.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { FlagIcon, PlusIcon, TargetIcon } from '../Icons.jsx';
 import {
@@ -45,6 +44,8 @@ import {
   formatInr,
   progressTone,
 } from '../ui.jsx';
+import { hasCapability } from '../../auth/capabilities.js';
+import { CAPABILITIES } from '../../constants/capabilities.js';
 
 /** Keyboard slider changes are saved this long after the last key press, as one update. */
 const KEYBOARD_COMMIT_DELAY_MS = 600;
@@ -687,7 +688,7 @@ function ObjectiveComposer({
 
 export default function OkrAlignmentCanvas() {
   const { currentUser } = useAuth();
-  const isOrganisationWide = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
+  const isOrganisationWide = hasCapability(currentUser, CAPABILITIES.MANAGE_WORKFORCE);
   const [period, setPeriod] = useState(currentQuarter);
   const [composer, setComposer] = useState(null); // { level, parentObjective? }
   const [actionError, setActionError] = useState(null);

@@ -5,23 +5,24 @@
  *   /login        -> Login       (signed-out users only)
  *   /signup       -> Signup      (signed-out users only)
  *
- *   Signed in, inside AppShell (sidebar layout):
- *   /dashboard    -> Dashboard        every role
- *   /account      -> Account          every role
- *   /support      -> CustomerSupport  customers
- *   /console      -> AgentConsole     staff (admin or agent)
- *   /admin/users  -> AdminUsers       admins
- *   /attendance   -> AttendanceCenter every role (punch-in, regularization, manager reviews)
- *   /payroll      -> PayrollCenter    every role (tax planner, payslips; issuing for HR/admin)
- *   /analytics    -> AdvancedAnalyticsHub every role (risk tab for HR/admin, OKRs, vault)
- *   /organisation -> OrgDirectory     staff (admin or agent)
- *   /admin/telemetry -> AgentTelemetry admins
- *   /admin/company -> CompanySettings admins (name, employee ID format, email domain)
- *   /people/onboarding -> PeopleOnboarding HR and admins (invite new joiners, import a CSV)
- *   /workplace    -> WorkplaceSetup   HR and admins (departments, offices, holidays, base offices)
- *   /leave        -> LeaveCenter      every role: My leave (index), /leave/calendar, /leave/approvals,
- *                                     and /leave/admin for HR and admins (policies, balances, payroll)
- *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  admins: Departments & Agents
+ *   Signed in, inside AppShell (sidebar layout), with the capability each page needs
+ *   (constants/capabilities.js; the server tells the browser which ones a person has):
+ *   /dashboard    -> Dashboard        everyone
+ *   /account      -> Account          everyone
+ *   /support      -> CustomerSupport  USE_SUPPORT_CHAT
+ *   /console      -> AgentConsole     STAFF_SUPPORT
+ *   /admin/users  -> AdminUsers       MANAGE_USERS
+ *   /attendance   -> AttendanceCenter everyone (punch-in, regularization, manager reviews)
+ *   /payroll      -> PayrollCenter    everyone (tax planner, payslips; issuing with MANAGE_PAYSLIPS)
+ *   /analytics    -> AdvancedAnalyticsHub everyone (risk tab with MANAGE_WORKFORCE, OKRs, vault)
+ *   /organisation -> OrgDirectory     STAFF_SUPPORT
+ *   /admin/telemetry -> AgentTelemetry VIEW_AGENT_TELEMETRY
+ *   /admin/company -> CompanySettings MANAGE_COMPANY_SETTINGS (name, employee ID format, email domain)
+ *   /people/onboarding -> PeopleOnboarding MANAGE_WORKFORCE (invite new joiners, import a CSV)
+ *   /workplace    -> WorkplaceSetup   MANAGE_WORKFORCE (departments, offices, holidays, base offices)
+ *   /leave        -> LeaveCenter      everyone: My leave (index), /leave/calendar, /leave/approvals,
+ *                                     and /leave/admin with MANAGE_WORKFORCE (policies, balances, payroll)
+ *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  MANAGE_KNOWLEDGE_BASES
  *   /knowledge(/:departmentId)       -> the same pages, for the departments a person heads or leads
  *                                     (every signed-in user may open it; the backend decides what it shows)
  *
@@ -31,21 +32,14 @@
  *
  *   anything else -> redirects to /
  *
- * Guards nest: ProtectedRoute (signed in) -> AppShell (layout) -> role guard -> page. Guards
+ * Guards nest: ProtectedRoute (signed in) -> AppShell (layout) -> CapabilityRoute -> page. Guards
  * only steer navigation; the backend authorises every request on its own.
  */
 
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import AppShell from './components/AppShell.jsx';
-import {
-  AdminRoute,
-  CustomerRoute,
-  PeopleManagerRoute,
-  ProtectedRoute,
-  PublicOnlyRoute,
-  StaffRoute,
-} from './components/RouteGuards.jsx';
+import { CapabilityRoute, ProtectedRoute, PublicOnlyRoute } from './components/RouteGuards.jsx';
 import Account from './pages/Account.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 
@@ -54,6 +48,7 @@ import CustomerSupport from './pages/CustomerSupport.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
+import { CAPABILITIES } from './constants/capabilities.js';
 import { ROUTE_PATHS } from './constants/routes.js';
 import { LoadingBlock } from './components/ui.jsx';
 
@@ -127,29 +122,35 @@ export default function App() {
               <Route index element={<MyLeavePanel />} />
               <Route path={ROUTE_PATHS.LEAVE_CALENDAR} element={<LeaveCalendarPanel />} />
               <Route path={ROUTE_PATHS.LEAVE_APPROVALS} element={<ApprovalsPanel />} />
-              <Route element={<PeopleManagerRoute />}>
+              <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_WORKFORCE} />}>
                 <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministrationPanel />} />
               </Route>
             </Route>
 
-            <Route element={<CustomerRoute />}>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.USE_SUPPORT_CHAT} />}>
               <Route path={ROUTE_PATHS.SUPPORT} element={<CustomerSupport />} />
             </Route>
 
-            <Route element={<StaffRoute />}>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.STAFF_SUPPORT} />}>
               <Route path={ROUTE_PATHS.CONSOLE} element={<AgentConsole />} />
               <Route path={ROUTE_PATHS.ORGANISATION} element={<OrgDirectory />} />
             </Route>
 
-            <Route element={<PeopleManagerRoute />}>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_WORKFORCE} />}>
               <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
               <Route path={ROUTE_PATHS.WORKPLACE} element={<WorkplaceSetup />} />
             </Route>
 
-            <Route element={<AdminRoute />}>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_USERS} />}>
               <Route path={ROUTE_PATHS.ADMIN_USERS} element={<AdminUsers />} />
+            </Route>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.VIEW_AGENT_TELEMETRY} />}>
               <Route path={ROUTE_PATHS.AGENT_TELEMETRY} element={<AgentTelemetry />} />
+            </Route>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_COMPANY_SETTINGS} />}>
               <Route path={ROUTE_PATHS.COMPANY} element={<CompanySettings />} />
+            </Route>
+            <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_KNOWLEDGE_BASES} />}>
               <Route
                 path={ROUTE_PATHS.KNOWLEDGE_HUB}
                 element={<KnowledgeBases scope="hub" detailPathOf={hubDepartmentPath} />}

@@ -20,8 +20,8 @@ import {
   requestPayslipGeneration,
   requestPayslipList,
   requestTaxEstimate,
-  requestWorkforceRisk,
 } from '../api/workforceApi.js';
+import { requestEmployees } from '../api/workplaceApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { CheckBadgeIcon, CurrencyIcon, DocumentIcon, DownloadIcon, SparklesIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
@@ -43,8 +43,10 @@ import {
   formatInr,
   openSignedUrl,
 } from '../components/ui.jsx';
-import { ROUTE_PATHS, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
+import { ROUTE_PATHS } from '../constants/routes.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
+import { hasCapability } from '../auth/capabilities.js';
+import { CAPABILITIES } from '../constants/capabilities.js';
 
 const INITIAL_COMPENSATION = Object.freeze({
   annualGross: '1800000',
@@ -695,11 +697,11 @@ function IssuePayslip({ rules, employeeOptions }) {
 
 export default function PayrollCenter() {
   const { currentUser } = useAuth();
-  const isPayrollAdmin = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
+  const isPayrollAdmin = hasCapability(currentUser, CAPABILITIES.MANAGE_PAYSLIPS);
   const [activeTabId, setActiveTabId] = useState('planner');
   const rulesResource = useApiResource((signal) => requestPayrollRules(signal), []);
-  // HR and admins pick employees from the workforce roster (the risk report lists every current employee).
-  const rosterResource = useApiResource((signal) => requestWorkforceRisk({ limit: 500 }, signal), [], {
+  // Whoever issues payslips (HR, Finance, admins) picks employees from the employee directory.
+  const rosterResource = useApiResource((signal) => requestEmployees(signal), [], {
     enabled: isPayrollAdmin,
   });
   const employeeOptions = useMemo(

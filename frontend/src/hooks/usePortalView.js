@@ -3,15 +3,16 @@
  *
  *   const { canSwitch, view, setView } = usePortalView(currentUser);
  *
- * Only PORTAL_SWITCH_ROLES can switch; for everyone else `canSwitch` is false and `view` is null (one
+ * Only people with a PORTAL_SWITCH_CAPABILITIES capability can switch; for everyone else `canSwitch` is false and `view` is null (one
  * sidebar, as always). The choice is remembered per person in this browser; when storage is blocked
  * (a private window, blocked site data) it simply starts at DEFAULT_PORTAL_VIEW each time.
  */
 
 import { useCallback, useState } from 'react';
+import { hasAnyCapability } from '../auth/capabilities.js';
 import {
   DEFAULT_PORTAL_VIEW,
-  PORTAL_SWITCH_ROLES,
+  PORTAL_SWITCH_CAPABILITIES,
   PORTAL_VIEWS,
   PORTAL_VIEW_STORAGE_KEY_PREFIX,
 } from '../constants/portal.js';
@@ -28,7 +29,7 @@ function readStoredView(storageKey) {
 }
 
 export function usePortalView(currentUser) {
-  const canSwitch = PORTAL_SWITCH_ROLES.includes(currentUser.role);
+  const canSwitch = hasAnyCapability(currentUser, PORTAL_SWITCH_CAPABILITIES);
   const storageKey = `${PORTAL_VIEW_STORAGE_KEY_PREFIX}${currentUser.id}`;
   const [chosenView, setChosenView] = useState(() => (canSwitch ? readStoredView(storageKey) : null));
 

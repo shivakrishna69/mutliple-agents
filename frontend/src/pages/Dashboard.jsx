@@ -39,6 +39,8 @@ import {
   TeamCard,
 } from '../components/dashboard/SupportSections.jsx';
 import { SERVICE_STATE_TONES } from '../constants/dashboardDisplay.js';
+import { hasCapability } from '../auth/capabilities.js';
+import { CAPABILITIES } from '../constants/capabilities.js';
 import { USER_ROLES } from '../constants/routes.js';
 import { useApiResource } from '../hooks/useApiResource.js';
 import { useSystemHealth } from '../hooks/useSystemHealth.js';
@@ -49,6 +51,8 @@ const DEFAULT_RANGE = 'today';
 const SUBTITLES = Object.freeze({
   [USER_ROLES.ADMIN]: 'Here’s what’s happening across your people and support right now.',
   [USER_ROLES.HR]: 'Here’s how your organisation is doing today.',
+  [USER_ROLES.FINANCE]: 'Here’s your payroll and compensation work at a glance.',
+  [USER_ROLES.IT_ADMIN]: 'Here’s how your accounts and systems are doing right now.',
   [USER_ROLES.AGENT]: 'Here’s what’s waiting in support right now.',
 });
 
@@ -107,9 +111,9 @@ const statGrid = (count) =>
 export default function Dashboard() {
   const { currentUser } = useAuth();
   const [rangeKey, setRangeKey] = useState(DEFAULT_RANGE);
-  const isAdmin = currentUser.role === USER_ROLES.ADMIN;
+  const canSeeSystemHealth = hasCapability(currentUser, CAPABILITIES.VIEW_SYSTEM_HEALTH);
   const overview = useApiResource((signal) => requestDashboardOverview(rangeKey, { signal }), [rangeKey]);
-  const health = useSystemHealth(isAdmin);
+  const health = useSystemHealth(canSeeSystemHealth);
   const data = overview.data;
   const isCustomerView = Boolean(data) && !data.people && !data.support && !data.me;
   const conversations = useApiResource((signal) => requestConversationList({ signal }), [], {
@@ -142,7 +146,7 @@ export default function Dashboard() {
         </div>
         {(support || people) && data && (
           <div className="flex flex-wrap items-center gap-3">
-            {isAdmin && <AiAgentPill health={health.data} />}
+            {canSeeSystemHealth && <AiAgentPill health={health.data} />}
             <RangePicker ranges={data.ranges} value={rangeKey} onChange={setRangeKey} />
           </div>
         )}
@@ -179,6 +183,16 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Accounts and system health without the people or support columns (an IT administrator). */}
+      {data && !support && !people && (data.accounts || canSeeSystemHealth) && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {data.accounts && <TeamCard accounts={data.accounts} />}
+          {canSeeSystemHealth && (
+            <ConnectedServices health={health.data} isLoading={health.isLoading} error={health.error} />
+          )}
+        </div>
+      )}
+
       {(support || people) && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
@@ -189,7 +203,9 @@ export default function Dashboard() {
           <div className="space-y-6">
             {support && <ConsoleCard waitingForAgent={support.queue.waitingForAgent} />}
             {data.accounts && <TeamCard accounts={data.accounts} />}
-            {isAdmin && <ConnectedServices health={health.data} isLoading={health.isLoading} error={health.error} />}
+            {canSeeSystemHealth && (
+              <ConnectedServices health={health.data} isLoading={health.isLoading} error={health.error} />
+            )}
             {people && <HolidaysPanel holidays={people.holidays} />}
           </div>
         </div>
