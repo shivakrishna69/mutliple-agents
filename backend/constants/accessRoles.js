@@ -92,13 +92,23 @@ export const CAPABILITIES = Object.freeze({
   VIEW_AGENT_TELEMETRY: 'view_agent_telemetry',
   // The support console and the organisation directory.
   STAFF_SUPPORT: 'staff_support',
+  // Every department's knowledge base and agent (Departments & Agents). Heads and knowledge leads
+  // manage their own department's without it.
+  MANAGE_KNOWLEDGE_BASES: 'manage_knowledge_bases',
+  // Ask for help in the support chat. Staff answer it rather than use it, so admins do not get it.
+  USE_SUPPORT_CHAT: 'use_support_chat',
 });
 
 const C = CAPABILITIES;
 
+/** Capabilities for people asking for help, never for the administrators who answer them. */
+const REQUESTER_CAPABILITIES = Object.freeze([C.USE_SUPPORT_CHAT]);
+
 /** What each role may do. A role not listed here may do nothing beyond its own workspace. */
 export const ROLE_CAPABILITIES = Object.freeze({
-  [ROLES.ADMIN]: Object.freeze(Object.values(CAPABILITIES)),
+  [ROLES.ADMIN]: Object.freeze(
+    Object.values(CAPABILITIES).filter((capability) => !REQUESTER_CAPABILITIES.includes(capability)),
+  ),
   [ROLES.HR]: Object.freeze([
     C.MANAGE_WORKFORCE,
     C.READ_EMPLOYEE_DIRECTORY,
@@ -118,7 +128,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.VIEW_AGENT_TELEMETRY,
   ]),
   [ROLES.AGENT]: Object.freeze([C.STAFF_SUPPORT]),
-  [ROLES.EMPLOYEE]: Object.freeze([]),
+  [ROLES.EMPLOYEE]: Object.freeze([C.USE_SUPPORT_CHAT]),
 });
 
 /** True when `role` may do `capability`. An unknown role may do nothing. */
@@ -129,6 +139,16 @@ export function hasCapability(role, capability) {
 /** The capabilities of `role`, for the signed-in user's summary (the browser shows what they allow). */
 export function capabilitiesOf(role) {
   return [...(ROLE_CAPABILITIES[role] ?? [])];
+}
+
+/**
+ * The roles `assignerRole` may give someone in Users & roles (with their labels and groups): every
+ * role for an admin; every role except admin for anyone else who manages users.
+ */
+export function assignableRoleDefinitionsFor(assignerRole) {
+  if (!hasCapability(assignerRole, CAPABILITIES.MANAGE_USERS)) return [];
+  const mayAssignAdmin = hasCapability(assignerRole, CAPABILITIES.ASSIGN_ADMIN_ROLE);
+  return ROLE_DEFINITIONS.filter((definition) => mayAssignAdmin || definition.value !== ROLES.ADMIN);
 }
 
 /** Roles that can be given by invitation. Nobody becomes an admin by invitation. */

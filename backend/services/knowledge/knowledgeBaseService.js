@@ -25,6 +25,7 @@
 
 import { createHash } from 'node:crypto';
 
+import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import { KNOWLEDGE_MESSAGES } from '../../constants/messages.js';
 import { KNOWLEDGE_BASE_SETTINGS } from '../../constants/validation.js';
@@ -32,7 +33,7 @@ import AgentDocument, { DOCUMENT_STATUSES } from '../../models/AgentDocument.js'
 import Department from '../../models/Department.js';
 import DepartmentAgent, { AGENT_STATUSES } from '../../models/DepartmentAgent.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../../models/EmployeeProfile.js';
-import User, { ACCOUNT_STATUSES, ROLES } from '../../models/User.js';
+import User, { ACCOUNT_STATUSES } from '../../models/User.js';
 import { logger } from '../../utils/logger.js';
 import { isDuplicateKeyError } from '../../utils/mongoErrors.js';
 import { sanitizeOriginalFileName } from '../../validators/vaultValidators.js';
@@ -366,7 +367,8 @@ export async function requeueKnowledgeDocuments({ departmentId = null } = {}) {
 
 /** The departments this user heads or leads, or every department for an administrator. */
 async function manageableDepartments(user, ownProfileId) {
-  if (user.role === ROLES.ADMIN) return Department.find({}).sort({ name: 1 }).lean();
+  if (hasCapability(user.role, CAPABILITIES.MANAGE_KNOWLEDGE_BASES))
+    return Department.find({}).sort({ name: 1 }).lean();
   const ledAgents = await DepartmentAgent.find({ managedBy: user.id }).select('departmentId').lean();
   const departmentIds = ledAgents.map((agent) => agent.departmentId);
   return Department.find({

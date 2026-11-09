@@ -19,7 +19,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { ROLES } from '../models/User.js';
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { SUPPORT_MESSAGES, VALIDATION_MESSAGES } from '../constants/messages.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
@@ -31,7 +31,7 @@ const CLIENT_MESSAGE_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
 
 export async function sendCustomerMessage(req, res, next) {
   try {
-    if (req.user.role !== ROLES.EMPLOYEE) {
+    if (!hasCapability(req.user.role, CAPABILITIES.USE_SUPPORT_CHAT)) {
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, SUPPORT_MESSAGES.CUSTOMERS_ONLY);
     }
 
