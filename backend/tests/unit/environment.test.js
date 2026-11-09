@@ -109,6 +109,13 @@ describe('loadConfig', () => {
     assert.equal(loadWith({ REDIS_URL: 'redis://redis:6379' }).redisUrl, 'redis://redis:6379');
   });
 
+  it("namespaces the queues with QUEUE_PREFIX, BullMQ's own by default", () => {
+    assert.equal(loadWith({}).queuePrefix, 'bull');
+    assert.equal(loadWith({ QUEUE_PREFIX: ' nsk-staging ' }).queuePrefix, 'nsk-staging');
+    assert.throws(() => loadWith({ QUEUE_PREFIX: 'bad:prefix' }), /QUEUE_PREFIX may only contain/);
+    assert.throws(() => loadWith({ QUEUE_PREFIX: 'x'.repeat(65) }), /QUEUE_PREFIX may only contain/);
+  });
+
   it('requires the company details and a signing secret before payslips can be enabled', () => {
     const payslipBucket = { PAYSLIP_S3_BUCKET: 'company-payslips', AWS_REGION: 'ap-south-1' };
     assert.throws(() => loadWith(payslipBucket), /COMPANY_LEGAL_NAME .* is required when PAYSLIP_S3_BUCKET is set/);

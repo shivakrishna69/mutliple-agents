@@ -14,7 +14,10 @@
  *
  *   const queue = createDurableQueue({ queueName, jobName, dataKey, label, sweepIntervalMs,
  *                                      findWaitingIds, runJob, concurrency, attempts, backoffMs });
- *   queue.init({ redisUrl, ... })   starts the queue, this instance's worker (with Redis) and the sweep;
+ *   queue.init({ redisUrl, queuePrefix, ... })
+ *                                   starts the queue, this instance's worker (with Redis) and the sweep;
+ *                                   queuePrefix namespaces the keys, so deployments (or test servers)
+ *                                   sharing one Redis never take each other's jobs
  *                                   the whole config object is given to runJob as context.config
  *   queue.dispatch(recordId)        hands a record to a worker
  *   queue.close()                   stops everything (on shutdown)
@@ -29,6 +32,8 @@ import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { logger } from '../utils/logger.js';
 
+// BullMQ's own key prefix, used when the config names none.
+const DEFAULT_PREFIX = 'bull';
 // Failed BullMQ jobs kept for inspection; the record in MongoDB is the source of truth.
 const FAILED_JOBS_KEPT = 100;
 
@@ -101,10 +106,12 @@ export function createDurableQueue({
       const queueConnection = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
       const workerConnection = queueConnection.duplicate();
       state.connections = [queueConnection, workerConnection];
-      state.queue = new Queue(queueName, { connection: queueConnection });
+      const prefix = config.queuePrefix ?? DEFAULT_PREFIX;
+      state.queue = new Queue(queueName, { connection: queueConnection, prefix });
       state.worker = new Worker(queueName, (queuedJob) => runJob(queuedJob.data[dataKey], state.runContext), {
         connection: workerConnection,
         concurrency,
+        prefix,
       });
       state.worker.on('failed', (queuedJob, runError) =>
         logger.error(`${label} stopped; it will be retried`, {
