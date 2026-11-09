@@ -18,7 +18,7 @@ missing or weak secrets (e.g. `JWT_SECRET`, `AI_SERVICE_API_KEY` shorter than 32
 |---|---|
 | `npm run dev` | development server with auto-restart |
 | `npm start` | production start |
-| `npm run set-role -- <email> <admin\|agent\|hr\|customer>` | recovery tool to change a role directly in the database |
+| `npm run set-role -- <email> <admin\|hr\|finance\|it_admin\|agent\|employee>` | recovery tool to change a role directly in the database (always stored lowercase) |
 | `npm run send-test-message` | sends a signed test message to the inbound webhook |
 | `node scripts/reindexKnowledge.js [departmentId]` | puts knowledge base documents back in the queue to be indexed again (after Qdrant lost its data, or the embedding or chunking changed) |
 | `node scripts/checkOfferLetterPdf.js` | renders and locks a sample offer letter, to check this machine's Chromium and qpdf |
@@ -48,7 +48,7 @@ scripts/         operational scripts
 |---|---|---|
 | `/api/auth` | signup with email confirmation, login, logout, current user, password change, forgotten password reset | public / signed in |
 | `/api/support`, `/api/conversations`, `/api/webhooks` | support desk | customers / staff / signed webhooks |
-| `/api/admin` | users and roles | admin |
+| `/api/admin` | users and roles (only an admin grants or changes administration) | admin, IT administrator |
 | `/api/attendance` | punch-in (office, home or on duty), punch-out, today's board, AI regularization, manager reviews | employees / managers / HR |
 | `/api/presence` | my presence setup and notice, who is available/away/offline now, daily active hours | everyone (own) / managers / HR |
 | `/api/payroll` | tax estimates, payslips, public payslip verification | employees / HR |
@@ -168,8 +168,10 @@ Bulk import (`/api/employees/bulk-upload`):
 
 Columns (case, spaces and hyphens do not matter): `name`, `personal_email`, `department_code`,
 `designation`, `date_of_joining` are required; `company_email`, `department_name` (for a new
-department), `role` (employee, hr, agent), `manager_email`, `work_type` (Onsite, Hybrid, Remote),
-`employment_status` (Probation, Active) and `office_code` are optional.
+department), `role` (employee, agent; an admin also hr, finance, it_admin), `manager_email`,
+`work_type` (Onsite, Hybrid, Remote), `employment_status` (Probation, Active), `office_code`,
+`job_level` (a value or label, e.g. `cto` or "Team Lead"; Individual Contributor when empty) and
+`employment_type` (full_time, contractor, intern; full-time when empty) are optional.
 
 ## Onboarding offers: CTC structure and offer letters
 
