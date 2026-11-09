@@ -5,6 +5,7 @@
  */
 
 import { useId } from 'react';
+import { groupsOf } from '../utils/groupedOptions.js';
 
 const BUTTON_VARIANTS = Object.freeze({
   primary:
@@ -240,16 +241,31 @@ export function TextInput({ label, hint, error, className, ...inputProps }) {
   );
 }
 
+const renderOption = (option) => (
+  <option key={option.value} value={option.value}>
+    {option.label}
+  </option>
+);
+
+/** Options listed in order; those with a `group` (utils/groupedOptions.js) are shown under it. */
+export function SelectOptions({ options }) {
+  return groupsOf(options).map(({ group, options: groupOptions }) =>
+    group ? (
+      <optgroup key={group} label={group}>
+        {groupOptions.map(renderOption)}
+      </optgroup>
+    ) : (
+      groupOptions.map(renderOption)
+    ),
+  );
+}
+
 export function SelectInput({ label, hint, error, options, className, ...selectProps }) {
   return (
     <Field label={label} hint={hint} error={error} className={className}>
       {(controlId, inputClassName) => (
         <select id={controlId} className={inputClassName} aria-invalid={Boolean(error) || undefined} {...selectProps}>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+          <SelectOptions options={options} />
         </select>
       )}
     </Field>

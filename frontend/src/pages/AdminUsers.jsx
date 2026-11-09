@@ -1,15 +1,18 @@
 /**
- * Users & roles (admins only): find accounts and change their role from the site.
+ * Users & roles (MANAGE_USERS: admins and IT administrators): find accounts and change their role.
  *
  *   - Search by name or email (debounced) and filter by role; tab counts are totals per role.
  *   - Changing a role is two steps: pick the new role in the row's menu, then confirm with Save
  *     (Cancel restores it). One change can be in flight at a time per row.
+ *   - The role menu lists the roles the server says you may assign, grouped (Administration,
+ *     Operations, …). An IT administrator is never offered Admin, and admins' rows are read-only
+ *     for them: only an admin grants or changes administration (the backend refuses it too).
  *   - Your own row is read-only: the backend refuses self role changes (409) so an admin cannot
  *     lock the deployment out of administration by accident.
  *   - After a change, the affected user's open sessions lose their live connection and pick up
  *     the new permissions on their next request (backend disconnectUserSockets).
  *
- * The page is behind AdminRoute, and every request is authorised again by the backend.
+ * The page is behind CapabilityRoute (MANAGE_USERS), and every request is authorised again by the backend.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,23 +23,26 @@ import ErrorBanner from '../components/ErrorBanner.jsx';
 import { SearchIcon, ShieldIcon, UsersIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import RoleBadge from '../components/RoleBadge.jsx';
+import { SelectOptions } from '../components/ui.jsx';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { ROLE_DISPLAY, USER_ROLES } from '../constants/routes.js';
+import { toGroupedOptions } from '../utils/groupedOptions.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
 /** Same limit as the backend (adminController MAX_SEARCH_LENGTH). */
 const SEARCH_MAX_LENGTH = 100;
-const ROLE_OPTIONS = Object.freeze([
-  USER_ROLES.EMPLOYEE,
-  USER_ROLES.AGENT,
+/** Every role, in the order of the summary cards and filter tabs (most access first). */
+const DISPLAYED_ROLES = Object.freeze([
+  USER_ROLES.ADMIN,
   USER_ROLES.HR,
   USER_ROLES.FINANCE,
   USER_ROLES.IT_ADMIN,
-  USER_ROLES.ADMIN,
+  USER_ROLES.AGENT,
+  USER_ROLES.EMPLOYEE,
 ]);
 const ROLE_FILTER_TABS = Object.freeze([
   { value: '', label: 'All' },
-  ...ROLE_OPTIONS.map((role) => ({ value: role, label: ROLE_DISPLAY[role].pluralLabel })),
+  ...DISPLAYED_ROLES.map((role) => ({ value: role, label: ROLE_DISPLAY[role].pluralLabel })),
 ]);
 
 const joinedDateFormatter = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -64,8 +70,11 @@ function UserAvatar({ name }) {
   );
 }
 
-/** Role cell: badge for your own row; otherwise a menu plus Save/Cancel once a different role is picked. */
-function RoleEditor({ userSummary, isCurrentUser, isSaving, onSaveRole }) {
+/**
+ * Role cell: a badge for your own row, and for an admin's row when you may not change admins;
+ * otherwise a grouped menu of the roles you may assign, plus Save/Cancel once a different one is picked.
+ */
+function RoleEditor({ userSummary, isCurrentUser, roleOptions, canChangeAdmins, isSaving, onSaveRole }) {
   const [selectedRole, setSelectedRole] = useState(userSummary.role);
   const hasPendingChange = selectedRole !== userSummary.role;
 
@@ -76,11 +85,16 @@ function RoleEditor({ userSummary, isCurrentUser, isSaving, onSaveRole }) {
     setSelectedRole(userSummary.role);
   }
 
-  if (isCurrentUser) {
+  const readOnlyReason = isCurrentUser
+    ? 'Your own role can’t be changed here'
+    : userSummary.role === USER_ROLES.ADMIN && !canChangeAdmins
+      ? 'Only an admin can change an admin’s role'
+      : null;
+  if (readOnlyReason) {
     return (
       <div className="flex items-center gap-2">
         <RoleBadge role={userSummary.role} />
-        <span className="text-xs text-slate-400">Your own role can’t be changed here</span>
+        <span className="text-xs text-slate-400">{readOnlyReason}</span>
       </div>
     );
   }
@@ -97,11 +111,7 @@ function RoleEditor({ userSummary, isCurrentUser, isSaving, onSaveRole }) {
         onChange={(changeEvent) => setSelectedRole(changeEvent.target.value)}
         className="rounded-lg border border-slate-200 bg-white py-1.5 pr-8 pl-3 text-sm text-slate-800 shadow-sm transition hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 focus:outline-none disabled:opacity-60"
       >
-        {ROLE_OPTIONS.map((roleOption) => (
-          <option key={roleOption} value={roleOption}>
-            {ROLE_DISPLAY[roleOption].label}
-          </option>
-        ))}
+        <SelectOptions options={toGroupedOptions(roleOptions)} />
       </select>
       {hasPendingChange && (
         <>
@@ -136,6 +146,8 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('');
   const [users, setUsers] = useState([]);
   const [countsByRole, setCountsByRole] = useState(null);
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [canChangeAdmins, setCanChangeAdmins] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [pageError, setPageError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
@@ -166,6 +178,8 @@ export default function AdminUsers() {
       .then((userListResult) => {
         setUsers(userListResult.users);
         setCountsByRole(userListResult.countsByRole);
+        setRoleOptions(userListResult.roleOptions);
+        setCanChangeAdmins(userListResult.canChangeAdmins);
         setPageError(null);
       })
       .catch((error) => {
@@ -219,23 +233,25 @@ export default function AdminUsers() {
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-8 lg:py-10">
       <PageHeader
         title="Users & roles"
-        description="Give teammates access to the support console or HR tools, or make them administrators."
+        description={
+          canChangeAdmins
+            ? 'Give teammates access to HR, payroll, IT or support tools, or make them administrators.'
+            : 'Give teammates access to HR, payroll, IT or support tools. Only an admin can grant administration.'
+        }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {ROLE_OPTIONS.slice()
-          .reverse()
-          .map((role) => (
-            <div key={role} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <RoleBadge role={role} />
-                <span className="text-2xl font-bold tracking-tight text-slate-900">
-                  {countsByRole ? (countsByRole[role] ?? 0) : '—'}
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">{ROLE_DISPLAY[role].description}</p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {DISPLAYED_ROLES.map((role) => (
+          <div key={role} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <RoleBadge role={role} />
+              <span className="text-2xl font-bold tracking-tight text-slate-900">
+                {countsByRole ? (countsByRole[role] ?? 0) : '—'}
+              </span>
             </div>
-          ))}
+            <p className="mt-3 text-sm text-slate-500">{ROLE_DISPLAY[role].description}</p>
+          </div>
+        ))}
       </div>
 
       {pageError && (
@@ -359,6 +375,8 @@ export default function AdminUsers() {
                         <RoleEditor
                           userSummary={userSummary}
                           isCurrentUser={isCurrentUser}
+                          roleOptions={roleOptions}
+                          canChangeAdmins={canChangeAdmins}
                           isSaving={savingUserId === userSummary.id}
                           onSaveRole={saveRole}
                         />
