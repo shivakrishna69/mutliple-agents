@@ -25,6 +25,7 @@ npm run test:integration    # real server + MongoDB (about 15 seconds)
 | `employeeImportParser.test.js` | Reading employee CSVs: Excel BOM, header names, quoted cells, line numbers, and the files refused                                                                                                                    |
 | `calendarDates.test.js`        | Calendar-date helpers across month, year and leap-day boundaries; nth weekday of the month                                                                                                                           |
 | `workingDays.test.js`          | Weekly offs (every week and 2nd/4th Saturday), holidays, half days and the sandwich rule, counted by hand on October 2026                                                                                            |
+| `telemetryWorkflows.test.js`   | The telemetry workflows the backend accepts match the ai-service's WORKFLOW_* names, so no workflow's events are dropped                                                                                             |
 | `leaveAccrualRules.test.js`    | Monthly and upfront accrual, start- and end-of-month credits, joiner pro-rata and rounding, accrual during notice, year-end carry forward, lapse and encashment, worked out by hand                                  |
 
 ## Integration tests (`tests/integration/`)
