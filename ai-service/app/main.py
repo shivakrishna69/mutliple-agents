@@ -17,6 +17,20 @@ Endpoints
                       The department knowledge index (app/knowledge/router.py): store a batch of a
                       document's chunks, or evict a document's chunks. Same key. 503 when QDRANT_URL
                       is not set or the index cannot be reached.
+    POST /ai/knowledge/answer
+                      One employee question to a department's agent (app/nodes/knowledge_agent/):
+                      KnowledgeAnswerInput -> KnowledgeAnswerResponse { outcome answered | not_found |
+                      refused, answer, citations, passages_considered, usage }. Same key. 503 when
+                      the LLM or the knowledge index is not configured or unreachable, 504 on the
+                      turn deadline. With "stream": true the body is newline-delimited JSON
+                      (application/x-ndjson), one event per line:
+                          {"type": "delta", "text": ...}   part of the answer, as it is written
+                          {"type": "final", ...}           the KnowledgeAnswerResponse; its answer
+                                                           replaces the deltas (the checks may change it)
+                          {"type": "error", "code", "message"}  instead of "final" when the turn failed
+                                                           after the response started (codes:
+                                                           knowledge_unavailable, timeout, unavailable,
+                                                           internal_error)
 
 Request lifecycle for POST /ai/process
     1. Middleware assigns/propagates X-Request-Id and logs the request when it completes.
@@ -46,6 +60,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import logging
 import sys
 import time
@@ -56,13 +71,15 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from app.agent import (
+    AgentError,
     AgentRuntime,
     AgentTimeoutError,
     InvalidModelOutputError,
+    KnowledgeAnswerUnavailableError,
     LeaveAssistantUnavailableError,
     LLMNotConfiguredError,
     RegularizationUnavailableError,
@@ -71,6 +88,7 @@ from app.config import ConfigurationError, Settings
 from app.knowledge.router import knowledge_router
 from app.knowledge.service import KnowledgeService, KnowledgeUnavailableError
 from app.logging_config import configure_logging
+from app.nodes.knowledge_agent import KnowledgeAnswerInput, KnowledgeAnswerResponse
 from app.nodes.leave_assistant import LeaveAssistantInput, LeaveAssistantResponse
 from app.schemas import (
     AIProcessResponse,
@@ -156,6 +174,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     knowledge_service = KnowledgeService(settings)
     application.state.knowledge_service = knowledge_service
     knowledge_service.start()
+    agent_runtime.attach_knowledge_retriever(knowledge_service)
     eviction_task = asyncio.create_task(run_thread_eviction_loop(agent_runtime), name="thread-eviction")
 
     if agent_runtime.is_llm_configured:
@@ -518,6 +537,119 @@ async def answer_leave_question(turn_input: LeaveAssistantInput, request: Reques
         },
     )
     return LeaveAssistantResponse(reply=result.reply, draft=result.draft, tools_used=result.tools_used)
+
+
+NDJSON_MEDIA_TYPE = "application/x-ndjson"
+# Messages of stream error events; safe to show, like ServiceError messages.
+KNOWLEDGE_STREAM_ERRORS = {
+    "knowledge_unavailable": "Knowledge index unavailable",
+    "timeout": "AI processing timed out",
+    "unavailable": "The knowledge agent is unavailable",
+    "internal_error": "Internal server error",
+}
+
+
+def ndjson_line(event: dict[str, Any]) -> str:
+    return json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
+def log_knowledge_answer(result: KnowledgeAnswerResponse, log_context: dict[str, Any], started_at: float) -> None:
+    logger.info(
+        "Knowledge question answered",
+        extra={
+            **log_context,
+            "outcome": result.outcome.value,
+            "passages_considered": result.passages_considered,
+            "citations": len(result.citations),
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 1),
+        },
+    )
+
+
+async def stream_knowledge_answer(
+    agent_runtime: AgentRuntime, answer_input: KnowledgeAnswerInput, log_context: dict[str, Any]
+) -> AsyncIterator[str]:
+    """The answer as NDJSON events (see the module docstring). Stops the turn if the caller leaves."""
+    started_at = time.perf_counter()
+    lines: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def send_delta(text: str) -> None:
+        await lines.put(ndjson_line({"type": "delta", "text": text}))
+
+    async def run_turn() -> None:
+        error_code: str | None = None
+        try:
+            result = await agent_runtime.process_knowledge_question(answer_input, send_delta)
+            log_knowledge_answer(result, log_context, started_at)
+            await lines.put(ndjson_line({"type": "final", **result.model_dump(mode="json")}))
+        except KnowledgeUnavailableError as unavailable_error:
+            logger.error(
+                "Knowledge answer failed: index unavailable", extra={**log_context, "reason": unavailable_error.reason}
+            )
+            error_code = "knowledge_unavailable"
+        except AgentTimeoutError as timeout_error:
+            logger.error("Knowledge answer timed out", extra={**log_context, "detail": timeout_error.detail})
+            error_code = "timeout"
+        except AgentError as agent_error:
+            logger.error("Knowledge answer failed", extra={**log_context, "reason": agent_error.failure_kind})
+            error_code = "unavailable"
+        except Exception:
+            logger.exception("Knowledge answer failed unexpectedly", extra=log_context)
+            error_code = "internal_error"
+        finally:
+            if error_code is not None:
+                await lines.put(
+                    ndjson_line({"type": "error", "code": error_code, "message": KNOWLEDGE_STREAM_ERRORS[error_code]})
+                )
+            await lines.put(None)
+
+    turn = asyncio.create_task(run_turn(), name="knowledge-answer-stream")
+    try:
+        while (line := await lines.get()) is not None:
+            yield line
+    finally:
+        if not turn.done():
+            turn.cancel()
+            try:
+                await turn
+            except asyncio.CancelledError:
+                pass
+
+
+@app.post(
+    "/ai/knowledge/answer",
+    response_model=KnowledgeAnswerResponse,
+    responses={**ERROR_RESPONSES, 200: {"content": {NDJSON_MEDIA_TYPE: {}}}},
+    dependencies=[Depends(require_internal_api_key)],
+    tags=["knowledge"],
+)
+async def answer_knowledge_question(answer_input: KnowledgeAnswerInput, request: Request):
+    """Answers one employee question from a department's knowledge base, citing its passages."""
+    agent_runtime: AgentRuntime = request.app.state.agent_runtime
+    knowledge_service: KnowledgeService = request.app.state.knowledge_service
+    log_context = {"requestId": getattr(request.state, "request_id", None), "department_id": answer_input.department_id}
+    if not agent_runtime.is_llm_configured:
+        logger.error("Knowledge question rejected: LLM not configured", extra=log_context)
+        raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI model is not configured")
+    if not knowledge_service.is_configured:
+        raise KnowledgeUnavailableError("QDRANT_URL is not configured")
+    if answer_input.stream:
+        return StreamingResponse(
+            stream_knowledge_answer(agent_runtime, answer_input, log_context), media_type=NDJSON_MEDIA_TYPE
+        )
+
+    started_at = time.perf_counter()
+    try:
+        result = await agent_runtime.process_knowledge_question(answer_input)
+    except KnowledgeAnswerUnavailableError as unavailable_error:
+        raise ServiceError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, KNOWLEDGE_STREAM_ERRORS["unavailable"]
+        ) from unavailable_error
+    except AgentTimeoutError as timeout_error:
+        logger.error("Knowledge answer timed out", extra={**log_context, "detail": timeout_error.detail})
+        raise ServiceError(status.HTTP_504_GATEWAY_TIMEOUT, KNOWLEDGE_STREAM_ERRORS["timeout"]) from timeout_error
+    log_knowledge_answer(result, log_context, started_at)
+    return result
 
 
 app.include_router(
