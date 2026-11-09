@@ -110,6 +110,16 @@ class Settings:
     embedding_cache_dir: str | None
     embedding_offline: bool
 
+    # Answers from a department's knowledge (app/nodes/knowledge_agent/): how many passages the
+    # search returns, the least relevance (cosine similarity, 0-1) a passage needs to be shown to the
+    # model at all, how many earlier messages of the conversation go with a question, how long a
+    # cited excerpt may be, and the model's temperature (low: answers should follow the documents).
+    knowledge_answer_top_k: int
+    knowledge_min_relevance: float
+    knowledge_answer_history_messages: int
+    knowledge_excerpt_chars: int
+    knowledge_answer_temperature: float
+
     # Conversation memory bounds (see agent.ThreadRegistry).
     max_context_messages: int
     thread_idle_ttl_seconds: int
@@ -224,4 +234,9 @@ class Settings:
             qdrant_timeout_seconds=_read_int("QDRANT_TIMEOUT_SECONDS", 10, 1, 60),
             embedding_cache_dir=os.getenv("EMBEDDING_CACHE_DIR", "").strip() or None,
             embedding_offline=embedding_offline,
+            knowledge_answer_top_k=_read_int("KNOWLEDGE_ANSWER_TOP_K", 6, 1, 20),
+            knowledge_min_relevance=_read_float("KNOWLEDGE_MIN_RELEVANCE", 0.6, 0.0, 1.0),
+            knowledge_answer_history_messages=_read_int("KNOWLEDGE_ANSWER_HISTORY_MESSAGES", 6, 0, 20),
+            knowledge_excerpt_chars=_read_int("KNOWLEDGE_EXCERPT_CHARS", 1200, 100, 2000),
+            knowledge_answer_temperature=_read_float("KNOWLEDGE_ANSWER_TEMPERATURE", 0.1, 0.0, 1.0),
         )
