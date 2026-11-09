@@ -31,7 +31,7 @@
  *   event_id        32 hex chars                     eventId
  *   event_type      one of AGENT_TELEMETRY_EVENTS    eventType (also the socket event name)
  *   occurred_at     ISO-8601 timestamp               occurredAt
- *   workflow        support | regularization         workflow
+ *   workflow        TELEMETRY_WORKFLOWS              workflow
  *   turn_id         32 hex chars                     turnId    groups the events of one turn
  *   sequence        integer >= 0, per turn           sequence  orders events within a turn
  *   conversation_id ObjectId string or null          conversationId
@@ -64,7 +64,8 @@ export const THINKING_PHASES = Object.freeze([
   'turn_failed',
 ]);
 
-export const TELEMETRY_WORKFLOWS = Object.freeze(['support', 'regularization']);
+/** The ai-service's workflows (ai-service/app/telemetry.py WORKFLOW_*); a backend test keeps them equal. */
+export const TELEMETRY_WORKFLOWS = Object.freeze(['support', 'regularization', 'leave_assistant', 'knowledge_answer']);
 export const TELEMETRY_STATUSES = Object.freeze(['success', 'error']);
 
 export const TELEMETRY_LIMITS = Object.freeze({
