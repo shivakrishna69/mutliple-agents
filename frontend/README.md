@@ -43,10 +43,10 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | File | Covers |
 |---|---|
 | `e2e/auth.spec.js` | Sign-up with the phone country picker, date of birth and gender, confirmed with the emailed code (a wrong code refused first); the server's message under each refused field; sign-out and the session ending on the server; a sign-in before confirming leads to "verify your email" and the emailed link confirms, once; forgot password with the emailed code, which also expires the emailed link; wrong password; redirect to sign-in |
-| `e2e/roles.spec.js` | What admin, HR and customers see; the admin changes the employee ID format and email domain; admin-only addresses redirect customers |
+| `e2e/roles.spec.js` | Users & roles for an admin (every role, grouped) and an IT administrator (never Admin; admins' rows read-only); company settings for both |
 | `e2e/onboarding.spec.js` | HR invites a joiner (who gets an employee ID), who activates the account from the link (after agreeing to the terms); the link works once; HR imports a CSV with a new department, a manager, their report and a bad row, starts it, sees every row's outcome and downloads the results |
 | `e2e/payroll.spec.js` | The tax planner's result for a hand-checked salary |
-| `e2e/pages.spec.js` | Every page of every role loads with no uncaught errors or 5xx responses; public payslip check |
+| `e2e/pages.spec.js` | For each of the six roles: the exact sidebar, the role badge and dashboard sections, every page it may open loads with no uncaught errors or 5xx responses, and every guarded page it may not open redirects to the dashboard; public payslip check |
 | `e2e/leaveApprovalSteps.spec.js` | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved |
 | `e2e/leaveAssistant.spec.js` | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message |
 | `e2e/leaveRequests.spec.js` | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave |
@@ -62,8 +62,9 @@ On failure, `playwright-report/` and `test-results/` hold screenshots and traces
 src/App.jsx           route table (workforce pages are lazy-loaded)
 src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors
 src/auth/             AuthContext: session state and CSRF token
-src/components/       AppShell (dark role-aware sidebar, top bar with breadcrumb, the portal switcher for
-                      admins and HR and, for admins, the services' state), PortalSwitcher, RouteGuards,
+src/components/       AppShell (dark sidebar built from the signed-in person's capabilities, top bar with
+                      breadcrumb, the portal switcher for admins, HR and IT administrators and, with
+                      VIEW_SYSTEM_HEALTH, the services' state), PortalSwitcher, RouteGuards (CapabilityRoute),
                       ui.jsx design primitives, feature panels (knowledge/: a department agent's
                       settings with the lead picker, and its documents with upload, status and delete;
                       workplace/: departments, offices, holidays, base offices; people/: the CSV import;
@@ -95,7 +96,11 @@ src/validation/       client-side form checks (the backend validates again); the
                       nothing themselves and show the server's messages
 ```
 
-Route guards only steer navigation; the backend authorises every request.
+Navigation follows capabilities, not role names: the server sends the signed-in person's
+capabilities with their profile (`user.capabilities`), `auth/capabilities.js` answers "may they do
+X?", and each sidebar item and `CapabilityRoute` names the capability it needs
+(`constants/capabilities.js`, kept equal to the backend's by a backend unit test). Route guards only
+steer navigation; the backend authorises every request.
 
 **Portal views.** Admins and HR switch, in the top bar (in the menu on small screens), between
 "Employee self-service" (their own pages) and "Admin / Management" (the management tools too; where
