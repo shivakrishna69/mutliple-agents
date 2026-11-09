@@ -62,6 +62,8 @@ const rowSchema = new mongoose.Schema(
       workLocationType: String,
       employmentStatus: String,
       officeCode: { type: String, default: null },
+      jobLevel: { type: String, default: null },
+      employmentType: { type: String, default: null },
     },
     // A manager who already worked here when the file was checked; a manager in the same file is
     // found by `input.managerEmail` when their row is imported.

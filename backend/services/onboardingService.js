@@ -240,6 +240,8 @@ export function toDraftSummary(draft) {
       workLocationType: draft.position.workLocationType,
       dateOfJoining: draft.position.dateOfJoining.toISOString().slice(0, 10),
       employmentStatus: draft.position.employmentStatus,
+      jobLevel: draft.position.jobLevel,
+      employmentType: draft.position.employmentType,
     },
     compensation: { ...draft.compensation },
     structure: draft.structure,
@@ -365,6 +367,8 @@ const invitationInputOf = (draft) => ({
     workLocationType: draft.position.workLocationType,
     dateOfJoining: draft.position.dateOfJoining,
     employmentStatus: draft.position.employmentStatus,
+    jobLevel: draft.position.jobLevel,
+    employmentType: draft.position.employmentType,
   },
 });
 

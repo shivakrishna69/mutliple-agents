@@ -1,3 +1,3 @@
-name,personal_email,company_email,department_code,department_name,designation,role,manager_email,date_of_joining,work_type,employment_status,office_code
-Asha Example,asha.example@example.com,,ENG,Engineering,Engineering Manager,employee,,2026-11-02,Onsite,Active,
-Ravi Example,ravi.example@example.com,,ENG,,Software Engineer,employee,asha.example@example.com,2026-11-02,Hybrid,Probation,
+name,personal_email,company_email,department_code,department_name,designation,role,manager_email,date_of_joining,work_type,employment_status,office_code,job_level,employment_type
+Asha Example,asha.example@example.com,,ENG,Engineering,Engineering Manager,employee,,2026-11-02,Onsite,Active,,manager,full_time
+Ravi Example,ravi.example@example.com,,ENG,,Software Engineer,employee,asha.example@example.com,2026-11-02,Hybrid,Probation,,individual_contributor,full_time

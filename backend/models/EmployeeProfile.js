@@ -66,6 +66,7 @@
  */
 
 import mongoose from 'mongoose';
+import { DEFAULT_EMPLOYMENT_TYPE, DEFAULT_JOB_LEVEL, EMPLOYMENT_TYPES, JOB_LEVELS } from '../constants/accessRoles.js';
 import { MAC_ADDRESS_PATTERN, ORGANIZATION_FIELD_LIMITS } from '../constants/validation.js';
 import { invalidateOrgHierarchyCache } from '../services/orgHierarchyCache.js';
 import Department from './Department.js';
@@ -193,6 +194,20 @@ const employeeProfileSchema = new mongoose.Schema(
         enum: { values: Object.values(EMPLOYMENT_STATUSES), message: 'Employment status "{VALUE}" is not valid' },
         required: true,
         default: EMPLOYMENT_STATUSES.PROBATION,
+      },
+      // Who the person is in the company (constants/accessRoles.js): for display and reports only;
+      // it grants nothing (approvals follow reporting lines and department heads).
+      jobLevel: {
+        type: String,
+        enum: { values: JOB_LEVELS, message: 'Job level "{VALUE}" is not valid' },
+        required: true,
+        default: DEFAULT_JOB_LEVEL,
+      },
+      employmentType: {
+        type: String,
+        enum: { values: EMPLOYMENT_TYPES, message: 'Employment type "{VALUE}" is not valid' },
+        required: true,
+        default: DEFAULT_EMPLOYMENT_TYPE,
       },
     },
 

@@ -29,6 +29,8 @@ export const IMPORT_COLUMNS = Object.freeze([
   Object.freeze({ name: 'work_type', required: false }),
   Object.freeze({ name: 'employment_status', required: false }),
   Object.freeze({ name: 'office_code', required: false }),
+  Object.freeze({ name: 'job_level', required: false }),
+  Object.freeze({ name: 'employment_type', required: false }),
 ]);
 
 /** Other names spreadsheets use for the same columns. */

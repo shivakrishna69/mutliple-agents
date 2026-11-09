@@ -18,12 +18,29 @@ import Department from '../models/Department.js';
 import { IMPORT_ROW_STATUSES } from '../models/EmployeeImportJob.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
-import User, { ACCOUNT_STATUSES, ROLES } from '../models/User.js';
+import {
+  DEFAULT_EMPLOYMENT_TYPE,
+  DEFAULT_JOB_LEVEL,
+  EMPLOYMENT_TYPE_DEFINITIONS,
+  INVITABLE_ROLES,
+  JOB_LEVEL_DEFINITIONS,
+} from '../constants/accessRoles.js';
+import User, { ACCOUNT_STATUSES } from '../models/User.js';
 import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { invitableRolesFor } from './invitationService.js';
 
-/** The role column's words, and the account role each gives. Empty means employee. */
-export const IMPORT_ROLE_VALUES = Object.freeze({ employee: ROLES.CUSTOMER, hr: ROLES.HR, agent: ROLES.AGENT });
+/** A cell matching a definition's value or label, ignoring case, spaces and hyphens; null when none. */
+function choiceOf(cellText, definitions) {
+  const normalize = (text) => text.toLowerCase().replace(/[\s-]+/g, '_');
+  const wanted = normalize(cellText);
+  return (
+    definitions.find((definition) => [definition.value, definition.label].map(normalize).includes(wanted))?.value ??
+    null
+  );
+}
+
+/** The role column's words: the stored role values (constants/accessRoles.js INVITABLE_ROLES). Empty means employee. */
+export const IMPORT_ROLE_VALUES = Object.freeze(Object.fromEntries(INVITABLE_ROLES.map((role) => [role, role])));
 const IMPORTABLE_EMPLOYMENT_STATUSES = Object.freeze([EMPLOYMENT_STATUSES.PROBATION, EMPLOYMENT_STATUSES.ACTIVE]);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -92,6 +109,19 @@ function checkRow(values, { allowedRoles, now }) {
     issue('employment_status', `must be ${IMPORTABLE_EMPLOYMENT_STATUSES.join(' or ')} (or empty for Probation)`);
 
   const officeCode = cell('office_code').toUpperCase() || null;
+  const jobLevel = cell('job_level') ? choiceOf(cell('job_level'), JOB_LEVEL_DEFINITIONS) : DEFAULT_JOB_LEVEL;
+  if (!jobLevel) {
+    issue('job_level', `must be one of ${JOB_LEVEL_DEFINITIONS.map((level) => level.value).join(', ')} (or empty)`);
+  }
+  const employmentType = cell('employment_type')
+    ? choiceOf(cell('employment_type'), EMPLOYMENT_TYPE_DEFINITIONS)
+    : DEFAULT_EMPLOYMENT_TYPE;
+  if (!employmentType) {
+    issue(
+      'employment_type',
+      `must be one of ${EMPLOYMENT_TYPE_DEFINITIONS.map((type) => type.value).join(', ')} (or empty)`,
+    );
+  }
   return {
     input: {
       name,
@@ -105,6 +135,8 @@ function checkRow(values, { allowedRoles, now }) {
       workLocationType,
       employmentStatus,
       officeCode,
+      jobLevel,
+      employmentType,
     },
     departmentName: cell('department_name'),
     issues,
