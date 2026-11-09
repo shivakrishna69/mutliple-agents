@@ -1,11 +1,12 @@
 /**
  * Company settings endpoints (routes/companyRoutes.js): the branding anyone may see, the full
- * settings for HR and administrators, and changes by administrators only. Changes are audited.
+ * settings for READ_COMPANY_SETTINGS (admins, IT administrators, HR), and changes by
+ * MANAGE_COMPANY_SETTINGS (admins, IT administrators). Changes are audited.
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { COMPANY_MESSAGES } from '../constants/messages.js';
-import { ROLES } from '../models/User.js';
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import {
   getCompanySettings,
   toCompanyBranding,
@@ -38,19 +39,19 @@ export async function getCompanyBranding(req, res, next) {
 /** GET /api/company/settings */
 export const getCompanySettingsHandler = companyHandler(
   'view_company_settings',
-  { requiresWorkforceAdmin: true, isWrite: false },
+  { capability: CAPABILITIES.READ_COMPANY_SETTINGS, isWrite: false },
   async () => ({
     message: COMPANY_MESSAGES.SETTINGS_RETRIEVED,
     data: { settings: toCompanySettingsSummary(await getCompanySettings()) },
   }),
 );
 
-/** PATCH /api/company/settings (administrators only) */
+/** PATCH /api/company/settings (admins and IT administrators; HR is told who can) */
 export const patchCompanySettings = companyHandler(
   'update_company_settings',
-  { requiresWorkforceAdmin: true, isWrite: true },
+  { capability: CAPABILITIES.READ_COMPANY_SETTINGS, isWrite: true },
   async (req) => {
-    if (req.user.role !== ROLES.ADMIN) {
+    if (!hasCapability(req.user.role, CAPABILITIES.MANAGE_COMPANY_SETTINGS)) {
       throw new ServiceError(HTTP_STATUS.FORBIDDEN, 'ADMINS_ONLY', COMPANY_MESSAGES.ADMINS_ONLY);
     }
     const validation = validateCompanySettingsChanges(req.body);

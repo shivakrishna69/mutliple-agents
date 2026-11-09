@@ -9,11 +9,13 @@
 import { Router } from 'express';
 import { listUsers, updateUserRole } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { requireAdmin } from '../middleware/requireRole.js';
+import { CAPABILITIES } from '../constants/accessRoles.js';
+import { ADMIN_MESSAGES } from '../constants/messages.js';
+import { requireCapability } from '../middleware/requireRole.js';
 
 const adminRouter = Router();
 
-adminRouter.use(protect, requireAdmin);
+adminRouter.use(protect, requireCapability(CAPABILITIES.MANAGE_USERS, ADMIN_MESSAGES.USER_MANAGERS_ONLY));
 adminRouter.get('/users', listUsers);
 adminRouter.patch('/users/:userId/role', updateUserRole);
 

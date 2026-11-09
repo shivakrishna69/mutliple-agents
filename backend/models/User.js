@@ -25,16 +25,15 @@
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { ROLES } from '../constants/accessRoles.js';
 import { EMAIL_PATTERN, GENDERS, PHONE_SETTINGS, USER_FIELD_LIMITS } from '../constants/validation.js';
 import { invalidateOrgHierarchyCache } from '../services/orgHierarchyCache.js';
 
-/** Allowed values for `role`. Import this instead of repeating the strings in route code. */
-export const ROLES = Object.freeze({
-  ADMIN: 'admin',
-  AGENT: 'agent',
-  HR: 'hr',
-  CUSTOMER: 'customer',
-});
+/**
+ * Allowed values for `role`, defined with what each may do in constants/accessRoles.js; re-exported
+ * here for the code that imports them with the model.
+ */
+export { ROLES };
 
 /**
  * bcrypt cost factor. 12 rounds takes roughly 200–300 ms per hash on current server CPUs:
@@ -125,7 +124,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: { values: Object.values(ROLES), message: 'Role "{VALUE}" is not valid' },
-      default: ROLES.CUSTOMER,
+      default: ROLES.EMPLOYEE,
       required: true,
     },
     // Only active accounts can sign in (controllers/authController.js) or keep a session.

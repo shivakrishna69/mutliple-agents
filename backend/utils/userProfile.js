@@ -5,6 +5,8 @@
  * field added to the User model later stays private until someone deliberately exposes it here.
  */
 
+import { capabilitiesOf, labelOfRole } from '../constants/accessRoles.js';
+
 /** Mongoose projection for the public profile. The password is never selected. */
 export const PUBLIC_USER_PROFILE_FIELDS = '_id name email role createdAt updatedAt';
 
@@ -15,6 +17,10 @@ export function toPublicUserProfile(userRecord) {
     name: userRecord.name,
     email: userRecord.email,
     role: userRecord.role,
+    // The role's label and what it may do (constants/accessRoles.js), so screens show and offer only
+    // what the backend will allow; the backend still checks every request.
+    roleLabel: labelOfRole(userRecord.role),
+    capabilities: capabilitiesOf(userRecord.role),
     createdAt: userRecord.createdAt,
     updatedAt: userRecord.updatedAt,
   };

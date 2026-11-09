@@ -13,8 +13,8 @@
  * sees the person, with their employee ID, before they join; the account cannot sign in until the
  * person chooses a password through the link.
  *
- * Who may invite whom: HR and admins invite employees (role "customer") and support agents;
- * only admins invite HR. Nobody becomes an admin by invitation.
+ * Who may invite whom (constants/accessRoles.js INVITATION_GRANTS): HR invites employees and support
+ * agents; admins also HR, Finance & Payroll and IT administrators. Nobody becomes an admin by invitation.
  *
  * Accepting is made safe against double use without transactions:
  *   1. claim:     findOneAndUpdate pending+unexpired -> "accepting" (atomic; a second tab gets nothing)
@@ -30,13 +30,18 @@
  */
 
 import Department from '../models/Department.js';
-import EmployeeInvitation, {
-  INVITABLE_ROLES,
-  INVITATION_LIMITS,
-  INVITATION_STATUSES,
-} from '../models/EmployeeInvitation.js';
+import EmployeeInvitation, { INVITATION_LIMITS, INVITATION_STATUSES } from '../models/EmployeeInvitation.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
-import User, { ACCOUNT_STATUSES, ROLES } from '../models/User.js';
+import {
+  DEFAULT_EMPLOYMENT_TYPE,
+  DEFAULT_JOB_LEVEL,
+  EMPLOYMENT_TYPE_DEFINITIONS,
+  INVITATION_GRANTS,
+  JOB_LEVEL_DEFINITIONS,
+  ROLE_DEFINITIONS,
+  ROLES,
+} from '../constants/accessRoles.js';
+import User, { ACCOUNT_STATUSES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
 import { issueEmployeeCode } from './companySettings.js';
 import { listCurrentEmployees } from './employeeDirectory.js';
@@ -71,11 +76,9 @@ export const INVITATION_DISPLAY_STATUSES = Object.freeze(['pending', 'expired', 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INVITATION_VALIDITY_MS = INVITATION_LIMITS.VALIDITY_DAYS * DAY_MS;
 
-/** Roles each inviter role may grant. */
+/** Roles each inviter role may grant (constants/accessRoles.js INVITATION_GRANTS); none for anyone else. */
 export function invitableRolesFor(inviterRole) {
-  if (inviterRole === ROLES.ADMIN) return [...INVITABLE_ROLES];
-  if (inviterRole === ROLES.HR) return INVITABLE_ROLES.filter((invitableRole) => invitableRole !== ROLES.HR);
-  return [];
+  return [...(INVITATION_GRANTS[inviterRole] ?? [])];
 }
 
 function displayStatusOf(invitation, now = new Date()) {
@@ -131,6 +134,12 @@ export async function loadInvitationFormOptions(inviterRole) {
     })),
     managers: employees,
     roles: invitableRolesFor(inviterRole),
+    // The same roles with their labels and groups, in order (constants/accessRoles.js), and the job
+    // levels and employment types an employee record takes, for the form's grouped dropdowns.
+    roleOptions: ROLE_DEFINITIONS.filter((definition) => invitableRolesFor(inviterRole).includes(definition.value)),
+    jobLevels: JOB_LEVEL_DEFINITIONS,
+    employmentTypes: EMPLOYMENT_TYPE_DEFINITIONS,
+    defaults: { role: ROLES.EMPLOYEE, jobLevel: DEFAULT_JOB_LEVEL, employmentType: DEFAULT_EMPLOYMENT_TYPE },
     workLocationTypes: ['Onsite', 'Hybrid', 'Remote'],
     employmentStatuses: [EMPLOYMENT_STATUSES.PROBATION, EMPLOYMENT_STATUSES.ACTIVE],
     validityDays: INVITATION_LIMITS.VALIDITY_DAYS,

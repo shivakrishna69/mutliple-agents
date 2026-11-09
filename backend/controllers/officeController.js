@@ -5,6 +5,7 @@
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
+import { CAPABILITIES } from '../constants/accessRoles.js';
 import { OFFICE_MESSAGES } from '../constants/messages.js';
 import {
   assignEmployeeOffice,
@@ -32,6 +33,8 @@ const officeHandler = createWorkforceHandlerFactory({
 
 const ADMIN_READ = Object.freeze({ requiresWorkforceAdmin: true, isWrite: false });
 const ADMIN_WRITE = Object.freeze({ requiresWorkforceAdmin: true, isWrite: true });
+// The employee list: HR and admins, and read-only for Finance & Payroll and IT administrators.
+const DIRECTORY_READ = Object.freeze({ capability: CAPABILITIES.READ_EMPLOYEE_DIRECTORY, isWrite: false });
 
 /** GET /api/offices */
 export const getOffices = officeHandler('list_offices', ADMIN_READ, async () => ({
@@ -82,7 +85,7 @@ export const removeOffice = officeHandler('delete_office', ADMIN_WRITE, async (r
 });
 
 /** GET /api/employees : current employees, for HR's pickers */
-export const getEmployees = officeHandler('list_employees', ADMIN_READ, async () => ({
+export const getEmployees = officeHandler('list_employees', DIRECTORY_READ, async () => ({
   message: OFFICE_MESSAGES.EMPLOYEES_RETRIEVED,
   data: { employees: await listCurrentEmployees() },
 }));

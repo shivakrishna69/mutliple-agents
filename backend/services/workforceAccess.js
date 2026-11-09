@@ -8,17 +8,19 @@
  * roles a vault document may be shared with (models/DocumentVault.js), are not permission checks.
  */
 
+import { CAPABILITIES, ROLE_CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
-import { ROLES } from '../models/User.js';
 
 /**
- * Roles with organisation-wide access to HR data and operations. Mirrored by
- * WORKFORCE_ADMIN_ROLES in frontend/src/constants/routes.js, which only decides what to show.
+ * Roles with organisation-wide access to HR data and operations: those with MANAGE_WORKFORCE
+ * (constants/accessRoles.js). The browser learns its own capabilities from the signed-in user.
  */
-export const WORKFORCE_ADMIN_ROLES = Object.freeze([ROLES.ADMIN, ROLES.HR]);
+export const WORKFORCE_ADMIN_ROLES = Object.freeze(
+  Object.keys(ROLE_CAPABILITIES).filter((role) => hasCapability(role, CAPABILITIES.MANAGE_WORKFORCE)),
+);
 
 export function isWorkforceAdmin(role) {
-  return WORKFORCE_ADMIN_ROLES.includes(role);
+  return hasCapability(role, CAPABILITIES.MANAGE_WORKFORCE);
 }
 
 /** The signed-in user's EmployeeProfile id as a string, or null when they have no profile. */

@@ -31,7 +31,7 @@ const CLIENT_MESSAGE_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
 
 export async function sendCustomerMessage(req, res, next) {
   try {
-    if (req.user.role !== ROLES.CUSTOMER) {
+    if (req.user.role !== ROLES.EMPLOYEE) {
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, SUPPORT_MESSAGES.CUSTOMERS_ONLY);
     }
 

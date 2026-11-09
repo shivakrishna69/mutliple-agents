@@ -4,6 +4,7 @@
  * is reviewed in one place and the frontend can rely on stable text.
  */
 
+import { ROLE_DEFINITIONS } from './accessRoles.js';
 import {
   ACCOUNT_EMAIL_SETTINGS,
   GENDERS,
@@ -144,12 +145,14 @@ export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
 
 export const ADMIN_MESSAGES = Object.freeze({
   ADMINS_ONLY: 'Only administrators can do this',
+  USER_MANAGERS_ONLY: 'Only administrators and IT administrators can manage users',
+  ADMIN_ROLE_RESTRICTED: "Only an administrator can make someone an administrator or change an administrator's role",
   USERS_RETRIEVED: 'Users retrieved',
   ROLE_UPDATED: 'Role updated',
   ROLE_UNCHANGED: 'The user already has this role',
   USER_NOT_FOUND: 'User not found',
   INVALID_USER_ID: 'User id is not valid',
-  INVALID_ROLE: 'Role must be admin, agent, hr, or customer',
+  INVALID_ROLE: `Role must be one of: ${ROLE_DEFINITIONS.map((role) => role.label).join(', ')}`,
   CANNOT_CHANGE_OWN_ROLE: 'You cannot change your own role',
   SEARCH_TOO_LONG: 'Search text must be at most 100 characters',
 });
@@ -279,7 +282,7 @@ export const PAYROLL_MESSAGES = Object.freeze({
   PAYSLIPS_RETRIEVED: 'Payslips retrieved',
   DOWNLOAD_ISSUED: 'Download link issued',
   VERIFICATION_COMPLETED: 'Verification completed',
-  PAYSLIP_MANAGERS_ONLY: 'Only HR and administrators can issue payslips',
+  PAYSLIP_MANAGERS_ONLY: 'Only HR, Finance & Payroll and administrators can issue payslips',
   PAYSLIP_ACCESS_DENIED: 'You do not have access to these payslips',
   PAYSLIP_NOT_FOUND: 'Payslip not found',
   NO_EMPLOYEE_PROFILE: 'No employee profile is linked to your account',
@@ -310,8 +313,8 @@ export const COMPANY_MESSAGES = Object.freeze({
   SETTINGS_RETRIEVED: 'Company settings retrieved',
   SETTINGS_UPDATED: 'Company settings updated',
   INPUT_INVALID: 'The company settings are invalid',
-  RESTRICTED: 'Only HR and administrators can see the company settings',
-  ADMINS_ONLY: 'Only administrators can change the company settings',
+  RESTRICTED: 'Only administrators, IT administrators and HR can see the company settings',
+  ADMINS_ONLY: 'Only administrators and IT administrators can change the company settings',
 });
 
 export const DEPARTMENT_MESSAGES = Object.freeze({
@@ -617,7 +620,9 @@ export const SYSTEM_STATUS_LABELS = Object.freeze({
 
 /** Onboarding offers (controllers/onboardingController.js). */
 export const ONBOARDING_MESSAGES = Object.freeze({
-  HR_ONLY: 'Only HR and administrators can prepare and send offers',
+  HR_ONLY: 'Only HR, Finance & Payroll and administrators can see offers',
+  OFFER_MANAGERS_ONLY: 'Only HR and administrators can prepare, change and send offers',
+  COMPENSATION_MANAGERS_ONLY: 'Only HR, Finance & Payroll and administrators can work out salary structures',
   CALCULATED: 'Salary structure',
   SETTINGS_RETRIEVED: 'Onboarding settings',
   SETTINGS_UPDATED: 'Onboarding settings saved',
