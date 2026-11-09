@@ -52,7 +52,14 @@ export const ROUTE_PATHS = Object.freeze({
 });
 
 /** Account roles; mirrors backend constants ROLES. */
-export const USER_ROLES = Object.freeze({ ADMIN: 'admin', AGENT: 'agent', HR: 'hr', CUSTOMER: 'customer' });
+export const USER_ROLES = Object.freeze({
+  ADMIN: 'admin',
+  HR: 'hr',
+  FINANCE: 'finance',
+  IT_ADMIN: 'it_admin',
+  AGENT: 'agent',
+  EMPLOYEE: 'employee',
+});
 
 /** Roles allowed into the support console; mirrors backend services/conversationAccess.js STAFF_ROLES. */
 export const STAFF_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.AGENT]);
@@ -89,8 +96,21 @@ export const ROLE_DISPLAY = Object.freeze({
     description: 'Manages employee records and documents',
     badgeClassName: 'bg-amber-50 text-amber-800 ring-amber-600/20',
   },
-  // The backend role stays 'customer'; people with it are the company's employees, so they see this.
-  customer: {
+  finance: {
+    label: 'Finance & Payroll',
+    pluralLabel: 'Finance & Payroll',
+    assignmentPhrase: 'in Finance & Payroll',
+    description: 'Payslips, salary structures and offers (read), the employee directory',
+    badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  },
+  it_admin: {
+    label: 'IT Administrator',
+    pluralLabel: 'IT Administrators',
+    assignmentPhrase: 'an IT administrator',
+    description: 'User accounts, company settings and system health; no HR or salary data',
+    badgeClassName: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+  },
+  employee: {
     label: 'Employee',
     pluralLabel: 'Employees',
     assignmentPhrase: 'an employee',
