@@ -5,14 +5,14 @@
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { SYSTEM_HEALTH_MESSAGES } from '../constants/messages.js';
-import { ROLES } from '../models/User.js';
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import { checkSystemHealth } from '../services/systemHealth.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 
 export async function getSystemHealth(req, res, next) {
   try {
-    if (req.user.role !== ROLES.ADMIN) {
+    if (!hasCapability(req.user.role, CAPABILITIES.VIEW_SYSTEM_HEALTH)) {
       recordAuditEvent(req, {
         category: 'system',
         action: 'view_system_health',

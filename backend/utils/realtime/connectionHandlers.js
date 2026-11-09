@@ -5,7 +5,7 @@
  */
 
 import Conversation from '../../models/Conversation.js';
-import { ROLES } from '../../models/User.js';
+import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
 import { AGENT_TELEMETRY_EVENTS } from '../../services/agentTelemetry.js';
 import { SOCKET_MESSAGES } from '../../constants/messages.js';
 import { canUserAccessConversation, isStaffRole } from '../../services/conversationAccess.js';
@@ -198,7 +198,7 @@ function registerAgentTelemetryHandlers(socket, connectionRecord) {
       logger.warn('Socket event rate limited', { ...eventContext, event: SOCKET_EVENTS.SUBSCRIBE_AGENT_TELEMETRY });
       return respond(buildErrorAck(SOCKET_ERROR_CODES.RATE_LIMITED, SOCKET_MESSAGES.RATE_LIMITED));
     }
-    if (user.role !== ROLES.ADMIN) {
+    if (!hasCapability(user.role, CAPABILITIES.VIEW_AGENT_TELEMETRY)) {
       logger.warn('Agent telemetry subscription denied', eventContext);
       return respond(buildErrorAck(SOCKET_ERROR_CODES.TELEMETRY_FORBIDDEN, SOCKET_MESSAGES.TELEMETRY_FORBIDDEN));
     }

@@ -21,6 +21,7 @@
  */
 
 import mongoose from 'mongoose';
+import { DEFAULT_EMPLOYMENT_TYPE, DEFAULT_JOB_LEVEL, EMPLOYMENT_TYPES, JOB_LEVELS } from '../constants/accessRoles.js';
 import { GENDERS } from '../constants/validation.js';
 import { PROFESSIONAL_TAX_STATES, TAX_REGIMES } from '../utils/payroll/rules.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from './EmployeeProfile.js';
@@ -56,6 +57,10 @@ const onboardingDraftSchema = new mongoose.Schema(
       workLocationType: { type: String, enum: Object.values(WORK_LOCATION_TYPES), required: true },
       dateOfJoining: { type: Date, required: true },
       employmentStatus: { type: String, enum: Object.values(EMPLOYMENT_STATUSES), required: true },
+      // Who the person is in the company (constants/accessRoles.js): for display and reports only; it
+      // grants nothing (approvals follow reporting lines and department heads).
+      jobLevel: { type: String, enum: JOB_LEVELS, default: DEFAULT_JOB_LEVEL, required: true },
+      employmentType: { type: String, enum: EMPLOYMENT_TYPES, default: DEFAULT_EMPLOYMENT_TYPE, required: true },
     },
     compensation: {
       annualCtc: { type: Number, required: true },

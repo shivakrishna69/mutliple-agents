@@ -193,7 +193,7 @@ export async function registerAccount({
 
   // Every self-registered account is a customer, except the deployment's configured first admin
   // (BOOTSTRAP_ADMIN_EMAIL), which must confirm its email like everyone else.
-  const role = bootstrapAdminEmail && email === bootstrapAdminEmail ? ROLES.ADMIN : ROLES.CUSTOMER;
+  const role = bootstrapAdminEmail && email === bootstrapAdminEmail ? ROLES.ADMIN : ROLES.EMPLOYEE;
   // The signup's own details; they also replace those of an unconfirmed account with this address.
   const details = {
     firstName,

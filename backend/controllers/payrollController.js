@@ -14,7 +14,7 @@
  *
  * Privacy: salary and investment figures are personal financial data. Tax estimates are never
  * stored. Issued payslips are stored (the Payslip record and the encrypted PDF), readable only by
- * the employee, HR and admins. Salary figures are never logged; logs and audit events record only
+ * the employee and MANAGE_PAYSLIPS (HR, Finance & Payroll, admins). Salary figures are never logged; logs and audit events record only
  * ids, periods and outcomes. Responses carry Cache-Control: no-store (set by the router).
  */
 
@@ -38,7 +38,11 @@ import {
 } from '../services/payslipService.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
-import { findOwnEmployeeProfileId, isWorkforceAdmin } from '../services/workforceAccess.js';
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
+import { findOwnEmployeeProfileId } from '../services/workforceAccess.js';
+
+/** HR, Finance & Payroll and admins issue payslips and read anyone's (MANAGE_PAYSLIPS). */
+const canManagePayslips = (role) => hasCapability(role, CAPABILITIES.MANAGE_PAYSLIPS);
 import { logger } from '../utils/logger.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 
@@ -140,7 +144,7 @@ function toPayslipSummary(payslip) {
 }
 
 /**
- * POST /api/payroll/payslips   (admin, hr)
+ * POST /api/payroll/payslips   (MANAGE_PAYSLIPS: admin, hr, finance)
  * Body: { employeeId, year, month, salaryStructure, investmentsDeclared?, taxRegimeChoice,
  *         employmentDetails, reissue? }
  * Responses: 201 { payslip } | 400 invalid input | 403 not HR/admin | 404 employee |
@@ -149,7 +153,7 @@ function toPayslipSummary(payslip) {
  */
 export async function createPayslip(req, res, next) {
   try {
-    if (!isWorkforceAdmin(req.user.role)) {
+    if (!canManagePayslips(req.user.role)) {
       auditPayslip(req, 'generate_payslip', AUDIT_OUTCOMES.DENIED, { reason: 'role_not_allowed' });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PAYROLL_MESSAGES.PAYSLIP_MANAGERS_ONLY);
     }
@@ -230,12 +234,12 @@ export async function createPayslip(req, res, next) {
 
 /**
  * GET /api/payroll/payslips?employeeId=&year=&month=&includeSuperseded=true
- * Employees see their own payslips (employeeId defaults to their profile); HR and admins may list
+ * Employees see their own payslips (employeeId defaults to their profile); MANAGE_PAYSLIPS (HR, Finance & Payroll, admins) may list
  * any employee's. Newest first, at most 60.
  */
 export async function listPayslips(req, res, next) {
   try {
-    const isPayrollManager = isWorkforceAdmin(req.user.role);
+    const isPayrollManager = canManagePayslips(req.user.role);
     const ownProfileId = await findOwnEmployeeProfileId(req.user.id);
     const requestedEmployeeId =
       typeof req.query.employeeId === 'string' ? req.query.employeeId.toLowerCase() : ownProfileId;
@@ -293,7 +297,7 @@ export async function downloadPayslip(req, res, next) {
     const payslipOwner = await Payslip.findById(payslipId).select('employeeId').lean();
     if (!payslipOwner) return sendError(req, res, HTTP_STATUS.NOT_FOUND, PAYROLL_MESSAGES.PAYSLIP_NOT_FOUND);
     const isOwner = (await findOwnEmployeeProfileId(req.user.id)) === payslipOwner.employeeId.toString();
-    if (!isOwner && !isWorkforceAdmin(req.user.role)) {
+    if (!isOwner && !canManagePayslips(req.user.role)) {
       auditPayslip(req, 'download_payslip', AUDIT_OUTCOMES.DENIED, { payslipId, reason: 'not_owner' });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, PAYROLL_MESSAGES.PAYSLIP_ACCESS_DENIED);
     }

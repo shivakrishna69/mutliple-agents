@@ -48,7 +48,7 @@ export function CustomerRoute() {
   const { authStatus, currentUser } = useAuth();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (currentUser?.role !== USER_ROLES.CUSTOMER) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  if (currentUser?.role !== USER_ROLES.EMPLOYEE) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
   return <Outlet />;
 }
 

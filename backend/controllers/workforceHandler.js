@@ -12,6 +12,7 @@
 import mongoose from 'mongoose';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ServiceError } from '../services/serviceError.js';
+import { hasCapability } from '../constants/accessRoles.js';
 import { isWorkforceAdmin } from '../services/workforceAccess.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
@@ -32,17 +33,26 @@ export function idParamErrors(params, paramName) {
 
 /**
  * @param {{ auditCategory: string, restrictedMessage: string, inputInvalidMessage: string }} feature
- * @returns {(action: string, options: { requiresWorkforceAdmin: boolean, isWrite: boolean },
+ * @returns {(action: string,
+ *            options: { requiresWorkforceAdmin?: boolean, capability?: string, isWrite: boolean },
  *            handlerBody: (req) => Promise<object>) => import('express').RequestHandler}
+ *   `capability` (constants/accessRoles.js CAPABILITIES) gates the handler on that capability;
+ *   `requiresWorkforceAdmin` on MANAGE_WORKFORCE (HR and admins); neither leaves it open.
  */
 export function createWorkforceHandlerFactory({ auditCategory, restrictedMessage, inputInvalidMessage }) {
   const audit = (req, action, outcome, details = {}) =>
     recordAuditEvent(req, { category: auditCategory, action, outcome, ...details });
 
-  return function workforceHandler(action, { requiresWorkforceAdmin, isWrite }, handlerBody) {
+  return function workforceHandler(
+    action,
+    { requiresWorkforceAdmin = false, capability = null, isWrite },
+    handlerBody,
+  ) {
+    const isAllowed = (role) =>
+      capability ? hasCapability(role, capability) : !requiresWorkforceAdmin || isWorkforceAdmin(role);
     return async (req, res, next) => {
       try {
-        if (requiresWorkforceAdmin && !isWorkforceAdmin(req.user.role)) {
+        if (!isAllowed(req.user.role)) {
           if (isWrite) audit(req, action, AUDIT_OUTCOMES.DENIED);
           return sendError(req, res, HTTP_STATUS.FORBIDDEN, restrictedMessage);
         }

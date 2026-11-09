@@ -156,7 +156,7 @@ describe('departments', { skip: skipReason ?? false }, () => {
     const invitation = await hrClient.post('/api/people/invitations', {
       name: 'Late Joiner',
       email: 'late@example.com',
-      role: 'customer',
+      role: 'employee',
       designation: 'Agent',
       departmentId: support.id,
       workLocationType: 'Remote',

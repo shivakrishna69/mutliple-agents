@@ -25,7 +25,13 @@
  */
 
 import mongoose from 'mongoose';
-import { ROLES } from './User.js';
+import {
+  DEFAULT_EMPLOYMENT_TYPE,
+  DEFAULT_JOB_LEVEL,
+  EMPLOYMENT_TYPES,
+  INVITABLE_ROLES,
+  JOB_LEVELS,
+} from '../constants/accessRoles.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from './EmployeeProfile.js';
 
 const { ObjectId } = mongoose.Schema.Types;
@@ -38,7 +44,8 @@ export const INVITATION_STATUSES = Object.freeze({
 });
 
 /** Roles an invitation can grant. Admins are never created by invitation (promote in Users & roles). */
-export const INVITABLE_ROLES = Object.freeze([ROLES.CUSTOMER, ROLES.AGENT, ROLES.HR]);
+/** The roles an invitation may give (constants/accessRoles.js); re-exported for existing imports. */
+export { INVITABLE_ROLES };
 
 export const INVITATION_LIMITS = Object.freeze({
   VALIDITY_DAYS: 7,
@@ -68,6 +75,10 @@ const invitationSchema = new mongoose.Schema(
       workLocationType: { type: String, enum: Object.values(WORK_LOCATION_TYPES), required: true },
       dateOfJoining: { type: Date, required: true },
       employmentStatus: { type: String, enum: Object.values(EMPLOYMENT_STATUSES), required: true },
+      // Who the person is in the company (constants/accessRoles.js): for display and reports only; it
+      // grants nothing (approvals follow reporting lines and department heads).
+      jobLevel: { type: String, enum: JOB_LEVELS, default: DEFAULT_JOB_LEVEL, required: true },
+      employmentType: { type: String, enum: EMPLOYMENT_TYPES, default: DEFAULT_EMPLOYMENT_TYPE, required: true },
     },
     // The invited account and the employee ID it was given (services/employeeProvisioning.js). null on
     // invitations sent before accounts were created with the invitation.

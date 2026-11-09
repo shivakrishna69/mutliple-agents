@@ -75,7 +75,7 @@ function readCompensation(body, validationErrors) {
  */
 export function validateOfferInput(requestBody, { now = new Date() } = {}) {
   if (!isPlainObject(requestBody)) return bodyNotObjectResult();
-  const invitation = validateInvitationInput({ ...requestBody, role: requestBody.role ?? ROLES.CUSTOMER });
+  const invitation = validateInvitationInput({ ...requestBody, role: requestBody.role ?? ROLES.EMPLOYEE });
   const validationErrors = invitation.isValid ? [] : [...invitation.validationErrors];
   const birthDate = readBirthDate(requestBody.dateOfBirth, true, now);
   if (birthDate.error) validationErrors.push({ field: 'dateOfBirth', message: birthDate.error });

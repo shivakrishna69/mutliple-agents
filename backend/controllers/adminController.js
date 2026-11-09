@@ -1,11 +1,14 @@
 /**
- * Administration routes (admins only), replacing the command-line role script for deployments.
+ * User administration (MANAGE_USERS: admins and IT administrators), replacing the command-line role
+ * script for deployments.
  *
  *   GET   /api/admin/users?search=&role=     list users (newest first, at most USER_LIST_LIMIT)
- *   PATCH /api/admin/users/:userId/role      { role: 'admin' | 'agent' | 'hr' | 'customer' }
+ *   PATCH /api/admin/users/:userId/role      { role } (constants/accessRoles.js ROLES)
  *
  * Role changes:
- *   - An admin cannot change their own role, so the last admin can never demote themselves and
+ *   - Only an admin (ASSIGN_ADMIN_ROLE) makes someone an admin or changes an admin's role, so an IT
+ *     administrator manages every other account but can never take or remove administration.
+ *   - Nobody changes their own role; in particular an admin cannot, so the last admin can never demote themselves and
  *     lock everyone out of administration.
  *   - The change applies to HTTP requests immediately (every request reloads the user). The user's
  *     open sockets cached the old role, so they are closed with SESSION_ENDED (role_changed); the
@@ -13,6 +16,7 @@
  *   - Every change is logged with who made it, for audit.
  */
 
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import User, { ROLES } from '../models/User.js';
 import { ADMIN_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
@@ -99,6 +103,11 @@ export async function updateUserRole(req, res, next) {
     const userRecord = await User.findById(userId);
     if (!userRecord) {
       return sendError(req, res, HTTP_STATUS.NOT_FOUND, ADMIN_MESSAGES.USER_NOT_FOUND);
+    }
+    const touchesAdministration = requestedRole === ROLES.ADMIN || userRecord.role === ROLES.ADMIN;
+    if (touchesAdministration && !hasCapability(req.user.role, CAPABILITIES.ASSIGN_ADMIN_ROLE)) {
+      logger.warn('Admin role change refused', { requestId: req.id, actorUserId: req.user.id, targetUserId: userId });
+      return sendError(req, res, HTTP_STATUS.FORBIDDEN, ADMIN_MESSAGES.ADMIN_ROLE_RESTRICTED);
     }
     if (userRecord.role === requestedRole) {
       return sendSuccess(res, HTTP_STATUS.OK, ADMIN_MESSAGES.ROLE_UNCHANGED, { user: toAdminUserSummary(userRecord) });

@@ -18,6 +18,8 @@ export const IMPORT_TEMPLATE_COLUMNS = Object.freeze([
   'work_type',
   'employment_status',
   'office_code',
+  'job_level',
+  'employment_type',
 ]);
 
 /** Two made-up rows showing a manager and someone reporting to them. */
@@ -35,6 +37,8 @@ export const IMPORT_TEMPLATE_EXAMPLE_ROWS = Object.freeze([
     'Onsite',
     'Active',
     '',
+    'manager',
+    'full_time',
   ],
   [
     'Ravi Example',
@@ -49,6 +53,8 @@ export const IMPORT_TEMPLATE_EXAMPLE_ROWS = Object.freeze([
     'Hybrid',
     'Probation',
     '',
+    'individual_contributor',
+    'full_time',
   ],
 ]);
 
@@ -59,11 +65,17 @@ export const IMPORT_COLUMN_GUIDE = Object.freeze([
   { column: 'name, personal_email, department_code, designation, date_of_joining', meaning: 'Required' },
   { column: 'company_email', meaning: 'Leave blank to get first.last@ your company domain' },
   { column: 'department_name', meaning: 'Only for a new department code: it is created with this name' },
-  { column: 'role', meaning: 'employee (default), hr or agent' },
+  { column: 'role', meaning: 'employee (default) or agent; an admin also hr, finance or it_admin' },
   { column: 'manager_email', meaning: 'Their manager: someone already here, or earlier in the same file' },
   { column: 'work_type', meaning: 'Onsite (default), Remote or Hybrid' },
   { column: 'employment_status', meaning: 'Probation (default) or Active' },
   { column: 'date_of_joining', meaning: 'YYYY-MM-DD' },
+  {
+    column: 'job_level',
+    meaning:
+      'e.g. ceo, cto, vp, head_of_department, manager, team_lead (or the label); individual contributor when blank',
+  },
+  { column: 'employment_type', meaning: 'full_time (default), contractor or intern' },
 ]);
 
 export const IMPORT_MAX_FILE_BYTES = 2 * 1024 * 1024;

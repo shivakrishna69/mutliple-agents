@@ -8,24 +8,30 @@
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { ADMIN_MESSAGES, CONVERSATION_MESSAGES } from '../constants/messages.js';
-import { ROLES } from '../models/User.js';
+import { hasCapability } from '../constants/accessRoles.js';
+import { CONVERSATION_MESSAGES } from '../constants/messages.js';
 import { isStaffRole } from '../services/conversationAccess.js';
 import { sendError } from '../utils/apiResponse.js';
 import { logger } from '../utils/logger.js';
 
-/** Allows only admins. */
-export function requireAdmin(req, res, next) {
-  if (req.user?.role !== ROLES.ADMIN) {
-    logger.warn('Admin-only route refused', {
-      requestId: req.id,
-      userId: req.user?.id,
-      role: req.user?.role,
-      path: req.originalUrl,
-    });
-    return sendError(req, res, HTTP_STATUS.FORBIDDEN, ADMIN_MESSAGES.ADMINS_ONLY);
-  }
-  return next();
+/**
+ * Allows only roles with `capability` (constants/accessRoles.js); others get 403 with `refusalMessage`.
+ *   router.use(protect, requireCapability(CAPABILITIES.MANAGE_USERS, ADMIN_MESSAGES.USER_MANAGERS_ONLY));
+ */
+export function requireCapability(capability, refusalMessage) {
+  return function requireCapabilityMiddleware(req, res, next) {
+    if (!hasCapability(req.user?.role, capability)) {
+      logger.warn('Route refused: capability missing', {
+        requestId: req.id,
+        userId: req.user?.id,
+        role: req.user?.role,
+        capability,
+        path: req.originalUrl,
+      });
+      return sendError(req, res, HTTP_STATUS.FORBIDDEN, refusalMessage);
+    }
+    return next();
+  };
 }
 
 /** Allows only admins and agents. */

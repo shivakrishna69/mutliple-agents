@@ -13,6 +13,7 @@
 
 import { DASHBOARD_RANGE_LABELS } from '../constants/messages.js';
 import { DASHBOARD_SETTINGS } from '../constants/validation.js';
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import User, { ACCOUNT_STATUSES, ROLES } from '../models/User.js';
 import { getCompanySettings } from './companySettings.js';
 import { isStaffRole } from './conversationAccess.js';
@@ -48,11 +49,10 @@ async function loadAccountSummary(now) {
 export async function buildDashboardOverview({ viewer, rangeKey, now = new Date() }) {
   const { timeZone } = await getCompanySettings();
   const range = resolveDashboardRange(rangeKey, timeZone, now);
-  const isAdmin = viewer.role === ROLES.ADMIN;
   const [people, support, accounts, me] = await Promise.all([
     isWorkforceAdmin(viewer.role) ? loadPeopleSummary({ viewer, range, now }) : null,
     isStaffRole(viewer.role) ? loadSupportSummary({ viewer, range }) : null,
-    isAdmin ? loadAccountSummary(now) : null,
+    hasCapability(viewer.role, CAPABILITIES.MANAGE_USERS) ? loadAccountSummary(now) : null,
     loadSelfSummary({ viewer, now }),
   ]);
   return {

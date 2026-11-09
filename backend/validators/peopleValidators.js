@@ -5,6 +5,7 @@
  * services/invitationService.js.
  */
 
+import { DEFAULT_EMPLOYMENT_TYPE, DEFAULT_JOB_LEVEL, EMPLOYMENT_TYPES, JOB_LEVELS } from '../constants/accessRoles.js';
 import { EMAIL_PATTERN } from '../constants/validation.js';
 import { INVITABLE_ROLES, INVITATION_LIMITS } from '../models/EmployeeInvitation.js';
 import { EMPLOYMENT_STATUSES, WORK_LOCATION_TYPES } from '../models/EmployeeProfile.js';
@@ -77,6 +78,14 @@ export function validateInvitationInput(requestBody) {
     });
   }
 
+  const jobLevel = body.jobLevel ?? DEFAULT_JOB_LEVEL;
+  if (!JOB_LEVELS.includes(jobLevel))
+    validationErrors.push({ field: 'jobLevel', message: `must be one of ${JOB_LEVELS.join(', ')}` });
+  const employmentType = body.employmentType ?? DEFAULT_EMPLOYMENT_TYPE;
+  if (!EMPLOYMENT_TYPES.includes(employmentType)) {
+    validationErrors.push({ field: 'employmentType', message: `must be one of ${EMPLOYMENT_TYPES.join(', ')}` });
+  }
+
   if (validationErrors.length > 0) return { isValid: false, validationErrors };
   return {
     isValid: true,
@@ -92,6 +101,8 @@ export function validateInvitationInput(requestBody) {
         workLocationType: body.workLocationType,
         dateOfJoining,
         employmentStatus: body.employmentStatus,
+        jobLevel,
+        employmentType,
       },
     },
   };

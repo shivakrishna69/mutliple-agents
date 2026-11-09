@@ -38,7 +38,7 @@ describe('authentication and sessions', { skip: skipReason ?? false }, () => {
     const confirmResponse = await client.post('/api/auth/verify-email', { token });
     assert.equal(confirmResponse.status, 200);
     assert.equal(confirmResponse.body.data.user.email, 'asha.rao@example.com');
-    assert.equal(confirmResponse.body.data.user.role, 'customer');
+    assert.equal(confirmResponse.body.data.user.role, 'employee');
     assert.equal(confirmResponse.body.data.user.password, undefined);
     assert.equal(typeof confirmResponse.body.data.csrfToken, 'string');
 

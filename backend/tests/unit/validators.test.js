@@ -202,7 +202,7 @@ describe('validateInvitationInput', () => {
   const validInvitation = {
     name: 'Kiran Patel',
     email: 'Kiran.Patel@Example.com',
-    role: 'customer',
+    role: 'employee',
     designation: 'Support Engineer',
     departmentId: '64B000000000000000000001',
     workLocationType: WORK_LOCATION_TYPES.ONSITE,

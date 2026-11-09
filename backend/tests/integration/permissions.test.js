@@ -40,7 +40,7 @@ describe('role permissions', { skip: skipReason ?? false }, () => {
     assert.equal(promotionResponse.status, 403);
 
     const storedUser = await testServer.database.collection('users').findOne({ email: 'cyrus@example.com' });
-    assert.equal(storedUser.role, 'customer');
+    assert.equal(storedUser.role, 'employee');
   });
 
   it('keeps workforce risk analytics to HR and admins', async () => {

@@ -79,7 +79,7 @@ const NAVIGATION_SECTIONS = Object.freeze([
         path: ROUTE_PATHS.SUPPORT,
         Icon: ChatIcon,
         views: BOTH_VIEWS,
-        isVisibleTo: (role) => role === USER_ROLES.CUSTOMER,
+        isVisibleTo: (role) => role === USER_ROLES.EMPLOYEE,
       },
       {
         label: 'Support console',

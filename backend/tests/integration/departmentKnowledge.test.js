@@ -155,7 +155,7 @@ describe('department knowledge base API', { skip: mongoReason ?? false }, () => 
       ['employee of the department', member.client],
       ['HR', hr],
       ['support agent', supportAgent],
-      ['customer', customer],
+      ['employee', customer],
       ["another department's head", financeHead.client],
     ]) {
       const responses = [

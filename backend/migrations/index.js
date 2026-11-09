@@ -16,6 +16,7 @@ import addEmployeeCodes from './addEmployeeCodes.js';
 import addOfficeAttendanceSettings from './addOfficeAttendanceSettings.js';
 import markExistingAccountsVerified from './markExistingAccountsVerified.js';
 import seedLeaveTypeTemplate from './seedLeaveTypeTemplate.js';
+import standardizeAccessRoles from './standardizeAccessRoles.js';
 
 /** In the order they must run. Add new migrations at the end. */
 const MIGRATIONS = Object.freeze([
@@ -28,6 +29,7 @@ const MIGRATIONS = Object.freeze([
   addEmployeeCodes,
   addOfficeAttendanceSettings,
   markExistingAccountsVerified,
+  standardizeAccessRoles,
 ]);
 
 export async function runStartupMigrations() {

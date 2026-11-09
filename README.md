@@ -116,10 +116,24 @@ docker compose down              # stop (data is kept in the mongo-data volume)
 
 ## Roles
 
-`admin` (everything incl. user management) · `hr` (people, payroll, analytics, onboarding) ·
-`agent` (support console) · `customer` (support chat; also the employee role today). Employee
-features additionally need an employee profile linked to the account. Every permission is enforced
-by the backend; the frontend only hides what a role cannot use.
+Access roles decide what someone may do; they are defined once, with what each may do, in
+`backend/constants/accessRoles.js`:
+
+| Role | May do |
+|---|---|
+| `admin` | everything, including users, roles and company settings |
+| `hr` | people, onboarding, leave, attendance, workplace, payroll and offers |
+| `finance` (Finance & Payroll) | payslips, salary structures and the compensation policy, offers (read), the employee directory |
+| `it_admin` (IT Administrator) | user accounts and roles (never administration), company settings, system health; no HR or salary data |
+| `agent` (Support Agent) | the support console |
+| `employee` | their own workspace: attendance, leave, payslips, support chat |
+
+Nobody becomes an admin by invitation; only an admin makes someone an admin. Separately, every
+employee record has a **job level** (CEO, CTO, COO, CFO, VP; Head of Department, Manager, Team Lead;
+Individual Contributor) and an **employment type** (full-time, contractor, intern), for display and
+reports only: they grant nothing, and approvals follow reporting lines and department heads.
+Employee features need an employee profile linked to the account. Every permission is enforced by
+the backend; the frontend only hides what a role cannot use.
 
 ## Project status
 

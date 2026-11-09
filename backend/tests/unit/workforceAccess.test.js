@@ -10,18 +10,18 @@ describe('isWorkforceAdmin', () => {
     assert.equal(isWorkforceAdmin('admin'), true);
     assert.equal(isWorkforceAdmin('hr'), true);
     assert.equal(isWorkforceAdmin('agent'), false);
-    assert.equal(isWorkforceAdmin('customer'), false);
+    assert.equal(isWorkforceAdmin('employee'), false);
     assert.equal(isWorkforceAdmin(undefined), false);
   });
 
   it('is the rule the document vault uses for managing other employees’ documents', () => {
-    for (const role of ['admin', 'hr', 'agent', 'customer'])
+    for (const role of ['admin', 'hr', 'agent', 'employee'])
       assert.equal(isVaultManagerRole(role), isWorkforceAdmin(role));
   });
 });
 
 describe('evaluateUploadAccess', () => {
-  const employee = { role: 'customer' };
+  const employee = { role: 'employee' };
 
   it('lets employees upload their own ID and leave documents, and nothing HR issues', () => {
     for (const documentType of ['Gov_ID', 'Leave_Document']) {

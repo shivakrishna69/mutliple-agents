@@ -601,7 +601,7 @@ describe('invitations and unconfirmed signups', { skip: skipReason ?? false }, (
     hrClient.post('/api/people/invitations', {
       name,
       email,
-      role: 'customer',
+      role: 'employee',
       designation: 'Analyst',
       departmentId,
       workLocationType: WORK_LOCATION_TYPES.ONSITE,
@@ -668,7 +668,7 @@ describe('without a mail server', { skip: skipReason ?? false }, () => {
             name: 'Old Timer',
             email: 'old.timer@example.com',
             password: '$2a$04$abcdefghijklmnopqrstuuJ8m9N8Z5lZ1JxV4o5bYyq3m2Q5wQyGa',
-            role: 'customer',
+            role: 'employee',
             status: 'active',
             createdAt,
             updatedAt: createdAt,
@@ -676,7 +676,7 @@ describe('without a mail server', { skip: skipReason ?? false }, () => {
           {
             name: 'Invited Ivy',
             email: 'ivy@example.com',
-            role: 'customer',
+            role: 'employee',
             status: 'invited',
             createdAt,
             updatedAt: createdAt,

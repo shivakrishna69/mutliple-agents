@@ -29,7 +29,7 @@ describe('decideKnowledgeAccess', () => {
   });
 
   it('lets the head manage their department and choose its lead, whatever their role', () => {
-    for (const role of ['customer', 'hr', 'agent']) {
+    for (const role of ['employee', 'hr', 'agent']) {
       assert.deepEqual(decideKnowledgeAccess({ ...department, role, userId: OTHER_USER, ownProfileId: HEAD_PROFILE }), {
         canManage: true,
         canAssignLead: true,
@@ -40,7 +40,7 @@ describe('decideKnowledgeAccess', () => {
 
   it('lets the lead manage the knowledge base but not choose the lead', () => {
     assert.deepEqual(
-      decideKnowledgeAccess({ ...department, role: 'customer', userId: LEAD_USER, ownProfileId: null }),
+      decideKnowledgeAccess({ ...department, role: 'employee', userId: LEAD_USER, ownProfileId: null }),
       {
         canManage: true,
         canAssignLead: false,
@@ -50,7 +50,7 @@ describe('decideKnowledgeAccess', () => {
   });
 
   it('refuses everyone else, HR included, and a department with no head or lead', () => {
-    for (const role of ['customer', 'hr', 'agent']) {
+    for (const role of ['employee', 'hr', 'agent']) {
       assert.equal(
         decideKnowledgeAccess({ ...department, role, userId: OTHER_USER, ownProfileId: '65f1a2b3c4d5e6f708192aff' })
           .canManage,
@@ -60,7 +60,7 @@ describe('decideKnowledgeAccess', () => {
     }
     assert.equal(
       decideKnowledgeAccess({
-        role: 'customer',
+        role: 'employee',
         userId: OTHER_USER,
         ownProfileId: null,
         departmentHeadId: null,

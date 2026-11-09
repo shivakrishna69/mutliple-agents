@@ -34,7 +34,7 @@ describe('OKR edits by several people at once', { skip: skipReason ?? false }, (
     const invitationResponse = await hrClient.post('/api/people/invitations', {
       name: 'Esha Employee',
       email,
-      role: 'customer',
+      role: 'employee',
       designation: 'Account Manager',
       departmentId: departmentInsert.insertedId.toString(),
       workLocationType: WORK_LOCATION_TYPES.HYBRID,

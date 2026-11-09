@@ -79,7 +79,7 @@ describe('today’s attendance', { skip: skipReason ?? false }, () => {
     await hrClient.post('/api/people/invitations', {
       name: 'Gopal Invited',
       email: 'gopal@example.com',
-      role: 'customer',
+      role: 'employee',
       designation: 'Analyst',
       departmentId: operationsId,
       reportingManagerId: manager.profileId,

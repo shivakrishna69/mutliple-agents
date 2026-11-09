@@ -41,9 +41,12 @@ import {
   formatDate,
   formatDateTime,
 } from '../components/ui.jsx';
+import { ROLE_DISPLAY, USER_ROLES } from '../constants/routes.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 
-const ROLE_LABELS = Object.freeze({ customer: 'Employee', agent: 'Support agent', hr: 'HR' });
+/** A role's label: from the server's options when loaded, otherwise the shared role display. */
+const roleLabelOf = (role, roleOptions = []) =>
+  roleOptions.find((option) => option.value === role)?.label ?? ROLE_DISPLAY[role]?.label ?? role;
 const STATUS_DISPLAY = Object.freeze({
   pending: { label: 'Pending', tone: 'amber' },
   expired: { label: 'Expired', tone: 'slate' },
@@ -106,7 +109,7 @@ function InviteForm({ options, onInvited, onCancel }) {
     name: '',
     email: '',
     companyEmail: '',
-    role: options.roles[0] ?? 'customer',
+    role: options.defaults?.role ?? options.roles[0] ?? USER_ROLES.EMPLOYEE,
     designation: '',
     departmentId: options.departments[0]?.id ?? '',
     reportingManagerId: '',
@@ -204,7 +207,10 @@ function InviteForm({ options, onInvited, onCancel }) {
               value={form.role}
               onChange={update('role')}
               error={fieldErrors.role}
-              options={options.roles.map((roleName) => ({ value: roleName, label: ROLE_LABELS[roleName] ?? roleName }))}
+              options={options.roles.map((roleName) => ({
+                value: roleName,
+                label: roleLabelOf(roleName, options.roleOptions),
+              }))}
             />
           </div>
         </fieldset>
@@ -319,7 +325,7 @@ function InvitationRow({ invitation, onChanged, onLinkIssued }) {
           <p className="text-xs text-slate-500">
             {invitation.designation} · {invitation.department.name ?? '—'}
             {invitation.reportingManager?.name && ` · reports to ${invitation.reportingManager.name}`} ·{' '}
-            {ROLE_LABELS[invitation.role] ?? invitation.role} · joins {formatDate(invitation.dateOfJoining)}
+            {roleLabelOf(invitation.role)} · joins {formatDate(invitation.dateOfJoining)}
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">

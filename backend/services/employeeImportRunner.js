@@ -181,6 +181,9 @@ async function importRow(job, row, { context, references }) {
           workLocationType: input.workLocationType,
           dateOfJoining: new Date(`${input.dateOfJoining}T00:00:00.000Z`),
           employmentStatus: input.employmentStatus,
+          // Rows checked before job levels existed have none: the defaults apply.
+          jobLevel: input.jobLevel ?? undefined,
+          employmentType: input.employmentType ?? undefined,
         },
       },
       appContext: context.emailContext,

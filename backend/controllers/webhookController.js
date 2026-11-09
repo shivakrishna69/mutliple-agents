@@ -439,7 +439,7 @@ export async function receiveIncomingMessage(req, res, next) {
     const logContext = { requestId: req.id, eventId };
     logger.info('Webhook ingested', { ...logContext, stage: 'ingested', textLength: text.length });
 
-    const customerRecord = await User.findOne({ email: senderEmail, role: ROLES.CUSTOMER }).select('_id').lean();
+    const customerRecord = await User.findOne({ email: senderEmail, role: ROLES.EMPLOYEE }).select('_id').lean();
     if (!customerRecord) {
       logger.warn('Webhook sender is not a registered customer', { ...logContext, stage: 'ingested' });
       return sendError(req, res, HTTP_STATUS.NOT_FOUND, WEBHOOK_MESSAGES.SENDER_NOT_FOUND);

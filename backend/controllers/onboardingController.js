@@ -1,7 +1,9 @@
 /**
- * Onboarding offers (routes/onboardingRoutes.js; rules in services/onboardingService.js). HR and
- * administrators only: everyone else gets 403 ONBOARDING_MESSAGES.HR_ONLY, and the refusal is
- * audited. Every change and every calculation is audited too (category "onboarding"); audit
+ * Onboarding offers (routes/onboardingRoutes.js; rules in services/onboardingService.js), by
+ * capability (constants/accessRoles.js): reading needs READ_OFFERS (admins, HR, Finance & Payroll),
+ * the CTC calculator and the compensation policy MANAGE_COMPENSATION (the same), and preparing,
+ * changing, cancelling or sending an offer, or the offer terms, MANAGE_OFFERS (admins, HR). Everyone
+ * else gets 403 with the message naming who can, and the refusal is audited. Every change and every calculation is audited too (category "onboarding"); audit
  * records name drafts and users by id, never the candidate's details.
  *
  *   GET   /settings                   the compensation policy and offer terms
@@ -16,6 +18,7 @@
  *                                     was created but the email failed (dispatch again to retry)
  */
 
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ONBOARDING_MESSAGES } from '../constants/messages.js';
 import { DRAFT_STATUSES } from '../models/OnboardingDraft.js';
@@ -38,6 +41,7 @@ import {
   validateSettingsChanges,
   validateVersionOnly,
 } from '../validators/onboardingValidators.js';
+import { ServiceError } from '../services/serviceError.js';
 import { createWorkforceHandlerFactory, idParamErrors } from './workforceHandler.js';
 
 const onboardingHandler = createWorkforceHandlerFactory({
@@ -45,22 +49,38 @@ const onboardingHandler = createWorkforceHandlerFactory({
   restrictedMessage: ONBOARDING_MESSAGES.HR_ONLY,
   inputInvalidMessage: ONBOARDING_MESSAGES.INPUT_INVALID,
 });
-const HR_READ = Object.freeze({ requiresWorkforceAdmin: true, isWrite: false });
-const HR_AUDITED = Object.freeze({ requiresWorkforceAdmin: true, isWrite: true });
+// Every offer endpoint is open to READ_OFFERS (admins, HR, Finance & Payroll); changes then need
+// their own capability, so a refusal says exactly who can (and is audited).
+const OFFERS_READ = Object.freeze({ capability: CAPABILITIES.READ_OFFERS, isWrite: false });
+const OFFERS_AUDITED = Object.freeze({ capability: CAPABILITIES.READ_OFFERS, isWrite: true });
 
-export const getSettings = onboardingHandler('view_onboarding_settings', HR_READ, async () => ({
+/** Refuses (403, audited) unless the user has `capability`. */
+function requireCapability(req, capability, code) {
+  if (!hasCapability(req.user.role, capability)) {
+    throw new ServiceError(HTTP_STATUS.FORBIDDEN, code, ONBOARDING_MESSAGES[code]);
+  }
+}
+const requireOfferManager = (req) => requireCapability(req, CAPABILITIES.MANAGE_OFFERS, 'OFFER_MANAGERS_ONLY');
+const requireCompensationManager = (req) =>
+  requireCapability(req, CAPABILITIES.MANAGE_COMPENSATION, 'COMPENSATION_MANAGERS_ONLY');
+
+export const getSettings = onboardingHandler('view_onboarding_settings', OFFERS_READ, async () => ({
   message: ONBOARDING_MESSAGES.SETTINGS_RETRIEVED,
   data: { settings: toSettingsSummary(await getOnboardingSettings()) },
 }));
 
-export const patchSettings = onboardingHandler('update_onboarding_settings', HR_AUDITED, async (req) => {
+export const patchSettings = onboardingHandler('update_onboarding_settings', OFFERS_AUDITED, async (req) => {
   const validation = validateSettingsChanges(req.body);
   if (!validation.isValid) return { validationErrors: validation.validationErrors };
+  // The compensation policy is Finance's too; the offer terms are HR's.
+  if (validation.sanitizedInput.changes.compensation) requireCompensationManager(req);
+  if (validation.sanitizedInput.changes.offerTerms) requireOfferManager(req);
   const settings = await updateOnboardingSettings({ ...validation.sanitizedInput, actorUserId: req.user.id });
   return { message: ONBOARDING_MESSAGES.SETTINGS_UPDATED, data: { settings } };
 });
 
-export const postCalculation = onboardingHandler('calculate_offer', HR_AUDITED, async (req) => {
+export const postCalculation = onboardingHandler('calculate_offer', OFFERS_AUDITED, async (req) => {
+  requireCompensationManager(req);
   const validation = validateOfferInput(req.body);
   if (!validation.isValid) return { validationErrors: validation.validationErrors };
   const result = await calculateOffer(validation.sanitizedInput);
@@ -71,7 +91,8 @@ export const postCalculation = onboardingHandler('calculate_offer', HR_AUDITED, 
   };
 });
 
-export const postDraft = onboardingHandler('create_offer_draft', HR_AUDITED, async (req) => {
+export const postDraft = onboardingHandler('create_offer_draft', OFFERS_AUDITED, async (req) => {
+  requireOfferManager(req);
   const validation = validateOfferInput(req.body);
   if (!validation.isValid) return { validationErrors: validation.validationErrors };
   const draft = await createDraft({ offer: validation.sanitizedInput, actorUserId: req.user.id });
@@ -83,7 +104,7 @@ export const postDraft = onboardingHandler('create_offer_draft', HR_AUDITED, asy
   };
 });
 
-export const getDrafts = onboardingHandler('list_offer_drafts', HR_READ, async (req) => {
+export const getDrafts = onboardingHandler('list_offer_drafts', OFFERS_READ, async (req) => {
   const { status } = req.query;
   if (status !== undefined && !Object.values(DRAFT_STATUSES).includes(status)) {
     return {
@@ -93,13 +114,14 @@ export const getDrafts = onboardingHandler('list_offer_drafts', HR_READ, async (
   return { message: ONBOARDING_MESSAGES.DRAFTS_RETRIEVED, data: { drafts: await listDrafts({ status }) } };
 });
 
-export const getOneDraft = onboardingHandler('view_offer_draft', HR_READ, async (req) => {
+export const getOneDraft = onboardingHandler('view_offer_draft', OFFERS_READ, async (req) => {
   const paramErrors = idParamErrors(req.params, 'draftId');
   if (paramErrors) return { validationErrors: paramErrors };
   return { message: ONBOARDING_MESSAGES.DRAFT_RETRIEVED, data: { draft: await getDraft(req.params.draftId) } };
 });
 
-export const patchDraft = onboardingHandler('update_offer_draft', HR_AUDITED, async (req) => {
+export const patchDraft = onboardingHandler('update_offer_draft', OFFERS_AUDITED, async (req) => {
+  requireOfferManager(req);
   const paramErrors = idParamErrors(req.params, 'draftId');
   if (paramErrors) return { validationErrors: paramErrors };
   const validation = validateOfferEdit(req.body);
@@ -109,7 +131,8 @@ export const patchDraft = onboardingHandler('update_offer_draft', HR_AUDITED, as
   return { message: ONBOARDING_MESSAGES.DRAFT_UPDATED, data: { draft }, auditDetails: { draftId: draft.id } };
 });
 
-export const postCancellation = onboardingHandler('cancel_offer_draft', HR_AUDITED, async (req) => {
+export const postCancellation = onboardingHandler('cancel_offer_draft', OFFERS_AUDITED, async (req) => {
+  requireOfferManager(req);
   const paramErrors = idParamErrors(req.params, 'draftId');
   if (paramErrors) return { validationErrors: paramErrors };
   const validation = validateVersionOnly(req.body);
@@ -122,7 +145,8 @@ export const postCancellation = onboardingHandler('cancel_offer_draft', HR_AUDIT
   return { message: ONBOARDING_MESSAGES.DRAFT_CANCELLED, data: { draft }, auditDetails: { draftId: draft.id } };
 });
 
-export const postDispatch = onboardingHandler('dispatch_offer', HR_AUDITED, async (req) => {
+export const postDispatch = onboardingHandler('dispatch_offer', OFFERS_AUDITED, async (req) => {
+  requireOfferManager(req);
   const paramErrors = idParamErrors(req.params, 'draftId');
   if (paramErrors) return { validationErrors: paramErrors };
   const { draft, wasSent } = await dispatchDraft({

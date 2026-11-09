@@ -26,7 +26,14 @@ import { ROLE_DISPLAY, USER_ROLES } from '../constants/routes.js';
 const SEARCH_DEBOUNCE_MS = 300;
 /** Same limit as the backend (adminController MAX_SEARCH_LENGTH). */
 const SEARCH_MAX_LENGTH = 100;
-const ROLE_OPTIONS = Object.freeze([USER_ROLES.CUSTOMER, USER_ROLES.AGENT, USER_ROLES.HR, USER_ROLES.ADMIN]);
+const ROLE_OPTIONS = Object.freeze([
+  USER_ROLES.EMPLOYEE,
+  USER_ROLES.AGENT,
+  USER_ROLES.HR,
+  USER_ROLES.FINANCE,
+  USER_ROLES.IT_ADMIN,
+  USER_ROLES.ADMIN,
+]);
 const ROLE_FILTER_TABS = Object.freeze([
   { value: '', label: 'All' },
   ...ROLE_OPTIONS.map((role) => ({ value: role, label: ROLE_DISPLAY[role].pluralLabel })),
