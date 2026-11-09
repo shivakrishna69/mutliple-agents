@@ -233,6 +233,49 @@ describe('employee import', { skip: skipReason ?? false }, () => {
     assert.equal(started.status, 409, JSON.stringify(started.body));
     assert.equal(started.body.error.code, 'NOTHING_TO_IMPORT');
   });
+
+  it('reads job levels and employment types by value or label, with the defaults when empty', async () => {
+    const content = [
+      'name,personal_email,department_code,department_name,designation,date_of_joining,job_level,employment_type',
+      `Tia Tech,tia.tech@example.com,JOBS,Jobs Team,Chief Technology Officer,${today},Chief Technology Officer (CTO),Contractor`,
+      `Lee Lead,lee.lead@example.com,JOBS,,Team Lead,${today},team lead,intern`,
+      `Nia None,nia.none@example.com,JOBS,,Analyst,${today},,`,
+      `Bad Level,bad.level@example.com,JOBS,,Analyst,${today},emperor,`,
+      `Bad Type,bad.type@example.com,JOBS,,Analyst,${today},,permanent`,
+    ].join('\n');
+    const uploaded = await upload(adminClient, content);
+    assert.equal(uploaded.status, 201, JSON.stringify(uploaded.body));
+    const { job } = uploaded.body.data;
+    assert.deepEqual(
+      job.issues.map((issue) => [issue.rowNumber, issue.field]),
+      [
+        [5, 'job_level'],
+        [6, 'employment_type'],
+      ],
+    );
+    const started = await adminClient.post(`/api/employees/bulk-upload/${job.id}/confirm`);
+    assert.equal(started.status, 202, JSON.stringify(started.body));
+    await waitForImport(adminClient, job.id);
+
+    const organizationOf = async (email) => {
+      const account = await testServer.database.collection('users').findOne({ email });
+      return (await testServer.database.collection('employeeprofiles').findOne({ userId: account._id }))
+        .organizationData;
+    };
+    assert.deepEqual(
+      await Promise.all(
+        ['tia.tech@example.com', 'lee.lead@example.com', 'nia.none@example.com'].map(async (email) => {
+          const organization = await organizationOf(email);
+          return [organization.jobLevel, organization.employmentType];
+        }),
+      ),
+      [
+        ['cto', 'contractor'],
+        ['team_lead', 'intern'],
+        ['individual_contributor', 'full_time'],
+      ],
+    );
+  });
 });
 
 describe('employee import after a restart', { skip: skipReason ?? false }, () => {
@@ -248,7 +291,7 @@ describe('employee import after a restart', { skip: skipReason ?? false }, () =>
       companyEmail: null,
       departmentCode: 'OPS',
       designation: 'Analyst',
-      role: 'customer',
+      role: 'employee',
       managerEmail: null,
       dateOfJoining: today,
       workLocationType: 'Onsite',

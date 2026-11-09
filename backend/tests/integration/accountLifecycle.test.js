@@ -48,7 +48,7 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
             name: 'Old Timer',
             email: 'old.timer@example.com',
             password: 'not-a-real-hash',
-            role: 'customer',
+            role: 'employee',
             createdAt: now,
             updatedAt: now,
           })
@@ -70,7 +70,7 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
         await database.collection('employeeinvitations').insertOne({
           email: 'legacy.invitee@example.com',
           name: 'Legacy Invitee',
-          role: 'customer',
+          role: 'employee',
           profileDraft: {
             designation: 'Analyst',
             departmentId,
@@ -104,7 +104,7 @@ describe('account lifecycle', { skip: skipReason ?? false }, () => {
 
   async function invite(fields) {
     const response = await adminClient.post('/api/people/invitations', {
-      role: 'customer',
+      role: 'employee',
       designation: 'Data Engineer',
       departmentId: departmentId.toString(),
       workLocationType: 'Onsite',

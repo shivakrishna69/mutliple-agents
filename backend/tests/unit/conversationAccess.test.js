@@ -7,7 +7,7 @@ const CUSTOMER_ID = '64b000000000000000000001';
 const AGENT_ID = '64b000000000000000000002';
 const OTHER_AGENT_ID = '64b000000000000000000003';
 
-const customer = { id: CUSTOMER_ID, role: 'customer' };
+const customer = { id: CUSTOMER_ID, role: 'employee' };
 const agent = { id: AGENT_ID, role: 'agent' };
 
 describe('canUserAccessConversation', () => {
@@ -46,6 +46,6 @@ describe('isStaffRole', () => {
     assert.equal(isStaffRole('admin'), true);
     assert.equal(isStaffRole('agent'), true);
     assert.equal(isStaffRole('hr'), false);
-    assert.equal(isStaffRole('customer'), false);
+    assert.equal(isStaffRole('employee'), false);
   });
 });

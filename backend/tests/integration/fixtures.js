@@ -78,7 +78,7 @@ export async function onboardEmployee({
   const invitationResponse = await hrClient.post('/api/people/invitations', {
     name,
     email,
-    role: 'customer',
+    role: 'employee',
     designation: 'Analyst',
     departmentId,
     reportingManagerId,

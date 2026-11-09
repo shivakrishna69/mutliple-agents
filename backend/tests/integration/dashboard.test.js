@@ -45,7 +45,7 @@ describe('dashboard sections by role', { skip: skipReason ?? false }, () => {
       admin: await createSignedInClient(testServer, { name: 'Ada Admin', email: TEST_ADMIN_EMAIL }),
       hr: await createSignedInClient(testServer, { name: 'Hema HR', email: 'hema@example.com', role: 'hr' }),
       agent: await createSignedInClient(testServer, { name: 'Arun Agent', email: 'arun@example.com', role: 'agent' }),
-      customer: await createSignedInClient(testServer, { name: 'Cyrus', email: 'cyrus@example.com' }),
+      employee: await createSignedInClient(testServer, { name: 'Cyrus', email: 'cyrus@example.com' }),
     };
   });
 
@@ -62,7 +62,7 @@ describe('dashboard sections by role', { skip: skipReason ?? false }, () => {
     assert.deepEqual(await present('admin'), ['accounts', 'people', 'support']);
     assert.deepEqual(await present('hr'), ['people']);
     assert.deepEqual(await present('agent'), ['support']);
-    assert.deepEqual(await present('customer'), []);
+    assert.deepEqual(await present('employee'), []);
   });
 
   it('defaults to today, offers its three ranges, and refuses any other', async () => {
@@ -90,13 +90,13 @@ describe('dashboard sections by role', { skip: skipReason ?? false }, () => {
     await testServer.database.collection('users').insertOne({
       name: 'Old Timer',
       email: 'old@example.com',
-      role: 'customer',
+      role: 'employee',
       status: 'active',
       createdAt: new Date(Date.now() - 30 * DAY),
       updatedAt: new Date(Date.now() - 30 * DAY),
     });
     const { accounts } = await overviewOf(clients.admin);
-    assert.deepEqual(accounts.perRole, { admin: 1, agent: 1, hr: 1, customer: 2 });
+    assert.deepEqual(accounts.perRole, { admin: 1, hr: 1, finance: 0, it_admin: 0, agent: 1, employee: 2 });
     assert.equal(accounts.total, 5);
     assert.equal(accounts.newThisWeek, 4);
   });
@@ -118,7 +118,7 @@ describe('dashboard support figures', { skip: skipReason ?? false }, () => {
     const { insertedId: customerId } = await users.insertOne({
       name: 'Sarah Jenkins',
       email: 'sarah@example.com',
-      role: 'customer',
+      role: 'employee',
       status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),

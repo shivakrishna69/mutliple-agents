@@ -341,7 +341,7 @@ async function seedConfirmedAccount(testServer, client, { name, email }) {
     name,
     email,
     password: await bcrypt.hash(STRONG_PASSWORD, 4),
-    role: email === TEST_ADMIN_EMAIL ? 'admin' : 'customer',
+    role: email === TEST_ADMIN_EMAIL ? 'admin' : 'employee',
     status: 'active',
     emailVerifiedAt: now,
     createdAt: now,

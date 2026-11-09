@@ -30,7 +30,7 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
     return {
       name: 'Kiran Patel',
       email,
-      role: 'customer',
+      role: 'employee',
       designation: 'Support Engineer',
       departmentId,
       workLocationType: WORK_LOCATION_TYPES.ONSITE,
@@ -155,7 +155,7 @@ describe('onboarding by email invitation', { skip: skipReason ?? false }, () => 
       acceptTerms: true,
     });
     assert.equal(acceptResponse.status, 201, JSON.stringify(acceptResponse.body));
-    assert.equal(acceptResponse.body.data.user.role, 'customer');
+    assert.equal(acceptResponse.body.data.user.role, 'employee');
     const account = await testServer.database.collection('users').findOne({ email: 'nisha@example.com' });
     assert.equal(account.termsVersion, TERMS_VERSION);
     assert.ok(account.termsAcceptedAt instanceof Date && account.emailVerifiedAt instanceof Date);
