@@ -4,7 +4,7 @@ import { ACCOUNTS } from './environment.js';
 import { signIn } from './helpers.js';
 
 test('the tax planner shows zero new-regime tax at ₹12,75,000 gross and recommends it', async ({ page }) => {
-  await signIn(page, ACCOUNTS.customer.email);
+  await signIn(page, ACCOUNTS.employee.email);
   await page.goto('/payroll');
 
   // 12,75,000 − 75,000 standard deduction = 12,00,000 taxable: fully covered by the s.156 rebate.

@@ -32,12 +32,26 @@ test('HR invites a new joiner, then imports more from a CSV', async ({ page, bro
   await page.getByLabel('Personal email').fill('nisha.kapoor@example.com');
   await page.getByLabel('Job title').fill('Support Engineer');
   await page.getByLabel('Department').selectOption({ label: DEPARTMENT_NAME });
+  // Access and job level are grouped; HR is offered only the roles HR may grant.
+  const groupLabels = (select) =>
+    select.locator('optgroup').evaluateAll((groups) => groups.map((group) => group.label));
+  const access = page.getByLabel('Access');
+  expect(await groupLabels(access)).toEqual(['Support', 'General']);
+  await expect(access.locator('option')).toHaveText(['Support Agent', 'Employee']);
+  await expect(access).toHaveValue('employee');
+  const jobLevel = page.getByLabel('Job level');
+  expect(await groupLabels(jobLevel)).toEqual(['Executive', 'Management', 'Staff']);
+  await expect(jobLevel).toHaveValue('individual_contributor');
+  await jobLevel.selectOption({ label: 'Team Lead' });
+  await page.getByLabel('Employment type').selectOption({ label: 'Contractor' });
   await page.getByRole('button', { name: 'Send invitation' }).click();
 
   // The invitation is emailed; the new joiner opens the link from their inbox.
   const inviteUrl = await emailedLink('nisha.kapoor@example.com', '/invite');
   const invitationRow = page.getByRole('listitem').filter({ hasText: 'nisha.kapoor@example.com' });
   await expect(invitationRow.getByText(/^NSK\d{4}$/)).toBeVisible();
+  await expect(invitationRow.getByText(/Support Engineer · Team Lead · Contractor/)).toBeVisible();
+  await expect(invitationRow.getByText('Employee', { exact: true })).toBeVisible();
 
   // The new joiner opens the link in their own browser (no shared cookies with HR).
   const joinerContext = await browser.newContext();
