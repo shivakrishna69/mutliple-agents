@@ -10,38 +10,38 @@ export const ROUTE_PATHS = Object.freeze({
   RESET_PASSWORD_WITH_CODE: '/reset-password',
   RESET_PASSWORD: '/reset-password/:token',
   DASHBOARD: '/dashboard',
-  // Support console for staff (admins and agents) only.
+  // Support console (STAFF_SUPPORT).
   CONSOLE: '/console',
-  // Support chat for customers.
+  // Support chat (USE_SUPPORT_CHAT).
   SUPPORT: '/support',
   // Profile and password, for every signed-in user.
   ACCOUNT: '/account',
-  // User and role management, admins only.
+  // User and role management (MANAGE_USERS).
   ADMIN_USERS: '/admin/users',
   // Workforce: every signed-in user (features need an employee profile; the backend decides).
   ATTENDANCE: '/attendance',
   PAYROLL: '/payroll',
   ANALYTICS: '/analytics',
-  // Organisation directory, staff only (the backend restricts /api/org to admins and agents).
+  // Organisation directory (STAFF_SUPPORT).
   ORGANISATION: '/organisation',
-  // Company name, employee ID format and email domain, admins only.
+  // Company name, employee ID format and email domain (MANAGE_COMPANY_SETTINGS).
   COMPANY: '/admin/company',
-  // Live agent telemetry console, admins only.
+  // Live agent telemetry console (VIEW_AGENT_TELEMETRY).
   AGENT_TELEMETRY: '/admin/telemetry',
   // Public payslip verification (no sign-in).
   VERIFY_PAYSLIP: '/verify/payslip',
-  // Employee onboarding by invitation, HR and admins.
+  // Employee onboarding by invitation (MANAGE_WORKFORCE).
   ONBOARDING: '/people/onboarding',
-  // Offices, holidays and employees' base offices, HR and admins.
+  // Offices, holidays and employees' base offices (MANAGE_WORKFORCE).
   WORKPLACE: '/workplace',
   // Leave, with a tab per address. The backend's emails link to /leave and /leave/approvals
   // (backend/services/leaveRequestEmails.js LEAVE_APP_PATHS), so those two must not move.
   LEAVE: '/leave',
   LEAVE_CALENDAR: '/leave/calendar',
   LEAVE_APPROVALS: '/leave/approvals',
-  // Leave administration (policies, balances, payroll export), HR and admins.
+  // Leave administration: policies, balances, payroll export (MANAGE_WORKFORCE).
   LEAVE_ADMIN: '/leave/admin',
-  // Department knowledge bases: every department's for admins (management), and the ones a person
+  // Department knowledge bases: every department's with MANAGE_KNOWLEDGE_BASES, and the ones a person
   // heads or leads (self-service). The same pages; the backend decides what each person sees.
   KNOWLEDGE_HUB: '/admin/knowledge',
   KNOWLEDGE_HUB_DEPARTMENT: '/admin/knowledge/:departmentId',
@@ -61,39 +61,33 @@ export const USER_ROLES = Object.freeze({
   EMPLOYEE: 'employee',
 });
 
-/** Roles allowed into the support console; mirrors backend services/conversationAccess.js STAFF_ROLES. */
-export const STAFF_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.AGENT]);
-
 /**
- * Roles with organisation-wide HR access (people, payroll, analytics, reviews); mirrors backend
- * services/workforceAccess.js WORKFORCE_ADMIN_ROLES. Only decides what to show: the backend enforces it.
- */
-export const WORKFORCE_ADMIN_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.HR]);
-
-/**
- * What each role can do, shown wherever a role is chosen or displayed. `pluralLabel` names a group
- * of users ("Agents", "HR"); `assignmentPhrase` completes "<name> is now …".
+ * How each role is shown: its badge colour and phrases. Labels and descriptions match backend
+ * constants/accessRoles.js ROLE_DEFINITIONS (which the server also sends where roles are chosen);
+ * they are kept here so a badge never waits for a request. What a role may do is not here: it comes
+ * from the server as capabilities (auth/capabilities.js). `pluralLabel` names a group of users;
+ * `assignmentPhrase` completes "<name> is now …".
  */
 export const ROLE_DISPLAY = Object.freeze({
   admin: {
     label: 'Admin',
     pluralLabel: 'Admins',
     assignmentPhrase: 'an admin',
-    description: 'Full access, including user management',
+    description: 'Everything, including users, roles and company settings',
     badgeClassName: 'bg-violet-50 text-violet-700 ring-violet-600/20',
   },
   agent: {
-    label: 'Agent',
-    pluralLabel: 'Agents',
-    assignmentPhrase: 'an agent',
-    description: 'Handles escalated conversations in the console',
+    label: 'Support Agent',
+    pluralLabel: 'Support Agents',
+    assignmentPhrase: 'a support agent',
+    description: 'The support console',
     badgeClassName: 'bg-sky-50 text-sky-700 ring-sky-600/20',
   },
   hr: {
     label: 'HR',
     pluralLabel: 'HR',
     assignmentPhrase: 'an HR team member',
-    description: 'Manages employee records and documents',
+    description: 'People, onboarding, leave, attendance, workplace and payroll',
     badgeClassName: 'bg-amber-50 text-amber-800 ring-amber-600/20',
   },
   finance: {
@@ -114,7 +108,7 @@ export const ROLE_DISPLAY = Object.freeze({
     label: 'Employee',
     pluralLabel: 'Employees',
     assignmentPhrase: 'an employee',
-    description: 'Uses their workspace: leave, attendance, payroll and the support chat',
+    description: 'Their own workspace: attendance, leave, payslips, support chat',
     badgeClassName: 'bg-slate-100 text-slate-700 ring-slate-500/20',
   },
 });

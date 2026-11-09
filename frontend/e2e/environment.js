@@ -13,11 +13,18 @@ export const MAIL_INBOX_URL = `http://127.0.0.1:${MAIL_INBOX_PORT}`;
 
 export const PASSWORD = 'Valid#Pass2026';
 
-/** Created by global setup. The admin is the backend's bootstrap email. */
+/**
+ * One account per access role, keyed by the role, created by global setup. The admin is the
+ * backend's bootstrap email; the others get their role from global setup (an employee keeps the
+ * default role). Each account has 5 sign-ins per 15 minutes, so the specs share them sparingly.
+ */
 export const ACCOUNTS = Object.freeze({
   admin: { name: 'Avery Admin', email: 'admin@example.com' },
-  hr: { name: 'Hema Rao', email: 'hema.hr@example.com' },
-  customer: { name: 'Cyrus Mehta', email: 'cyrus@example.com' },
+  hr: { name: 'Hema Rao', email: 'hema.hr@example.com', role: 'hr' },
+  finance: { name: 'Fiona Finance', email: 'fiona.finance@example.com', role: 'finance' },
+  it_admin: { name: 'Ishaan Iyer', email: 'ishaan.it@example.com', role: 'it_admin' },
+  agent: { name: 'Arjun Agent', email: 'arjun.agent@example.com', role: 'agent' },
+  employee: { name: 'Cyrus Mehta', email: 'cyrus@example.com' },
 });
 
 /**

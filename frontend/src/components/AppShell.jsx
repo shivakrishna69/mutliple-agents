@@ -10,12 +10,14 @@
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
  * pages (the chat and the console) can fill it with `h-full` while ordinary pages scroll inside it.
  *
- * Navigation items are filtered by role here for convenience only; every page is also behind a
- * route guard (RouteGuards.jsx) and every API call is authorised by the backend.
+ * Each navigation item names the capability it needs (constants/capabilities.js), the same one its
+ * route guard checks (App.jsx); the server says which capabilities the signed-in person has, so the
+ * sidebar never compares role names. It only steers navigation: the backend authorises every call.
  *
- * Admins and HR choose a portal view (PortalSwitcher.jsx, hooks/usePortalView.js): "Employee
- * self-service" keeps their own pages, "Admin / Management" adds the management tools. Each item
- * names the views it belongs to; for everyone else the sidebar ignores views. "My department's
+ * People who manage the company (PORTAL_SWITCH_CAPABILITIES) choose a portal view (PortalSwitcher.jsx,
+ * hooks/usePortalView.js): "Employee self-service" keeps their own pages, "Admin / Management" adds
+ * the management tools. Each item names the views it belongs to; for everyone else the sidebar
+ * ignores views. "My department's
  * knowledge base" is shown to people who head or lead a department (GET /api/knowledge-bases).
  *
  * Sign-out revokes the session on the server first. If that fails, the user stays signed in and
@@ -27,6 +29,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api/httpClient.js';
 import { requestKnowledgeBases } from '../api/knowledgeApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { hasCapability } from '../auth/capabilities.js';
 import BrandMark from './BrandMark.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import PortalSwitcher from './PortalSwitcher.jsx';
@@ -50,11 +53,12 @@ import {
   UserCircleIcon,
   UsersIcon,
 } from './Icons.jsx';
+import { CAPABILITIES } from '../constants/capabilities.js';
 import { SERVICE_STATE_TONES } from '../constants/dashboardDisplay.js';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { KNOWLEDGE_ACCESS_BASIS } from '../constants/knowledge.js';
 import { PORTAL_VIEWS } from '../constants/portal.js';
-import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
+import { ROUTE_PATHS } from '../constants/routes.js';
 import { useApiResource } from '../hooks/useApiResource.js';
 import { usePortalView } from '../hooks/usePortalView.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
@@ -66,34 +70,36 @@ const SELF_SERVICE_ONLY = Object.freeze([PORTAL_VIEWS.SELF_SERVICE]);
 const MANAGEMENT_ONLY = Object.freeze([PORTAL_VIEWS.MANAGEMENT]);
 
 /**
- * Sidebar entries, grouped into sections. `isVisibleTo(role, context)` decides who sees each one
- * (context: { managesOwnKnowledgeBase }); `views` the portal views it belongs to, for people who switch.
+ * Sidebar entries, grouped into sections. `capability` is what a person needs to see one (null:
+ * everyone); `isVisibleTo(context)`, when present, is a further condition (context:
+ * { managesOwnKnowledgeBase }); `views` the portal views it belongs to, for people who switch.
  */
 const NAVIGATION_SECTIONS = Object.freeze([
   {
     sectionTitle: 'Workspace',
     items: [
-      { label: 'Overview', path: ROUTE_PATHS.DASHBOARD, Icon: HomeIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
+      { label: 'Overview', path: ROUTE_PATHS.DASHBOARD, Icon: HomeIcon, views: BOTH_VIEWS, capability: null },
       {
         label: 'Support chat',
         path: ROUTE_PATHS.SUPPORT,
         Icon: ChatIcon,
         views: BOTH_VIEWS,
-        isVisibleTo: (role) => role === USER_ROLES.EMPLOYEE,
+        capability: CAPABILITIES.USE_SUPPORT_CHAT,
       },
       {
         label: 'Support console',
         path: ROUTE_PATHS.CONSOLE,
         Icon: InboxIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => STAFF_ROLES.includes(role),
+        capability: CAPABILITIES.STAFF_SUPPORT,
       },
       {
         label: "My department's knowledge base",
         path: ROUTE_PATHS.MY_KNOWLEDGE,
         Icon: BookOpenIcon,
         views: SELF_SERVICE_ONLY,
-        isVisibleTo: (role, context) => context.managesOwnKnowledgeBase,
+        capability: null,
+        isVisibleTo: (context) => context.managesOwnKnowledgeBase,
       },
     ],
   },
@@ -105,37 +111,37 @@ const NAVIGATION_SECTIONS = Object.freeze([
         path: ROUTE_PATHS.ATTENDANCE,
         Icon: MapPinIcon,
         views: BOTH_VIEWS,
-        isVisibleTo: () => true,
+        capability: null,
       },
-      { label: 'Leave', path: ROUTE_PATHS.LEAVE, Icon: CalendarIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
-      { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
+      { label: 'Leave', path: ROUTE_PATHS.LEAVE, Icon: CalendarIcon, views: BOTH_VIEWS, capability: null },
+      { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, views: BOTH_VIEWS, capability: null },
       {
         label: 'Analytics hub',
         path: ROUTE_PATHS.ANALYTICS,
         Icon: ChartIcon,
         views: BOTH_VIEWS,
-        isVisibleTo: () => true,
+        capability: null,
       },
       {
         label: 'Organisation',
         path: ROUTE_PATHS.ORGANISATION,
         Icon: SitemapIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => STAFF_ROLES.includes(role),
+        capability: CAPABILITIES.STAFF_SUPPORT,
       },
       {
         label: 'Onboarding',
         path: ROUTE_PATHS.ONBOARDING,
         Icon: UserPlusIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
+        capability: CAPABILITIES.MANAGE_WORKFORCE,
       },
       {
         label: 'Workplace',
         path: ROUTE_PATHS.WORKPLACE,
         Icon: BuildingIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => WORKFORCE_ADMIN_ROLES.includes(role),
+        capability: CAPABILITIES.MANAGE_WORKFORCE,
       },
     ],
   },
@@ -147,44 +153,44 @@ const NAVIGATION_SECTIONS = Object.freeze([
         path: ROUTE_PATHS.KNOWLEDGE_HUB,
         Icon: BookOpenIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+        capability: CAPABILITIES.MANAGE_KNOWLEDGE_BASES,
       },
       {
         label: 'Company',
         path: ROUTE_PATHS.COMPANY,
         Icon: BuildingIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+        capability: CAPABILITIES.MANAGE_COMPANY_SETTINGS,
       },
       {
         label: 'Users & roles',
         path: ROUTE_PATHS.ADMIN_USERS,
         Icon: UsersIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+        capability: CAPABILITIES.MANAGE_USERS,
       },
       {
         label: 'Agent telemetry',
         path: ROUTE_PATHS.AGENT_TELEMETRY,
         Icon: TerminalIcon,
         views: MANAGEMENT_ONLY,
-        isVisibleTo: (role) => role === USER_ROLES.ADMIN,
+        capability: CAPABILITIES.VIEW_AGENT_TELEMETRY,
       },
     ],
   },
   {
     sectionTitle: 'Settings',
-    items: [
-      { label: 'Account', path: ROUTE_PATHS.ACCOUNT, Icon: UserCircleIcon, views: BOTH_VIEWS, isVisibleTo: () => true },
-    ],
+    items: [{ label: 'Account', path: ROUTE_PATHS.ACCOUNT, Icon: UserCircleIcon, views: BOTH_VIEWS, capability: null }],
   },
 ]);
 
 const ALL_NAVIGATION_ITEMS = NAVIGATION_SECTIONS.flatMap((section) => section.items);
 
-/** True when this person sees `item`: their role allows it, and it belongs to their view (if they switch). */
-const isItemVisible = (item, { role, view, context }) =>
-  item.isVisibleTo(role, context) && (view === null || item.views.includes(view));
+/** True when this person sees `item`: they have its capability, and it belongs to their view (if they switch). */
+const isItemVisible = (item, { user, view, context }) =>
+  (item.capability === null || hasCapability(user, item.capability)) &&
+  (item.isVisibleTo?.(context) ?? true) &&
+  (view === null || item.views.includes(view));
 
 /** The item for the page at `pathname` (the longest matching path). */
 function itemOfPath(pathname) {
@@ -351,7 +357,7 @@ export default function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { branding } = usePublicAuthSettings();
-  const health = useSystemHealth(currentUser.role === USER_ROLES.ADMIN);
+  const health = useSystemHealth(hasCapability(currentUser, CAPABILITIES.VIEW_SYSTEM_HEALTH));
   const companyName = branding?.name ?? null;
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -361,7 +367,7 @@ export default function AppShell() {
   // load just leaves the entry out; the page itself is still reachable and reports its own errors.
   const knowledgeBases = useApiResource((signal) => requestKnowledgeBases(signal), [currentUser.id]);
   const visibility = {
-    role: currentUser.role,
+    user: currentUser,
     view,
     context: {
       managesOwnKnowledgeBase: (knowledgeBases.data?.knowledgeBases ?? []).some(

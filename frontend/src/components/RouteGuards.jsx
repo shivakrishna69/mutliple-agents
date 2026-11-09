@@ -8,7 +8,8 @@
 
 import { Navigate, Outlet } from 'react-router';
 import { AUTH_STATUS, useAuth } from '../auth/AuthContext.jsx';
-import { ROUTE_PATHS, STAFF_ROLES, USER_ROLES, WORKFORCE_ADMIN_ROLES } from '../constants/routes.js';
+import { hasCapability } from '../auth/capabilities.js';
+import { ROUTE_PATHS } from '../constants/routes.js';
 import { SESSION_MESSAGES } from '../constants/messages.js';
 
 function SessionCheckSpinner() {
@@ -32,41 +33,15 @@ export function ProtectedRoute() {
 }
 
 /**
- * Renders the child route only for signed-in staff (admin or agent). Customers are sent to the
- * dashboard; signed-out users to login. The backend enforces the same rule on every staff route.
+ * Renders the child route only for a signed-in person with `capability` (constants/capabilities.js);
+ * anyone else is sent to the dashboard, and signed-out users to login. The backend enforces the same
+ * capability on every request the page makes.
  */
-export function StaffRoute() {
+export function CapabilityRoute({ capability }) {
   const { authStatus, currentUser } = useAuth();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (!STAFF_ROLES.includes(currentUser?.role)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
-  return <Outlet />;
-}
-
-/** Renders the child route only for signed-in customers; staff are sent to the dashboard. */
-export function CustomerRoute() {
-  const { authStatus, currentUser } = useAuth();
-  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
-  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (currentUser?.role !== USER_ROLES.EMPLOYEE) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
-  return <Outlet />;
-}
-
-/** Renders the child route only for signed-in admins; everyone else is sent to the dashboard. */
-export function AdminRoute() {
-  const { authStatus, currentUser } = useAuth();
-  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
-  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (currentUser?.role !== USER_ROLES.ADMIN) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
-  return <Outlet />;
-}
-
-/** Renders the child route only for signed-in HR users and admins. */
-export function PeopleManagerRoute() {
-  const { authStatus, currentUser } = useAuth();
-  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
-  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
-  if (!WORKFORCE_ADMIN_ROLES.includes(currentUser?.role)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  if (!hasCapability(currentUser, capability)) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
   return <Outlet />;
 }
 

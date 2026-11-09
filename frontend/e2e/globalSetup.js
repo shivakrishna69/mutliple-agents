@@ -13,7 +13,12 @@
  */
 
 import { onboardEmployee } from '../../backend/tests/integration/fixtures.js';
-import { endEmailCooldowns, signUpAndConfirm, startTestServer } from '../../backend/tests/integration/testServer.js';
+import {
+  endEmailCooldowns,
+  insertConfirmedAccount,
+  signUpAndConfirm,
+  startTestServer,
+} from '../../backend/tests/integration/testServer.js';
 import { startStandInAiService } from './standInAiService.js';
 import {
   ACCOUNTS,
@@ -143,10 +148,17 @@ export default async function globalSetup() {
     throw startupError;
   }
   try {
-    for (const account of [...Object.values(ACCOUNTS), RESET_ACCOUNT, KNOWLEDGE_ADMIN])
+    // Accounts with a role are written straight to the database with it (as scripts/setUserRole.js
+    // would set it): signing up always creates an employee, and sign-ups are limited per network,
+    // which the sign-up tests need for themselves.
+    const roleAccounts = Object.values(ACCOUNTS).filter((listed) => listed.role);
+    for (const account of roleAccounts) await insertConfirmedAccount(testServer, account);
+    for (const account of [
+      ...Object.values(ACCOUNTS).filter((listed) => !roleAccounts.includes(listed)),
+      RESET_ACCOUNT,
+      KNOWLEDGE_ADMIN,
+    ])
       await signUp(testServer, account);
-    // The same change scripts/setUserRole.js makes; the API cannot create HR accounts directly.
-    await testServer.database.collection('users').updateOne({ email: ACCOUNTS.hr.email }, { $set: { role: 'hr' } });
     await testServer.database
       .collection('users')
       .updateOne({ email: KNOWLEDGE_ADMIN.email }, { $set: { role: 'admin' } });

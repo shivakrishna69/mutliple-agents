@@ -133,7 +133,9 @@ employee record has a **job level** (CEO, CTO, COO, CFO, VP; Head of Department,
 Individual Contributor) and an **employment type** (full-time, contractor, intern), for display and
 reports only: they grant nothing, and approvals follow reporting lines and department heads.
 Employee features need an employee profile linked to the account. Every permission is enforced by
-the backend; the frontend only hides what a role cannot use.
+the backend. The server also tells the browser the signed-in person's **capabilities**, and the
+sidebar, the route guards and each page's sections are built from them alone (never from role
+names), so a role's menu always matches what it may do.
 
 ## Project status
 

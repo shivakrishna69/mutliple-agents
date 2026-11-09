@@ -1,9 +1,14 @@
 /**
- * Onboarding (HR and admins): invite people one by one or import them from a CSV, and track their
- * invitations.
+ * Onboarding (MANAGE_WORKFORCE: HR and admins): invite people one by one or import them from a CSV,
+ * and track their invitations.
  *
- *   Invite form    name, personal email, optional company email, role, job title, department,
- *                  manager, work mode, joining date, employment status -> POST /api/people/invitations.
+ *   Invite form    name, personal email, optional company email, access role, job title, job level,
+ *                  employment type, department, manager, work mode, joining date, employment status
+ *                  -> POST /api/people/invitations. Access role and job level are grouped dropdowns
+ *                  (Operations / Support / General; Executive / Management / Staff) built from the
+ *                  server's options, which offer only the roles this inviter may grant. Access decides
+ *                  what the person may do in the software; job level is who they are in the company
+ *                  and grants nothing.
  *                  The person gets an employee ID at once, and an email with a one-time link (valid
  *                  for the configured number of days).
  *   Import         many people from a CSV (components/people/EmployeeImportPanel.jsx).
@@ -41,12 +46,11 @@ import {
   formatDate,
   formatDateTime,
 } from '../components/ui.jsx';
-import { ROLE_DISPLAY, USER_ROLES } from '../constants/routes.js';
+import RoleBadge from '../components/RoleBadge.jsx';
+import { USER_ROLES } from '../constants/routes.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
+import { labelOf, toGroupedOptions } from '../utils/groupedOptions.js';
 
-/** A role's label: from the server's options when loaded, otherwise the shared role display. */
-const roleLabelOf = (role, roleOptions = []) =>
-  roleOptions.find((option) => option.value === role)?.label ?? ROLE_DISPLAY[role]?.label ?? role;
 const STATUS_DISPLAY = Object.freeze({
   pending: { label: 'Pending', tone: 'amber' },
   expired: { label: 'Expired', tone: 'slate' },
@@ -111,6 +115,8 @@ function InviteForm({ options, onInvited, onCancel }) {
     companyEmail: '',
     role: options.defaults?.role ?? options.roles[0] ?? USER_ROLES.EMPLOYEE,
     designation: '',
+    jobLevel: options.defaults?.jobLevel ?? options.jobLevels?.at(-1)?.value ?? '',
+    employmentType: options.defaults?.employmentType ?? options.employmentTypes?.[0]?.value ?? '',
     departmentId: options.departments[0]?.id ?? '',
     reportingManagerId: '',
     workLocationType: 'Onsite',
@@ -207,10 +213,8 @@ function InviteForm({ options, onInvited, onCancel }) {
               value={form.role}
               onChange={update('role')}
               error={fieldErrors.role}
-              options={options.roles.map((roleName) => ({
-                value: roleName,
-                label: roleLabelOf(roleName, options.roleOptions),
-              }))}
+              options={toGroupedOptions(options.roleOptions)}
+              hint={options.roleOptions.find((roleOption) => roleOption.value === form.role)?.description}
             />
           </div>
         </fieldset>
@@ -224,6 +228,21 @@ function InviteForm({ options, onInvited, onCancel }) {
               error={fieldErrors.designation}
               placeholder="Software Engineer"
               required
+            />
+            <SelectInput
+              label="Job level"
+              value={form.jobLevel}
+              onChange={update('jobLevel')}
+              error={fieldErrors.jobLevel}
+              options={toGroupedOptions(options.jobLevels)}
+              hint="For the org chart and reports; it grants no access"
+            />
+            <SelectInput
+              label="Employment type"
+              value={form.employmentType}
+              onChange={update('employmentType')}
+              error={fieldErrors.employmentType}
+              options={toGroupedOptions(options.employmentTypes)}
             />
             <SelectInput
               label="Department"
@@ -277,7 +296,7 @@ function InviteForm({ options, onInvited, onCancel }) {
   );
 }
 
-function InvitationRow({ invitation, onChanged, onLinkIssued }) {
+function InvitationRow({ invitation, jobLevels, employmentTypes, onChanged, onLinkIssued }) {
   const { csrfToken } = useAuth();
   const [busyAction, setBusyAction] = useState(null);
   const [rowError, setRowError] = useState(null);
@@ -320,12 +339,14 @@ function InvitationRow({ invitation, onChanged, onLinkIssued }) {
             {invitation.employeeCode && (
               <span className="ml-2 font-mono text-xs font-normal text-slate-500">{invitation.employeeCode}</span>
             )}{' '}
-            <span className="font-normal text-slate-500">· {invitation.email}</span>
+            <span className="font-normal text-slate-500">· {invitation.email}</span>{' '}
+            <RoleBadge role={invitation.role} />
           </p>
           <p className="text-xs text-slate-500">
-            {invitation.designation} · {invitation.department.name ?? '—'}
-            {invitation.reportingManager?.name && ` · reports to ${invitation.reportingManager.name}`} ·{' '}
-            {roleLabelOf(invitation.role)} · joins {formatDate(invitation.dateOfJoining)}
+            {invitation.designation} · {labelOf(jobLevels, invitation.jobLevel)} ·{' '}
+            {labelOf(employmentTypes, invitation.employmentType)} · {invitation.department.name ?? '—'}
+            {invitation.reportingManager?.name && ` · reports to ${invitation.reportingManager.name}`} · joins{' '}
+            {formatDate(invitation.dateOfJoining)}
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
@@ -511,6 +532,8 @@ export default function PeopleOnboarding() {
                 <InvitationRow
                   key={invitation.id}
                   invitation={invitation}
+                  jobLevels={optionsResource.data?.jobLevels}
+                  employmentTypes={optionsResource.data?.employmentTypes}
                   onChanged={allInvitationsResource.reload}
                   onLinkIssued={setLastResult}
                 />

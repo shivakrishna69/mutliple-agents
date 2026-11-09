@@ -110,27 +110,32 @@ multiagent-tool/
 
 ## 5. Roles and permissions
 
-Roles (stored on `User.role`): **admin**, **hr**, **agent**, **customer**.
-- `customer` doubles as the **employee** role today (there is no separate "employee" role; the UI labels
-  it "Employee" in onboarding but badges show "Customer").
-- **Staff** = admin + agent (support console, org chart).
+Access roles (stored on `User.role`, lowercase): **admin**, **hr**, **finance**, **it_admin**, **agent**,
+**employee**. Each has a fixed set of capabilities in `backend/constants/accessRoles.js`; code checks
+capabilities, never role names. The browser receives the signed-in person's capabilities with their
+profile and builds the sidebar, route guards and page sections from them.
 - Employee features (attendance, payslips, OKR editing, vault) also require an **EmployeeProfile**
-  linked to the user. Roles control *what you may do*; the profile says *who you are in the company*.
+  linked to the user. Roles control *what you may do*; the profile says *who you are in the company*,
+  including a **job level** (CEO … Individual Contributor) and an **employment type** (full-time,
+  contractor, intern), which grant nothing.
 
-| Capability | admin | hr | agent | customer/employee |
-|---|---|---|---|---|
-| Support chat (as a customer) | | | | ✓ |
-| Support console (claim/reply to escalated chats) | ✓ | | ✓ | |
-| Users & roles management | ✓ | | | |
-| Agent telemetry console | ✓ | | | |
-| Organisation chart | ✓ | | ✓ | |
-| Onboarding / invitations | ✓ (can invite HR) | ✓ (employees, agents) | | |
-| Workforce risk analytics | ✓ | ✓ | | |
-| Company OKRs (create/manage) | ✓ | ✓ | | |
-| Team OKRs | department heads (by `Department.departmentHeadId`) | | | |
-| Issue payslips / view anyone's | ✓ | ✓ | | |
-| Own attendance, payslips, tax planner, vault | if profile | if profile | if profile | if profile |
-| Approve attendance reviews | ✓ (all) | ✓ (all) | | reporting managers (their reports) |
+| Capability | admin | hr | finance | it_admin | agent | employee |
+|---|---|---|---|---|---|---|
+| Support chat (USE_SUPPORT_CHAT) | | | | | | ✓ |
+| Support console, organisation chart (STAFF_SUPPORT) | ✓ | | | | ✓ | |
+| Users & roles (MANAGE_USERS) | ✓ (any role) | | | ✓ (never admin) | | |
+| Company settings (MANAGE_COMPANY_SETTINGS) | ✓ | read | | ✓ | | |
+| System health, agent telemetry | ✓ | | | ✓ | | |
+| Departments & Agents (MANAGE_KNOWLEDGE_BASES) | ✓ | | | | | |
+| Onboarding, workplace, leave admin, risk analytics (MANAGE_WORKFORCE) | ✓ | ✓ | | | | |
+| Invitations | ✓ (hr, finance, it_admin, agent, employee) | ✓ (agent, employee) | | | | |
+| Employee directory | ✓ | ✓ | ✓ | ✓ | | |
+| Issue payslips / view anyone's (MANAGE_PAYSLIPS) | ✓ | ✓ | ✓ | | | |
+| CTC calculator, compensation policy | ✓ | ✓ | ✓ | | | |
+| Offers: read / prepare and send | ✓ / ✓ | ✓ / ✓ | ✓ / | | | |
+| Team OKRs | department heads (by `Department.departmentHeadId`) | | | | | |
+| Own attendance, payslips, tax planner, vault | if profile | if profile | if profile | if profile | if profile | if profile |
+| Approve attendance reviews | ✓ (all) | ✓ (all) | | | | reporting managers (their reports) |
 
 Frontend route guards only steer navigation; **every API call is authorised again on the backend**.
 

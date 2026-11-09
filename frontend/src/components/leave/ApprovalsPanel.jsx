@@ -35,11 +35,12 @@ import {
   describeLeaveDates,
   formatDays,
 } from '../../constants/leave.js';
-import { WORKFORCE_ADMIN_ROLES } from '../../constants/routes.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { formatCalendarDate } from '../../utils/dates.js';
 import { CheckBadgeIcon } from '../Icons.jsx';
 import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, Tabs, TextInput, formatDateTime } from '../ui.jsx';
+import { hasCapability } from '../../auth/capabilities.js';
+import { CAPABILITIES } from '../../constants/capabilities.js';
 
 const QUEUE_TABS = Object.freeze([
   { id: APPROVAL_QUEUES.REQUESTS, label: 'Leave requests' },
@@ -178,7 +179,7 @@ function ApprovalItem({ request, queue, onDecided, onOvertaken }) {
 
 export default function ApprovalsPanel() {
   const { currentUser } = useAuth();
-  const isWorkforceAdmin = WORKFORCE_ADMIN_ROLES.includes(currentUser?.role);
+  const isWorkforceAdmin = hasCapability(currentUser, CAPABILITIES.MANAGE_WORKFORCE);
   const [queue, setQueue] = useState(APPROVAL_QUEUES.REQUESTS);
   const [lastDecision, setLastDecision] = useState(null);
   const [overtakenMessage, setOvertakenMessage] = useState(null);

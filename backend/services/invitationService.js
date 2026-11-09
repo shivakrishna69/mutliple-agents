@@ -104,6 +104,8 @@ export function toInvitationSummary(invitation, { departmentNames = new Map(), m
     workLocationType: draft.workLocationType,
     dateOfJoining: draft.dateOfJoining.toISOString().slice(0, 10),
     employmentStatus: draft.employmentStatus,
+    jobLevel: draft.jobLevel ?? DEFAULT_JOB_LEVEL,
+    employmentType: draft.employmentType ?? DEFAULT_EMPLOYMENT_TYPE,
     expiresAt: invitation.expiresAt.toISOString(),
     sendCount: invitation.sendCount,
     lastSentAt: invitation.lastSentAt.toISOString(),

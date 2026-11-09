@@ -2,7 +2,8 @@
  * User administration (MANAGE_USERS: admins and IT administrators), replacing the command-line role
  * script for deployments.
  *
- *   GET   /api/admin/users?search=&role=     list users (newest first, at most USER_LIST_LIMIT)
+ *   GET   /api/admin/users?search=&role=     list users (newest first, at most USER_LIST_LIMIT), with
+ *                                           the roles the caller may assign (roleOptions)
  *   PATCH /api/admin/users/:userId/role      { role } (constants/accessRoles.js ROLES)
  *
  * Role changes:
@@ -16,7 +17,7 @@
  *   - Every change is logged with who made it, for audit.
  */
 
-import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
+import { CAPABILITIES, assignableRoleDefinitionsFor, hasCapability } from '../constants/accessRoles.js';
 import User, { ROLES } from '../models/User.js';
 import { ADMIN_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
@@ -77,6 +78,8 @@ export async function listUsers(req, res, next) {
     return sendSuccess(res, HTTP_STATUS.OK, ADMIN_MESSAGES.USERS_RETRIEVED, {
       users: userRecords.map(toAdminUserSummary),
       countsByRole,
+      roleOptions: assignableRoleDefinitionsFor(req.user.role),
+      canChangeAdmins: hasCapability(req.user.role, CAPABILITIES.ASSIGN_ADMIN_ROLE),
     });
   } catch (error) {
     return next(error);

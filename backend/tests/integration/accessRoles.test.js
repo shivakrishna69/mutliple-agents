@@ -75,7 +75,7 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
       assert.equal(user.roleLabel, ROLE_DEFINITIONS.find((definition) => definition.value === role).label);
       assert.deepEqual(user.capabilities, capabilitiesOf(role));
     }
-    assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), []);
+    assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), [CAPABILITIES.USE_SUPPORT_CHAT]);
   });
 
   it('keeps each area to the roles the access table gives it', async () => {
@@ -130,6 +130,12 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
       AGENT,
     ]);
     await assertReachableBy('the organisation directory', (client) => client.get('/api/org/hierarchy'), [ADMIN, AGENT]);
+    await assertReachableBy('the support chat', (client) => client.post('/api/support/messages', {}), [ROLES.EMPLOYEE]);
+    await assertReachableBy(
+      "every department's knowledge base",
+      (client) => client.get(`/api/departments/${departmentId}/agent/settings`),
+      [ADMIN],
+    );
   });
 
   it('lets administrators and IT administrators change the company settings, and tells HR who can', async () => {
@@ -168,7 +174,16 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
 
   it('lets an IT administrator manage accounts but never grant or take away administration', async () => {
     const itAdmin = clients[ROLES.IT_ADMIN];
-    const { users } = (await itAdmin.get('/api/admin/users')).body.data;
+    const { users, roleOptions, canChangeAdmins } = (await itAdmin.get('/api/admin/users')).body.data;
+    assert.equal(canChangeAdmins, false);
+    assert.deepEqual(
+      roleOptions.map((role) => role.value),
+      ROLE_DEFINITIONS.map((role) => role.value).filter((role) => role !== ROLES.ADMIN),
+      'an IT administrator is never offered the admin role',
+    );
+    const adminView = (await clients[ROLES.ADMIN].get('/api/admin/users')).body.data;
+    assert.equal(adminView.canChangeAdmins, true);
+    assert.deepEqual(adminView.roleOptions, ROLE_DEFINITIONS);
     const idOf = (email) => users.find((user) => user.email === email).id;
     const agentId = idOf('agent@example.com');
 
@@ -243,6 +258,9 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
     const stored = await organizationOf('chitra.employee@example.com');
     assert.equal(stored.organizationData.jobLevel, 'cto');
     assert.equal(stored.organizationData.employmentType, 'contractor');
+    const { invitations } = (await clients[ROLES.ADMIN].get('/api/people/invitations')).body.data;
+    const listed = invitations.find((invitation) => invitation.email === 'chitra.employee@example.com');
+    assert.deepEqual([listed.jobLevel, listed.employmentType], ['cto', 'contractor']);
 
     const unknownLevel = await invite(clients[ROLES.ADMIN], { role: ROLES.AGENT, jobLevel: 'emperor' });
     assert.equal(unknownLevel.status, 400);
@@ -258,8 +276,21 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
     assert.equal(agentProfile.organizationData.employmentType, 'full_time');
   });
 
-  it('gives every capability to administrators, and MANAGE_WORKFORCE to administrators and HR only', () => {
-    assert.deepEqual([...capabilitiesOf(ROLES.ADMIN)].sort(), Object.values(CAPABILITIES).sort());
+  it('gives administrators every capability but the support chat, and MANAGE_WORKFORCE to administrators and HR only', () => {
+    assert.deepEqual(
+      [...capabilitiesOf(ROLES.ADMIN)].sort(),
+      Object.values(CAPABILITIES)
+        .filter((capability) => capability !== CAPABILITIES.USE_SUPPORT_CHAT)
+        .sort(),
+    );
+    assert.deepEqual(
+      ALL_ROLES.filter((role) => capabilitiesOf(role).includes(CAPABILITIES.USE_SUPPORT_CHAT)),
+      [ROLES.EMPLOYEE],
+    );
+    assert.deepEqual(
+      ALL_ROLES.filter((role) => capabilitiesOf(role).includes(CAPABILITIES.MANAGE_KNOWLEDGE_BASES)),
+      [ROLES.ADMIN],
+    );
     assert.deepEqual(
       ALL_ROLES.filter((role) => capabilitiesOf(role).includes(CAPABILITIES.MANAGE_WORKFORCE)),
       [ROLES.ADMIN, ROLES.HR],

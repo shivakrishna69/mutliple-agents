@@ -22,7 +22,7 @@ import {
   requestWorkforceRisk,
 } from '../../api/workforceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { ROUTE_PATHS, WORKFORCE_ADMIN_ROLES } from '../../constants/routes.js';
+import { ROUTE_PATHS } from '../../constants/routes.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { CheckBadgeIcon, DocumentIcon, DownloadIcon, ShieldIcon, UploadIcon } from '../Icons.jsx';
 import {
@@ -37,6 +37,8 @@ import {
   formatDate,
   openSignedUrl,
 } from '../ui.jsx';
+import { hasCapability } from '../../auth/capabilities.js';
+import { CAPABILITIES } from '../../constants/capabilities.js';
 
 /** Mirrors backend VAULT_DOCUMENT_TYPES; `isSelfUploadable` mirrors services/vaultAccess.js. */
 const DOCUMENT_TYPES = Object.freeze([
@@ -256,7 +258,7 @@ function DocumentRow({ vaultDocument, canVerify, onChanged }) {
 
 export default function DocumentVaultPanel() {
   const { currentUser } = useAuth();
-  const isRecordsAdmin = WORKFORCE_ADMIN_ROLES.includes(currentUser.role);
+  const isRecordsAdmin = hasCapability(currentUser, CAPABILITIES.MANAGE_WORKFORCE);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('me');
   const documentsResource = useApiResource(
     (signal) => requestEmployeeDocuments(selectedEmployeeId, signal),

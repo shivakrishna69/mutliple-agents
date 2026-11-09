@@ -2,7 +2,7 @@
  * Who may manage a department's knowledge base: one rule, used by every knowledge base endpoint
  * (middleware/departmentKnowledgeScope.js).
  *
- *   administrator           any department; may also choose the department's knowledge lead
+ *   administrator           any department (MANAGE_KNOWLEDGE_BASES); may also choose the department's knowledge lead
  *   department head         their own department (Department.departmentHeadId is their employee
  *                           profile); may also choose the knowledge lead
  *   knowledge lead          the department whose agent names them (DepartmentAgent.managedBy)
@@ -12,7 +12,7 @@
  * allowed it (for the audit log), or is null when refused.
  */
 
-import { ROLES } from '../../models/User.js';
+import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
 
 export const KNOWLEDGE_ACCESS_BASIS = Object.freeze({
   ADMIN: 'admin',
@@ -27,7 +27,8 @@ const sameId = (left, right) => Boolean(left) && Boolean(right) && left.toString
  *   departmentHeadId: object|string|null, managedBy: object|string|null }} facts
  */
 export function decideKnowledgeAccess({ role, userId, ownProfileId, departmentHeadId, managedBy }) {
-  if (role === ROLES.ADMIN) return { canManage: true, canAssignLead: true, basis: KNOWLEDGE_ACCESS_BASIS.ADMIN };
+  if (hasCapability(role, CAPABILITIES.MANAGE_KNOWLEDGE_BASES))
+    return { canManage: true, canAssignLead: true, basis: KNOWLEDGE_ACCESS_BASIS.ADMIN };
   if (sameId(ownProfileId, departmentHeadId)) {
     return { canManage: true, canAssignLead: true, basis: KNOWLEDGE_ACCESS_BASIS.DEPARTMENT_HEAD };
   }

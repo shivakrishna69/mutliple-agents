@@ -335,18 +335,27 @@ export async function signUpAndConfirm(testServer, client, { name, email, passwo
  * On a server without email: an active, confirmed account written straight to the database (test
  * data, like the role switch below), then signed in through the API.
  */
-async function seedConfirmedAccount(testServer, client, { name, email }) {
+/**
+ * Writes an active account with a confirmed email and the test password straight to the database,
+ * without signing up (which is rate limited per network) or signing in. `role` defaults to admin for
+ * the bootstrap email and employee otherwise.
+ */
+export async function insertConfirmedAccount(testServer, { name, email, role = null }) {
   const now = new Date();
   await testServer.database.collection('users').insertOne({
     name,
     email,
     password: await bcrypt.hash(STRONG_PASSWORD, 4),
-    role: email === TEST_ADMIN_EMAIL ? 'admin' : 'employee',
+    role: role ?? (email === TEST_ADMIN_EMAIL ? 'admin' : 'employee'),
     status: 'active',
     emailVerifiedAt: now,
     createdAt: now,
     updatedAt: now,
   });
+}
+
+async function seedConfirmedAccount(testServer, client, { name, email }) {
+  await insertConfirmedAccount(testServer, { name, email });
   const loginResponse = await client.login(email);
   if (loginResponse.status !== 200) {
     throw new Error(`Login for ${email} failed: ${loginResponse.status} ${JSON.stringify(loginResponse.body)}`);

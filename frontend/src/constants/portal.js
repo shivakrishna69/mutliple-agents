@@ -4,7 +4,7 @@
  * the sidebar shows; route guards and the backend still decide what anyone may open.
  */
 
-import { USER_ROLES } from './routes.js';
+import { CAPABILITIES } from './capabilities.js';
 
 export const PORTAL_VIEWS = Object.freeze({ SELF_SERVICE: 'self-service', MANAGEMENT: 'management' });
 
@@ -13,8 +13,15 @@ export const PORTAL_VIEW_DISPLAY = Object.freeze({
   [PORTAL_VIEWS.MANAGEMENT]: { label: 'Admin / Management', shortLabel: 'Management' },
 });
 
-/** Who can switch; everyone else always sees their one sidebar. */
-export const PORTAL_SWITCH_ROLES = Object.freeze([USER_ROLES.ADMIN, USER_ROLES.HR]);
+/**
+ * Who can switch: people with any of these management capabilities (admins, HR, IT administrators).
+ * Everyone else always sees their one sidebar.
+ */
+export const PORTAL_SWITCH_CAPABILITIES = Object.freeze([
+  CAPABILITIES.MANAGE_WORKFORCE,
+  CAPABILITIES.MANAGE_USERS,
+  CAPABILITIES.MANAGE_COMPANY_SETTINGS,
+]);
 
 /** Where a person who can switch starts. */
 export const DEFAULT_PORTAL_VIEW = PORTAL_VIEWS.MANAGEMENT;
