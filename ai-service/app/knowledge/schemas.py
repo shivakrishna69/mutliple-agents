@@ -65,3 +65,16 @@ class RemoveDocumentInput(StrictModel):
 
 class RemoveDocumentResponse(BaseModel):
     removed: int
+
+
+class RetrievedPassage(BaseModel):
+    """One chunk a search found, with its relevance (cosine similarity, higher is closer)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document_id: str
+    chunk_index: int
+    text: str
+    heading_path: list[str]
+    page: int | None
+    score: float
