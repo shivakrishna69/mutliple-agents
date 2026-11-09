@@ -55,3 +55,28 @@ def test_telemetry_needs_a_backend_url(environment):
     environment(AGENT_TELEMETRY_ENABLED="true", BACKEND_INTERNAL_URL="")
     with pytest.raises(ConfigurationError, match="AGENT_TELEMETRY_ENABLED"):
         Settings.from_environment()
+
+
+def test_knowledge_answer_settings_have_measured_defaults(environment):
+    settings = Settings.from_environment()
+    assert settings.knowledge_answer_top_k == 6
+    assert settings.knowledge_min_relevance == 0.6
+    assert settings.knowledge_answer_history_messages == 6
+    assert settings.knowledge_excerpt_chars == 1200
+    assert settings.knowledge_answer_temperature == 0.1
+
+
+@pytest.mark.parametrize(
+    ("variable_name", "value"),
+    [
+        ("KNOWLEDGE_MIN_RELEVANCE", "1.5"),
+        ("KNOWLEDGE_ANSWER_TOP_K", "0"),
+        ("KNOWLEDGE_ANSWER_HISTORY_MESSAGES", "50"),
+        ("KNOWLEDGE_EXCERPT_CHARS", "many"),
+        ("KNOWLEDGE_ANSWER_TEMPERATURE", "2"),
+    ],
+)
+def test_knowledge_answer_settings_out_of_range_are_refused(environment, variable_name, value):
+    environment(**{variable_name: value})
+    with pytest.raises(ConfigurationError, match=variable_name):
+        Settings.from_environment()

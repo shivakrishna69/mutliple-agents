@@ -7,6 +7,7 @@ Qdrant (app/knowledge/store.py).
                    document does not wait for it; neither failing stops the service
     index_chunks   ensures the collection exists (once), embeds, upserts; returns the count
     remove_document  evicts a document's chunks; returns how many there were
+    search_passages  the passages of one department closest to a question, most relevant first
 
 Qdrant being unreachable, or the model failing to load, raises KnowledgeUnavailableError (503): the
 backend then retries the document later. Nothing here logs chunk text.
@@ -25,7 +26,7 @@ from qdrant_client.http.exceptions import ApiException
 from app.config import Settings
 from app.knowledge.constants import COLLECTION_NAME
 from app.knowledge.embedder import EmbeddingModelError, KnowledgeEmbedder, passage_text
-from app.knowledge.schemas import IndexChunksInput
+from app.knowledge.schemas import IndexChunksInput, RetrievedPassage
 from app.knowledge.store import KnowledgeStore
 
 logger = logging.getLogger("ai_service.knowledge")
@@ -125,6 +126,29 @@ class KnowledgeService:
             return await store.remove_document(document_id)
         except INDEX_FAILURES as index_error:
             raise KnowledgeUnavailableError(type(index_error).__name__) from index_error
+
+    async def search_passages(self, *, department_id: str, question: str, limit: int) -> list[RetrievedPassage]:
+        """Up to `limit` passages of the department, most relevant first; none when it has no documents."""
+        store = await self._ready_store()
+        try:
+            vector = await self._embedder.embed_query(question)
+        except EmbeddingModelError as model_error:
+            raise KnowledgeUnavailableError("embedding model unavailable") from model_error
+        try:
+            points = await store.search(vector, department_id=department_id, limit=limit)
+        except INDEX_FAILURES as index_error:
+            raise KnowledgeUnavailableError(type(index_error).__name__) from index_error
+        return [
+            RetrievedPassage(
+                document_id=point.payload["document_id"],
+                chunk_index=point.payload["chunk_index"],
+                text=point.payload["text"],
+                heading_path=point.payload.get("heading_path") or [],
+                page=point.payload.get("page"),
+                score=point.score,
+            )
+            for point in points
+        ]
 
     async def aclose(self) -> None:
         if self._model_task is not None and not self._model_task.done():

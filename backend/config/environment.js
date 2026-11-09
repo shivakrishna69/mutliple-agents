@@ -15,6 +15,9 @@ import { EMAIL_PATTERN, HEX_COLOR_PATTERN } from '../constants/validation.js';
  * HMAC-SHA256 needs a key at least as long as its 256-bit output; shorter secrets can be
  * brute-forced offline from a single signed value.
  */
+// BullMQ's default key prefix, and what QUEUE_PREFIX may contain.
+const DEFAULT_QUEUE_PREFIX = 'bull';
+const QUEUE_PREFIX_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const MIN_SECRET_LENGTH = 32;
 
 /** Bounds for IMPORT_EMAILS_PER_MINUTE. */
@@ -355,6 +358,14 @@ export function loadConfig() {
     }
   }
 
+  // Optional. The namespace of the background queues' keys in Redis. Deployments that share one Redis
+  // need different prefixes, or each one's workers take the other's jobs (and find nothing to do).
+  // The default is BullMQ's own, so existing queues keep working.
+  const queuePrefix = process.env.QUEUE_PREFIX?.trim() || DEFAULT_QUEUE_PREFIX;
+  if (!QUEUE_PREFIX_PATTERN.test(queuePrefix)) {
+    throw new Error('QUEUE_PREFIX may only contain letters, digits, "_" and "-" (at most 64 characters)');
+  }
+
   // Optional. How many invitation emails an employee import sends per minute: mail providers cap
   // sending (often a few hundred an hour), and a steady pace keeps the import within it.
   const importEmailsPerMinute = readBoundedInteger('IMPORT_EMAILS_PER_MINUTE', IMPORT_EMAILS_PER_MINUTE_BOUNDS);
@@ -379,6 +390,7 @@ export function loadConfig() {
     env,
     cookieSecure,
     redisUrl,
+    queuePrefix,
     employeeImport: { emailsPerMinute: importEmailsPerMinute },
     vaultStorage,
     payslips,

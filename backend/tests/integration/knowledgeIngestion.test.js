@@ -10,6 +10,8 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
+import { Worker } from 'bullmq';
+import { Redis } from 'ioredis';
 import mongoose from 'mongoose';
 
 import { KNOWLEDGE_MESSAGES } from '../../constants/messages.js';
@@ -362,12 +364,61 @@ describe('knowledge ingestion', { skip: mongoReason ?? false }, () => {
     after(() => closeKnowledgeIngestionQueue());
 
     it('processes a dispatched document through Redis', async () => {
-      initKnowledgeIngestionQueue({ ...config, redisUrl: process.env.TEST_REDIS_URL });
+      // A namespace of its own, so a test server sharing the test Redis cannot take this test's jobs.
+      initKnowledgeIngestionQueue({
+        ...config,
+        redisUrl: process.env.TEST_REDIS_URL,
+        queuePrefix: `test_ingest_${randomBytes(6).toString('hex')}`,
+      });
       const document = await uploadDocument(Buffer.from('Through Redis.\n', 'utf8'), { originalName: 'Redis.md' });
       await dispatchDocumentIngestion(document._id.toString());
       const done = await waitForStatus(document._id, [DOCUMENT_STATUSES.READY]);
       assert.equal(done.attempts, 1);
       assert.equal(index.chunksOf(document._id).size, 1);
+    });
+
+    it('never hands its jobs to a worker of another deployment sharing the Redis', async () => {
+      await closeKnowledgeIngestionQueue();
+      const prefix = `test_ingest_${randomBytes(6).toString('hex')}`;
+      initKnowledgeIngestionQueue({ ...config, redisUrl: process.env.TEST_REDIS_URL, queuePrefix: prefix });
+      // Another deployment's worker on the same queue name with BullMQ's default namespace, as every
+      // deployment had before QUEUE_PREFIX: it would take some of these jobs and find nothing to do.
+      const foreignConnection = new Redis(process.env.TEST_REDIS_URL, { maxRetriesPerRequest: null });
+      const takenByForeignWorker = [];
+      const foreignWorker = new Worker(
+        'knowledge-ingestion',
+        async (job) => {
+          takenByForeignWorker.push(job.data.documentId);
+        },
+        { connection: foreignConnection, prefix: 'bull' },
+      );
+      try {
+        const documents = [];
+        for (const label of ['one', 'two', 'three', 'four', 'five']) {
+          const document = await uploadDocument(
+            Buffer.from(
+              `Shared Redis, ${label}.
+`,
+              'utf8',
+            ),
+            {
+              originalName: `${label}.md`,
+            },
+          );
+          await dispatchDocumentIngestion(document._id.toString());
+          documents.push(document);
+        }
+        for (const document of documents) await waitForStatus(document._id, [DOCUMENT_STATUSES.READY]);
+        const ours = new Set(documents.map((document) => document._id.toString()));
+        assert.deepEqual(
+          takenByForeignWorker.filter((documentId) => ours.has(documentId)),
+          [],
+        );
+      } finally {
+        await foreignWorker.close();
+        await foreignConnection.quit();
+        await closeKnowledgeIngestionQueue();
+      }
     });
   });
 });

@@ -63,9 +63,10 @@ class KnowledgeEmbedder:
                 raise EmbeddingModelError(f"{EMBEDDING_MODEL_NAME} could not be loaded") from load_error
             self._model = model
 
-    def _embed_now(self, texts: list[str]) -> list[list[float]]:
+    def _embed_now(self, texts: list[str], *, as_query: bool = False) -> list[list[float]]:
         self.load()
-        vectors = [vector.tolist() for vector in self._model.embed(texts, batch_size=EMBEDDING_BATCH_SIZE)]
+        embed = self._model.query_embed if as_query else self._model.embed
+        vectors = [vector.tolist() for vector in embed(texts, batch_size=EMBEDDING_BATCH_SIZE)]
         if len(vectors) != len(texts) or any(len(vector) != EMBEDDING_DIMENSIONS for vector in vectors):
             raise EmbeddingModelError("the model returned vectors of an unexpected shape")
         return vectors
@@ -74,3 +75,8 @@ class KnowledgeEmbedder:
         """One vector per text, in order. Raises EmbeddingModelError."""
         async with self._embed_lock:
             return await asyncio.to_thread(self._embed_now, texts)
+
+    async def embed_query(self, question: str) -> list[float]:
+        """The vector of a question, to search passages with (the model's query form). Raises EmbeddingModelError."""
+        async with self._embed_lock:
+            return (await asyncio.to_thread(self._embed_now, [question], as_query=True))[0]

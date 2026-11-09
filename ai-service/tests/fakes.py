@@ -10,8 +10,8 @@ from datetime import date, datetime
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from pydantic import Field
 
 from app.nodes.attendance_agent import (
@@ -134,3 +134,56 @@ __all__ = [
     "text_reply",
     "tool_call_reply",
 ]
+
+
+class StreamingScriptedChatModel(BaseChatModel):
+    """
+    Streams each queued reply in the given pieces (a list of strings; an Exception is raised
+    instead), with token usage on the last piece, and records every input it received.
+    """
+
+    replies: list[Any] = Field(default_factory=list)
+    received_inputs: list[list[BaseMessage]] = Field(default_factory=list)
+    usage: dict[str, int] = Field(
+        default_factory=lambda: {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150}
+    )
+
+    @property
+    def _llm_type(self) -> str:
+        return "streaming-scripted"
+
+    def _next_pieces(self, messages: list[BaseMessage]) -> list[str]:
+        self.received_inputs.append(list(messages))
+        if not self.replies:
+            raise AssertionError("StreamingScriptedChatModel received more calls than scripted replies")
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    def _generate(self, messages: list[BaseMessage], stop: Any = None, run_manager: Any = None, **kwargs: Any):
+        text = "".join(self._next_pieces(messages))
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text, usage_metadata=self.usage))])
+
+    def _stream(self, messages: list[BaseMessage], stop: Any = None, run_manager: Any = None, **kwargs: Any):
+        pieces = self._next_pieces(messages)
+        for index, piece in enumerate(pieces):
+            is_last = index == len(pieces) - 1
+            yield ChatGenerationChunk(
+                message=AIMessageChunk(content=piece, usage_metadata=self.usage if is_last else None)
+            )
+
+
+class FakePassageRetriever:
+    """Returns the given passages for any question, and records each search."""
+
+    def __init__(self, passages: list[Any] | None = None, *, error: Exception | None = None) -> None:
+        self.passages = passages or []
+        self.error = error
+        self.searches: list[dict[str, Any]] = []
+
+    async def search_passages(self, *, department_id: str, question: str, limit: int) -> list[Any]:
+        self.searches.append({"department_id": department_id, "question": question, "limit": limit})
+        if self.error is not None:
+            raise self.error
+        return self.passages[:limit]

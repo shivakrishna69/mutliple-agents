@@ -70,6 +70,14 @@ from app.nodes.attendance_agent import (
     create_regularization_model,
 )
 from app.nodes.context import AgentContext
+from app.nodes.knowledge_agent import (
+    AnswerSettings,
+    KnowledgeAnswerer,
+    KnowledgeAnswerInput,
+    KnowledgeAnswerResponse,
+    PassageRetriever,
+)
+from app.nodes.knowledge_agent.answerer import DeltaSink
 from app.nodes.leave_assistant import (
     BackendLeaveSystems,
     LeaveAssistant,
@@ -82,6 +90,7 @@ from app.nodes.transcript import replies_given_this_turn
 from app.schemas import MESSAGE_CONTENT_MAX_LENGTH, EmployeeContext
 from app.services.backend_client import BackendInternalClient
 from app.telemetry import (
+    WORKFLOW_KNOWLEDGE_ANSWER,
     WORKFLOW_LEAVE_ASSISTANT,
     WORKFLOW_REGULARIZATION,
     WORKFLOW_SUPPORT,
@@ -119,6 +128,10 @@ class AgentTimeoutError(AgentError):
 
 class RegularizationUnavailableError(AgentError):
     """BACKEND_INTERNAL_URL is not configured, so attendance cannot be read or written."""
+
+
+class KnowledgeAnswerUnavailableError(AgentError):
+    """Department questions cannot be answered: the knowledge index is not attached to the runtime."""
 
 
 class LeaveAssistantUnavailableError(AgentError):
@@ -252,6 +265,10 @@ class AgentRuntime:
         self.regularization_agent: RegularizationAgent | None = None
         # The leave assistant reads leave through the backend's internal API; None without it.
         self.leave_assistant: LeaveAssistant | None = None
+        # Answers from department knowledge; built by attach_knowledge_retriever once the knowledge
+        # index exists, and only with a model. Its model runs at KNOWLEDGE_ANSWER_TEMPERATURE.
+        self.knowledge_answerer: KnowledgeAnswerer | None = None
+        self._knowledge_model: ChatGroq | None = None
         # One pooled client for the backend's internal API, shared by the regularization agent
         # and telemetry delivery.
         self._backend_client: BackendInternalClient | None = None
@@ -263,6 +280,7 @@ class AgentRuntime:
             self.telemetry_publisher = TelemetryPublisher(self._backend_client)
         if settings.groq_api_key:
             self._response_model = self._create_chat_model(settings.llm_temperature)
+            self._knowledge_model = self._create_chat_model(settings.knowledge_answer_temperature)
             # The attendance regularization sub-agent writes through the backend's internal API.
             # Activity evidence comes from the simulated source only where simulated data is
             # allowed (never in production); without a source every request goes to the manager.
@@ -288,6 +306,21 @@ class AgentRuntime:
 
         # The cyclic support workflow (app/graph.py), persisted per thread by memory_checkpointer.
         self.compiled_graph = build_support_graph(self.memory_checkpointer)
+
+    def attach_knowledge_retriever(self, retriever: PassageRetriever) -> None:
+        """Lets the runtime answer department questions from `retriever` (the knowledge service)."""
+        if self._knowledge_model is None:
+            return
+        self.knowledge_answerer = KnowledgeAnswerer(
+            self._knowledge_model,
+            retriever,
+            AnswerSettings(
+                top_k=self._settings.knowledge_answer_top_k,
+                min_relevance=self._settings.knowledge_min_relevance,
+                history_messages=self._settings.knowledge_answer_history_messages,
+                excerpt_chars=self._settings.knowledge_excerpt_chars,
+            ),
+        )
 
     def start(self) -> None:
         """Starts background work that needs the running event loop (called on application startup)."""
@@ -515,6 +548,30 @@ class AgentRuntime:
     # ---------------------------------------------------------------------------------------------
     # Leave assistant (POST /ai/leave/assistant)
     # ---------------------------------------------------------------------------------------------
+
+    async def process_knowledge_question(
+        self, answer_input: KnowledgeAnswerInput, on_delta: DeltaSink | None = None
+    ) -> KnowledgeAnswerResponse:
+        """
+        One employee question to a department's agent, bounded by AI_PROCESS_TIMEOUT_SECONDS. It only
+        reads, so a timeout or a retry is always safe. KnowledgeUnavailableError (the index) passes
+        through for the HTTP layer.
+        """
+        if not self.is_llm_configured:
+            raise LLMNotConfiguredError("llm_not_configured", "GROQ_API_KEY is not set")
+        if self.knowledge_answerer is None:
+            raise KnowledgeAnswerUnavailableError("knowledge_not_attached", "the knowledge index is not attached")
+        try:
+            async with telemetry_turn(self.telemetry_publisher, workflow=WORKFLOW_KNOWLEDGE_ANSWER) as turn_telemetry:
+                async with asyncio.timeout(self._settings.process_timeout_seconds):
+                    result = await self.knowledge_answerer.answer(answer_input, on_delta)
+                if turn_telemetry is not None:
+                    turn_telemetry.route_decision = result.outcome.value
+                return result
+        except TimeoutError as timeout_error:
+            raise AgentTimeoutError(
+                "turn_timeout", f"knowledge answer exceeded {self._settings.process_timeout_seconds} s"
+            ) from timeout_error
 
     async def process_leave_question(self, turn_input: LeaveAssistantInput) -> LeaveAssistantResult:
         """

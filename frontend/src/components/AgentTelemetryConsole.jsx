@@ -221,6 +221,8 @@ export default function AgentTelemetryConsole() {
             <option value="all">all workflows</option>
             <option value="support">support</option>
             <option value="regularization">regularization</option>
+            <option value="leave_assistant">leave_assistant</option>
+            <option value="knowledge_answer">knowledge_answer</option>
           </select>
           <input
             value={searchText}

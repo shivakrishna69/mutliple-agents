@@ -84,6 +84,8 @@ function buildServerEnvironment({ port, mongoUri, appOrigin, aiServiceUrl, inter
     WEBHOOK_SIGNING_SECRET: randomBytes(32).toString('hex'),
     AI_SERVICE_API_KEY: internalApiKey,
     AI_SERVICE_URL: aiServiceUrl,
+    // Queues of their own: test servers sharing the test Redis must not take each other's jobs.
+    QUEUE_PREFIX: `test_${randomBytes(6).toString('hex')}`,
     CORS_ORIGINS: appOrigin,
     BOOTSTRAP_ADMIN_EMAIL: TEST_ADMIN_EMAIL,
     COMPANY_NAME: 'Test Company',
