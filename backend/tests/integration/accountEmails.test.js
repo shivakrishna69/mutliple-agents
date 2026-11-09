@@ -181,14 +181,18 @@ describe('confirming the email address', { skip: skipReason ?? false }, () => {
   });
 
   it('sends a branded email with a link to the app, and stores only the link hash', async () => {
-    const [message] = testServer.mailbox.messagesTo('mira@example.com');
+    // An account of its own: earlier tests expire their tokens, which MongoDB's TTL cleanup then
+    // deletes at a moment of its choosing.
+    assert.equal((await testServer.createClient().signup('Nora Bose', 'nora@example.com')).status, 202);
+    const [message] = await testServer.mailbox.waitForMessages('nora@example.com', 1);
     assert.equal(message.from.replaceAll('"', ''), TEST_MAIL_FROM, 'sent from MAIL_FROM');
     assert.match(message.subject, /Test Company/);
     const token = tokenFromEmail(message, ACCOUNT_LINK_PATHS.EMAIL_VERIFICATION);
     assert.ok(message.text.includes(`${TEST_APP_ORIGIN}${ACCOUNT_LINK_PATHS.EMAIL_VERIFICATION}/${token}`));
     assert.ok(message.html.includes(`${TEST_APP_ORIGIN}${ACCOUNT_LINK_PATHS.EMAIL_VERIFICATION}/${token}`));
 
-    const storedTokens = await testServer.database.collection('accounttokens').find({}).toArray();
+    const nora = await findUser(testServer, 'nora@example.com');
+    const storedTokens = await testServer.database.collection('accounttokens').find({ userId: nora._id }).toArray();
     assert.ok(storedTokens.length > 0);
     assert.equal(JSON.stringify(storedTokens).includes(token), false, 'the raw token is never stored');
     const raj = await findUser(testServer, 'raj@example.com');
