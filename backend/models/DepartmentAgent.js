@@ -9,14 +9,16 @@
  *                  change who it is
  *   systemPrompt   the department's instructions for the agent, written by its lead. Untrusted
  *                  input: the agent keeps its own rules above it
- *   status         ACTIVE, or PAUSED: a paused agent takes no new documents
+ *   status         ACTIVE, or PAUSED: a paused agent takes no new documents and answers no questions
+ *   audience       who may ask it (AGENT_AUDIENCES): FOLLOW_DEPARTMENT (the default) uses the
+ *                  department's shared-service switch; COMPANY or DEPARTMENT overrides it
  *
  * Every change is versioned (optimisticConcurrency), so two leads editing at once cannot overwrite
  * each other.
  */
 
 import mongoose from 'mongoose';
-import { KNOWLEDGE_BASE_SETTINGS } from '../constants/validation.js';
+import { AGENT_AUDIENCES, KNOWLEDGE_BASE_SETTINGS } from '../constants/validation.js';
 
 const { ObjectId } = mongoose.Schema.Types;
 
@@ -52,6 +54,12 @@ const departmentAgentSchema = new mongoose.Schema(
       type: String,
       enum: Object.values(AGENT_STATUSES),
       default: AGENT_STATUSES.ACTIVE,
+      required: true,
+    },
+    audience: {
+      type: String,
+      enum: Object.values(AGENT_AUDIENCES),
+      default: AGENT_AUDIENCES.FOLLOW_DEPARTMENT,
       required: true,
     },
     createdByUserId: { type: ObjectId, ref: 'User', required: true, immutable: true },

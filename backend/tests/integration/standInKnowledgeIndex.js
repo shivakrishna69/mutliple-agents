@@ -9,6 +9,13 @@
  *   index.requests                 every request: { path, body }
  *   index.failNext(count)          the next `count` requests answer 503
  *   index.pauseNextIndexing()      the next chunks request waits; returns { reached, release }
+ *   index.scriptAnswer(script)     how the next POST /ai/knowledge/answer replies (queued, in order):
+ *                                    { outcome, answer, citations, deltas?, usage?, passagesConsidered? }
+ *                                    streamed as NDJSON like the real service (deltas, then final);
+ *                                    { status } answers that HTTP status instead;
+ *                                    { deltas?, errorCode } streams the deltas, then an error event.
+ *                                  Without a script it answers not_found.
+ *   index.answerRequests()         the bodies of every answer request received
  *   index.stop()
  */
 
@@ -19,6 +26,7 @@ export async function startStandInKnowledgeIndex({ apiKey }) {
   const requests = [];
   let failuresLeft = 0;
   let pause = null;
+  const answerScripts = [];
 
   const readBody = async (request) => {
     const parts = [];
@@ -53,6 +61,30 @@ export async function startStandInKnowledgeIndex({ apiKey }) {
       chunksByDocument.set(body.document_id, stored);
       return reply(response, 200, { indexed: body.chunks.length });
     }
+    if (request.method === 'POST' && request.url === '/ai/knowledge/answer') {
+      const script = answerScripts.shift() ?? { outcome: 'not_found', answer: 'Not found.', citations: [] };
+      if (script.status) return reply(response, script.status, { error: { message: 'scripted failure' } });
+      response.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+      for (const text of script.deltas ?? [])
+        response.write(`${JSON.stringify({ type: 'delta', text })}
+`);
+      if (script.errorCode) {
+        response.end(`${JSON.stringify({ type: 'error', code: script.errorCode, message: 'scripted' })}
+`);
+        return undefined;
+      }
+      const final = {
+        type: 'final',
+        outcome: script.outcome,
+        answer: script.answer,
+        citations: script.citations ?? [],
+        passages_considered: script.passagesConsidered ?? (script.citations ?? []).length,
+        usage: script.usage === undefined ? { input_tokens: 100, output_tokens: 20 } : script.usage,
+      };
+      response.end(`${JSON.stringify(final)}
+`);
+      return undefined;
+    }
     if (request.method === 'POST' && request.url === '/ai/knowledge/documents/remove') {
       const removed = chunksByDocument.get(body.document_id)?.size ?? 0;
       chunksByDocument.delete(body.document_id);
@@ -71,6 +103,10 @@ export async function startStandInKnowledgeIndex({ apiKey }) {
       stored.set(chunkIndex, chunk);
       chunksByDocument.set(documentId.toString(), stored);
     },
+    scriptAnswer: (script) => {
+      answerScripts.push(script);
+    },
+    answerRequests: () => requests.filter((entry) => entry.path === '/ai/knowledge/answer').map((entry) => entry.body),
     failNext: (count) => {
       failuresLeft = count;
     },

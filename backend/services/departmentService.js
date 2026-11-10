@@ -61,6 +61,7 @@ export function toDepartmentSummary(department, memberCount = 0) {
     parentDepartmentId: idOrNull(department.parentDepartmentId),
     departmentHeadId: idOrNull(department.departmentHeadId),
     isActive: department.isActive !== false,
+    isSharedService: department.isSharedService === true,
     memberCount,
     version: department.__v,
   };

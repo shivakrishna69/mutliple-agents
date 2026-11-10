@@ -20,4 +20,5 @@ export const CAPABILITIES = Object.freeze({
   STAFF_SUPPORT: 'staff_support',
   MANAGE_KNOWLEDGE_BASES: 'manage_knowledge_bases',
   USE_SUPPORT_CHAT: 'use_support_chat',
+  ASK_DEPARTMENT_AGENTS: 'ask_department_agents',
 });

@@ -557,3 +557,43 @@ export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
   // Processing attempts before a document is marked FAILED.
   MAX_ATTEMPTS: 3,
 });
+
+/**
+ * Who may ask a department's agent (DepartmentAgent.audience). FOLLOW_DEPARTMENT uses the
+ * department's shared-service switch (Department.isSharedService): the whole company for a shared
+ * service such as HR or IT, the department's own people otherwise.
+ */
+export const AGENT_AUDIENCES = Object.freeze({
+  FOLLOW_DEPARTMENT: 'FOLLOW_DEPARTMENT',
+  COMPANY: 'COMPANY',
+  DEPARTMENT: 'DEPARTMENT',
+});
+
+/** Questions to department agents, their conversations and the department's Questions Inbox. */
+export const AGENT_CHAT_SETTINGS = Object.freeze({
+  QUESTION_MAX_LENGTH: 2_000,
+  // Earlier messages of the conversation sent with a question (the ai-service keeps at most its own
+  // KNOWLEDGE_ANSWER_HISTORY_MESSAGES of them).
+  HISTORY_MESSAGES: 6,
+  // Conversations and their messages are deleted this long after their last message.
+  RETENTION_DAYS: 90,
+  CONVERSATION_TITLE_MAX_LENGTH: 80,
+  CONVERSATIONS_LISTED: 50,
+  MESSAGES_PER_CONVERSATION_LISTED: 200,
+  FEEDBACK_COMMENT_MAX_LENGTH: 1_000,
+  // A lead's answer in the Questions Inbox.
+  LEAD_ANSWER_MAX_LENGTH: 8_000,
+  QUESTIONS_LISTED: 100,
+  // Answered and dismissed questions are deleted this long after they were closed; open ones stay.
+  CLOSED_QUESTION_RETENTION_DAYS: 365,
+  // The question as an FAQ entry's title (and its file name).
+  FAQ_QUESTION_MAX_LENGTH: 300,
+  // Daily usage counters are kept this long, then deleted.
+  USAGE_RETENTION_DAYS: 7,
+});
+
+/** In-app notifications (models/Notification.js). */
+export const NOTIFICATION_SETTINGS = Object.freeze({
+  LISTED: 50,
+  RETENTION_DAYS: 90,
+});

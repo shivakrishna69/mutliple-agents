@@ -57,6 +57,8 @@ export async function insertDepartment(database, { name = 'Operations', code = '
     parentDepartmentId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    // The version Mongoose would give it, so the department can be edited through the API.
+    __v: 0,
   });
   return insertedId.toString();
 }
