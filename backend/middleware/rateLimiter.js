@@ -224,6 +224,20 @@ export const leaveAssistantRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_LEAVE_ASSISTANT_MESSAGES,
 });
 
+export const agentQuestionRateLimitByUser = createRateLimiter({
+  limiterName: 'agent_questions_per_user',
+  ...RATE_LIMITS.AGENT_QUESTIONS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_AGENT_QUESTIONS,
+});
+
+export const agentChatWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'agent_chat_writes_per_user',
+  ...RATE_LIMITS.AGENT_CHAT_WRITES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_AGENT_CHAT_CHANGES,
+});
+
 export const workplaceSetupWriteRateLimitByUser = createRateLimiter({
   limiterName: 'workplace_setup_writes_per_user',
   ...RATE_LIMITS.WORKPLACE_SETUP_WRITES_PER_USER,
