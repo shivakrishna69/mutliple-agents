@@ -345,6 +345,7 @@ with `STALE_VERSION`.
 
 | Endpoint                                                    | What it does                                                                                                          |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/task-boards`                                      | the boards the person can open: their department's and those they head, every active department's for an admin        |
 | `GET /board`                                                | the department, the viewer's role and rights, the head, the task leads, the people tasks can go to, the active sprint |
 | `PUT /task-leads`                                           | `{ leadUserIds, version }`: the head (or an admin) names the task leads                                               |
 | `GET /sprints`, `POST /sprints`, `PATCH /sprints/:sprintId` | sprints with their progress; create `{ name, goal?, startDate, endDate }`; change fields or `status`, with `version`  |

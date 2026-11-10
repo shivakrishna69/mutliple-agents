@@ -50,6 +50,7 @@ const ROLE_ACCESS = {
     navigation: [
       'Overview',
       'Support console',
+      'Department Board',
       'Ask an agent',
       'Attendance',
       'Leave',

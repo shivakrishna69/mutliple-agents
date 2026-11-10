@@ -2,6 +2,9 @@
  * Department task boards (services/tasks/), mounted at /api/departments/:departmentId behind
  * middleware/departmentBoardScope.js (who is on the board, and as lead or member):
  *
+ * Also, mounted at /api/task-boards (routes/taskBoardListRoutes.js):
+ *   GET   /api/task-boards               the boards this person can open (none: an empty list)
+ *
  *   GET   /board                         the board: people, leads, the viewer's rights, the active sprint
  *   PUT   /task-leads                    { leadUserIds, version }: the head (or an admin) names task leads
  *   GET   /sprints                       sprints with their progress
@@ -18,9 +21,11 @@
  * Every change is audited (category "tasks") with ids and the fields changed, never their text.
  */
 
+import { CAPABILITIES } from '../constants/accessRoles.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { TASK_MESSAGES } from '../constants/messages.js';
 import { TASK_AUDIT_CATEGORY } from '../middleware/departmentBoardScope.js';
+import { listMyBoards } from '../services/tasks/boardAccess.js';
 import { getBoardSummary, setTaskLeads } from '../services/tasks/boardService.js';
 import { createSprint, listSprints, updateSprint } from '../services/tasks/sprintService.js';
 import { addComment, createTask, getTask, getTeamWork, listTasks, updateTask } from '../services/tasks/taskService.js';
@@ -49,6 +54,15 @@ const auditScope = (req) => ({
   departmentId: req.boardScope.department._id.toString(),
   boardRole: req.boardScope.role,
 });
+
+export const getMyBoards = boardHandler(
+  'list_task_boards',
+  { capability: CAPABILITIES.USE_TASK_BOARDS, isWrite: false },
+  async (req) => ({
+    message: TASK_MESSAGES.BOARDS_RETRIEVED,
+    data: { boards: await listMyBoards(req.user) },
+  }),
+);
 
 export const getBoard = boardHandler('view_task_board', SCOPED_READ, async (req) => ({
   message: TASK_MESSAGES.BOARD_RETRIEVED,

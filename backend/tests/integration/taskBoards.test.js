@@ -82,6 +82,19 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
     assert.equal((await hr.get(`/api/departments/${engineering}`)).status, 200);
   });
 
+  it('lists the boards each person can open', async () => {
+    const boardsOf = async (client) => {
+      const response = await client.get('/api/task-boards');
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      return response.body.data.boards.map((entry) => `${entry.department.code}:${entry.role}`);
+    };
+    assert.deepEqual(await boardsOf(dev1.client), ['ENG:MEMBER']);
+    assert.deepEqual(await boardsOf(engHead.client), ['ENG:LEAD']);
+    assert.deepEqual(await boardsOf(finDev.client), ['FIN:MEMBER']);
+    assert.deepEqual(await boardsOf(hr), [], 'no employee record');
+    assert.deepEqual(await boardsOf(admin), ['ENG:LEAD', 'FIN:LEAD']);
+  });
+
   it('tells each person their role, and lets only the head name task leads from the department', async () => {
     const memberView = (await dev1.client.get(`${boardPath(engineering)}/board`)).body.data.board;
     assert.equal(memberView.viewer.role, 'MEMBER');

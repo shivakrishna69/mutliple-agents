@@ -10,6 +10,9 @@
  *            and change any task, and see the team's work
  *   anyone else   refused, HR included: a department's work is its own
  *
+ * listMyBoards(user) → the boards this person can open: every active department's for an
+ * administrator; otherwise their own department's and those of the departments they head.
+ *
  * loadBoardScope(user, departmentId) → { department, board, role, isHead, isAdmin, memberUserIds },
  * creating the board the first time; memberUserIds are the accounts tasks may be assigned to (the
  * department's people and its head).
@@ -95,6 +98,48 @@ export async function loadBoardScope(user, departmentId) {
 }
 
 export const isLead = (scope) => scope.role === BOARD_ROLES.LEAD;
+
+/** The boards this person can open, by department name, with their role on each. */
+export async function listMyBoards(user) {
+  const canUseBoards =
+    hasCapability(user.role, CAPABILITIES.USE_TASK_BOARDS) ||
+    hasCapability(user.role, CAPABILITIES.MANAGE_ALL_TASK_BOARDS);
+  if (!canUseBoards) return [];
+  let candidates;
+  if (hasCapability(user.role, CAPABILITIES.MANAGE_ALL_TASK_BOARDS)) {
+    candidates = await Department.find({ isActive: { $ne: false } })
+      .select('_id')
+      .lean();
+  } else {
+    const profile = await EmployeeProfile.findOne({
+      userId: user.id,
+      'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
+    })
+      .select('_id organizationData.departmentId')
+      .lean();
+    if (!profile) return [];
+    candidates = await Department.find({
+      isActive: { $ne: false },
+      $or: [{ _id: profile.organizationData?.departmentId ?? null }, { departmentHeadId: profile._id }],
+    })
+      .select('_id')
+      .lean();
+  }
+  const boards = [];
+  for (const { _id } of candidates) {
+    try {
+      const scope = await loadBoardScope(user, _id.toString());
+      boards.push({
+        department: { id: scope.department._id.toString(), name: scope.department.name, code: scope.department.code },
+        role: scope.role,
+      });
+    } catch (scopeError) {
+      // An account that is not active anymore, say: that board is simply not listed.
+      if (!(scopeError instanceof ServiceError)) throw scopeError;
+    }
+  }
+  return boards.sort((first, second) => first.department.name.localeCompare(second.department.name));
+}
 
 export function requireLead(scope) {
   if (!isLead(scope)) throw boardRefusal(HTTP_STATUS.FORBIDDEN, 'LEADS_ONLY');

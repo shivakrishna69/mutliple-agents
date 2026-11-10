@@ -28,6 +28,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api/httpClient.js';
 import { requestKnowledgeBases } from '../api/knowledgeApi.js';
+import { requestMyBoards } from '../api/tasksApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { hasCapability } from '../auth/capabilities.js';
 import BrandMark from './BrandMark.jsx';
@@ -37,6 +38,7 @@ import PortalSwitcher from './PortalSwitcher.jsx';
 import RoleBadge from './RoleBadge.jsx';
 import {
   BookOpenIcon,
+  CheckBadgeIcon,
   BuildingIcon,
   CalendarIcon,
   ChartIcon,
@@ -74,7 +76,7 @@ const MANAGEMENT_ONLY = Object.freeze([PORTAL_VIEWS.MANAGEMENT]);
 /**
  * Sidebar entries, grouped into sections. `capability` is what a person needs to see one (null:
  * everyone); `isVisibleTo(context)`, when present, is a further condition (context:
- * { managesOwnKnowledgeBase }); `views` the portal views it belongs to, for people who switch.
+ * { managesOwnKnowledgeBase, hasTaskBoard }); `views` the portal views it belongs to, for people who switch.
  */
 const NAVIGATION_SECTIONS = Object.freeze([
   {
@@ -102,6 +104,14 @@ const NAVIGATION_SECTIONS = Object.freeze([
         views: SELF_SERVICE_ONLY,
         capability: null,
         isVisibleTo: (context) => context.managesOwnKnowledgeBase,
+      },
+      {
+        label: 'Department Board',
+        path: ROUTE_PATHS.BOARDS,
+        Icon: CheckBadgeIcon,
+        views: BOTH_VIEWS,
+        capability: CAPABILITIES.USE_TASK_BOARDS,
+        isVisibleTo: (context) => context.hasTaskBoard,
       },
       {
         label: 'Ask an agent',
@@ -376,10 +386,16 @@ export default function AppShell() {
   // Whether this person heads or leads a department (for "My department's knowledge base"). A failed
   // load just leaves the entry out; the page itself is still reachable and reports its own errors.
   const knowledgeBases = useApiResource((signal) => requestKnowledgeBases(signal), [currentUser.id]);
+  // Whether this person is on any department's task board (for "Department Board"); a failed load
+  // just leaves the entry out.
+  const taskBoards = useApiResource((signal) => requestMyBoards(signal), [currentUser.id], {
+    enabled: hasCapability(currentUser, CAPABILITIES.USE_TASK_BOARDS),
+  });
   const visibility = {
     user: currentUser,
     view,
     context: {
+      hasTaskBoard: (taskBoards.data?.boards ?? []).length > 0,
       managesOwnKnowledgeBase: (knowledgeBases.data?.knowledgeBases ?? []).some(
         (knowledgeBase) => knowledgeBase.access.basis !== KNOWLEDGE_ACCESS_BASIS.ADMIN,
       ),
