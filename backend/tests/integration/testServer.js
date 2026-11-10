@@ -246,6 +246,14 @@ export class TestClient {
    * @returns {Promise<{ status: number, body: any }>}
    */
   async request(method, requestPath, { body, sendCsrfToken = true, headers: extraHeaders = {} } = {}) {
+    const response = await this.send(method, requestPath, { body, sendCsrfToken, headers: extraHeaders });
+    const responseBody = await response.json().catch(() => null);
+    if (typeof responseBody?.data?.csrfToken === 'string') this.csrfToken = responseBody.data.csrfToken;
+    return { status: response.status, body: responseBody };
+  }
+
+  /** The fetch Response, with this client's cookies and CSRF token sent and new cookies stored. */
+  async send(method, requestPath, { body, sendCsrfToken = true, headers: extraHeaders = {} } = {}) {
     const headers = { Origin: TEST_APP_ORIGIN, Accept: 'application/json', ...extraHeaders };
     const isMultipart = body instanceof FormData;
     // fetch sets the multipart Content-Type itself, with the boundary.
@@ -259,13 +267,21 @@ export class TestClient {
       body: body === undefined || isMultipart ? body : JSON.stringify(body),
     });
     this.storeCookies(response);
-    const responseBody = await response.json().catch(() => null);
-    if (typeof responseBody?.data?.csrfToken === 'string') this.csrfToken = responseBody.data.csrfToken;
-    return { status: response.status, body: responseBody };
+    return response;
+  }
+
+  /** POST whose answer is read as text (a streamed NDJSON answer, say): { status, contentType, text }. */
+  async postForText(requestPath, body) {
+    const response = await this.send('POST', requestPath, { body });
+    return { status: response.status, contentType: response.headers.get('content-type'), text: await response.text() };
   }
 
   get(requestPath, options) {
     return this.request('GET', requestPath, options);
+  }
+
+  delete(requestPath, options) {
+    return this.request('DELETE', requestPath, options);
   }
 
   post(requestPath, body, options) {

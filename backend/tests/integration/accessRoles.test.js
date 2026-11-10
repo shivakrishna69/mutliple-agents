@@ -75,7 +75,14 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
       assert.equal(user.roleLabel, ROLE_DEFINITIONS.find((definition) => definition.value === role).label);
       assert.deepEqual(user.capabilities, capabilitiesOf(role));
     }
-    assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), [CAPABILITIES.USE_SUPPORT_CHAT]);
+    assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), [
+      CAPABILITIES.ASK_DEPARTMENT_AGENTS,
+      CAPABILITIES.USE_SUPPORT_CHAT,
+    ]);
+    assert.ok(
+      ALL_ROLES.every((role) => capabilitiesOf(role).includes(CAPABILITIES.ASK_DEPARTMENT_AGENTS)),
+      'every role may ask department agents (which ones is decided per agent)',
+    );
   });
 
   it('keeps each area to the roles the access table gives it', async () => {
