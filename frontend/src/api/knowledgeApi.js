@@ -64,3 +64,31 @@ export async function requestKnowledgeDocumentDeletion(departmentId, documentId,
   });
   return { ...responseData, message: responseMessage };
 }
+
+// --- The Questions Inbox (backend/controllers/agentQuestionController.js) ------------------------
+//   GET  /api/departments/:id/agent/questions?status=
+//   POST /api/departments/:id/agent/questions/:questionId/answer   { answer, saveAsFaq?, faqQuestion? }
+//   POST /api/departments/:id/agent/questions/:questionId/dismiss
+//   POST /api/departments/:id/agent/questions/:questionId/faq      { faqQuestion? }
+
+export const requestDepartmentQuestions = (departmentId, status, callerSignal) =>
+  getData(`${agentPath(departmentId)}/questions${toQueryString({ status })}`, callerSignal);
+
+async function postQuestionAction(departmentId, questionId, action, requestPayload, csrfToken) {
+  const { responseData, responseMessage } = await sendApiRequest({
+    method: 'POST',
+    endpointPath: `${agentPath(departmentId)}/questions/${encode(questionId)}/${action}`,
+    requestPayload,
+    csrfToken,
+  });
+  return { ...responseData, message: responseMessage };
+}
+
+export const requestQuestionAnswer = (departmentId, questionId, answerInput, csrfToken) =>
+  postQuestionAction(departmentId, questionId, 'answer', answerInput, csrfToken);
+
+export const requestQuestionDismissal = (departmentId, questionId, csrfToken) =>
+  postQuestionAction(departmentId, questionId, 'dismiss', {}, csrfToken);
+
+export const requestQuestionFaq = (departmentId, questionId, faqQuestion, csrfToken) =>
+  postQuestionAction(departmentId, questionId, 'faq', faqQuestion ? { faqQuestion } : {}, csrfToken);

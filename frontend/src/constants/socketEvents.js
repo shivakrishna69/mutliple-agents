@@ -10,6 +10,8 @@ export const SOCKET_EVENTS = Object.freeze({
   CONVERSATION_STATUS_UPDATED: 'CONVERSATION_STATUS_UPDATED',
   CONVERSATION_ACCESS_REVOKED: 'CONVERSATION_ACCESS_REVOKED',
   SESSION_ENDED: 'SESSION_ENDED',
+  // Server -> client: a new in-app notification for this user (backend models/Notification.js)
+  NOTIFICATION_CREATED: 'NOTIFICATION_CREATED',
   // Server -> client, agent telemetry channel (admins; backend services/agentTelemetry.js)
   AGENT_THINKING_EVENT: 'AGENT_THINKING_EVENT',
   TOOL_EXECUTION_STARTED: 'TOOL_EXECUTION_STARTED',
