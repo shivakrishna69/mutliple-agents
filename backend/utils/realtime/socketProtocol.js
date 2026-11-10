@@ -13,6 +13,8 @@ export const SOCKET_EVENTS = Object.freeze({
   SESSION_ENDED: 'SESSION_ENDED',
   // Server -> client: someone's presence changed (to them, their manager, HR and administrators)
   PRESENCE_UPDATED: 'PRESENCE_UPDATED',
+  // Server -> client: a new in-app notification for this user (models/Notification.js)
+  NOTIFICATION_CREATED: 'NOTIFICATION_CREATED',
   // Server -> client, agent telemetry channel (names are AGENT_TELEMETRY_EVENTS)
   AGENT_THINKING_EVENT: AGENT_TELEMETRY_EVENTS.AGENT_THINKING_EVENT,
   TOOL_EXECUTION_STARTED: AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_STARTED,

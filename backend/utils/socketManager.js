@@ -18,7 +18,7 @@
  *   session:<sessionId>               every socket opened with one login session; used to
  *                                     disconnect them all at once on logout.
  *   user:<userId>                     every socket of one user; used to end them after a role or
- *                                     password change.
+ *                                     password change, and to push their in-app notifications.
  *   staff                             every admin/agent socket; receives every conversation's
  *                                     status changes so queue views stay current.
  *   conversation:<id>:staff           admins/agents viewing one conversation; full payloads.
@@ -495,5 +495,26 @@ export function disconnectUserSockets(userId, endReasonCode, { exceptSessionId }
       userId,
       error: { name: disconnectError.name, message: disconnectError.message, stack: disconnectError.stack },
     });
+  }
+}
+
+/**
+ * Pushes a new in-app notification (services/notifications.js) to every open session of its user.
+ * Never throws; returns false when nothing could be sent (the notification is stored either way,
+ * so the bell shows it on the next load).
+ * @param {string} userId
+ * @param {object} notificationPayload  services/notifications.js toNotificationSummary
+ */
+export function emitNotification(userId, notificationPayload) {
+  if (!socketIoInstance) return false;
+  try {
+    socketIoInstance.to(ROOM_NAMES.user(userId)).emit(SOCKET_EVENTS.NOTIFICATION_CREATED, notificationPayload);
+    return true;
+  } catch (emitError) {
+    logger.error('Failed to emit NOTIFICATION_CREATED', {
+      userId,
+      error: { name: emitError.name, message: emitError.message, stack: emitError.stack },
+    });
+    return false;
   }
 }

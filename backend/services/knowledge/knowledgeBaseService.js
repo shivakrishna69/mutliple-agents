@@ -29,7 +29,8 @@ import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import { KNOWLEDGE_MESSAGES } from '../../constants/messages.js';
 import { KNOWLEDGE_BASE_SETTINGS } from '../../constants/validation.js';
-import AgentDocument, { DOCUMENT_STATUSES } from '../../models/AgentDocument.js';
+import AgentDocument, { DOCUMENT_SOURCES, DOCUMENT_STATUSES } from '../../models/AgentDocument.js';
+import { effectiveAudienceOf } from '../agentChat/agentAudience.js';
 import Department from '../../models/Department.js';
 import DepartmentAgent, { AGENT_STATUSES } from '../../models/DepartmentAgent.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../../models/EmployeeProfile.js';
@@ -96,6 +97,22 @@ async function ensureAgent(department, actorUserId) {
  * @param {string} departmentId  a valid id (checked by the route)
  * @returns {Promise<{ department: object, agent: import('mongoose').Document, access: object }>}
  */
+/**
+ * True when `user` manages this department's knowledge base (its head, its knowledge lead,
+ * administrators): the rule of services/knowledge/knowledgeAccess.js, for other features.
+ * @param {{ id: string, role: string }} user
+ * @param {{ department: object, agent: object, ownProfileId: string|object|null }} facts
+ */
+export function managesKnowledgeBase(user, { department, agent, ownProfileId }) {
+  return decideKnowledgeAccess({
+    role: user.role,
+    userId: user.id,
+    ownProfileId,
+    departmentHeadId: department.departmentHeadId,
+    managedBy: agent.managedBy,
+  }).canManage;
+}
+
 export async function loadKnowledgeScope(user, departmentId) {
   const department = await Department.findById(departmentId).lean();
   if (!department) throw refusal(HTTP_STATUS.NOT_FOUND, 'DEPARTMENT_NOT_FOUND');
@@ -131,6 +148,9 @@ export async function toSettingsSummary({ department, agent, access }) {
     name: agent.name,
     systemPrompt: agent.systemPrompt,
     status: agent.status,
+    audience: agent.audience,
+    // Who may ask, once the audience is applied to the department (COMPANY or DEPARTMENT).
+    effectiveAudience: effectiveAudienceOf(department, agent),
     lead: agent.managedBy ? (users.get(agent.managedBy.toString()) ?? null) : null,
     limits: {
       systemPromptMaxLength: KNOWLEDGE_BASE_SETTINGS.SYSTEM_PROMPT_MAX_LENGTH,
@@ -207,7 +227,7 @@ export async function updateKnowledgeSettings(scope, { changes, version }, actor
     if (changes.managedBy !== null) await assertEligibleLead(changes.managedBy, department);
     agent.managedBy = changes.managedBy;
   }
-  for (const field of ['name', 'systemPrompt', 'status']) {
+  for (const field of ['name', 'systemPrompt', 'status', 'audience']) {
     if (changes[field] !== undefined) agent[field] = changes[field];
   }
   agent.updatedByUserId = actorUserId;
@@ -222,6 +242,7 @@ function toDocumentSummary(document, users) {
     mimeType: document.mimeType,
     fileSize: document.fileSize,
     status: document.status,
+    source: document.source ?? DOCUMENT_SOURCES.UPLOAD,
     errorMessage: document.errorMessage,
     chunkCount: document.chunkCount,
     uploadedBy: users.get(document.uploadedBy.toString()) ?? {
@@ -255,8 +276,15 @@ async function deleteStoredFileQuietly(fileKey) {
  * @param {object} scope
  * @param {{ buffer: Buffer, originalname: string }} file  from middleware/knowledgeUpload.js
  * @param {string} actorUserId
+ * @param {{ source?: string, sourceQuestionId?: string|null }} [origin]  FAQ entries from the Questions
+ *   Inbox (services/agentChat/agentQuestionService.js) pass source FAQ and their question
  */
-export async function uploadKnowledgeDocument({ department, agent }, file, actorUserId) {
+export async function uploadKnowledgeDocument(
+  { department, agent },
+  file,
+  actorUserId,
+  { source = DOCUMENT_SOURCES.UPLOAD, sourceQuestionId = null } = {},
+) {
   if (agent.status !== AGENT_STATUSES.ACTIVE) throw refusal(HTTP_STATUS.CONFLICT, 'AGENT_PAUSED');
   const documentCount = await AgentDocument.countDocuments({ departmentId: department._id });
   if (documentCount >= KNOWLEDGE_BASE_SETTINGS.MAX_DOCUMENTS_PER_DEPARTMENT) {
@@ -295,6 +323,8 @@ export async function uploadKnowledgeDocument({ department, agent }, file, actor
       fileSize: file.buffer.length,
       contentSha256,
       uploadedBy: actorUserId,
+      source,
+      sourceQuestionId,
     });
   } catch (createError) {
     await deleteStoredFileQuietly(fileKey);
