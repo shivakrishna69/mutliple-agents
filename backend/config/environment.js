@@ -25,6 +25,8 @@ const IMPORT_EMAILS_PER_MINUTE_BOUNDS = Object.freeze({ MIN: 1, MAX: 600, DEFAUL
 
 /** Bounds for REMEMBERED_SESSION_DAYS: how long "remember this device" keeps someone signed in. */
 const REMEMBERED_SESSION_DAYS_BOUNDS = Object.freeze({ MIN: 1, MAX: 90, DEFAULT: 30 });
+// Questions one person may ask department agents per day (UTC); each is a model call.
+const AGENT_DAILY_QUESTION_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 50 });
 
 /** A whole-number setting within `bounds` ({ MIN, MAX, DEFAULT }); refuses startup otherwise. */
 function readBoundedInteger(variableName, bounds) {
@@ -372,6 +374,7 @@ export function loadConfig() {
   // Optional. "Remember this device" at sign-in keeps a session this many days; otherwise it ends
   // when the browser closes (and at JWT_EXPIRES_IN at the latest).
   const rememberedSessionDays = readBoundedInteger('REMEMBERED_SESSION_DAYS', REMEMBERED_SESSION_DAYS_BOUNDS);
+  const agentDailyQuestionLimit = readBoundedInteger('AGENT_DAILY_QUESTION_LIMIT', AGENT_DAILY_QUESTION_LIMIT_BOUNDS);
 
   // Optional. Employee document vault storage; null disables the vault.
   const vaultStorage = loadS3StorageConfig(env, 'VAULT');
@@ -403,6 +406,7 @@ export function loadConfig() {
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
     rememberedSessionDays,
+    agentDailyQuestionLimit,
     corsOrigins,
     mail,
     appPublicUrl,

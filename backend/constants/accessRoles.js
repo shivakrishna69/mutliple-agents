@@ -97,6 +97,8 @@ export const CAPABILITIES = Object.freeze({
   MANAGE_KNOWLEDGE_BASES: 'manage_knowledge_bases',
   // Ask for help in the support chat. Staff answer it rather than use it, so admins do not get it.
   USE_SUPPORT_CHAT: 'use_support_chat',
+  // Ask department agents questions (which agents is decided per agent, by its audience).
+  ASK_DEPARTMENT_AGENTS: 'ask_department_agents',
 });
 
 const C = CAPABILITIES;
@@ -110,6 +112,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     Object.values(CAPABILITIES).filter((capability) => !REQUESTER_CAPABILITIES.includes(capability)),
   ),
   [ROLES.HR]: Object.freeze([
+    C.ASK_DEPARTMENT_AGENTS,
     C.MANAGE_WORKFORCE,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
@@ -118,8 +121,15 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.MANAGE_OFFERS,
     C.READ_COMPANY_SETTINGS,
   ]),
-  [ROLES.FINANCE]: Object.freeze([C.READ_EMPLOYEE_DIRECTORY, C.MANAGE_PAYSLIPS, C.MANAGE_COMPENSATION, C.READ_OFFERS]),
+  [ROLES.FINANCE]: Object.freeze([
+    C.ASK_DEPARTMENT_AGENTS,
+    C.READ_EMPLOYEE_DIRECTORY,
+    C.MANAGE_PAYSLIPS,
+    C.MANAGE_COMPENSATION,
+    C.READ_OFFERS,
+  ]),
   [ROLES.IT_ADMIN]: Object.freeze([
+    C.ASK_DEPARTMENT_AGENTS,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_USERS,
     C.READ_COMPANY_SETTINGS,
@@ -127,8 +137,8 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.VIEW_SYSTEM_HEALTH,
     C.VIEW_AGENT_TELEMETRY,
   ]),
-  [ROLES.AGENT]: Object.freeze([C.STAFF_SUPPORT]),
-  [ROLES.EMPLOYEE]: Object.freeze([C.USE_SUPPORT_CHAT]),
+  [ROLES.AGENT]: Object.freeze([C.ASK_DEPARTMENT_AGENTS, C.STAFF_SUPPORT]),
+  [ROLES.EMPLOYEE]: Object.freeze([C.ASK_DEPARTMENT_AGENTS, C.USE_SUPPORT_CHAT]),
 });
 
 /** True when `role` may do `capability`. An unknown role may do nothing. */

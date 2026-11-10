@@ -56,6 +56,11 @@ export const RATE_LIMITS = Object.freeze({
   LEAVE_REQUEST_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // The leave assistant: each question costs model calls; a person asks a few a minute at most.
   LEAVE_ASSISTANT_MESSAGES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
+  // Questions to department agents (each one is a model call); the daily quota is separate
+  // (AGENT_DAILY_QUESTION_LIMIT).
+  AGENT_QUESTIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
+  // Feedback, clearing conversations, and a lead's work in the Questions Inbox.
+  AGENT_CHAT_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Invitations send email: generous for onboarding a batch, low enough to stop mail abuse.
   INVITATION_SENDS_PER_USER: Object.freeze({ windowMs: 10 * 60 * 1000, maxRequests: 60 }),
   // Employee imports: each upload checks up to thousands of rows; a few corrections in a row are normal.

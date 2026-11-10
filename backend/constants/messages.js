@@ -63,6 +63,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_OKR_UPDATES: 'Too many OKR updates in a short time. Please wait a moment and try again',
   TOO_MANY_LEAVE_ADMIN_UPDATES: 'Too many leave changes in a short time. Please wait a moment and try again',
   TOO_MANY_LEAVE_ASSISTANT_MESSAGES: 'Too many questions to the leave assistant in a short time. Please wait a moment',
+  TOO_MANY_AGENT_QUESTIONS: 'Too many questions to department agents in a short time. Please wait a moment',
+  TOO_MANY_AGENT_CHAT_CHANGES: 'Too many changes in a short time. Please wait a moment and try again',
   TOO_MANY_LEAVE_REQUEST_UPDATES:
     'Too many leave requests or decisions in a short time. Please wait a moment and try again',
   TOO_MANY_WORKPLACE_SETUP_UPDATES:
@@ -696,4 +698,56 @@ export const KNOWLEDGE_MESSAGES = Object.freeze({
     FILE_MISSING: 'The stored copy of this file is missing or damaged. Delete it and upload it again',
     INDEX_UNAVAILABLE: 'The knowledge index could not be reached after several attempts. Try again later',
   }),
+});
+
+/** Questions to department agents, their conversations, and each department's Questions Inbox. */
+export const AGENT_CHAT_MESSAGES = Object.freeze({
+  AGENTS_RETRIEVED: 'Department agents you can ask',
+  ANSWERED: 'The agent answered',
+  CONVERSATIONS_RETRIEVED: 'Your conversations with this agent',
+  CONVERSATION_RETRIEVED: 'Conversation',
+  CONVERSATION_DELETED: 'Conversation deleted',
+  CONVERSATIONS_CLEARED: 'Your conversations with this agent were deleted',
+  FEEDBACK_SAVED: 'Thanks for your feedback',
+  FEEDBACK_ESCALATED: 'Thanks for your feedback. Your question was sent to the department',
+  QUESTIONS_RETRIEVED: 'Questions for this department',
+  QUESTION_ANSWERED: 'Answer sent',
+  QUESTION_DISMISSED: 'Question closed',
+  FAQ_SAVED: 'Saved as an FAQ. The agent can use it once it is processed',
+  INPUT_INVALID: 'Some details need fixing',
+  ASK_DENIED: "This agent answers questions from its department's people only",
+  ASK_NOT_ALLOWED: 'Your role cannot ask department agents',
+  NO_EMPLOYEE_PROFILE: 'Department agents answer employees. Your account is not linked to an employee record',
+  DEPARTMENT_NOT_FOUND: 'Department not found',
+  AGENT_UNAVAILABLE: "This department's agent is not available right now",
+  AGENT_NOT_READY: "This department's agent has no documents to answer from yet",
+  AI_UNAVAILABLE: 'The agent could not answer right now. Please try again in a moment',
+  STREAM_FAILED: 'Something went wrong while answering. Please try again',
+  DAILY_LIMIT_REACHED: (limit) =>
+    `You have asked ${limit} questions today, the daily limit. You can ask again tomorrow (UTC)`,
+  CONVERSATION_NOT_FOUND: 'Conversation not found',
+  MESSAGE_NOT_FOUND: 'Answer not found',
+  QUESTION_NOT_FOUND: 'Question not found in this department',
+  QUESTION_CLOSED: 'This question has already been closed',
+  QUESTION_NOT_ANSWERED: 'Answer the question before saving it as an FAQ',
+  FAQ_ALREADY_SAVED: 'This question is already saved as an FAQ',
+  // What the employee reads when the agent did not answer; their question went to the department.
+  REPLY_NOT_FOUND: (departmentName) =>
+    `I couldn't find this in the ${departmentName} knowledge base, so I sent your question to the ${departmentName} team. You'll be notified when they reply.`,
+  REPLY_REFUSED: (departmentName) =>
+    `I couldn't find a reliable answer to this in the ${departmentName} knowledge base, so I sent your question to the ${departmentName} team. You'll be notified when they reply.`,
+});
+
+/** In-app notifications. */
+export const NOTIFICATION_MESSAGES = Object.freeze({
+  RETRIEVED: 'Notifications',
+  MARKED_READ: 'Marked as read',
+  ALL_MARKED_READ: 'All notifications marked as read',
+  NOT_FOUND: 'Notification not found',
+  INPUT_INVALID: 'Some details need fixing',
+  QUESTION_RECEIVED_TITLE: (departmentName) => `New question for ${departmentName}`,
+  QUESTION_RECEIVED_BODY: (askerName, agentName) => `${askerName} asked ${agentName} something it could not answer`,
+  QUESTION_DOWNVOTED_BODY: (askerName, agentName) => `${askerName} found an answer from ${agentName} unhelpful`,
+  QUESTION_ANSWERED_TITLE: (departmentName) => `${departmentName} answered your question`,
+  QUESTION_ANSWERED_BODY: (leadName) => `${leadName} replied to the question you asked the department's agent`,
 });
