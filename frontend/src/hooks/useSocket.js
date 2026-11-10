@@ -10,6 +10,7 @@
  *     onConversationStatusUpdated: (statusPayload) => { ... },
  *     onConversationJoined: (conversationSnapshot) => { ... },   // also after every re-join
  *     onConversationAccessRevoked: (revocationPayload) => { ... },
+ *     onNotificationCreated: (notification) => { ... },          // the user's in-app notifications
  *   });
  *
  * Lifecycle
@@ -95,6 +96,7 @@ export function useSocket({
   onConversationStatusUpdated,
   onConversationJoined,
   onConversationAccessRevoked,
+  onNotificationCreated,
 } = {}) {
   const { authStatus, markSessionEnded } = useAuth();
   const isAuthenticated = authStatus === AUTH_STATUS.AUTHENTICATED;
@@ -114,6 +116,7 @@ export function useSocket({
       onConversationStatusUpdated,
       onConversationJoined,
       onConversationAccessRevoked,
+      onNotificationCreated,
     };
   });
 
@@ -274,6 +277,11 @@ export function useSocket({
       );
     };
 
+    const handleNotificationCreated = (notification) => {
+      if (!isPlainObject(notification)) return;
+      invokeCallbackSafely('onNotificationCreated', consumerCallbacksRef.current.onNotificationCreated, notification);
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
@@ -281,6 +289,7 @@ export function useSocket({
     socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
     socket.on(SOCKET_EVENTS.CONVERSATION_STATUS_UPDATED, handleConversationStatusUpdated);
     socket.on(SOCKET_EVENTS.CONVERSATION_ACCESS_REVOKED, handleConversationAccessRevoked);
+    socket.on(SOCKET_EVENTS.NOTIFICATION_CREATED, handleNotificationCreated);
 
     setConnectionStatus(SOCKET_CONNECTION_STATUS.CONNECTING);
     socket.connect();
