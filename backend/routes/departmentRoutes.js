@@ -10,6 +10,8 @@
  *   DELETE /:departmentId       remove one nothing refers to (otherwise deactivate it)
  *   GET    /agents/available    the department agents this person may ask (everyone signed in;
  *                               controllers/agentChatController.js)
+ *   /:departmentId/board, /task-leads, /sprints, /tasks   the department's task board, for its people
+ *                               (routes/departmentBoardRoutes.js)
  *   /:departmentId/agent/...    the department's knowledge base, its agent's chat and its Questions
  *                               Inbox (routes/departmentKnowledgeRoutes.js)
  */
@@ -25,6 +27,7 @@ import {
 import { getAvailableAgents } from '../controllers/agentChatController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { workplaceSetupWriteRateLimitByUser } from '../middleware/rateLimiter.js';
+import departmentBoardRouter from './departmentBoardRoutes.js';
 import departmentKnowledgeRouter from './departmentKnowledgeRoutes.js';
 
 const departmentRouter = Router();
@@ -36,6 +39,8 @@ departmentRouter.use(protect, (req, res, next) => {
 // Before the /:departmentId routes, so "agents" is never read as a department id.
 departmentRouter.get('/agents/available', getAvailableAgents);
 departmentRouter.use('/:departmentId/agent', departmentKnowledgeRouter);
+// The task board's paths (board, task-leads, sprints, tasks); anything else falls through.
+departmentRouter.use('/:departmentId', departmentBoardRouter);
 departmentRouter.get('/', getDepartments);
 departmentRouter.get('/:departmentId', getDepartmentById);
 departmentRouter.post('/', workplaceSetupWriteRateLimitByUser, postDepartment);

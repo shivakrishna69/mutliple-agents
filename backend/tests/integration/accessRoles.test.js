@@ -77,6 +77,7 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
     }
     assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), [
       CAPABILITIES.ASK_DEPARTMENT_AGENTS,
+      CAPABILITIES.USE_TASK_BOARDS,
       CAPABILITIES.USE_SUPPORT_CHAT,
     ]);
     assert.ok(

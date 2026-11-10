@@ -39,8 +39,11 @@ import { ATTENDANCE_FIELD_LIMITS } from '../constants/validation.js';
 import Attendance, {
   ATTENDANCE_CHECK_OUT_SOURCES,
   ATTENDANCE_ENTRY_SOURCES,
+  ATTENDANCE_STATUSES,
+  ATTENDANCE_VERIFICATION_STATUSES,
   ATTENDANCE_WORK_MODES,
 } from '../models/Attendance.js';
+import { getCompanySettings } from '../services/companySettings.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import { AI_FAILURE_KIND, AiServiceError, requestAttendanceRegularization } from '../services/aiServiceClient.js';
@@ -133,7 +136,8 @@ function toAttendanceSummary(attendanceRecord) {
   return {
     id: attendanceRecord._id.toString(),
     employeeId: attendanceRecord.employeeId.toString(),
-    officeLocationId: attendanceRecord.officeLocationId.toString(),
+    officeLocationId: attendanceRecord.officeLocationId?.toString() ?? null,
+    verificationStatus: attendanceRecord.verificationStatus ?? null,
     date: attendanceRecord.date,
     timeZone: attendanceRecord.timeZone,
     checkInTime: attendanceRecord.checkInTime.toISOString(),
@@ -158,6 +162,64 @@ function toAttendanceSummary(attendanceRecord) {
 }
 
 /**
+ * The punch-in of an employee without a base office: recorded with its location, in the company's
+ * time zone, as LOCATION_LOGGED_UNASSIGNED. No radius or shift applies, so it is never refused for
+ * where it was made and is never late (HR reviews these entries; assigning an office starts the
+ * checks on the next punch).
+ */
+async function punchInWithoutOffice(req, res, punch) {
+  const { employeeId, workMode, onDutyReason, reading, deviceFingerprint, macAddress, registeredMacAddress } = punch;
+  const { timeZone } = await getCompanySettings();
+  const punchedAt = new Date();
+  const { calendarDate } = readOfficeLocalClock(punchedAt, timeZone);
+  if (await Attendance.exists({ employeeId, date: calendarDate })) {
+    return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+      code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN,
+      message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN,
+    });
+  }
+  let attendanceRecord;
+  try {
+    attendanceRecord = await Attendance.create({
+      employeeId,
+      officeLocationId: null,
+      verificationStatus: ATTENDANCE_VERIFICATION_STATUSES.LOCATION_LOGGED_UNASSIGNED,
+      date: calendarDate,
+      timeZone,
+      checkInTime: punchedAt,
+      workMode,
+      onDutyReason,
+      checkInCoordinates: reading,
+      geofence: { enforced: false, distanceMeters: null, allowedRadiusMeters: null },
+      deviceFingerprint: createHash('sha256').update(deviceFingerprint, 'utf8').digest('hex'),
+      checkInMacAddress: macAddress,
+      calculationStatus: ATTENDANCE_STATUSES.NORMAL,
+      lateByMinutes: 0,
+    });
+  } catch (persistError) {
+    if (isDuplicateKeyError(persistError)) {
+      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
+        code: ATTENDANCE_ERROR_CODES.ALREADY_PUNCHED_IN,
+        message: ATTENDANCE_MESSAGES.ALREADY_PUNCHED_IN,
+      });
+    }
+    throw persistError;
+  }
+  auditPunchIn(req, AUDIT_OUTCOMES.ALLOWED, {
+    employeeId,
+    attendanceId: attendanceRecord._id.toString(),
+    date: calendarDate,
+    workMode,
+    verificationStatus: ATTENDANCE_VERIFICATION_STATUSES.LOCATION_LOGGED_UNASSIGNED,
+    accuracyMeters: reading.accuracyMeters,
+    deviceCheck: registeredMacAddress ? 'registered_mac_matched' : 'no_registered_device',
+  });
+  return sendSuccess(res, HTTP_STATUS.CREATED, ATTENDANCE_MESSAGES.PUNCHED_IN_UNASSIGNED, {
+    attendance: toAttendanceSummary(attendanceRecord),
+  });
+}
+
+/**
  * POST /api/attendance/punch-in
  * Responses:
  *   201 { message, data: { attendance } }
@@ -166,7 +228,11 @@ function toAttendanceSummary(attendanceRecord) {
  *   403 { error: { code: EMPLOYMENT_ENDED | WORK_MODE_NOT_ALLOWED | DEVICE_NOT_RECOGNISED
  *                       | UNAUTHORIZED_SPATIAL_LOCATION, context? } }
  *   404 { error: { code: PROFILE_NOT_FOUND } }
- *   409 { error: { code: OFFICE_NOT_CONFIGURED | ALREADY_PUNCHED_IN } }
+ *   409 { error: { code: ALREADY_PUNCHED_IN } }
+ *
+ * Without a base office the punch is not refused: the location is recorded, the date is the
+ * company's, nothing is checked against a radius or a shift, and the entry is marked
+ * LOCATION_LOGGED_UNASSIGNED for HR to review (punchInWithoutOffice).
  *   422 { error: { code: LOCATION_TOO_IMPRECISE, context } }
  *   429 too many attempts (rate limiter) / 500 unexpected (central error handler)
  */
@@ -204,23 +270,27 @@ export async function punchIn(req, res, next) {
     }
     const isGeofenceEnforced = workMode === ATTENDANCE_WORK_MODES.OFFICE;
 
-    // ---- 3. Office ----------------------------------------------------------------------------
-    const office = officeLocationId ? await OfficeLocation.findById(officeLocationId).lean() : null;
-    if (!office) {
-      auditPunchIn(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'office_not_configured' });
-      return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
-        code: ATTENDANCE_ERROR_CODES.OFFICE_NOT_CONFIGURED,
-        message: ATTENDANCE_MESSAGES.OFFICE_NOT_CONFIGURED,
-      });
-    }
-
-    // ---- 4. Device ----------------------------------------------------------------------------
+    // ---- 3. Device ----------------------------------------------------------------------------
     const deviceProblem = unregisteredDeviceReason(employeeProfile, macAddress);
     if (deviceProblem) {
       auditPunchIn(req, AUDIT_OUTCOMES.DENIED, { employeeId, reason: deviceProblem });
       return sendDeviceNotRecognised(req, res);
     }
     const registeredMacAddress = employeeProfile.biometricMetadata?.registeredDeviceMacAddress ?? null;
+
+    // ---- 4. Office ----------------------------------------------------------------------------
+    const office = officeLocationId ? await OfficeLocation.findById(officeLocationId).lean() : null;
+    if (!office) {
+      return punchInWithoutOffice(req, res, {
+        employeeId,
+        workMode,
+        onDutyReason,
+        reading: { lat, lng, accuracyMeters },
+        deviceFingerprint,
+        macAddress,
+        registeredMacAddress,
+      });
+    }
 
     // ---- 5. Precision -------------------------------------------------------------------------
     // Only an office punch is placed against a radius; elsewhere the reading is recorded as it is.
@@ -288,6 +358,9 @@ export async function punchIn(req, res, next) {
         onDutyReason,
         checkInCoordinates: { lat, lng, accuracyMeters },
         geofence: { enforced: isGeofenceEnforced, distanceMeters: roundedDistanceMeters, allowedRadiusMeters },
+        verificationStatus: isGeofenceEnforced
+          ? ATTENDANCE_VERIFICATION_STATUSES.GEOFENCE_VERIFIED
+          : ATTENDANCE_VERIFICATION_STATUSES.LOCATION_LOGGED,
         deviceFingerprint: createHash('sha256').update(deviceFingerprint, 'utf8').digest('hex'),
         checkInMacAddress: macAddress,
         calculationStatus,
@@ -387,8 +460,12 @@ export async function punchOut(req, res, next) {
       });
     }
 
-    const office = await OfficeLocation.findById(latestPunch.officeLocationId).lean();
-    if (office && (await closeIfOverdue(latestPunch, office, now))) {
+    const office = latestPunch.officeLocationId
+      ? await OfficeLocation.findById(latestPunch.officeLocationId).lean()
+      : null;
+    // A punch made without a base office has its own time limit (automaticPunchOut with no office).
+    const hasDeadline = Boolean(office) || !latestPunch.officeLocationId;
+    if (hasDeadline && (await closeIfOverdue(latestPunch, office, now))) {
       auditPunchOut(req, AUDIT_OUTCOMES.REJECTED, { employeeId, reason: 'deadline_passed', date: latestPunch.date });
       return sendCodedError(req, res, HTTP_STATUS.CONFLICT, {
         code: ATTENDANCE_ERROR_CODES.PUNCH_OUT_TOO_LATE,

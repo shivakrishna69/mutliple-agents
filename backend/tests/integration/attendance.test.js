@@ -7,6 +7,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ATTENDANCE_MESSAGES } from '../../constants/messages.js';
 import { insertDepartment, officeDocument, officeFields, onboardEmployee } from './fixtures.js';
 import { createSignedInClient, mongoUnavailableReason, startTestServer } from './testServer.js';
 
@@ -111,6 +112,62 @@ describe('attendance punches', { skip: skipReason ?? false }, () => {
     assert.equal(geofence.enforced, true);
     assert.equal(geofence.allowedRadiusMeters, 200);
     assert.ok(geofence.distanceMeters > 100 && geofence.distanceMeters < 200, `distance ${geofence.distanceMeters}`);
+    assert.equal(response.body.data.attendance.verificationStatus, 'GEOFENCE_VERIFIED');
+  });
+
+  it('records the location of an employee without a base office instead of refusing the punch', async () => {
+    const unassigned = await onboardEmployee({ testServer, hrClient, email: 'no.office@example.com', departmentId });
+    const response = await unassigned.client.post('/api/attendance/punch-in', punchAt(FAR_FROM_OFFICE));
+    assert.equal(response.status, 201, JSON.stringify(response.body));
+    assert.equal(response.body.message, ATTENDANCE_MESSAGES.PUNCHED_IN_UNASSIGNED);
+    const { attendance } = response.body.data;
+    assert.equal(attendance.verificationStatus, 'LOCATION_LOGGED_UNASSIGNED');
+    assert.equal(attendance.officeLocationId, null);
+    assert.deepEqual(attendance.geofence, { enforced: false, distanceMeters: null, allowedRadiusMeters: null });
+    assert.equal(attendance.calculationStatus, 'Normal');
+    assert.equal(attendance.lateByMinutes, 0);
+    assert.deepEqual(
+      { lat: attendance.checkInCoordinates.lat, lng: attendance.checkInCoordinates.lng },
+      { lat: FAR_FROM_OFFICE.lat, lng: FAR_FROM_OFFICE.lng },
+    );
+    assert.equal(attendance.timeZone, 'Asia/Kolkata', "the company's time zone");
+
+    const again = await unassigned.client.post('/api/attendance/punch-in', punchAt(FAR_FROM_OFFICE));
+    assert.equal(again.status, 409);
+    assert.equal(again.body.error.code, 'ALREADY_PUNCHED_IN');
+    const today = (await unassigned.client.get('/api/attendance/me/today')).body.data.day;
+    assert.ok(today.automaticPunchOutAt, 'an open punch without an office still closes on its own');
+
+    const out = await unassigned.client.post('/api/attendance/punch-out', punchAt(FAR_FROM_OFFICE));
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+  });
+
+  it('closes a forgotten punch without a base office after its time limit', async () => {
+    const unassigned = await onboardEmployee({
+      testServer,
+      hrClient,
+      email: 'no.office.late@example.com',
+      departmentId,
+    });
+    const checkInTime = new Date(Date.now() - 20 * 60 * 60 * 1000);
+    const document = openPunchDocument(testServer.database, {
+      employeeId: unassigned.profileId,
+      officeLocationId: officeId,
+      date: '2026-01-06',
+      checkInTime,
+    });
+    const { insertedId } = await testServer.database.collection('attendances').insertOne({
+      ...document,
+      officeLocationId: null,
+      verificationStatus: 'LOCATION_LOGGED_UNASSIGNED',
+      geofence: { enforced: false, distanceMeters: null, allowedRadiusMeters: null },
+    });
+    const tooLate = await unassigned.client.post('/api/attendance/punch-out', punchAt(FAR_FROM_OFFICE));
+    assert.equal(tooLate.status, 409);
+    assert.equal(tooLate.body.error.code, 'PUNCH_OUT_TOO_LATE');
+    const stored = await testServer.database.collection('attendances').findOne({ _id: insertedId });
+    assert.equal(stored.checkOutSource, 'auto_closed');
+    assert.equal(stored.workedMinutes, 16 * 60);
   });
 
   it('refuses a punch-in outside the office’s radius, and accepts it within the employee’s own', async () => {

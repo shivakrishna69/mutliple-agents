@@ -12,6 +12,7 @@ import {
   MESSAGE_FIELD_LIMITS,
   ONBOARDING_SETTINGS,
   SIGNUP_PROFILE_SETTINGS,
+  TASK_SETTINGS,
   USER_FIELD_LIMITS,
   WEBHOOK_FIELD_LIMITS,
 } from './validation.js';
@@ -65,6 +66,7 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_LEAVE_ASSISTANT_MESSAGES: 'Too many questions to the leave assistant in a short time. Please wait a moment',
   TOO_MANY_AGENT_QUESTIONS: 'Too many questions to department agents in a short time. Please wait a moment',
   TOO_MANY_AGENT_CHAT_CHANGES: 'Too many changes in a short time. Please wait a moment and try again',
+  TOO_MANY_TASK_CHANGES: 'Too many task changes in a short time. Please wait a moment and try again',
   TOO_MANY_LEAVE_REQUEST_UPDATES:
     'Too many leave requests or decisions in a short time. Please wait a moment and try again',
   TOO_MANY_WORKPLACE_SETUP_UPDATES:
@@ -193,6 +195,8 @@ export const VAULT_MESSAGES = Object.freeze({
 
 export const ATTENDANCE_MESSAGES = Object.freeze({
   PUNCHED_IN: 'Punched in',
+  PUNCHED_IN_UNASSIGNED:
+    'Punched in. You have no base office yet, so your location was recorded for HR to review. Ask HR to assign your office',
   BODY_MUST_BE_OBJECT: 'Request body must be a JSON object',
   LATITUDE_INVALID: 'lat must be a number between -90 and 90',
   LONGITUDE_INVALID: 'lng must be a number between -180 and 180',
@@ -750,4 +754,38 @@ export const NOTIFICATION_MESSAGES = Object.freeze({
   QUESTION_DOWNVOTED_BODY: (askerName, agentName) => `${askerName} found an answer from ${agentName} unhelpful`,
   QUESTION_ANSWERED_TITLE: (departmentName) => `${departmentName} answered your question`,
   QUESTION_ANSWERED_BODY: (leadName) => `${leadName} replied to the question you asked the department's agent`,
+  TASK_ASSIGNED_TITLE: (taskKey) => `${taskKey} was assigned to you`,
+  TASK_ASSIGNED_BODY: (assignerName, taskTitle) => `${assignerName} assigned you "${taskTitle}"`,
+});
+
+/** Department task boards: sprints, tasks, comments and team leads. */
+export const TASK_MESSAGES = Object.freeze({
+  BOARD_RETRIEVED: 'Task board',
+  LEADS_UPDATED: 'Task leads saved',
+  SPRINTS_RETRIEVED: 'Sprints',
+  SPRINT_CREATED: 'Sprint created',
+  SPRINT_UPDATED: 'Sprint saved',
+  TASKS_RETRIEVED: 'Tasks',
+  TASK_RETRIEVED: 'Task',
+  TASK_CREATED: 'Task created',
+  TASK_UPDATED: 'Task saved',
+  COMMENT_ADDED: 'Comment added',
+  METRICS_RETRIEVED: 'Team work',
+  INPUT_INVALID: 'Some details need fixing',
+  NOT_ALLOWED: 'Task boards are not available to your role',
+  DEPARTMENT_NOT_FOUND: 'Department not found',
+  NOT_A_MEMBER: "Only this department's people can see its task board",
+  LEADS_ONLY: "Only this department's head and task leads can do this",
+  HEAD_ONLY: "Only this department's head or an administrator can choose its task leads",
+  LEAD_NOT_A_MEMBER: 'Task leads must be people in this department',
+  ASSIGNEE_NOT_A_MEMBER: 'Tasks can only be assigned to people in this department',
+  SPRINT_NOT_FOUND: 'Sprint not found in this department',
+  SPRINT_COMPLETED: 'This sprint is completed; it takes no more tasks',
+  SPRINT_ALREADY_ACTIVE: 'Another sprint is active. Complete it before starting this one',
+  SPRINT_TRANSITION_NOT_ALLOWED: 'A sprint goes from planning to active to completed, in that order',
+  SPRINT_DATES_INVALID: `A sprint ends on or after its start, and lasts at most ${TASK_SETTINGS.SPRINT_MAX_DAYS} days`,
+  TASK_NOT_FOUND: 'Task not found in this department',
+  TASK_EDIT_NOT_ALLOWED: 'You can change tasks you reported or are assigned to',
+  TASK_STATUS_NOT_ALLOWED: 'You can move tasks assigned to you; the task leads can move any task',
+  TASK_SPRINT_NOT_ALLOWED: 'Only the task leads plan sprints',
 });

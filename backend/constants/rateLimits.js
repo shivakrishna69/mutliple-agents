@@ -61,6 +61,8 @@ export const RATE_LIMITS = Object.freeze({
   AGENT_QUESTIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
   // Feedback, clearing conversations, and a lead's work in the Questions Inbox.
   AGENT_CHAT_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // Creating and changing tasks, sprints and comments (a board drag is one change).
+  TASK_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 120 }),
   // Invitations send email: generous for onboarding a batch, low enough to stop mail abuse.
   INVITATION_SENDS_PER_USER: Object.freeze({ windowMs: 10 * 60 * 1000, maxRequests: 60 }),
   // Employee imports: each upload checks up to thousands of rows; a few corrections in a row are normal.
