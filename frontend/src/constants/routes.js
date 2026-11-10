@@ -53,6 +53,11 @@ export const ROUTE_PATHS = Object.freeze({
   // may the knowledge base pages' ?tab=questions&question=<id>.
   ASK_AGENTS: '/agents',
   ASK_AGENT: '/agents/:departmentId',
+  // Department task boards (USE_TASK_BOARDS): the boards a person can open, and one board. The
+  // backend's task notifications link to /boards/:departmentId?task=<id>
+  // (backend/services/tasks/taskService.js TASK_APP_PATHS), so it must not move.
+  BOARDS: '/boards',
+  BOARD: '/boards/:departmentId',
   // Public page behind the emailed invitation link.
   ACCEPT_INVITATION: '/invite/:token',
 });
