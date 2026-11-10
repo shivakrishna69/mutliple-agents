@@ -50,6 +50,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | `e2e/leaveApprovalSteps.spec.js` | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved |
 | `e2e/leaveAssistant.spec.js` | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message |
 | `e2e/leaveRequests.spec.js` | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave |
+| `e2e/questionsInbox.spec.js` | Department agents in two browsers: the head adds a document; an employee asks the agent, sees the answer appear as it is written with its source card and citation link, rates it; a question the documents do not cover goes to the department; the head is notified live, opens it from the bell, answers and saves it as an FAQ; the employee is notified live and reads the reply in their conversation; the FAQ becomes a Ready document |
 | `e2e/knowledgeHub.spec.js` | An admin opens Departments & Agents, an agent nobody has set up yet, and saves its instructions; switching to self-service leaves the management page and is remembered after a reload; the department head reaches the knowledge base from self-service, sees those instructions, uploads a document that becomes Ready while the list refreshes itself, sees a disguised file refused with the server's reason, and deletes the document; an employee who leads nothing sees no entry and cannot open the hub; HR switches views without the admin-only hub |
 | `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds a department, deactivates and reactivates it; adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
 
@@ -60,13 +61,17 @@ On failure, `playwright-report/` and `test-results/` hold screenshots and traces
 
 ```
 src/App.jsx           route table (workforce pages are lazy-loaded)
-src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors
+src/api/              one module per backend area; httpClient.js handles cookies, CSRF and errors, and
+                      streams newline-delimited JSON answers (streamApiRequest)
 src/auth/             AuthContext: session state and CSRF token
 src/components/       AppShell (dark sidebar built from the signed-in person's capabilities, top bar with
-                      breadcrumb, the portal switcher for admins, HR and IT administrators and, with
+                      breadcrumb, the portal switcher for admins, HR and IT administrators, the
+                      notification bell (NotificationCenter, live over the socket) and, with
                       VIEW_SYSTEM_HEALTH, the services' state), PortalSwitcher, RouteGuards (CapabilityRoute),
                       ui.jsx design primitives, feature panels (knowledge/: a department agent's
-                      settings with the lead picker, and its documents with upload, status and delete;
+                      settings with the lead picker and who may ask it, its documents with upload, status
+                      and delete, and its Questions Inbox; agentChat/: a conversation's messages with
+                      citation links, source cards and thumbs up/down;
                       workplace/: departments, offices, holidays, base offices; people/: the CSV import;
                       leave/: my leave, calendar, approvals and leave administration, the tabs of
                       pages/LeaveCenter.jsx)
@@ -83,12 +88,14 @@ src/hooks/            useApiResource (load/abort/error), useAuthRequest (a submi
                       errors), usePublicAuthSettings (branding, auth options with the signup choices, password policy; loaded
                       once), useSystemHealth (admins; one check shared by the top bar and the dashboard),
                       useCountdown, useSocket, useAgentTelemetry, usePortalView (the view an admin or HR
-                      person chose, remembered in this browser)
+                      person chose, remembered in this browser), useNotifications (the bell's list,
+                      kept current over the socket and reloaded after a reconnect)
 src/pages/            one file per screen
 src/constants/        routes and roles, messages, socket event names, workplace, leave and import labels,
                       the signed-out screens' slides (authScreens.js), field styles (formStyles.js) and
                       the dashboard's status labels and tones (dashboardDisplay.js), the portal views
-                      (portal.js) and the knowledge base statuses (knowledge.js)
+                      (portal.js), the knowledge base statuses (knowledge.js) and department agent chat
+                      (agentChat.js)
 src/utils/            dates in the browser's time zone, CSV downloads, dates of birth (mm/dd/yyyy <-> YYYY-MM-DD),
                       the dashboard's numbers (shares, durations; "—" when there is nothing to measure)
 public/brand/         the NSK logo (white letters for dark backgrounds, charcoal for light ones) and the square icons
@@ -126,3 +133,21 @@ Served with the app, so no font or image request leaves the site:
   License 1.1, from `@fontsource` packages imported in `src/index.css`.
 - Country flags for the phone picker: `country-flag-icons` (MIT), one small SVG per country,
   loaded only when shown.
+
+## Department agents
+
+`/agents` lists the department agents the person may ask (their own department's and every shared
+service's); `/agents/:departmentId` is one agent's chat (pages/AgentChat.jsx). An answer streams in
+as the agent writes it (api/agentChatApi.js streamAgentQuestion over httpClient.js streamApiRequest);
+the stored answer replaces the streamed text when it is complete. Each citation mark ([1]) links to
+its source card: the document, its section and page, and the quoted excerpt (never the whole
+document). Thumbs down, or an answer the agent could not give, sends the question to the
+department; the answer then says so, and shows when the department replies. A new conversation gets
+its address (`?conversation=<id>`) as soon as the question is stored, which is where the backend's
+notifications and emails link.
+
+Heads and knowledge leads answer in the **Questions** tab of the knowledge base page
+(components/knowledge/QuestionsInboxPanel.jsx, `?tab=questions&question=<id>`), optionally saving the
+answer as an FAQ document. Both sides are told in the notification bell, live over the socket
+(`NOTIFICATION_CREATED`); opening a notification goes to the page it names and reloads it, even when
+it is already open.
