@@ -4,6 +4,7 @@
  *
  *   Settings    the agent's name, instructions, Active/Paused and lead (KnowledgeSettingsPanel.jsx)
  *   Documents   upload, processing status, failures and delete (KnowledgeDocumentsPanel.jsx)
+ *   Questions   what the agent could not answer, to reply to and save as FAQs (QuestionsInboxPanel.jsx)
  *
  * The open tab is kept in the address (?tab=documents), so it survives a reload and can be shared.
  * Anyone the backend refuses (403), an unknown department (404) or an inactive one (409) sees the
@@ -12,10 +13,11 @@
 
 import { Link, useParams, useSearchParams } from 'react-router';
 import { requestKnowledgeSettings } from '../api/knowledgeApi.js';
-import { ArrowLeftIcon, DocumentIcon, SparklesIcon } from '../components/Icons.jsx';
+import { ArrowLeftIcon, DocumentIcon, QuestionIcon, SparklesIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import KnowledgeDocumentsPanel from '../components/knowledge/KnowledgeDocumentsPanel.jsx';
 import KnowledgeSettingsPanel from '../components/knowledge/KnowledgeSettingsPanel.jsx';
+import QuestionsInboxPanel from '../components/knowledge/QuestionsInboxPanel.jsx';
 import { Badge, LoadingBlock, Notice, Tabs } from '../components/ui.jsx';
 import { AGENT_STATUS_DISPLAY } from '../constants/knowledge.js';
 import { useApiResource } from '../hooks/useApiResource.js';
@@ -23,6 +25,7 @@ import { useApiResource } from '../hooks/useApiResource.js';
 const DETAIL_TABS = Object.freeze([
   { id: 'settings', label: 'Settings', Icon: SparklesIcon },
   { id: 'documents', label: 'Documents', Icon: DocumentIcon },
+  { id: 'questions', label: 'Questions', Icon: QuestionIcon },
 ]);
 const TAB_PARAMETER = 'tab';
 
@@ -81,16 +84,16 @@ export default function KnowledgeBaseDetail({ listPath, listLabel }) {
         actions={<Badge tone={status.tone}>{status.label}</Badge>}
       />
       <Tabs tabs={DETAIL_TABS} activeTabId={activeTabId} onChange={selectTab} label="Knowledge base sections" />
-      {activeTabId === 'settings' ? (
+      {activeTabId === 'settings' && (
         <KnowledgeSettingsPanel
           departmentId={departmentId}
           settings={settings}
           onSaved={(savedSettings) => settingsResource.setData({ settings: savedSettings })}
           onReload={settingsResource.reload}
         />
-      ) : (
-        <KnowledgeDocumentsPanel departmentId={departmentId} settings={settings} />
       )}
+      {activeTabId === 'documents' && <KnowledgeDocumentsPanel departmentId={departmentId} settings={settings} />}
+      {activeTabId === 'questions' && <QuestionsInboxPanel departmentId={departmentId} />}
     </div>
   );
 }

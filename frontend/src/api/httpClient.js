@@ -69,12 +69,37 @@ function convertDetailsToFieldErrors(errorDetails) {
   return fieldErrors;
 }
 
+/** The ApiError for a non-2xx response and its parsed body (or null). */
+function toApiError(httpResponse, responseBody) {
+  const backendError = responseBody?.error;
+  const requestId = backendError?.requestId ?? httpResponse.headers.get('X-Request-Id');
+
+  if (httpResponse.status >= 500) {
+    // No backend error body means the response came from something in front of the API
+    // (the dev proxy or a load balancer) because the backend itself did not answer.
+    return new ApiError({
+      message: backendError ? API_MESSAGES.UNEXPECTED_SERVER_ERROR : API_MESSAGES.SERVER_UNAVAILABLE,
+      status: httpResponse.status,
+      requestId,
+    });
+  }
+
+  return new ApiError({
+    message: typeof backendError?.message === 'string' ? backendError.message : API_MESSAGES.UNEXPECTED_RESPONSE,
+    status: httpResponse.status,
+    requestId,
+    fieldErrors: convertDetailsToFieldErrors(backendError?.details),
+    code: typeof backendError?.code === 'string' ? backendError.code : null,
+    context: backendError?.context && typeof backendError.context === 'object' ? backendError.context : null,
+  });
+}
+
 /**
  * Sends one request to the backend and returns `{ responseData, responseMessage, httpStatus }` on
  * 2xx, where `responseData` is the response's `data` object and `responseMessage` its `message`
  * (the text to show the person, written by the backend).
  * @param {object} requestDescription
- * @param {'GET'|'POST'|'PATCH'} requestDescription.method
+ * @param {'GET'|'POST'|'PATCH'|'DELETE'} requestDescription.method
  * @param {string} requestDescription.endpointPath
  * @param {object} [requestDescription.requestPayload]  JSON body, for POST/PATCH.
  * @param {FormData} [requestDescription.formData]      Multipart body (file uploads); the browser sets
@@ -114,30 +139,81 @@ export async function sendApiRequest({ method, endpointPath, requestPayload, for
     responseBody = null;
   }
 
-  if (!httpResponse.ok) {
-    const backendError = responseBody?.error;
-    const requestId = backendError?.requestId ?? httpResponse.headers.get('X-Request-Id');
-
-    if (httpResponse.status >= 500) {
-      // No backend error body means the response came from something in front of the API
-      // (the dev proxy or a load balancer) because the backend itself did not answer.
-      throw new ApiError({
-        message: backendError ? API_MESSAGES.UNEXPECTED_SERVER_ERROR : API_MESSAGES.SERVER_UNAVAILABLE,
-        status: httpResponse.status,
-        requestId,
-      });
-    }
-
-    throw new ApiError({
-      message: typeof backendError?.message === 'string' ? backendError.message : API_MESSAGES.UNEXPECTED_RESPONSE,
-      status: httpResponse.status,
-      requestId,
-      fieldErrors: convertDetailsToFieldErrors(backendError?.details),
-      code: typeof backendError?.code === 'string' ? backendError.code : null,
-      context: backendError?.context && typeof backendError.context === 'object' ? backendError.context : null,
-    });
-  }
+  if (!httpResponse.ok) throw toApiError(httpResponse, responseBody);
 
   const responseMessage = typeof responseBody?.message === 'string' ? responseBody.message : null;
   return { responseData: responseBody?.data, responseMessage, httpStatus: httpResponse.status };
+}
+
+/** Upper bound for a streamed answer: the backend's own deadline for the AI service is shorter. */
+const STREAM_TIMEOUT_MS = 120_000;
+
+/**
+ * POSTs a JSON body to an endpoint that answers as newline-delimited JSON (one event per line, e.g.
+ * a department agent's streamed answer), calling `onEvent(event)` for each line as it arrives.
+ * Refusals the backend sends before the stream starts (a 4xx or 5xx JSON error) throw ApiError
+ * exactly like sendApiRequest; so do a dropped connection and the timeout. Resolves when the stream
+ * ends. A caller abort rethrows the AbortError, as sendApiRequest does.
+ * @param {{ endpointPath: string, requestPayload: object, csrfToken: string,
+ *   callerSignal?: AbortSignal, onEvent: (event: object) => void }} request
+ */
+export async function streamApiRequest({ endpointPath, requestPayload, csrfToken, callerSignal, onEvent }) {
+  const timeoutSignal = AbortSignal.timeout(STREAM_TIMEOUT_MS);
+  const requestSignal = callerSignal ? AbortSignal.any([callerSignal, timeoutSignal]) : timeoutSignal;
+  const failure = (transportError) => {
+    if (callerSignal?.aborted) return transportError;
+    if (timeoutSignal.aborted) return new ApiError({ message: API_MESSAGES.REQUEST_TIMED_OUT, status: 0 });
+    return new ApiError({ message: API_MESSAGES.NETWORK_UNAVAILABLE, status: 0 });
+  };
+
+  let httpResponse;
+  try {
+    httpResponse = await fetch(`${API_BASE_URL}${endpointPath}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/x-ndjson, application/json',
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: JSON.stringify(requestPayload),
+      credentials: 'include',
+      signal: requestSignal,
+    });
+  } catch (transportError) {
+    throw failure(transportError);
+  }
+  if (!httpResponse.ok) {
+    const responseBody = await httpResponse.json().catch(() => null);
+    throw toApiError(httpResponse, responseBody);
+  }
+
+  const decoder = new TextDecoder();
+  let buffered = '';
+  const emitLine = (line) => {
+    if (!line.trim()) return;
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      throw new ApiError({ message: API_MESSAGES.UNEXPECTED_RESPONSE, status: httpResponse.status });
+    }
+    onEvent(event);
+  };
+  try {
+    const reader = httpResponse.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffered += decoder.decode(value, { stream: true });
+      let newlineAt;
+      while ((newlineAt = buffered.indexOf('\n')) !== -1) {
+        emitLine(buffered.slice(0, newlineAt));
+        buffered = buffered.slice(newlineAt + 1);
+      }
+    }
+    emitLine(buffered + decoder.decode());
+  } catch (streamError) {
+    if (streamError instanceof ApiError) throw streamError;
+    throw failure(streamError);
+  }
 }

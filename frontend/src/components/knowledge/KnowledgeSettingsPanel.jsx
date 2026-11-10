@@ -12,7 +12,12 @@
 import { useEffect, useState } from 'react';
 import { requestKnowledgeSettingsUpdate, requestLeadCandidates } from '../../api/knowledgeApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { AGENT_STATUSES, LEAD_SEARCH_DEBOUNCE_MS } from '../../constants/knowledge.js';
+import {
+  AGENT_AUDIENCE_OPTIONS,
+  AGENT_STATUSES,
+  EFFECTIVE_AUDIENCE_DISPLAY,
+  LEAD_SEARCH_DEBOUNCE_MS,
+} from '../../constants/knowledge.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { Button, Card, Field, Notice, SelectInput, TextInput, Toggle } from '../ui.jsx';
 
@@ -25,6 +30,7 @@ const formFromSettings = (settings) => ({
   name: settings.name,
   systemPrompt: settings.systemPrompt,
   status: settings.status,
+  audience: settings.audience,
   leadId: settings.lead?.id ?? NO_LEAD,
 });
 
@@ -35,6 +41,7 @@ function changesOf(form, settings) {
   if (form.name.trim() !== saved.name) changes.name = form.name.trim();
   if (form.systemPrompt !== saved.systemPrompt) changes.systemPrompt = form.systemPrompt;
   if (form.status !== saved.status) changes.status = form.status;
+  if (form.audience !== saved.audience) changes.audience = form.audience;
   if (form.leadId !== saved.leadId) changes.managedBy = form.leadId || null;
   return changes;
 }
@@ -195,6 +202,15 @@ export default function KnowledgeSettingsPanel({ departmentId, settings, onSaved
           onChange={(isActive) =>
             setForm({ ...form, status: isActive ? AGENT_STATUSES.ACTIVE : AGENT_STATUSES.PAUSED })
           }
+        />
+
+        <SelectInput
+          label="Who can ask the agent"
+          value={form.audience}
+          onChange={(changeEvent) => setForm({ ...form, audience: changeEvent.target.value })}
+          error={fieldErrors.audience}
+          options={AGENT_AUDIENCE_OPTIONS}
+          hint={EFFECTIVE_AUDIENCE_DISPLAY[settings.effectiveAudience]}
         />
 
         {permissions.canAssignLead ? (

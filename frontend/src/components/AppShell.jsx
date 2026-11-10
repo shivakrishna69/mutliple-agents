@@ -31,6 +31,7 @@ import { requestKnowledgeBases } from '../api/knowledgeApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { hasCapability } from '../auth/capabilities.js';
 import BrandMark from './BrandMark.jsx';
+import NotificationCenter from './NotificationCenter.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import PortalSwitcher from './PortalSwitcher.jsx';
 import RoleBadge from './RoleBadge.jsx';
@@ -48,6 +49,7 @@ import {
   MenuIcon,
   SignOutIcon,
   SitemapIcon,
+  SparklesIcon,
   TerminalIcon,
   UserPlusIcon,
   UserCircleIcon,
@@ -100,6 +102,13 @@ const NAVIGATION_SECTIONS = Object.freeze([
         views: SELF_SERVICE_ONLY,
         capability: null,
         isVisibleTo: (context) => context.managesOwnKnowledgeBase,
+      },
+      {
+        label: 'Ask an agent',
+        path: ROUTE_PATHS.ASK_AGENTS,
+        Icon: SparklesIcon,
+        views: BOTH_VIEWS,
+        capability: CAPABILITIES.ASK_DEPARTMENT_AGENTS,
       },
     ],
   },
@@ -340,6 +349,7 @@ function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
       <div className="flex shrink-0 items-center gap-3">
         {switcher}
         <SystemsPill health={health} />
+        <NotificationCenter />
         <span
           className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"
           title={currentUser.name}
@@ -482,7 +492,7 @@ export default function AppShell() {
             <MenuIcon className="h-6 w-6" />
           </button>
           <BrandMark />
-          <span className="w-8" aria-hidden="true" />
+          <NotificationCenter />
         </header>
 
         {signOutError && (

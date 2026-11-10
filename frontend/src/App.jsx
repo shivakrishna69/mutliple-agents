@@ -23,6 +23,8 @@
  *   /leave        -> LeaveCenter      everyone: My leave (index), /leave/calendar, /leave/approvals,
  *                                     and /leave/admin with MANAGE_WORKFORCE (policies, balances, payroll)
  *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  MANAGE_KNOWLEDGE_BASES
+ *   /agents       -> AgentDirectory   ASK_DEPARTMENT_AGENTS (the department agents this person may ask)
+ *   /agents/:departmentId -> AgentChat ASK_DEPARTMENT_AGENTS (?conversation=<id> opens one)
  *   /knowledge(/:departmentId)       -> the same pages, for the departments a person heads or leads
  *                                     (every signed-in user may open it; the backend decides what it shows)
  *
@@ -75,6 +77,8 @@ const LeaveAdministrationPanel = lazy(() => import('./components/leave/LeaveAdmi
 const WorkplaceSetup = lazy(() => import('./pages/WorkplaceSetup.jsx'));
 const KnowledgeBases = lazy(() => import('./pages/KnowledgeBases.jsx'));
 const KnowledgeBaseDetail = lazy(() => import('./pages/KnowledgeBaseDetail.jsx'));
+const AgentDirectory = lazy(() => import('./pages/AgentDirectory.jsx'));
+const AgentChat = lazy(() => import('./pages/AgentChat.jsx'));
 
 /** "/admin/knowledge/<id>" from the route pattern, for links from the list to a department. */
 const pathWithDepartment = (pattern) => (departmentId) =>
@@ -125,6 +129,11 @@ export default function App() {
               <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_WORKFORCE} />}>
                 <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministrationPanel />} />
               </Route>
+            </Route>
+
+            <Route element={<CapabilityRoute capability={CAPABILITIES.ASK_DEPARTMENT_AGENTS} />}>
+              <Route path={ROUTE_PATHS.ASK_AGENTS} element={<AgentDirectory />} />
+              <Route path={ROUTE_PATHS.ASK_AGENT} element={<AgentChat />} />
             </Route>
 
             <Route element={<CapabilityRoute capability={CAPABILITIES.USE_SUPPORT_CHAT} />}>

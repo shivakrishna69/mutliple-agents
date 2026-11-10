@@ -47,6 +47,12 @@ export const ROUTE_PATHS = Object.freeze({
   KNOWLEDGE_HUB_DEPARTMENT: '/admin/knowledge/:departmentId',
   MY_KNOWLEDGE: '/knowledge',
   MY_KNOWLEDGE_DEPARTMENT: '/knowledge/:departmentId',
+  // Department agents: the ones a person may ask, and one agent's chat (ASK_DEPARTMENT_AGENTS). The
+  // backend's notifications and emails link to /agents/:departmentId?conversation=<id>
+  // (backend/services/agentChat/agentQuestionService.js AGENT_APP_PATHS), so it must not move; nor
+  // may the knowledge base pages' ?tab=questions&question=<id>.
+  ASK_AGENTS: '/agents',
+  ASK_AGENT: '/agents/:departmentId',
   // Public page behind the emailed invitation link.
   ACCEPT_INVITATION: '/invite/:token',
 });
