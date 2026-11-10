@@ -30,6 +30,7 @@ const GUARDED_PAGES = Object.freeze([
 
 const EVERYONE_PAGES = Object.freeze([
   '/dashboard',
+  '/agents',
   '/attendance',
   '/payroll',
   '/analytics',
@@ -49,6 +50,7 @@ const ROLE_ACCESS = {
     navigation: [
       'Overview',
       'Support console',
+      'Ask an agent',
       'Attendance',
       'Leave',
       'Payroll',
@@ -68,14 +70,24 @@ const ROLE_ACCESS = {
   },
   hr: {
     badge: 'HR',
-    navigation: ['Overview', 'Attendance', 'Leave', 'Payroll', 'Analytics hub', 'Onboarding', 'Workplace', 'Account'],
+    navigation: [
+      'Overview',
+      'Ask an agent',
+      'Attendance',
+      'Leave',
+      'Payroll',
+      'Analytics hub',
+      'Onboarding',
+      'Workplace',
+      'Account',
+    ],
     guardedPages: ['/people/onboarding', '/workplace', '/leave/admin'],
     shows: ['Headcount by department', 'Upcoming holidays'],
     hides: ['Recent conversations', 'Connected services'],
   },
   finance: {
     badge: 'Finance & Payroll',
-    navigation: ['Overview', 'Attendance', 'Leave', 'Payroll', 'Analytics hub', 'Account'],
+    navigation: ['Overview', 'Ask an agent', 'Attendance', 'Leave', 'Payroll', 'Analytics hub', 'Account'],
     guardedPages: [],
     shows: [],
     hides: ['Recent conversations', 'Connected services', 'Headcount by department'],
@@ -84,6 +96,7 @@ const ROLE_ACCESS = {
     badge: 'IT Administrator',
     navigation: [
       'Overview',
+      'Ask an agent',
       'Attendance',
       'Leave',
       'Payroll',
@@ -102,6 +115,7 @@ const ROLE_ACCESS = {
     navigation: [
       'Overview',
       'Support console',
+      'Ask an agent',
       'Attendance',
       'Leave',
       'Payroll',
@@ -115,7 +129,16 @@ const ROLE_ACCESS = {
   },
   employee: {
     badge: 'Employee',
-    navigation: ['Overview', 'Support chat', 'Attendance', 'Leave', 'Payroll', 'Analytics hub', 'Account'],
+    navigation: [
+      'Overview',
+      'Support chat',
+      'Ask an agent',
+      'Attendance',
+      'Leave',
+      'Payroll',
+      'Analytics hub',
+      'Account',
+    ],
     guardedPages: ['/support'],
     shows: ['Need a hand? We reply in seconds.'],
     hides: ['Recent conversations', 'Headcount by department', 'Connected services'],
