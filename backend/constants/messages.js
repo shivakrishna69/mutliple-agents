@@ -761,6 +761,7 @@ export const NOTIFICATION_MESSAGES = Object.freeze({
 /** Department task boards: sprints, tasks, comments and team leads. */
 export const TASK_MESSAGES = Object.freeze({
   BOARD_RETRIEVED: 'Task board',
+  BOARDS_RETRIEVED: 'Task boards you can open',
   LEADS_UPDATED: 'Task leads saved',
   SPRINTS_RETRIEVED: 'Sprints',
   SPRINT_CREATED: 'Sprint created',
