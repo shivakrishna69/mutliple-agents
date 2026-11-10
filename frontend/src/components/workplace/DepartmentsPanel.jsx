@@ -22,7 +22,7 @@ import { requestEmployees } from '../../api/workplaceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { BuildingIcon, PlusIcon } from '../Icons.jsx';
-import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, SelectInput, TextInput } from '../ui.jsx';
+import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, SelectInput, TextInput, Toggle } from '../ui.jsx';
 
 const NONE = '';
 
@@ -34,6 +34,7 @@ function formFromDepartment(department) {
     budgetCode: department?.budgetCode ?? '',
     parentDepartmentId: department?.parentDepartmentId ?? NONE,
     departmentHeadId: department?.departmentHeadId ?? NONE,
+    isSharedService: department?.isSharedService ?? false,
   };
 }
 
@@ -46,6 +47,7 @@ function departmentInputFromForm(form) {
     budgetCode: form.budgetCode.trim().toUpperCase() || null,
     parentDepartmentId: form.parentDepartmentId || null,
     departmentHeadId: form.departmentHeadId || null,
+    isSharedService: form.isSharedService,
   };
 }
 
@@ -163,6 +165,12 @@ function DepartmentForm({ department, departments, employees, onSaved, onCancel 
             options={headOptions}
           />
         </div>
+        <Toggle
+          label="Shared service"
+          description="Serves the whole company, like HR, IT or Finance: everyone can ask its agent unless the agent's own setting says otherwise."
+          checked={form.isSharedService}
+          onChange={(isSharedService) => setForm({ ...form, isSharedService })}
+        />
         <div className="flex justify-end gap-3">
           <Button variant="ghost" onClick={onCancel}>
             Cancel
@@ -219,6 +227,7 @@ function DepartmentRow({ department, parentName, headName, onEdit, onChanged }) 
           {department.memberCount} {department.memberCount === 1 ? 'person' : 'people'}
         </Badge>
         {!department.isActive && <Badge tone="slate">Inactive</Badge>}
+        {department.isSharedService && <Badge tone="sky">Shared service</Badge>}
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" disabled={busyAction !== null} onClick={onEdit}>
             Edit

@@ -14,6 +14,20 @@ export const AGENT_STATUS_DISPLAY = Object.freeze({
 export const AGENT_STATUSES = Object.freeze({ ACTIVE: 'ACTIVE', PAUSED: 'PAUSED' });
 
 /**
+ * Who may ask an agent; mirrors backend constants/validation.js AGENT_AUDIENCES. Following the
+ * department means the whole company for a shared service, the department's people otherwise.
+ */
+export const AGENT_AUDIENCE_OPTIONS = Object.freeze([
+  { value: 'FOLLOW_DEPARTMENT', label: 'Follow the department (company-wide for a shared service)' },
+  { value: 'COMPANY', label: 'Everyone in the company' },
+  { value: 'DEPARTMENT', label: "This department's people only" },
+]);
+export const EFFECTIVE_AUDIENCE_DISPLAY = Object.freeze({
+  COMPANY: 'Everyone in the company can ask it.',
+  DEPARTMENT: "This department's people, sub-teams included, can ask it.",
+});
+
+/**
  * How the backend says a person may manage a knowledge base (backend/services/knowledge/knowledgeAccess.js).
  * ADMIN is reach as an administrator; the others mean the department is the person's own.
  */
