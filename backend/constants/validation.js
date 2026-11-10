@@ -610,6 +610,8 @@ export const TASK_SETTINGS = Object.freeze({
   TASKS_LISTED: 500,
   SPRINTS_LISTED: 100,
   ACTIVITY_LISTED: 200,
+  // Unassigned backlog tasks the leads' team overview lists (the most urgent first); it reports the total.
+  UNASSIGNED_BACKLOG_LISTED: 20,
   // Space left between neighbouring tasks in a column, so a task can be moved between two others
   // by giving it an order in between, without renumbering the column.
   ORDER_GAP: 1_024,

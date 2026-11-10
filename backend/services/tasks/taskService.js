@@ -15,7 +15,8 @@
  *                                    every change is recorded in the activity, and a new assignee is
  *                                    notified in the app
  *   addComment(scope, ...)           anyone on the board
- *   getTeamWork(scope, filters)      leads: each person's tasks by status and story points
+ *   getTeamWork(scope, filters)      leads: each person's tasks by status and story points; for a
+ *                                    sprint, its burndown; and the unassigned backlog
  */
 
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
@@ -30,7 +31,8 @@ import { notifyUsers } from '../notifications.js';
 import { assertCurrentVersion, saveVersioned } from '../serviceError.js';
 import { boardRefusal, isLead, requireLead } from './boardAccess.js';
 import { peopleByIds } from './boardService.js';
-import { findSprint } from './sprintService.js';
+import { findSprint, toSprintSummary } from './sprintService.js';
+import { sprintBurndown, unassignedBacklog } from './teamWorkInsights.js';
 
 /**
  * The page of the web app a task notification links to. The frontend's route must match
@@ -308,8 +310,9 @@ export async function getTeamWork(scope, { sprintId }) {
   requireLead(scope);
   const { department } = scope;
   const match = { departmentId: department._id };
+  const sprint = sprintId && sprintId !== BACKLOG ? await findSprint(department, sprintId, { lean: true }) : null;
   if (sprintId === BACKLOG) match.sprintId = null;
-  else if (sprintId) match.sprintId = (await findSprint(department, sprintId, { lean: true }))._id;
+  else if (sprint) match.sprintId = sprint._id;
   const rows = await Task.aggregate([
     { $match: match },
     {
@@ -349,5 +352,12 @@ export async function getTeamWork(scope, { sprintId }) {
       person: people.get(userId) ?? { id: userId, name: null, email: null },
       ...byPerson.get(userId),
     }));
-  return { members: [...members, ...formerMembers], unassigned: byPerson.get(null) ?? zero(), totals };
+  const backlog = await unassignedBacklog(department);
+  return {
+    members: [...members, ...formerMembers],
+    unassigned: byPerson.get(null) ?? zero(),
+    totals,
+    sprint: sprint ? { ...toSprintSummary(sprint), burndown: await sprintBurndown(sprint) } : null,
+    unassignedBacklog: { total: backlog.total, tasks: await summarize(backlog.tasks) },
+  };
 }

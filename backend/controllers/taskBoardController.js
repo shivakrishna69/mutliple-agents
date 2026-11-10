@@ -13,7 +13,8 @@
  *   GET   /tasks?sprintId=&assignee=&status=
  *   POST  /tasks                         { title, description?, taskType?, priority?, assigneeId?,
  *                                          storyPoints?, sprintId? (leads) }
- *   GET   /tasks/metrics?sprintId=       each person's work                           leads
+ *   GET   /tasks/metrics?sprintId=       each person's work, sprint burndown, unassigned leads
+ *                                        backlog
  *   GET   /tasks/:taskId                 with its activity and comments
  *   PATCH /tasks/:taskId                 { ...changes, version }: status, order, assignee, fields
  *   POST  /tasks/:taskId/comments        { body }
