@@ -6,7 +6,12 @@
  *                   the backlog
  *   Backlog         sprints being planned with their tasks, then the backlog; leads plan, start and
  *                   complete sprints and move tasks into them (components/tasks/BacklogPanel.jsx)
- *   Filters         assignee (everyone, me, unassigned), status and type, on both views
+ *   Team overview   leads only (?view=team): each person's workload, a sprint's progress and
+ *                   burndown, the unassigned backlog (components/tasks/TeamOverview.jsx)
+ *   Filters         assignee (everyone, me, unassigned), status and type, on the sprint and backlog
+ *
+ * The head (or an administrator) chooses the task leads from "Task leads" (TaskLeadsDialog). Tabs and
+ * buttons follow the viewer's rights from the backend, which decides again on every request.
  *
  * "Create task" opens the create dialog; any task opens its detail (?task=<id>, which is where
  * the backend's assignment notifications link). The view is kept in the address (?view=backlog).
@@ -18,11 +23,13 @@ import { useId, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { requestBoard, requestSprints, requestTaskUpdate, requestTasks } from '../api/tasksApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { ArrowLeftIcon, PlusIcon } from '../components/Icons.jsx';
+import { ArrowLeftIcon, PlusIcon, UsersIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import BacklogPanel from '../components/tasks/BacklogPanel.jsx';
 import KanbanBoard from '../components/tasks/KanbanBoard.jsx';
 import { CreateTaskDialog, SprintDialog, TaskDetailDialog } from '../components/tasks/TaskDialogs.jsx';
+import TaskLeadsDialog from '../components/tasks/TaskLeadsDialog.jsx';
+import TeamOverview from '../components/tasks/TeamOverview.jsx';
 import { Badge, Button, EmptyState, LoadingBlock, Notice, Tabs, formatDate } from '../components/ui.jsx';
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { ASSIGNEE_FILTERS, BOARD_COLUMNS, SPRINT_STATUSES, TASK_TYPE_OPTIONS } from '../constants/tasks.js';
@@ -31,7 +38,10 @@ import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 const VIEWS = Object.freeze([
   { id: 'sprint', label: 'Active sprint' },
   { id: 'backlog', label: 'Backlog' },
+  { id: 'team', label: 'Team overview', isVisibleTo: (viewer) => viewer.canSeeTeamWork },
 ]);
+const DEFAULT_VIEW = 'sprint';
+const viewsFor = (viewer) => VIEWS.filter((candidate) => !candidate.isVisibleTo || candidate.isVisibleTo(viewer));
 const ALL = '';
 const STALE_VERSION = 'STALE_VERSION';
 
@@ -88,7 +98,6 @@ export default function DepartmentBoard() {
   const { departmentId } = useParams();
   const { currentUser, csrfToken } = useAuth();
   const [searchParameters, setSearchParameters] = useSearchParams();
-  const view = searchParameters.get('view') === 'backlog' ? 'backlog' : 'sprint';
   const openTaskId = searchParameters.get('task');
 
   const boardResource = useApiResource((signal) => requestBoard(departmentId, signal), [departmentId]);
@@ -100,6 +109,9 @@ export default function DepartmentBoard() {
   const [moveError, setMoveError] = useState(null);
 
   const board = boardResource.data?.board ?? null;
+  const views = board ? viewsFor(board.viewer) : [];
+  const requestedView = searchParameters.get('view');
+  const view = views.some((candidate) => candidate.id === requestedView) ? requestedView : DEFAULT_VIEW;
   const sprints = useMemo(() => sprintsResource.data?.sprints ?? [], [sprintsResource.data]);
   const allTasks = useMemo(() => tasksResource.data?.tasks ?? [], [tasksResource.data]);
   const activeSprint = sprints.find((sprint) => sprint.status === SPRINT_STATUSES.ACTIVE) ?? null;
@@ -184,6 +196,12 @@ export default function DepartmentBoard() {
         actions={
           <div className="flex items-center gap-2">
             {board.viewer.role === 'LEAD' && <Badge tone="violet">Task lead</Badge>}
+            {board.viewer.canChooseLeads && (
+              <Button variant="secondary" onClick={() => setDialog({ kind: 'leads' })}>
+                <UsersIcon className="h-4 w-4" />
+                Task leads
+              </Button>
+            )}
             <Button onClick={() => setDialog({ kind: 'create' })}>
               <PlusIcon className="h-4 w-4" />
               Create task
@@ -197,12 +215,12 @@ export default function DepartmentBoard() {
         <Notice tone="error" title={(tasksResource.error ?? sprintsResource.error).message} />
       )}
       <Tabs
-        tabs={VIEWS}
+        tabs={views}
         activeTabId={view}
-        onChange={(nextView) => setParameter('view', nextView === 'sprint' ? null : nextView)}
+        onChange={(nextView) => setParameter('view', nextView === DEFAULT_VIEW ? null : nextView)}
         label="Board views"
       />
-      <FilterBar filters={filters} onChange={setFilters} />
+      {view !== 'team' && <FilterBar filters={filters} onChange={setFilters} />}
 
       {view === 'sprint' &&
         (activeSprint ? (
@@ -246,7 +264,28 @@ export default function DepartmentBoard() {
           onPlanSprint={() => setDialog({ kind: 'sprint' })}
         />
       )}
+      {view === 'team' && sprintsResource.data && (
+        <TeamOverview
+          departmentId={departmentId}
+          board={board}
+          sprints={sprints}
+          revision={tasksResource.data}
+          onOpenTask={(task) => setParameter('task', task.id)}
+        />
+      )}
 
+      {dialog?.kind === 'leads' && (
+        <TaskLeadsDialog
+          departmentId={departmentId}
+          board={board}
+          onClose={() => setDialog(null)}
+          onSaved={(savedBoard, message) => {
+            setDialog(null);
+            setNotice(message ?? null);
+            boardResource.setData({ board: savedBoard });
+          }}
+        />
+      )}
       {dialog?.kind === 'create' && (
         <CreateTaskDialog
           departmentId={departmentId}
