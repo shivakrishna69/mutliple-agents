@@ -101,6 +101,22 @@ export const ATTENDANCE_CHECK_OUT_SOURCES = Object.freeze({
   AUTO_CLOSED: 'auto_closed',
 });
 
+/**
+ * How a device punch's location was verified:
+ *   GEOFENCE_VERIFIED            an office punch inside the base office's radius
+ *   LOCATION_LOGGED              a home or on-duty punch: the location is recorded, not checked
+ *   LOCATION_LOGGED_UNASSIGNED   the employee has no base office yet: the location is recorded so HR
+ *                                can review it, the punch is not refused, and there is no office shift
+ *                                to be late for (officeLocationId is null; the date is in the company's
+ *                                time zone)
+ * Null on regularization entries and on punches made before it was recorded.
+ */
+export const ATTENDANCE_VERIFICATION_STATUSES = Object.freeze({
+  GEOFENCE_VERIFIED: 'GEOFENCE_VERIFIED',
+  LOCATION_LOGGED: 'LOCATION_LOGGED',
+  LOCATION_LOGGED_UNASSIGNED: 'LOCATION_LOGGED_UNASSIGNED',
+});
+
 /** How the entry was created; see "Entry sources" above. */
 export const ATTENDANCE_ENTRY_SOURCES = Object.freeze({
   DEVICE_PUNCH: 'device_punch',
@@ -148,7 +164,8 @@ coordinatesSchema.pre('validate', function rejectNullIsland() {
 const geofenceEvidenceSchema = new mongoose.Schema(
   {
     enforced: { type: Boolean, required: true },
-    distanceMeters: { type: Number, min: 0, required: true },
+    // Null when there was no office to measure from (LOCATION_LOGGED_UNASSIGNED).
+    distanceMeters: { type: Number, min: 0, default: null },
     allowedRadiusMeters: { type: Number, min: 0, default: null },
   },
   { _id: false },
@@ -185,7 +202,25 @@ const attendanceSchema = new mongoose.Schema(
     // ──► EmployeeProfile._id
     employeeId: { type: ObjectId, ref: 'EmployeeProfile', required: true, immutable: true },
     // ──► OfficeLocation._id
-    officeLocationId: { type: ObjectId, ref: 'OfficeLocation', required: true, immutable: true },
+    // Required, except on a punch made without a base office (LOCATION_LOGGED_UNASSIGNED).
+    officeLocationId: {
+      type: ObjectId,
+      ref: 'OfficeLocation',
+      default: null,
+      immutable: true,
+      required: [
+        function officeRequired() {
+          return this.verificationStatus !== ATTENDANCE_VERIFICATION_STATUSES.LOCATION_LOGGED_UNASSIGNED;
+        },
+        'An attendance entry requires its office',
+      ],
+    },
+    verificationStatus: {
+      type: String,
+      enum: [...Object.values(ATTENDANCE_VERIFICATION_STATUSES), null],
+      default: null,
+      immutable: true,
+    },
     date: {
       type: String,
       required: true,

@@ -241,6 +241,10 @@ export async function getMyAttendanceDay({ userId, now = new Date() }) {
         }
       : null,
     punch: toPunchView(punch),
-    automaticPunchOutAt: isOpenDevicePunch && office ? isoOrNull(automaticPunchOut(punch, office).deadline) : null,
+    // A punch made without a base office closes on its own time limit (automaticPunchOut with null).
+    automaticPunchOutAt:
+      isOpenDevicePunch && (office || !punch.officeLocationId)
+        ? isoOrNull(automaticPunchOut(punch, punch.officeLocationId ? office : null).deadline)
+        : null,
   };
 }

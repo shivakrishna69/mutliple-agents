@@ -193,6 +193,8 @@ export const VAULT_MESSAGES = Object.freeze({
 
 export const ATTENDANCE_MESSAGES = Object.freeze({
   PUNCHED_IN: 'Punched in',
+  PUNCHED_IN_UNASSIGNED:
+    'Punched in. You have no base office yet, so your location was recorded for HR to review. Ask HR to assign your office',
   BODY_MUST_BE_OBJECT: 'Request body must be a JSON object',
   LATITUDE_INVALID: 'lat must be a number between -90 and 90',
   LONGITUDE_INVALID: 'lng must be a number between -180 and 180',

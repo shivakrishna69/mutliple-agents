@@ -223,6 +223,9 @@ export const ATTENDANCE_FIELD_LIMITS = Object.freeze({
 export const ATTENDANCE_DEFAULTS = Object.freeze({
   OFFICE_GEOFENCE_RADIUS_METRES: 200,
   AUTO_PUNCH_OUT_AFTER_MINUTES: 120,
+  // A punch made without a base office has no shift to end with: if it is left open, it is closed
+  // this long after the punch-in.
+  UNASSIGNED_AUTO_PUNCH_OUT_AFTER_MINUTES: 16 * 60,
 });
 
 /**

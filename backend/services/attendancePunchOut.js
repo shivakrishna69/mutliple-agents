@@ -54,15 +54,18 @@ export async function closeForgottenPunchOuts({ now = new Date() } = {}) {
     .lean();
   if (openPunches.length === 0) return { closedCount: 0 };
 
-  const offices = await OfficeLocation.find({ _id: { $in: openPunches.map((punch) => punch.officeLocationId) } })
+  const officeIds = openPunches.map((punch) => punch.officeLocationId).filter(Boolean);
+  const offices = await OfficeLocation.find({ _id: { $in: officeIds } })
     .select('timeZone workday.shiftEndLocalTime workday.autoPunchOutAfterMinutes')
     .lean();
   const officeById = new Map(offices.map((office) => [office._id.toString(), office]));
 
   let closedCount = 0;
   for (const punch of openPunches) {
-    const office = officeById.get(punch.officeLocationId.toString());
-    if (office && (await closeIfOverdue(punch, office, now))) closedCount += 1;
+    // A punch made without a base office (officeLocationId null) closes on its own time limit.
+    const office = punch.officeLocationId ? officeById.get(punch.officeLocationId.toString()) : null;
+    if (punch.officeLocationId && !office) continue;
+    if (await closeIfOverdue(punch, office, now)) closedCount += 1;
   }
   return { closedCount };
 }

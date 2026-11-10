@@ -115,10 +115,18 @@ const MINUTE_MS = 60_000;
  *   autoPunchOutAfterMinutes have passed after it (until then the employee may punch out).
  *   Punched in after the shift ended: closed after that delay (at least a minute), at that moment.
  * @param {{ date: string, checkInTime: Date }} punch
- * @param {{ timeZone: string, workday: { shiftEndLocalTime: string, autoPunchOutAfterMinutes?: number } }} office
+ * @param {{ timeZone: string, workday: { shiftEndLocalTime: string, autoPunchOutAfterMinutes?: number } }|null} office
+ *   null for a punch made without a base office: it is closed UNASSIGNED_AUTO_PUNCH_OUT_AFTER_MINUTES
+ *   after the punch-in
  * @returns {{ closeAt: Date, deadline: Date }}  deadline: from then on the punch is closed at closeAt
  */
 export function automaticPunchOut({ date, checkInTime }, office) {
+  if (!office) {
+    const closeAt = new Date(
+      checkInTime.getTime() + ATTENDANCE_DEFAULTS.UNASSIGNED_AUTO_PUNCH_OUT_AFTER_MINUTES * MINUTE_MS,
+    );
+    return { closeAt, deadline: closeAt };
+  }
   const delayMinutes = office.workday.autoPunchOutAfterMinutes ?? ATTENDANCE_DEFAULTS.AUTO_PUNCH_OUT_AFTER_MINUTES;
   const shiftEnd = zonedLocalTimeToInstant(date, office.workday.shiftEndLocalTime, office.timeZone);
   if (shiftEnd && shiftEnd > checkInTime) {
