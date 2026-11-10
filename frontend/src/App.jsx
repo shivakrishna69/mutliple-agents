@@ -24,6 +24,8 @@
  *                                     and /leave/admin with MANAGE_WORKFORCE (policies, balances, payroll)
  *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  MANAGE_KNOWLEDGE_BASES
  *   /agents       -> AgentDirectory   ASK_DEPARTMENT_AGENTS (the department agents this person may ask)
+ *   /boards       -> TaskBoards       USE_TASK_BOARDS (the department boards this person can open)
+ *   /boards/:departmentId -> DepartmentBoard USE_TASK_BOARDS (?view=backlog, ?task=<id>)
  *   /agents/:departmentId -> AgentChat ASK_DEPARTMENT_AGENTS (?conversation=<id> opens one)
  *   /knowledge(/:departmentId)       -> the same pages, for the departments a person heads or leads
  *                                     (every signed-in user may open it; the backend decides what it shows)
@@ -79,6 +81,8 @@ const KnowledgeBases = lazy(() => import('./pages/KnowledgeBases.jsx'));
 const KnowledgeBaseDetail = lazy(() => import('./pages/KnowledgeBaseDetail.jsx'));
 const AgentDirectory = lazy(() => import('./pages/AgentDirectory.jsx'));
 const AgentChat = lazy(() => import('./pages/AgentChat.jsx'));
+const TaskBoards = lazy(() => import('./pages/TaskBoards.jsx'));
+const DepartmentBoard = lazy(() => import('./pages/DepartmentBoard.jsx'));
 
 /** "/admin/knowledge/<id>" from the route pattern, for links from the list to a department. */
 const pathWithDepartment = (pattern) => (departmentId) =>
@@ -134,6 +138,11 @@ export default function App() {
             <Route element={<CapabilityRoute capability={CAPABILITIES.ASK_DEPARTMENT_AGENTS} />}>
               <Route path={ROUTE_PATHS.ASK_AGENTS} element={<AgentDirectory />} />
               <Route path={ROUTE_PATHS.ASK_AGENT} element={<AgentChat />} />
+            </Route>
+
+            <Route element={<CapabilityRoute capability={CAPABILITIES.USE_TASK_BOARDS} />}>
+              <Route path={ROUTE_PATHS.BOARDS} element={<TaskBoards />} />
+              <Route path={ROUTE_PATHS.BOARD} element={<DepartmentBoard />} />
             </Route>
 
             <Route element={<CapabilityRoute capability={CAPABILITIES.USE_SUPPORT_CHAT} />}>
