@@ -595,6 +595,26 @@ export const AGENT_CHAT_SETTINGS = Object.freeze({
   USAGE_RETENTION_DAYS: 7,
 });
 
+/** Department task boards: sprints, tasks and their activity (models/Sprint.js, Task.js, TaskActivity.js). */
+export const TASK_SETTINGS = Object.freeze({
+  TITLE_MAX_LENGTH: 200,
+  DESCRIPTION_MAX_LENGTH: 10_000,
+  COMMENT_MAX_LENGTH: 5_000,
+  SPRINT_NAME_MAX_LENGTH: 120,
+  SPRINT_GOAL_MAX_LENGTH: 1_000,
+  STORY_POINTS_MAX: 100,
+  // A sprint may last at most this many days.
+  SPRINT_MAX_DAYS: 90,
+  // People a department head may name as task leads.
+  LEADS_MAX: 20,
+  TASKS_LISTED: 500,
+  SPRINTS_LISTED: 100,
+  ACTIVITY_LISTED: 200,
+  // Space left between neighbouring tasks in a column, so a task can be moved between two others
+  // by giving it an order in between, without renumbering the column.
+  ORDER_GAP: 1_024,
+});
+
 /** In-app notifications (models/Notification.js). */
 export const NOTIFICATION_SETTINGS = Object.freeze({
   LISTED: 50,

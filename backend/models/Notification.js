@@ -20,6 +20,8 @@ export const NOTIFICATION_TYPES = Object.freeze({
   AGENT_QUESTION_RECEIVED: 'AGENT_QUESTION_RECEIVED',
   // To the person who asked: the department answered their question.
   AGENT_QUESTION_ANSWERED: 'AGENT_QUESTION_ANSWERED',
+  // To the person a task was assigned to (not when they assigned it to themselves).
+  TASK_ASSIGNED: 'TASK_ASSIGNED',
 });
 
 const notificationSchema = new mongoose.Schema(

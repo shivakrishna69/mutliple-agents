@@ -238,6 +238,13 @@ export const agentChatWriteRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_AGENT_CHAT_CHANGES,
 });
 
+export const taskWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'task_writes_per_user',
+  ...RATE_LIMITS.TASK_WRITES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_TASK_CHANGES,
+});
+
 export const workplaceSetupWriteRateLimitByUser = createRateLimiter({
   limiterName: 'workplace_setup_writes_per_user',
   ...RATE_LIMITS.WORKPLACE_SETUP_WRITES_PER_USER,
