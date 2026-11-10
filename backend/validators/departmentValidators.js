@@ -22,6 +22,7 @@ const DEPARTMENT_FIELDS = Object.freeze([
   'parentDepartmentId',
   'departmentHeadId',
   'isActive',
+  'isSharedService',
 ]);
 const REFERENCE_FIELDS = Object.freeze(['parentDepartmentId', 'departmentHeadId']);
 
@@ -34,8 +35,10 @@ function pickDepartmentFields(requestBody, validationErrors) {
     if (isValidObjectIdString(reference)) fields[referenceField] = reference.toLowerCase();
     else validationErrors.push({ field: referenceField, message: 'must be an id, or null' });
   }
-  if (fields.isActive !== undefined && typeof fields.isActive !== 'boolean') {
-    validationErrors.push({ field: 'isActive', message: 'must be true or false' });
+  for (const switchField of ['isActive', 'isSharedService']) {
+    if (fields[switchField] !== undefined && typeof fields[switchField] !== 'boolean') {
+      validationErrors.push({ field: switchField, message: 'must be true or false' });
+    }
   }
   return fields;
 }

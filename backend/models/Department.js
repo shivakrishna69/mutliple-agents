@@ -87,6 +87,9 @@ const departmentSchema = new mongoose.Schema(
     },
     // Inactive departments keep their history but take no new members.
     isActive: { type: Boolean, default: true },
+    // A shared service (HR, IT, Finance) serves the whole company: by default its agent answers
+    // everyone, while other departments' agents answer their own people (DepartmentAgent.audience).
+    isSharedService: { type: Boolean, default: false },
     // ──► EmployeeProfile._id. Optional: a newly created unit may not have a head yet.
     departmentHeadId: {
       type: ObjectId,

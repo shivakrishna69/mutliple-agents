@@ -22,6 +22,8 @@ import { KNOWLEDGE_BASE_SETTINGS } from '../constants/validation.js';
 
 const { ObjectId } = mongoose.Schema.Types;
 
+export const DOCUMENT_SOURCES = Object.freeze({ UPLOAD: 'UPLOAD', FAQ: 'FAQ' });
+
 export const DOCUMENT_STATUSES = Object.freeze({
   UPLOADED: 'UPLOADED',
   PROCESSING: 'PROCESSING',
@@ -67,6 +69,10 @@ const agentDocumentSchema = new mongoose.Schema(
     },
     errorMessage: { type: String, default: null, maxlength: KNOWLEDGE_BASE_SETTINGS.ERROR_MESSAGE_MAX_LENGTH },
     uploadedBy: { type: ObjectId, ref: 'User', required: true, immutable: true },
+    // UPLOAD: a file a lead added. FAQ: an answer from the Questions Inbox saved for the agent
+    // (sourceQuestionId names the question); processed and indexed like any other document.
+    source: { type: String, enum: Object.values(DOCUMENT_SOURCES), default: DOCUMENT_SOURCES.UPLOAD, immutable: true },
+    sourceQuestionId: { type: ObjectId, ref: 'AgentQuestion', default: null, immutable: true },
     chunkCount: {
       type: Number,
       default: 0,

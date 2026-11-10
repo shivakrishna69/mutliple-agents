@@ -4,14 +4,14 @@
  * known fields, their types, and the version an edit is based on.
  */
 
-import { KNOWLEDGE_BASE_SETTINGS } from '../constants/validation.js';
+import { AGENT_AUDIENCES, KNOWLEDGE_BASE_SETTINGS } from '../constants/validation.js';
 import { AGENT_STATUSES } from '../models/DepartmentAgent.js';
 import { isValidObjectIdString } from './conversationValidators.js';
 import { bodyNotObjectResult, checkVersion, isPlainObject, pickFields, validationResult } from './requestShape.js';
 
-const SETTINGS_FIELDS = Object.freeze(['name', 'systemPrompt', 'status', 'managedBy']);
+const SETTINGS_FIELDS = Object.freeze(['name', 'systemPrompt', 'status', 'managedBy', 'audience']);
 
-/** PATCH /settings: { name?, systemPrompt?, status?, managedBy? (a user id, or null), version }. */
+/** PATCH /settings: { name?, systemPrompt?, status?, managedBy? (a user id, or null), audience?, version }. */
 export function validateKnowledgeSettingsChanges(requestBody) {
   if (!isPlainObject(requestBody)) return bodyNotObjectResult();
   const validationErrors = [];
@@ -23,6 +23,12 @@ export function validateKnowledgeSettingsChanges(requestBody) {
   }
   if (changes.status !== undefined && !Object.values(AGENT_STATUSES).includes(changes.status)) {
     validationErrors.push({ field: 'status', message: `must be ${Object.values(AGENT_STATUSES).join(' or ')}` });
+  }
+  if (changes.audience !== undefined && !Object.values(AGENT_AUDIENCES).includes(changes.audience)) {
+    validationErrors.push({
+      field: 'audience',
+      message: `must be one of ${Object.values(AGENT_AUDIENCES).join(', ')}`,
+    });
   }
   if (changes.managedBy !== undefined && changes.managedBy !== null && !isValidObjectIdString(changes.managedBy)) {
     validationErrors.push({ field: 'managedBy', message: 'must be a user id, or null for no lead' });
