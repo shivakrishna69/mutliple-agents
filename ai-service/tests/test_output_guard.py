@@ -1,5 +1,7 @@
 """The deterministic guard that stops replies from claiming actions the AI cannot take."""
 
+import re
+
 import pytest
 
 from app.guards.output_guard import (
@@ -114,3 +116,42 @@ def test_matched_phrases_are_bounded_and_do_not_carry_the_whole_sentence():
     result = validate_and_sanitize_output(f"{HELPFUL_PARAGRAPH} I've forwarded the card ending 4242 to billing.")
     assert all("4242" not in violation.matched_phrase for violation in result.violations)
     assert result.describe().startswith("sanitized: 1 sentence")
+
+
+# --- Sentences that cite a source (department agents quoting documents) ----------------------------
+
+CITED = re.compile(r"\[\d+\]")
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Approved requests are scheduled, and we create the pipeline in Airflow [1].",
+        "We update access lists every Monday [2].",
+        "The on-call engineer will investigate failed jobs [3].",
+        "Your request will be forwarded to the data owner for approval [1].",
+        "The team will review it and reply within two working days [2].",
+    ],
+)
+def test_a_cited_sentence_restating_a_document_passes(sentence):
+    assert validate_and_sanitize_output(sentence, cited_sentence=CITED).outcome is GuardOutcome.PASSED
+    assert validate_and_sanitize_output(sentence).outcome is not GuardOutcome.PASSED, "uncited, it is still a claim"
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "I've forwarded your request to the data owner [1].",
+        "Let me open a ticket for you [2].",
+        "I'll make sure they're aware [1].",
+    ],
+)
+def test_the_assistant_claiming_an_action_is_caught_even_with_a_citation(sentence):
+    assert validate_and_sanitize_output(sentence, cited_sentence=CITED).outcome is not GuardOutcome.PASSED
+
+
+def test_a_sanitized_reply_can_leave_out_the_clarification():
+    reply = "Raise a ticket in the DE board with the source system [1]. Our team will review your request shortly."
+    result = validate_and_sanitize_output(reply, cited_sentence=CITED, clarification=None)
+    assert result.outcome is GuardOutcome.SANITIZED
+    assert result.final_text == "Raise a ticket in the DE board with the source system [1]."

@@ -43,6 +43,20 @@ passive_completion_claim, only after the citation, and never a promise ("... wil
 Apostrophes are matched in both straight (') and typographic (’) form, since models emit both.
 
 =================================================================================================
+Answers that quote documents
+=================================================================================================
+
+Department agents (app/nodes/knowledge_agent/) answer from a department's documents and cite each
+fact as [n]. Those documents are written in the company's voice ("We review pipeline requests every
+Tuesday", "The on-call engineer will investigate failed jobs"), and an answer restating them would
+match first_person_action, staff_commitment or passive_completion although the assistant claims
+nothing: it reports what the document says. So a caller may pass `cited_sentence`, a pattern a
+sentence carries when it cites a source; in such a sentence only the assistant speaking for itself
+is a violation ("I", "let me"): "I've forwarded your request [2]" is still removed. Sentences without
+a citation are checked exactly as before. The caller may also leave out CLARIFICATION_SENTENCE, which
+speaks of a support team that a department agent does not have.
+
+=================================================================================================
 Remediation
 =================================================================================================
 
@@ -287,8 +301,16 @@ def _is_cited_past_record(sentence: str, pattern_match: re.Match[str]) -> bool:
     return citation_match is not None and citation_match.end() <= pattern_match.start()
 
 
-def find_violations(sentence: str) -> list[GuardViolation]:
-    """Every prohibited pattern that matches the sentence, in PROHIBITED_PATTERNS order."""
+# The assistant speaking for itself: "I ...", "I've ...", "let me ...".
+_ASSISTANT_SUBJECT = re.compile(r"^(?:I\b|let\s+me\b)", re.IGNORECASE)
+
+
+def find_violations(sentence: str, *, cites_a_source: bool = False) -> list[GuardViolation]:
+    """
+    Every prohibited pattern that matches the sentence, in PROHIBITED_PATTERNS order. In a sentence
+    that cites a source, only claims the assistant makes for itself count (see "Answers that quote
+    documents").
+    """
     violations: list[GuardViolation] = []
     for prohibited_pattern in PROHIBITED_PATTERNS:
         pattern_match = prohibited_pattern.expression.search(sentence)
@@ -299,6 +321,15 @@ def find_violations(sentence: str) -> list[GuardViolation]:
                     candidate_match
                     for candidate_match in prohibited_pattern.expression.finditer(sentence)
                     if not _is_cited_past_record(sentence, candidate_match)
+                ),
+                None,
+            )
+        if pattern_match and cites_a_source:
+            pattern_match = next(
+                (
+                    candidate_match
+                    for candidate_match in prohibited_pattern.expression.finditer(sentence)
+                    if _ASSISTANT_SUBJECT.match(candidate_match.group(0))
                 ),
                 None,
             )
@@ -352,10 +383,17 @@ def _is_structural_remnant(line: str) -> bool:
     return re.fullmatch(r"[\s\-*•>#\d.)\]:]*", line) is not None
 
 
-def validate_and_sanitize_output(generated_text: str) -> GuardResult:
+def validate_and_sanitize_output(
+    generated_text: str,
+    *,
+    cited_sentence: re.Pattern[str] | None = None,
+    clarification: str | None = CLARIFICATION_SENTENCE,
+) -> GuardResult:
     """
     Checks a worker's reply for claims of actions the AI cannot take and remediates them.
     See the module docstring for the patterns and the PASSED / SANITIZED / ESCALATED rules.
+    `cited_sentence`: sentences matching it cite a source (see "Answers that quote documents").
+    `clarification`: appended to a sanitized reply; None appends nothing.
     """
     all_violations: list[GuardViolation] = []
     removed_sentence_count = 0
@@ -369,7 +407,8 @@ def validate_and_sanitize_output(generated_text: str) -> GuardResult:
             continue
         kept_sentences: list[str] = []
         for sentence in _split_line_into_sentences(original_line):
-            sentence_violations = find_violations(sentence)
+            cites_a_source = cited_sentence is not None and cited_sentence.search(sentence) is not None
+            sentence_violations = find_violations(sentence, cites_a_source=cites_a_source)
             if sentence_violations:
                 all_violations.extend(sentence_violations)
                 removed_sentence_count += 1
@@ -394,7 +433,7 @@ def validate_and_sanitize_output(generated_text: str) -> GuardResult:
 
     return GuardResult(
         GuardOutcome.SANITIZED,
-        f"{sanitized_body}\n\n{CLARIFICATION_SENTENCE}",
+        f"{sanitized_body}\n\n{clarification}" if clarification else sanitized_body,
         tuple(all_violations),
         removed_sentence_count,
     )
