@@ -3,7 +3,8 @@
  * or sending anything: it renders a sample letter with the configured Chromium
  * (PDF_BROWSER_EXECUTABLE_PATH or PDF_BROWSER_CHANNEL), locks it with qpdf (QPDF_PATH) using a
  * sample date of birth, then confirms with qpdf that the letter is AES-256 encrypted, that the date
- * of birth opens it and that another password does not.
+ * of birth opens it, that another password does not, and that it prints on SAMPLE_LETTER_PAGES pages
+ * (one per section: the sample's content fits each section on its page).
  *
  *   node scripts/checkOfferLetterPdf.js        (in the backend folder, or in the backend container)
  *
@@ -28,6 +29,7 @@ const runFile = promisify(execFile);
 const SAMPLE_DATE_OF_BIRTH = new Date('1995-06-15T00:00:00Z');
 const SAMPLE_JOINING_DATE = new Date('2026-12-01T00:00:00Z');
 const AES_256_REVISION = /R = 6/;
+const SAMPLE_LETTER_PAGES = 5;
 
 async function main() {
   const pdfBrowser = loadPdfBrowserConfig();
@@ -41,6 +43,7 @@ async function main() {
   const structure = computeCtcStructure(
     {
       annualCtc: 25_00_000,
+      variablePayAnnual: 2_50_000,
       taxRegime: 'new',
       workCity: 'Bengaluru',
       professionalTaxState: 'KA',
@@ -60,9 +63,21 @@ async function main() {
         dateOfJoining: SAMPLE_JOINING_DATE,
         workLocationType: 'Onsite',
         employmentStatus: 'Probation',
+        employmentType: 'full_time',
       },
       structure,
-      terms: { ...ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS, signatoryName: 'Sample Signatory' },
+      stockOptions: { units: 1_200, note: ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS.esopNote },
+      terms: {
+        ...ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS,
+        shiftTimings: '9:30 am to 6:30 pm, Monday to Friday',
+        additionalClauses: ['You may be asked to travel for work from time to time.'],
+        signatoryName: 'Sample Signatory',
+        signatoryTitle: 'Head of People',
+      },
+      leavePolicy: [
+        { name: 'Casual Leave', annualDays: 12 },
+        { name: 'Sick Leave', annualDays: 6 },
+      ],
       issuedOn: new Date(),
       validUntil: new Date(),
     },
@@ -84,6 +99,15 @@ async function main() {
     );
     if (wrongPasswordOpens) throw new Error('another password opened the letter');
     console.log('another password does not open it');
+    const { stdout: pageCount } = await runFile(offerLetters.qpdfPath, [
+      '--show-npages',
+      `--password=${password}`,
+      pdfPath,
+    ]);
+    if (Number(pageCount.trim()) !== SAMPLE_LETTER_PAGES) {
+      throw new Error(`the sample letter has ${pageCount.trim()} pages, not ${SAMPLE_LETTER_PAGES}`);
+    }
+    console.log(`prints on ${SAMPLE_LETTER_PAGES} pages`);
   } finally {
     await rm(workFolder, { recursive: true, force: true });
   }
