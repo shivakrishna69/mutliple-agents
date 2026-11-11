@@ -1,15 +1,19 @@
 /**
- * A department's task board in two browsers. The head (a lead) opens the board from the sidebar,
- * plans a sprint, creates a task for an employee in it and starts it. The employee opens the task
- * from the assignment notification, drags it to In progress, comments, filters the board, and creates
- * a task (which goes to the backlog; members do not plan sprints). The head sees the move, drags the
- * task to Done and completes the sprint, which sends unfinished work back to the backlog.
+ * A department's task board in two browsers, on one screen: the backlog beside the active sprint's
+ * columns. The head (a lead) opens it from the sidebar, plans a sprint from the header, creates tasks in
+ * it, starts it from its planning section, and quick-adds a task to the backlog. The employee opens their
+ * task from the assignment notification, drags it to In progress and on to In review, but cannot drop
+ * it on Done (a lead or its reporter marks work done); comments, filters, creates a task for themselves
+ * (members do not plan sprints) and, as its assignee, drags it from the backlog into To do. The head
+ * drags the reviewed task to Done and completes the sprint from the header, which sends unfinished work
+ * back to the backlog.
  * Then delegation: the employee, a member, has no team overview and cannot choose leads; the head
  * names them a task lead, and they read the team overview (their workload, the completed sprint's
  * burndown, the unassigned backlog, from which a task opens); the head takes the role back and the
  * overview is gone, even by address.
- * One sign-in per person: the suite's sign-ins share one address's limit (30 per 15 minutes). Runs after questionsInbox.spec.js (files run in name order), whose bell
- * counts this spec's notifications would otherwise change.
+ * One sign-in per person: the suite's sign-ins share one address's limit (30 per 15 minutes). Runs
+ * after questionsInbox.spec.js (files run in name order), whose bell counts this spec's notifications
+ * would otherwise change.
  */
 
 import { expect, test } from '@playwright/test';
@@ -20,6 +24,7 @@ import { localToday, mainNavigation, signIn, watchForPageProblems } from './help
 const TASK_TITLE = 'Fix the login button on Safari';
 const LEAD_ONLY_TASK = 'Plan the team offsite';
 const MEMBER_TASK = 'Write the release notes';
+const QUICK_TASK = 'Order the team badges';
 const COMMENT = 'Reproduced it, working on a fix.';
 
 /** A calendar date `days` after today, as the date inputs take it. */
@@ -33,6 +38,18 @@ function daysFromToday(days) {
 
 const column = (page, name) => page.getByRole('region', { name, exact: true });
 const card = (page, title) => page.getByRole('listitem', { name: new RegExp(title) });
+/**
+ * Drags a card onto a target with the mouse, to a point near the target's top. (Locator.dragTo scrolls
+ * a target that does not fully fit on screen into view after pressing, and a scroll cancels the drag.)
+ */
+async function dragCard(page, source, target) {
+  await source.hover();
+  const box = await target.boundingBox();
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + 60, { steps: 8 });
+  await page.mouse.up();
+}
+
 const bell = (page) => page.getByRole('banner').getByRole('button', { name: /^Notifications/ });
 
 async function setEmployeeAsLead(page, isLead) {
@@ -60,8 +77,8 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   await expect(headPage.getByRole('heading', { level: 1, name: `${DEPARTMENT_NAME} board` })).toBeVisible();
   await expect(headPage.getByText('No sprint is active').first()).toBeVisible();
 
-  await headPage.getByRole('tab', { name: 'Backlog' }).click();
-  await headPage.getByRole('button', { name: 'Plan a sprint' }).click();
+  await expect(headPage.getByRole('tab', { name: 'Backlog' })).toHaveCount(0);
+  await headPage.getByRole('button', { name: 'Plan sprint' }).click();
   const sprintDialog = headPage.getByRole('dialog', { name: 'Plan a sprint' });
   await sprintDialog.getByLabel('Sprint name').fill('Sprint 1');
   await sprintDialog.getByLabel('Starts').fill(localToday());
@@ -88,8 +105,13 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   await expect(sprintSection.getByText(TASK_TITLE)).toBeVisible();
   await sprintSection.getByRole('button', { name: 'Start sprint' }).click();
   await expect(headPage.getByText('Sprint saved')).toBeVisible();
-  await headPage.getByRole('tab', { name: 'Active sprint' }).click();
   await expect(card(column(headPage, 'To do'), TASK_TITLE)).toBeVisible();
+  await expect(headPage.getByText(/^Sprint 1 · .* · 14 days left$/)).toBeVisible();
+
+  // Quick add: a title is enough, and the task waits in the backlog.
+  await headPage.getByLabel('Add a task to the backlog').fill(QUICK_TASK);
+  await headPage.getByLabel('Add a task to the backlog').press('Enter');
+  await expect(column(headPage, 'Backlog').getByText(QUICK_TASK)).toBeVisible();
 
   // --- The employee opens it from the notification and moves it --------------------------------------
   const employeeContext = await browser.newContext();
@@ -115,7 +137,7 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
 
   await expect(card(employeePage, TASK_TITLE)).toHaveAttribute('draggable', 'true');
   await expect(card(employeePage, LEAD_ONLY_TASK)).toHaveAttribute('draggable', 'false');
-  await card(column(employeePage, 'To do'), TASK_TITLE).dragTo(column(employeePage, 'In progress'));
+  await dragCard(employeePage, card(column(employeePage, 'To do'), TASK_TITLE), column(employeePage, 'In progress'));
   await expect(card(column(employeePage, 'In progress'), TASK_TITLE)).toBeVisible();
 
   await card(employeePage, TASK_TITLE).getByRole('button').click();
@@ -129,6 +151,23 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   await reopened.getByRole('button', { name: 'Close' }).click();
   await expect(reopened).toHaveCount(0);
 
+  // Up to In review; marking it done is for a task lead or its reporter, not the assignee.
+  await dragCard(
+    employeePage,
+    card(column(employeePage, 'In progress'), TASK_TITLE),
+    column(employeePage, 'In review'),
+  );
+  await expect(card(column(employeePage, 'In review'), TASK_TITLE)).toBeVisible();
+  await dragCard(employeePage, card(column(employeePage, 'In review'), TASK_TITLE), column(employeePage, 'Done'));
+  await expect(card(column(employeePage, 'In review'), TASK_TITLE)).toBeVisible();
+  await expect(card(column(employeePage, 'Done'), TASK_TITLE)).toHaveCount(0);
+  await card(employeePage, TASK_TITLE).getByRole('button').click();
+  const inReview = employeePage.getByRole('dialog', { name: new RegExp(TASK_TITLE) });
+  await expect(inReview.getByLabel('Status').locator('option', { hasText: 'Done' })).toHaveCount(0);
+  await expect(inReview.getByText('A task lead or its reporter marks it done')).toBeVisible();
+  await employeePage.keyboard.press('Escape');
+  await expect(inReview).toHaveCount(0);
+
   // Filters
   await employeePage.getByLabel('Assignee', { exact: true }).selectOption({ label: 'Unassigned' });
   await expect(card(employeePage, TASK_TITLE)).toHaveCount(0);
@@ -140,32 +179,38 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   await expect(card(employeePage, TASK_TITLE)).toHaveCount(0);
   await employeePage.getByLabel('Type', { exact: true }).selectOption({ label: 'Any' });
 
-  // A member's task goes to the backlog: there is no sprint to choose.
+  // A member's task goes to the backlog (there is no sprint to choose); as its assignee, they bring it
+  // into the active sprint by dragging it to To do.
   await employeePage.getByRole('button', { name: 'Create task' }).click();
   const memberDialog = employeePage.getByRole('dialog', { name: 'Create a task' });
   await expect(memberDialog.getByLabel('Sprint', { exact: true })).toHaveCount(0);
   await memberDialog.getByLabel('Title').fill(MEMBER_TASK);
+  await memberDialog.getByLabel('Assignee').selectOption({ label: EMPLOYEE.name });
   await memberDialog.getByRole('button', { name: 'Create task' }).click();
   await expect(employeePage.getByText('Task created')).toBeVisible();
-  await employeePage.getByRole('tab', { name: 'Backlog' }).click();
   await employeePage.getByLabel('Assignee', { exact: true }).selectOption({ label: 'Everyone' });
-  await expect(employeePage.getByRole('region', { name: 'Backlog' }).getByText(MEMBER_TASK)).toBeVisible();
+  const memberBacklog = column(employeePage, 'Backlog');
+  await expect(card(memberBacklog, MEMBER_TASK)).toHaveAttribute('draggable', 'true');
+  await expect(card(memberBacklog, QUICK_TASK)).toHaveAttribute('draggable', 'false');
+  await dragCard(employeePage, card(memberBacklog, MEMBER_TASK), column(employeePage, 'To do'));
+  await expect(card(column(employeePage, 'To do'), MEMBER_TASK)).toBeVisible();
   await expect(employeePage.getByRole('button', { name: 'Complete sprint' })).toHaveCount(0);
+  await expect(employeePage.getByRole('button', { name: 'Plan sprint' })).toHaveCount(0);
 
   // --- The head finishes the task and completes the sprint -----------------------------------------
   await headPage.reload();
-  await expect(card(column(headPage, 'In progress'), TASK_TITLE)).toBeVisible();
-  await card(column(headPage, 'In progress'), TASK_TITLE).dragTo(column(headPage, 'Done'));
+  await expect(card(column(headPage, 'In review'), TASK_TITLE)).toBeVisible();
+  await expect(card(column(headPage, 'To do'), MEMBER_TASK)).toBeVisible();
+  await dragCard(headPage, card(column(headPage, 'In review'), TASK_TITLE), column(headPage, 'Done'));
   await expect(card(column(headPage, 'Done'), TASK_TITLE)).toBeVisible();
-  await headPage.getByRole('tab', { name: 'Backlog' }).click();
   headPage.once('dialog', (dialog) => dialog.accept());
-  await headPage.getByRole('region', { name: 'Sprint 1' }).getByRole('button', { name: 'Complete sprint' }).click();
+  await headPage.getByRole('button', { name: 'Complete sprint' }).click();
   await expect(headPage.getByText('Sprint saved')).toBeVisible();
-  const backlog = headPage.getByRole('region', { name: 'Backlog' });
+  const backlog = column(headPage, 'Backlog');
   await expect(backlog.getByText(LEAD_ONLY_TASK)).toBeVisible();
   await expect(backlog.getByText(MEMBER_TASK)).toBeVisible();
+  await expect(backlog.getByText(QUICK_TASK)).toBeVisible();
   await expect(backlog.getByText(TASK_TITLE)).toHaveCount(0);
-  await headPage.getByRole('tab', { name: 'Active sprint' }).click();
   await expect(headPage.getByText('No sprint is active').first()).toBeVisible();
 
   // --- The head names the employee a task lead ---------------------------------------------------------
@@ -180,13 +225,13 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   await expect(employeePage.getByText(`Task leads: ${KNOWLEDGE_HEAD.name}, ${EMPLOYEE.name}`)).toBeVisible();
 
   const employeeRow = employeePage.getByRole('row', { name: new RegExp(EMPLOYEE.name) });
-  await expect(employeeRow.getByRole('cell')).toHaveText(['0', '0', '0', '1', '3 / 3']);
+  await expect(employeeRow.getByRole('cell')).toHaveText(['1', '0', '0', '1', '3 / 3']);
   await expect(employeePage.getByText('2 backlog tasks have no owner')).toBeVisible();
   const alerts = employeePage.getByRole('list', { name: 'Unassigned backlog tasks' }).getByRole('listitem');
   await expect(alerts).toHaveCount(2);
   await expect(alerts.first()).toContainText(LEAD_ONLY_TASK);
   await expect(alerts.first()).toContainText('High');
-  await expect(alerts.nth(1)).toContainText(MEMBER_TASK);
+  await expect(alerts.nth(1)).toContainText(QUICK_TASK);
 
   await employeePage.getByLabel('Showing').selectOption({ label: 'Sprint 1 (completed)' });
   await expect(employeePage.getByRole('img', { name: 'Burndown of Sprint 1: 0 of 3 points still open' })).toBeVisible();
@@ -207,7 +252,7 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   // --- The head takes the role back; the overview is gone, even by address ----------------------------
   await setEmployeeAsLead(headPage, false);
   await employeePage.reload();
-  await expect(employeePage.getByRole('tab', { name: 'Active sprint' })).toHaveAttribute('aria-selected', 'true');
+  await expect(employeePage.getByRole('tab', { name: 'Board' })).toHaveAttribute('aria-selected', 'true');
   await expect(employeePage.getByRole('tab', { name: 'Team overview' })).toHaveCount(0);
   await expect(employeePage.getByText('Task lead', { exact: true })).toHaveCount(0);
 
