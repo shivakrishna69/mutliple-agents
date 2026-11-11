@@ -788,5 +788,8 @@ export const TASK_MESSAGES = Object.freeze({
   TASK_NOT_FOUND: 'Task not found in this department',
   TASK_EDIT_NOT_ALLOWED: 'You can change tasks you reported or are assigned to',
   TASK_STATUS_NOT_ALLOWED: 'You can move tasks assigned to you; the task leads can move any task',
-  TASK_SPRINT_NOT_ALLOWED: 'Only the task leads plan sprints',
+  TASK_SPRINT_NOT_ALLOWED:
+    'Only the task leads plan sprints; you can bring a backlog task assigned to you into the active sprint',
+  TASK_DONE_NEEDS_REVIEW: 'A task is marked done from In review. Move it to In review first',
+  TASK_DONE_NOT_ALLOWED: 'Only the task leads or the person who reported a task can mark it done',
 });
