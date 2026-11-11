@@ -23,11 +23,24 @@ const HEADER =
   'date_of_joining,work_type,employment_status,office_code';
 const csvOf = (rows) => [HEADER, ...rows].join('\n');
 
-/** Polls an import until `isDone` says so (by default: completed). */
-async function waitForImport(client, jobId, isDone = (job) => job.status === 'completed') {
+/**
+ * Polls an import until `isDone` says so (by default: completed). Given the test server's
+ * `database`, a refused poll also reports which imports the database holds, to tell a missing
+ * import from a refused request.
+ */
+async function waitForImport(client, jobId, isDone = (job) => job.status === 'completed', { database } = {}) {
   const deadline = Date.now() + 30_000;
   for (;;) {
     const response = await client.get(`/api/employees/bulk-upload/${jobId}`);
+    if (response.status !== 200 && database) {
+      const imports = await database
+        .collection('employeeimportjobs')
+        .find({}, { projection: { status: 1, attempts: 1, finishedAt: 1 } })
+        .toArray();
+      assert.fail(
+        `Import ${jobId}: ${response.status} ${JSON.stringify(response.body)}; imports in the database: ${JSON.stringify(imports)}`,
+      );
+    }
     assert.equal(response.status, 200, JSON.stringify(response.body));
     if (isDone(response.body.data.job)) return response.body.data.job;
     if (Date.now() > deadline) throw new Error(`Import still ${response.body.data.job.status} after 30 s`);
@@ -324,6 +337,8 @@ describe('employee import after a restart', { skip: skipReason ?? false }, () =>
   before(async () => {
     testServer = await startTestServer({
       mail: false,
+      // The import runner's progress is logged at info, and printed if a test here fails.
+      environment: { LOG_LEVEL: 'info' },
       // Imports a stopped server left behind: one interrupted mid-row (its lease ran out), one
       // that has already been tried too often.
       seedBeforeStart: async (database) => {
@@ -356,7 +371,7 @@ describe('employee import after a restart', { skip: skipReason ?? false }, () =>
   });
 
   it('resumes an import whose worker stopped, reporting the row it was in the middle of', async () => {
-    const finished = await waitForImport(adminClient, jobIds.interrupted);
+    const finished = await waitForImport(adminClient, jobIds.interrupted, undefined, testServer);
     assert.equal(finished.counts.created, 1);
     assert.equal(finished.counts.failed, 1);
     const results = await adminClient.get(`/api/employees/bulk-upload/${jobIds.interrupted}/results`);
@@ -369,7 +384,7 @@ describe('employee import after a restart', { skip: skipReason ?? false }, () =>
   });
 
   it('gives up on an import that keeps failing, reporting what is left', async () => {
-    const finished = await waitForImport(adminClient, jobIds.exhausted);
+    const finished = await waitForImport(adminClient, jobIds.exhausted, undefined, testServer);
     assert.equal(finished.counts.failed, 1);
     const results = await adminClient.get(`/api/employees/bulk-upload/${jobIds.exhausted}/results`);
     assert.match(results.body.data.rows[0].message, /Could not be imported/);

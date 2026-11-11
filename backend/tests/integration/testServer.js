@@ -15,6 +15,10 @@
  * `mailbox`, so signups are confirmed with the emailed link like a person would. `mail: false`
  * starts a server without email (for the "no mail server" behaviour); accounts are then written
  * straight to the database by createSignedInClient, since signing up needs email.
+ *
+ * Failures: when a test fails, each running test server's recent log (its last 20,000 characters,
+ * startup included) is printed with it, so a failure in CI shows the server's side too. Servers log
+ * at LOG_LEVEL: "error" unless a suite asks for more.
  */
 
 import { spawn } from 'node:child_process';
@@ -23,6 +27,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { afterEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
@@ -44,6 +49,21 @@ export const TEST_GENDER = 'prefer_not_to_say';
 
 /** Host variables the child needs to run at all; nothing application-specific is inherited. */
 const INHERITED_ENVIRONMENT_KEYS = ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'TEMP', 'TMP', 'HOME', 'USERPROFILE'];
+
+/** Servers started and not yet stopped, whose output a failing test prints. */
+const runningServers = new Set();
+
+afterEach((testContext) => {
+  if (testContext.passed !== false) return;
+  for (const server of runningServers) {
+    const output = server.output().trim();
+    if (output)
+      console.error(`
+--- test server ${server.baseUrl}, recent log ---
+${output}
+--- end ---`);
+  }
+});
 
 /** Resolves to a skip reason when MongoDB is unreachable outside CI, otherwise null. */
 export async function mongoUnavailableReason() {
@@ -153,6 +173,7 @@ export async function startTestServer({
   const database = mongoose.createConnection(mongoUri, { serverSelectionTimeoutMS: 5_000 });
   let serverProcess = null;
   let capturedOutput = '';
+  const diagnostics = { baseUrl, output: () => capturedOutput };
 
   function spawnServer() {
     serverProcess = spawn(process.execPath, [SERVER_ENTRY_PATH], {
@@ -175,6 +196,7 @@ export async function startTestServer({
   }
 
   async function stop() {
+    runningServers.delete(diagnostics);
     if (serverProcess && serverProcess.exitCode === null) {
       const exited = new Promise((resolve) => serverProcess.once('exit', resolve));
       serverProcess.kill();
@@ -191,6 +213,7 @@ export async function startTestServer({
     if (seedBeforeStart) await seedBeforeStart(database);
     spawnServer();
     await waitUntilHealthy(baseUrl, serverProcess, () => capturedOutput);
+    runningServers.add(diagnostics);
   } catch (startupError) {
     await stop();
     throw startupError;
