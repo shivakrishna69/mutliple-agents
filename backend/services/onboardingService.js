@@ -195,7 +195,7 @@ async function loadPositionNames(position) {
 }
 
 /** The leave a new employee earns, for the letter's terms: active leave types with a yearly quota. */
-async function loadLeavePolicy() {
+export async function loadLeavePolicy() {
   const leaveTypes = await LeaveType.find({ isActive: true, 'accrual.annualQuotaDays': { $gt: 0 } })
     .select('name accrual.annualQuotaDays')
     .sort({ name: 1 })
