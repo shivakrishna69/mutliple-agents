@@ -2,7 +2,8 @@
 Checks the model's citations against the passages it was given.
 
     [n] marks are found in any of the forms "[1]", "[1][2]", "[1, 2]"; "[1, 2]" is rewritten as
-    "[1][2]". A number outside 1..len(passages) cites nothing the model was shown, so that mark is
+    "[1][2]". Forms models also write are read as the same mark first: "[Passage 2]", "[source 2]",
+    "[^2]" and the full-width "【2】". A number outside 1..len(passages) cites nothing the model was shown, so that mark is
     removed. The numbers that remain keep the passage's position in the prompt (they are not
     renumbered), so text streamed while the model wrote it matches the final answer.
 """
@@ -21,6 +22,10 @@ NUMBER_SEPARATOR_PATTERN = re.compile(r"\s*,\s*")
 # A space left before punctuation where a mark was removed ("in March [9].").
 SPACE_BEFORE_PUNCTUATION_PATTERN = re.compile(r"[ \t]+([.,;:!?])")
 EXCERPT_ELLIPSIS = "…"
+# "[Passage 2]", "[source 2, 3]", "[^2]", "【2】" -> "[2]" / "[2, 3]".
+CITATION_VARIANT_PATTERN = re.compile(
+    r"(?:\[\s*(?:passages?|sources?|\^)\s*|【\s*)(\d+(?:\s*,\s*\d+)*)\s*(?:\]|】)", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -47,7 +52,7 @@ def check_citations(text: str, passage_count: int) -> CheckedCitations:
                 removed += 1
         return "".join(f"[{number}]" for number in kept)
 
-    rewritten = CITATION_GROUP_PATTERN.sub(rewrite, text)
+    rewritten = CITATION_GROUP_PATTERN.sub(rewrite, CITATION_VARIANT_PATTERN.sub(r"[\1]", text))
     if removed:
         rewritten = SPACE_BEFORE_PUNCTUATION_PATTERN.sub(r"\1", rewritten)
     return CheckedCitations(text=rewritten.strip(), cited_numbers=tuple(sorted(cited)), removed_marks=removed)

@@ -164,4 +164,32 @@ describe('chunkBlocks', () => {
   it('gives no chunks for a document with only headings', () => {
     assert.deepEqual(chunkBlocks([heading(1, 'Empty'), heading(2, 'Still empty')]), []);
   });
+
+  it('with the default settings, carries about 100 tokens of a section into its next chunk', () => {
+    const steps = Array.from(
+      { length: 24 },
+      (_, index) => `Step ${index + 1}: confirm the pipeline owner has approved stage ${index + 1} of the request.`,
+    );
+    const chunks = chunkBlocks([
+      heading(1, 'Pipeline Requests'),
+      paragraph('To request a new data pipeline, follow these steps in order.'),
+      ...steps.map((step) => paragraph(step)),
+    ]);
+    assert.ok(chunks.length >= 2);
+    for (const chunk of chunks) assert.ok(chunk.text.length <= KNOWLEDGE_BASE_SETTINGS.CHUNK_MAX_CHARS);
+    // The longest end of the first chunk that the second one starts with (the carried sentences are
+    // joined by spaces, so whitespace is compared loosely).
+    const [first, second] = chunks;
+    const [firstText, secondText] = [first.text, second.text].map((text) => text.replace(/\s+/g, ' '));
+    let carried = 0;
+    for (let length = Math.min(firstText.length, secondText.length); length > 0; length -= 1) {
+      if (secondText.startsWith(firstText.slice(-length))) {
+        carried = length;
+        break;
+      }
+    }
+    assert.ok(carried > 200, `only ${carried} characters were carried over`);
+    assert.ok(carried <= KNOWLEDGE_BASE_SETTINGS.CHUNK_OVERLAP_CHARS);
+    assert.deepEqual(second.headingPath, ['Pipeline Requests']);
+  });
 });

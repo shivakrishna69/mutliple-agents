@@ -59,8 +59,8 @@ def test_telemetry_needs_a_backend_url(environment):
 
 def test_knowledge_answer_settings_have_measured_defaults(environment):
     settings = Settings.from_environment()
-    assert settings.knowledge_answer_top_k == 6
-    assert settings.knowledge_min_relevance == 0.6
+    assert settings.knowledge_answer_top_k == 5
+    assert settings.knowledge_min_relevance == 0.5
     assert settings.knowledge_answer_history_messages == 6
     assert settings.knowledge_excerpt_chars == 1200
     assert settings.knowledge_answer_temperature == 0.1

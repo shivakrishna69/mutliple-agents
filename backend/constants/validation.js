@@ -564,12 +564,15 @@ export const KNOWLEDGE_BASE_SETTINGS = Object.freeze({
   // takes longer than this or needs more memory, so a hostile file cannot stall or exhaust the API.
   EXTRACTION_TIMEOUT_MS: 60_000,
   EXTRACTION_MAX_HEAP_MB: 256,
-  // Chunks: about this long (a few paragraphs), never longer than CHUNK_MAX_CHARS (within the
-  // embedding model's 512-token input), each starting with the end of the previous one in the
-  // same section, so a sentence cut at a boundary is still found whole.
+  // Chunks: about this long (a few paragraphs, ~300 tokens), never longer than CHUNK_MAX_CHARS
+  // (~450 tokens: with its headings it must fit the embedding model's 512-token input, or its end
+  // is cut off before it is embedded and can never be found), each starting with up to
+  // CHUNK_OVERLAP_CHARS (~100 tokens) of the end of the previous one in the same section, so a list
+  // item or a sentence cut at a boundary is still found with what leads up to it. After changing
+  // these, run scripts/reindexKnowledge.js so existing documents are chunked again.
   CHUNK_TARGET_CHARS: 1_200,
   CHUNK_MAX_CHARS: 1_800,
-  CHUNK_OVERLAP_CHARS: 200,
+  CHUNK_OVERLAP_CHARS: 400,
   // A heading kept with a chunk is cut to this length (the AI service accepts up to 500 characters).
   HEADING_MAX_CHARS: 300,
   // Chunks sent to the AI service per indexing request: at most about 30 KB of text, well inside

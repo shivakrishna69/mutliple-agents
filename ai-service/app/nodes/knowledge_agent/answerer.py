@@ -12,9 +12,11 @@ Turn
                 NOT_FOUND marker is held back until it cannot.
   3. Check      NOT_FOUND from the model -> NOT_FOUND. Otherwise citation marks that point at no
                 passage are removed (citations.py) and the output guard
-                (app/guards/output_guard.py) removes claims of actions the AI cannot take. No valid
-                citation left, or the guard escalates -> REFUSED with a fixed reply: an answer that
-                cannot be traced to the documents is not sent.
+                (app/guards/output_guard.py) removes claims of actions the AI cannot take. A
+                sentence that cites a passage restates the documents ("We review requests every
+                Tuesday [2]"), so there only the assistant claiming something for itself counts.
+                No valid citation left, or the guard escalates -> REFUSED with a fixed reply: an
+                answer that cannot be traced to the documents is not sent.
 
 The final answer is authoritative: when the checks changed what was streamed, the caller replaces
 the streamed text with it.
@@ -32,7 +34,7 @@ from langchain_core.messages import AIMessageChunk
 
 from app.guards.output_guard import GuardOutcome, validate_and_sanitize_output
 from app.knowledge.schemas import RetrievedPassage
-from app.nodes.knowledge_agent.citations import check_citations, citations_for
+from app.nodes.knowledge_agent.citations import CITATION_GROUP_PATTERN, check_citations, citations_for
 from app.nodes.knowledge_agent.prompts import NOT_FOUND_MARKER, build_messages
 from app.nodes.knowledge_agent.schemas import (
     AnswerOutcome,
@@ -112,7 +114,7 @@ class KnowledgeAnswerer:
             return self._fixed(AnswerOutcome.NOT_FOUND, answer_input, passages_considered=len(passages), usage=usage)
 
         checked = check_citations(text, len(passages))
-        guarded = validate_and_sanitize_output(checked.text)
+        guarded = validate_and_sanitize_output(checked.text, cited_sentence=CITATION_GROUP_PATTERN, clarification=None)
         final_text = guarded.final_text if guarded.outcome is not GuardOutcome.ESCALATED else None
         # The guard may remove the sentences that held the citations; check what is left.
         rechecked = check_citations(final_text, len(passages)) if final_text else None
