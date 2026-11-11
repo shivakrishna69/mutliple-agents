@@ -34,7 +34,8 @@ journeys through the real app belong in the browser tests.
 
 | File | Covers |
 |---|---|
-| `src/pages/DepartmentBoard.test.jsx` | The Team overview tab only for leads (a member asking for it by address gets the sprint view, and nothing is requested), the Task leads button only for the head or an administrator, and the overview's workload, pace, burndown and unassigned backlog |
+| `src/pages/DepartmentBoard.test.jsx` | The Team overview tab only for leads (a member asking for it by address gets the board, and nothing is requested), the Task leads button only for the head or an administrator, and the overview's workload, pace, burndown and unassigned backlog; the unified board (backlog beside the sprint columns, the sprint in the header, quick add), which cards a member may drag, and the leads' sprint actions |
+| `src/utils/taskBoard.test.js` | The board's rules: Done only from In review by a lead or the reporter, the backlog into To do by a lead or the assignee, the backlog and planned sprints for leads only |
 | `src/components/tasks/TaskLeadsDialog.test.jsx` | The department's people without the head, the current leads chosen, the saved list sent with the board version, the backend's refusal shown |
 | `src/utils/sprintProgress.test.js` | Sprint days, the ideal line, and the pace (not started, on track, behind, done) |
 
@@ -65,7 +66,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | `e2e/leaveApprovalSteps.spec.js` | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved |
 | `e2e/leaveAssistant.spec.js` | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message |
 | `e2e/leaveRequests.spec.js` | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave |
-| `e2e/taskBoards.spec.js` | A department board in two browsers: the head opens it from the sidebar, plans a sprint, creates tasks into it and starts it; the employee opens their task from the assignment notification, drags it to In progress (but not a task they may not move), comments, filters by assignee and type, creates a task that goes to the backlog; the head drags it to Done and completes the sprint, sending unfinished work back to the backlog. Then task leads: the member sees no team overview and cannot choose leads; the head names the employee a task lead, who then reads the team overview (their workload, the completed sprint's burndown, the unassigned backlog, most urgent first, from which a task opens); the head takes the role back and the overview is gone, even by address |
+| `e2e/taskBoards.spec.js` | A department board in two browsers, on one screen: the head opens it from the sidebar, plans a sprint from the header, creates tasks into it, starts it from its planning section and quick-adds a backlog task; the employee opens their task from the assignment notification, drags it to In progress and In review but cannot drop it on Done (nor drag a task they may not move), comments, filters by assignee and type, creates a task for themselves and drags it from the backlog into To do; the head drags the reviewed task to Done and completes the sprint from the header, sending unfinished work back to the backlog. Then task leads: the member sees no team overview and cannot choose leads; the head names the employee a task lead, who then reads the team overview (their workload, the completed sprint's burndown, the unassigned backlog, most urgent first, from which a task opens); the head takes the role back and the overview is gone, even by address |
 | `e2e/questionsInbox.spec.js` | Department agents in two browsers: the head adds a document; an employee asks the agent, sees the answer appear as it is written with its source card and citation link, rates it; a question the documents do not cover goes to the department; the head is notified live, opens it from the bell, answers and saves it as an FAQ; the employee is notified live and reads the reply in their conversation; the FAQ becomes a Ready document |
 | `e2e/knowledgeHub.spec.js` | An admin opens Departments & Agents, an agent nobody has set up yet, and saves its instructions; switching to self-service leaves the management page and is remembered after a reload; the department head reaches the knowledge base from self-service, sees those instructions, uploads a document that becomes Ready while the list refreshes itself, sees a disguised file refused with the server's reason, and deletes the document; an employee who leads nothing sees no entry and cannot open the hub; HR switches views without the admin-only hub |
 | `e2e/workplaceAndLeaveAdmin.spec.js` | HR adds a department, deactivates and reactivates it; adds an office with 2nd and 4th Saturdays off, a holiday and the employee's base office; adds a leave type, grants days, sees an over-limit encashment refused, the payroll export and the balance check |
@@ -87,8 +88,8 @@ src/components/       AppShell (dark sidebar built from the signed-in person's c
                       ui.jsx design primitives, feature panels (knowledge/: a department agent's
                       settings with the lead picker and who may ask it, its documents with upload, status
                       and delete, and its Questions Inbox; agentChat/: a conversation's messages with
-                      citation links, source cards and thumbs up/down; tasks/: the Kanban board with
-                      drag and drop, the backlog with sprint planning, the task dialogs, the task
+                      citation links, source cards and thumbs up/down; tasks/: the unified board
+                      (backlog, planned sprints and the sprint columns, with drag and drop), the task dialogs, the task
                       leads dialog and the team overview with its burndown chart;
                       Dialog.jsx: the accessible modal dialog;
                       workplace/: departments, offices, holidays, base offices; people/: the CSV import;
@@ -175,18 +176,26 @@ it is already open.
 
 `/boards` lists the task boards the person can open (`GET /api/task-boards`; with one, it opens
 straight away), and the sidebar's **Department Board** appears only for people on a board.
-`/boards/:departmentId` (pages/DepartmentBoard.jsx) has three views, kept in the address:
+`/boards/:departmentId` (pages/DepartmentBoard.jsx) has two views, kept in the address, under a header
+with the active sprint (name, dates, days left, goal) and the leads' **Plan sprint** and **Complete
+sprint**:
 
-- **Active sprint** (components/tasks/KanbanBoard.jsx): four columns. A task the viewer may move (a
-  lead, or its assignee) can be dragged to another column or within one; the new order sits between
-  its neighbours (utils/taskBoard.js `orderFor`), so nothing else is renumbered. The move shows at
-  once; if the backend refuses it, the task goes back and the reason is shown. Without a mouse, a card
-  opens the task, where its status can be chosen.
-- **Backlog** (`?view=backlog`, components/tasks/BacklogPanel.jsx): the sprints being planned and the
-  active one with their tasks, then the backlog. Leads plan, start and complete sprints and move tasks
-  between them.
+- **Board** (components/tasks/UnifiedBoard.jsx), one screen: on the left the backlog, with a quick
+  "add a task" field (title only, into the backlog) and each sprint being planned as a section that
+  folds away (leads start it there); on the right, separated by dividers, the active sprint's To do,
+  In progress, In review and Done. Dragging follows utils/taskBoard.js, the backend's rules:
+  - from the backlog (or a planned sprint) to To do brings the task into the active sprint: leads, or
+    the task's assignee;
+  - between the columns changes the status: leads, or the assignee; Done only from In review, by a
+    lead or the task's reporter; within a column, the order (it sits between its neighbours,
+    `orderFor`, so nothing else is renumbered);
+  - to the backlog or a planned sprint: leads.
+
+  A target that would refuse the task does not light up or take the drop. The move shows at once; if
+  the backend refuses it, the task goes back and the reason is shown. Without a mouse, a card opens the
+  task, whose dialog offers the same status and sprint choices.
 - **Team overview** (`?view=team`, components/tasks/TeamOverview.jsx), for leads only (others get the
-  active sprint view, even by address): for a sprint (the active one first), the backlog or all work,
+  board, even by address): for a sprint (the active one first), the backlog or all work,
   each person's tasks by status and story points (`GET /tasks/metrics`), people who left the
   department included; for a sprint, its points done, days gone, pace against the ideal line
   (utils/sprintProgress.js) and its burndown chart (BurndownChart.jsx, with a table view); and the
@@ -194,7 +203,7 @@ straight away), and the sidebar's **Department Board** appears only for people o
 
 The head (or an administrator) chooses the task leads with **Task leads** (TaskLeadsDialog.jsx):
 people in the department; the head always leads. The filter bar (assignee: everyone, me, unassigned;
-status; type) applies to the sprint and backlog views. **Create task**
+status; type) applies to the board. **Create task**
 opens the create dialog (members' tasks go to the backlog); a task opens its detail dialog
 (`?task=<id>`, where assignment notifications link) with its fields, each editable when the viewer may
 (utils/taskBoard.js `taskRightsOf`, the backend's rules), its activity and its comments. The backend
