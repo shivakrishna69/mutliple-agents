@@ -464,6 +464,11 @@ export const ONBOARDING_SETTINGS = Object.freeze({
   ESOP_UNITS_MAX: 1_00_00_000,
   WORK_CITY_MAX_LENGTH: 100,
   DRAFT_LIST_LIMIT: 200,
+  // Offers from one CSV (services/offerImport.js): each row is checked and its structure computed
+  // in the request, so the file is kept small.
+  IMPORT_MAX_ROWS: 200,
+  // Drafts sent in one bulk send: each renders and locks a letter and emails it, one after another.
+  BULK_SEND_MAX: 25,
   DEFAULT_COMPENSATION_POLICY: Object.freeze({
     basicShareBasisPoints: 5000,
     hraFiftyPercentCityBasisPoints: 5000,
