@@ -444,7 +444,6 @@ export const SYSTEM_HEALTH_SETTINGS = Object.freeze({
  * Onboarding offers (services/ctcStructure.js, services/offerLetterGenerator.js,
  * services/onboardingService.js). Rates are basis points (5000 = 50%).
  *
- *   ACTIVATION_VALIDITY_HOURS   how long the activation link in a dispatched offer works
  *   CTC_LIMITS                  the annual CTC an offer may state, in rupees
  *   DEFAULT_COMPENSATION_POLICY the company's salary structure until HR changes it:
  *       basicShareBasisPoints           Basic as a share of CTC
@@ -459,8 +458,10 @@ export const SYSTEM_HEALTH_SETTINGS = Object.freeze({
  *   OFFER_TERM_LIMITS           what HR may set the terms to
  */
 export const ONBOARDING_SETTINGS = Object.freeze({
-  ACTIVATION_VALIDITY_HOURS: 48,
   CTC_LIMITS: Object.freeze({ MIN: 1_00_000, MAX: 10_00_00_000 }),
+  // The variable (performance) part may be at most this share of the CTC.
+  VARIABLE_PAY_MAX_BASIS_POINTS: 4000,
+  ESOP_UNITS_MAX: 1_00_00_000,
   WORK_CITY_MAX_LENGTH: 100,
   DRAFT_LIST_LIMIT: 200,
   DEFAULT_COMPENSATION_POLICY: Object.freeze({
@@ -483,6 +484,31 @@ export const ONBOARDING_SETTINGS = Object.freeze({
     signatoryName: null,
     signatoryTitle: null,
     additionalClauses: Object.freeze([]),
+    // Page 3: when the working day runs, as the letter words it (e.g. "9:30 am to 6:30 pm, Monday to
+    // Friday"); without it the letter gives the weekly hours only.
+    shiftTimings: null,
+    // Page 4: the clauses every offer carries. Plain defaults a company should have its counsel review
+    // and adjust in the onboarding settings.
+    confidentialityClause:
+      'You will keep confidential all information about the company, its customers, employees and partners that is not public and that you learn during your employment. You will use it only to do your work, and return or delete it when your employment ends. This continues after your employment ends.',
+    ipAssignmentClause:
+      'Work you create in the course of your employment, or with the company’s time, equipment or information, including software, designs, documents and inventions, belongs to the company. You assign to the company all rights in that work and will sign any papers needed to record this. Work you created before joining and list in writing when you join remains yours.',
+    nonSolicitationClause:
+      'While you are employed, and for the period below after your employment ends, you will not persuade any employee of the company to leave it, or any customer you dealt with to stop doing business with it.',
+    nonSolicitationMonths: 12,
+    // Page 2, under the stock options: how they vest.
+    esopNote:
+      'Stock options are granted under the company’s employee stock option plan, subject to its vesting schedule and the terms of your grant letter.',
+    // Page 5: what to bring on the first day.
+    joiningChecklist: Object.freeze([
+      'This offer letter, signed on every page',
+      'PAN card and Aadhaar card',
+      'Two passport-size photographs',
+      'Educational certificates and mark sheets',
+      'Relieving letter and last three payslips from your previous employer',
+      'Bank account details for your salary (a cancelled cheque or a bank statement)',
+      'Your UAN from a previous employer, for the provident fund transfer, if you have one',
+    ]),
   }),
   OFFER_TERM_LIMITS: Object.freeze({
     PROBATION_MONTHS_MAX: 12,
@@ -492,6 +518,12 @@ export const ONBOARDING_SETTINGS = Object.freeze({
     SIGNATORY_MAX_LENGTH: 100,
     CLAUSES_MAX: 10,
     CLAUSE_MAX_LENGTH: 600,
+    LEGAL_CLAUSE_MAX_LENGTH: 2_000,
+    SHIFT_TIMINGS_MAX_LENGTH: 120,
+    NON_SOLICITATION_MONTHS_MAX: 24,
+    ESOP_NOTE_MAX_LENGTH: 600,
+    CHECKLIST_ITEMS_MAX: 15,
+    CHECKLIST_ITEM_MAX_LENGTH: 200,
   }),
 });
 

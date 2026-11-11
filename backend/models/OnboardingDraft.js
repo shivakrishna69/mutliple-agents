@@ -13,7 +13,11 @@
  *
  *   candidate      who the offer is for; dateOfBirth also opens the final letter (DDMMYYYY)
  *   position       the employee record the dispatch creates (as an HR invitation would)
- *   compensation   the inputs of services/ctcStructure.js
+ *   compensation   the inputs of services/ctcStructure.js (CTC, variable pay, the Basic, HRA and
+ *                  special allowance HR set, if any), and the stock options granted (not part of CTC)
+ *   terms          this offer's probation and notice period (the settings' when the draft was saved,
+ *                  unless HR set others) and its acceptance deadline (null: the settings' validity
+ *                  from the day it is sent)
  *   structure      the salary structure computed when the draft was saved, with the
  *                  settingsVersion it was computed under. Dispatch recomputes it and refuses when
  *                  it differs, so nobody sends figures they did not review.
@@ -67,6 +71,18 @@ const onboardingDraftSchema = new mongoose.Schema(
       taxRegime: { type: String, enum: Object.values(TAX_REGIMES), required: true },
       workCity: { type: String, required: true, trim: true },
       professionalTaxState: { type: String, enum: Object.values(PROFESSIONAL_TAX_STATES), required: true },
+      variablePayAnnual: { type: Number, default: 0 },
+      esopUnits: { type: Number, default: 0 },
+      components: {
+        basicAnnual: { type: Number, default: null },
+        hraAnnual: { type: Number, default: null },
+        specialAllowanceAnnual: { type: Number, default: null },
+      },
+    },
+    terms: {
+      probationMonths: { type: Number, required: true },
+      noticePeriodDays: { type: Number, required: true },
+      offerValidUntil: { type: Date, default: null },
     },
     structure: { type: mongoose.Schema.Types.Mixed, required: true },
     settingsVersion: { type: Number, required: true },

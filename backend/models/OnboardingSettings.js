@@ -7,9 +7,11 @@
  *   compensation   the salary structure policy services/ctcStructure.js applies: Basic share of
  *                  CTC, HRA share of Basic (50% cities and elsewhere), PF on the whole Basic or up
  *                  to the statutory ceiling, gratuity inside the CTC or not. Rates in basis points.
- *   offerTerms     the offer letter's terms: probation, notice period, weekly hours, how long the
- *                  offer stays open, the signatory (required before an offer can be sent), and up
- *                  to OFFER_TERM_LIMITS.CLAUSES_MAX further clauses
+ *   offerTerms     the offer letter's terms: probation, notice period, weekly hours and shift
+ *                  timings, how long the offer stays open, the signatory (required before an offer
+ *                  can be sent), up to OFFER_TERM_LIMITS.CLAUSES_MAX further clauses, the
+ *                  confidentiality, IP assignment and non-solicitation clauses (with its months), the
+ *                  stock option note and the joining checklist
  */
 
 import mongoose from 'mongoose';
@@ -30,14 +32,36 @@ const wholeNumber = (label, unit, defaultValue, [minimum, maximum]) => ({
   },
 });
 
-const optionalText = (label, defaultValue) => ({
+const optionalText = (label, defaultValue, maximumLength = TERM_LIMITS.SIGNATORY_MAX_LENGTH) => ({
   type: String,
   trim: true,
   default: defaultValue,
+  maxlength: [maximumLength, `${label} must be at most ${maximumLength} characters`],
+});
+
+/** A clause every offer carries: text that cannot be empty. */
+const requiredClause = (label, defaultValue) => ({
+  type: String,
+  trim: true,
+  default: defaultValue,
+  required: [true, `${label} cannot be empty`],
   maxlength: [
-    TERM_LIMITS.SIGNATORY_MAX_LENGTH,
-    `${label} must be at most ${TERM_LIMITS.SIGNATORY_MAX_LENGTH} characters`,
+    TERM_LIMITS.LEGAL_CLAUSE_MAX_LENGTH,
+    `${label} must be at most ${TERM_LIMITS.LEGAL_CLAUSE_MAX_LENGTH} characters`,
   ],
+});
+
+/** A list of short texts: at most `maximumItems`, each at most `maximumLength` characters. */
+const textList = (label, defaults, maximumItems, maximumLength) => ({
+  type: [
+    {
+      type: String,
+      trim: true,
+      maxlength: [maximumLength, `Each ${label} must be at most ${maximumLength} characters`],
+    },
+  ],
+  default: () => [...defaults],
+  validate: { validator: (items) => items.length <= maximumItems, message: `At most ${maximumItems} ${label}s` },
 });
 
 const onboardingSettingsSchema = new mongoose.Schema(
@@ -77,23 +101,27 @@ const onboardingSettingsSchema = new mongoose.Schema(
       ]),
       signatoryName: optionalText('Signatory name', TERMS.signatoryName),
       signatoryTitle: optionalText('Signatory title', TERMS.signatoryTitle),
-      additionalClauses: {
-        type: [
-          {
-            type: String,
-            trim: true,
-            maxlength: [
-              TERM_LIMITS.CLAUSE_MAX_LENGTH,
-              `Each clause must be at most ${TERM_LIMITS.CLAUSE_MAX_LENGTH} characters`,
-            ],
-          },
-        ],
-        default: () => [...TERMS.additionalClauses],
-        validate: {
-          validator: (clauses) => clauses.length <= TERM_LIMITS.CLAUSES_MAX,
-          message: `At most ${TERM_LIMITS.CLAUSES_MAX} clauses`,
-        },
-      },
+      additionalClauses: textList(
+        'clause',
+        TERMS.additionalClauses,
+        TERM_LIMITS.CLAUSES_MAX,
+        TERM_LIMITS.CLAUSE_MAX_LENGTH,
+      ),
+      shiftTimings: optionalText('Shift timings', TERMS.shiftTimings, TERM_LIMITS.SHIFT_TIMINGS_MAX_LENGTH),
+      confidentialityClause: requiredClause('The confidentiality clause', TERMS.confidentialityClause),
+      ipAssignmentClause: requiredClause('The IP assignment clause', TERMS.ipAssignmentClause),
+      nonSolicitationClause: requiredClause('The non-solicitation clause', TERMS.nonSolicitationClause),
+      nonSolicitationMonths: wholeNumber('Non-solicitation', 'months', TERMS.nonSolicitationMonths, [
+        0,
+        TERM_LIMITS.NON_SOLICITATION_MONTHS_MAX,
+      ]),
+      esopNote: optionalText('The stock option note', TERMS.esopNote, TERM_LIMITS.ESOP_NOTE_MAX_LENGTH),
+      joiningChecklist: textList(
+        'checklist item',
+        TERMS.joiningChecklist,
+        TERM_LIMITS.CHECKLIST_ITEMS_MAX,
+        TERM_LIMITS.CHECKLIST_ITEM_MAX_LENGTH,
+      ),
     },
     updatedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },

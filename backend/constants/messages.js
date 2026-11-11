@@ -10,7 +10,6 @@ import {
   GENDERS,
   KNOWLEDGE_BASE_SETTINGS,
   MESSAGE_FIELD_LIMITS,
-  ONBOARDING_SETTINGS,
   SIGNUP_PROFILE_SETTINGS,
   TASK_SETTINGS,
   USER_FIELD_LIMITS,
@@ -628,6 +627,8 @@ export const SYSTEM_STATUS_LABELS = Object.freeze({
   not_configured: 'Not set up',
 });
 
+const RUPEES = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
 /** Onboarding offers (controllers/onboardingController.js). */
 export const ONBOARDING_MESSAGES = Object.freeze({
   HR_ONLY: 'Only HR, Finance & Payroll and administrators can see offers',
@@ -647,7 +648,7 @@ export const ONBOARDING_MESSAGES = Object.freeze({
   DRAFT_CHANGED_ELSEWHERE: 'Someone else changed this draft a moment ago. Reload to see their changes',
   DRAFT_FIGURES_CHANGED:
     'The salary figures have changed since this draft was saved (the policy or the statutory rules changed). Review the new figures and save the draft again',
-  DISPATCHED: `Offer sent. The candidate has ${ONBOARDING_SETTINGS.ACTIVATION_VALIDITY_HOURS} hours to activate their account`,
+  DISPATCHED: 'Offer sent. The candidate accepts it by activating their account by the deadline in the letter',
   DISPATCH_IN_PROGRESS: 'This offer is already being sent',
   DISPATCH_NOT_ALLOWED: 'Only drafts waiting for review, or whose sending failed, can be sent',
   DISPATCH_EMAIL_FAILED: 'The employee record was created, but the offer email could not be sent. Try sending it again',
@@ -655,6 +656,12 @@ export const ONBOARDING_MESSAGES = Object.freeze({
   PDF_UNAVAILABLE: 'Offer letters cannot be produced on this server right now. Contact your administrator',
   CTC_TOO_LOW:
     'This CTC is too low for the company salary policy: Basic, HRA and employer contributions already exceed it',
+  SPLIT_EXCEEDS_GROSS:
+    'The Basic and HRA set here are more than the fixed CTC can pay after employer contributions. Lower them, or leave them to the policy',
+  SPLIT_DOES_NOT_ADD_UP: (expectedSpecialAllowance) =>
+    `The components do not add up to the fixed CTC: with this Basic and HRA, the special allowance is ${RUPEES.format(expectedSpecialAllowance)} a year`,
+  OFFER_EXPIRED:
+    'This offer’s acceptance deadline has passed. Set a later date and save the draft again before sending',
   INPUT_INVALID: 'Some details need fixing',
   PREVIEW_WATERMARK: 'DRAFT – NOT AN OFFER',
 });
