@@ -66,6 +66,29 @@ HANDBOOK = [
         ["Handbook", "Working hours"],
         "Core hours are 10:00 to 16:00. Hybrid employees work from the office at least three days a week.",
     ),
+    # A Data Engineering guide, written in the team's own voice (the questions that were refused).
+    (
+        ["Document Overview & Agent Guidelines"],
+        "This document explains how the Data Engineering team works and how the department agent answers "
+        "questions about it. The agent answers from this document only. Questions it does not cover go to "
+        "the Data Engineering team, who reply within two working days.",
+    ),
+    (
+        ["Data Engineering", "Pipeline Requests"],
+        "To request a new data pipeline, raise a ticket in the DE board with the source system, the refresh "
+        "frequency and the owner. We review new pipeline requests every Tuesday. Approved requests are "
+        "scheduled into the next sprint, and we create the pipeline in Airflow with alerting on failure.",
+    ),
+    (
+        ["Data Engineering", "Data Access"],
+        "Access to production warehouses is granted by role. Analysts get read access to the curated layer. "
+        "Raw layer access needs approval from the data owner. We update access lists every Monday.",
+    ),
+    (
+        ["Data Engineering", "On-call"],
+        "One engineer is on call each week. The on-call engineer will investigate failed jobs and will "
+        "contact the pipeline owner if a fix needs their input.",
+    ),
 ]
 
 # (question, index of the passage that answers it)
@@ -78,6 +101,13 @@ ANSWERED_BY_THE_HANDBOOK = [
     ("What is the deadline for submitting travel expenses?", 4),
     ("How many days a week must I come to the office?", 5),
     ("leave balance", 0),
+    # The exact heading, and questions worded differently from the text.
+    ("Document Overview & Agent Guidelines", 6),
+    ("What are the agent guidelines?", 6),
+    ("How do I request a new data pipeline?", 7),
+    ("who decides on new pipelines and when?", 7),
+    ("How can I get access to raw data?", 8),
+    ("what happens when a job fails at night", 9),
 ]
 
 NOT_IN_THE_HANDBOOK = [
