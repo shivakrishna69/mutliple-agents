@@ -198,14 +198,30 @@ department), `role` (employee, agent; an admin also hr, finance, it_admin), `man
 HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
 `services/onboardingService.js`). Nothing reaches the candidate until a person presses dispatch.
 
-| Endpoint                                                                      | What it does                                                                                                                                                                                                                                                                                          |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET` / `PATCH /settings`                                                     | the compensation policy (Basic share, HRA rates by city, PF on full Basic, gratuity in CTC) and offer terms (probation, notice, weekly hours, offer validity, signatory, extra clauses); changes take `version`                                                                                       |
-| `POST /calculate`                                                             | the salary structure for an offer; with `includePreview`, a watermarked, unlocked letter (base64). Saves nothing                                                                                                                                                                                      |
-| `POST /create-draft`                                                          | saves the offer for review (`PENDING_REVIEW`) with the structure as calculated                                                                                                                                                                                                                        |
-| `GET /drafts?status=`, `GET` / `PATCH /drafts/:id`, `POST /drafts/:id/cancel` | list, read, change while waiting for review, cancel (`version` required)                                                                                                                                                                                                                              |
-| `POST /drafts/:id/dispatch`                                                   | recalculates and refuses (`DRAFT_FIGURES_CHANGED`) if the figures moved since review, then creates the employee, renders the final letter, locks it and emails it with an activation link valid 48 hours. 200 when sent; 202 when the employee exists but the email failed (dispatch again to resend) |
+| Endpoint                                                                      | What it does                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET` / `PATCH /settings`                                                     | the compensation policy (Basic share, HRA rates by city, PF on full Basic, gratuity in CTC) and offer terms (probation, notice, weekly hours, shift timings, offer validity, signatory, extra clauses, the confidentiality, IP assignment and non-solicitation clauses with its months, the stock option note, the joining checklist); changes take `version`                                                         |
+| `POST /calculate`                                                             | the salary structure for an offer (`annualCtc`, optional `variablePayAnnual`, `esopUnits`, `components` `{ basicAnnual, hraAnnual, specialAllowanceAnnual }`, `terms` `{ probationMonths, noticePeriodDays, offerValidUntil }`); with `includePreview`, a watermarked, unlocked letter (base64). Saves nothing                                                                                                        |
+| `POST /create-draft`                                                          | saves the offer for review (`PENDING_REVIEW`) with the structure as calculated, and its terms: the settings' probation and notice unless HR set others, and its deadline (null: the settings' validity from the day it is sent)                                                                                                                                                                                       |
+| `GET /drafts?status=`, `GET` / `PATCH /drafts/:id`, `POST /drafts/:id/cancel` | list, read, change while waiting for review, cancel (`version` required); each with its `lifecycle` (below) and `acceptedAt`                                                                                                                                                                                                                                                                                          |
+| `POST /drafts/:id/dispatch`                                                   | recalculates and refuses (`DRAFT_FIGURES_CHANGED`) if the figures moved since review, refuses an offer whose deadline has passed (`OFFER_EXPIRED`), then creates the employee, renders the final letter, locks it and emails it with an activation link that works until the end of the deadline day (company time zone). 200 when sent; 202 when the employee exists but the email failed (dispatch again to resend) |
 
+- **The letter has five pages**, each section starting a page (a long one continues; the footer
+  counts the pages as printed): 1 the letter of appointment (role and pay at a glance, the deadline),
+  2 Annexure A (the structure, variable pay, stock options), 3 terms of employment (probation, hours
+  and shift, notice, the leave policy from the active leave types, further clauses), 4
+  confidentiality, IP assignment and non-solicitation, 5 the joining checklist and the signature
+  block. The clause and checklist texts are settings, with plain defaults
+  (`ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS`) a company should have its counsel review.
+- **Variable pay and a split HR sets:** `annualCtc` is the total; `variablePayAnnual` (at most
+  `VARIABLE_PAY_MAX_BASIS_POINTS` of it) is set aside, and the rest, the fixed CTC, is split. HR may
+  set Basic and HRA; Special allowance stays the balancing figure, so a split that cannot add up is
+  refused (`SPLIT_EXCEEDS_GROSS`, or `SPLIT_DOES_NOT_ADD_UP` naming the special allowance it would
+  be when HR stated another). Stock options are shown, not counted in the CTC.
+- **Lifecycle**, worked out from the draft and its invitation (never stored): `INVITED` (prepared,
+  not sent) → `OFFER_SENT` → `ACCEPTED` (the candidate activated their account from the offer
+  email: that is how an offer is accepted) → `PROBATION` (from the joining date, for the offer's
+  probation months) → `JOINED`; `WITHDRAWN` when the draft was cancelled or the invitation revoked.
 - **The structure is deterministic** (`services/ctcStructure.js`), in whole rupees: Basic, HRA (by
   default 50 % in the eight cities of `HRA_FIFTY_PERCENT_CITIES`, 40 % elsewhere; both rates are
   settings), special allowance, employer PF
@@ -223,7 +239,10 @@ HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
   (`QPDF_PATH`, default `qpdf` on the PATH); without them previews and dispatch answer
   `PDF_UNAVAILABLE` (503). The production image installs both (`WITH_PDF_BROWSER=true`, set in
   `docker-compose.prod.yml`). `node scripts/checkOfferLetterPdf.js` renders and locks a sample
-  letter and checks the password, which is how CI tests the production image.
+  letter, checks the password and that it prints on five pages, which is how CI tests the
+  production image.
+- **Email:** offers go through the configured SMTP server with the letter attached; Brevo works as
+  any SMTP relay (settings in `.env.example`).
 
 ## Department knowledge bases
 
