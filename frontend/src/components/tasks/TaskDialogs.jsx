@@ -26,14 +26,16 @@ import {
   DEFAULT_PRIORITY,
   DEFAULT_TASK_TYPE,
   PRIORITY_OPTIONS,
+  SPRINT_STATUSES,
   STATUS_LABELS,
   TASK_LIMITS,
+  TASK_STATUSES,
   TASK_TYPE_OPTIONS,
 } from '../../constants/tasks.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import Dialog from '../Dialog.jsx';
 import { Button, Field, LoadingBlock, Notice, SelectInput, TextInput, formatDateTime } from '../ui.jsx';
-import { taskRightsOf } from '../../utils/taskBoard.js';
+import { allowedStatusesOf, taskRightsOf } from '../../utils/taskBoard.js';
 
 const UNASSIGNED = '';
 const STALE_VERSION = 'STALE_VERSION';
@@ -248,9 +250,22 @@ function changesOf(form, task) {
   return changes;
 }
 
+/** Why the status cannot be changed (or only so far), in the board's rules. */
+function statusHint(task, rights) {
+  if (task.status === TASK_STATUSES.IN_REVIEW && !rights.canMarkDone && rights.canMove) {
+    return 'A task lead or its reporter marks it done';
+  }
+  if (!rights.canMove && !rights.canMarkDone) return 'Only its assignee or a task lead can move it';
+  if (task.status !== TASK_STATUSES.IN_REVIEW && task.status !== TASK_STATUSES.DONE)
+    return 'Done comes after In review';
+  return undefined;
+}
+
 function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved, onReload }) {
   const { csrfToken } = useAuth();
-  const rights = taskRightsOf(task, board.viewer, currentUserId);
+  const activeSprintId = sprints.find((sprint) => sprint.status === SPRINT_STATUSES.ACTIVE)?.id ?? null;
+  const rights = taskRightsOf(task, board.viewer, currentUserId, activeSprintId);
+  const statusChoices = allowedStatusesOf(task, rights);
   const [form, setForm] = useState(() => formOf(task));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -258,7 +273,11 @@ function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved
   const changes = changesOf(form, task);
   const hasChanges = Object.keys(changes).length > 0;
   const fieldErrors = saveError?.fieldErrors ?? {};
-  const plannable = sprints.filter((sprint) => sprint.status !== 'COMPLETED' || sprint.id === task.sprintId);
+  // Leads choose any open sprint; an assignee can only bring a backlog task into the active sprint.
+  const plannable = rights.canPlan
+    ? sprints.filter((sprint) => sprint.status !== SPRINT_STATUSES.COMPLETED || sprint.id === task.sprintId)
+    : sprints.filter((sprint) => sprint.id === activeSprintId && rights.canPullIntoSprint);
+  const canChooseSprint = rights.canPlan || rights.canPullIntoSprint;
 
   async function save(submitEvent) {
     submitEvent.preventDefault();
@@ -300,9 +319,12 @@ function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved
           label="Status"
           value={form.status}
           onChange={update('status')}
-          options={BOARD_COLUMNS.map((column) => ({ value: column.status, label: column.label }))}
-          disabled={!rights.canMove}
-          hint={rights.canMove ? undefined : 'Only its assignee or a task lead can move it'}
+          options={BOARD_COLUMNS.filter((column) => statusChoices.includes(column.status)).map((column) => ({
+            value: column.status,
+            label: column.label,
+          }))}
+          disabled={statusChoices.length <= 1}
+          hint={statusHint(task, rights)}
         />
         <SelectInput
           label="Assignee"
@@ -318,7 +340,7 @@ function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved
           onChange={update('sprintId')}
           error={fieldErrors.sprintId}
           options={sprintOptions(plannable)}
-          disabled={!rights.canPlan}
+          disabled={!canChooseSprint}
         />
         <SelectInput
           label="Type"
@@ -349,7 +371,7 @@ function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved
       <p className="text-xs text-slate-500">
         Reported by {task.reporter?.name ?? 'someone'} · created {formatDateTime(task.createdAt)}
       </p>
-      {(rights.canEdit || rights.canMove || rights.canPlan) && (
+      {(rights.canEdit || rights.canMove || rights.canMarkDone || canChooseSprint) && (
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setForm(formOf(task))} disabled={!hasChanges || isSaving}>
             Undo changes
