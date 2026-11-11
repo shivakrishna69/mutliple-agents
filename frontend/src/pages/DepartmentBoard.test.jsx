@@ -104,7 +104,7 @@ describe('department board rights', () => {
     renderBoard(VIEWERS.member, '?view=team');
     await boardHeading();
     expect(screen.queryByRole('tab', { name: 'Team overview' })).toBeNull();
-    expect(screen.getByRole('tab', { name: 'Active sprint' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Board' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.queryByRole('button', { name: 'Task leads' })).toBeNull();
     expect(requestTeamWork).not.toHaveBeenCalled();
   });
@@ -140,5 +140,66 @@ describe('department board rights', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Task leads' }));
     const dialog = screen.getByRole('dialog', { name: 'Task leads' });
     expect(within(dialog).getByRole('checkbox', { name: /Asha Rao/ })).toBeTruthy();
+  });
+});
+
+const boardTask = (fields) => ({
+  key: `ENG-${fields.id}`,
+  taskType: 'TASK',
+  priority: 'MEDIUM',
+  status: 'TODO',
+  sprintId: null,
+  assignee: null,
+  reporter: HEAD,
+  storyPoints: null,
+  orderIndex: 1024,
+  version: 0,
+  ...fields,
+});
+const TASKS = [
+  boardTask({ id: '1', title: 'My backlog task', assignee: ASHA }),
+  boardTask({ id: '2', title: 'Another backlog task', assignee: HEAD }),
+  boardTask({ id: '3', title: 'Sprint work in review', sprintId: SPRINT.id, status: 'IN_REVIEW', assignee: ASHA }),
+];
+const PLANNING_SPRINT = { ...SPRINT, id: 'sprint-2', name: 'Sprint 2', status: 'PLANNING' };
+const card = (title) => screen.getByRole('listitem', { name: new RegExp(title) });
+
+describe('the unified board', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requestSprints.mockResolvedValue({ sprints: [SPRINT, PLANNING_SPRINT] });
+    requestTasks.mockResolvedValue({ tasks: TASKS });
+  });
+
+  it('shows the backlog beside the sprint columns, and the sprint in the header', async () => {
+    renderBoard(VIEWERS.member);
+    await boardHeading();
+    const backlog = await screen.findByRole('region', { name: 'Backlog' });
+    expect(within(backlog).getByText('My backlog task')).toBeTruthy();
+    expect(screen.getByText(/^Sprint 1 · .* · Ship the export$/)).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'In review' })).getByText('Sprint work in review')).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'Sprint 2' })).getByText(/Planning/)).toBeTruthy();
+    expect(screen.getByLabelText('Add a task to the backlog')).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Backlog' })).toBeNull();
+  });
+
+  it('lets a member drag only what they may move: their own backlog task, not another', async () => {
+    renderBoard(VIEWERS.member);
+    await screen.findByRole('region', { name: 'Backlog' });
+    expect(card('My backlog task').getAttribute('draggable')).toBe('true');
+    expect(card('Another backlog task').getAttribute('draggable')).toBe('false');
+    expect(card('Sprint work in review').getAttribute('draggable')).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Plan sprint' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Complete sprint' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start sprint' })).toBeNull();
+  });
+
+  it('gives leads the sprint actions and every card', async () => {
+    renderBoard(VIEWERS.lead);
+    await screen.findByRole('region', { name: 'Backlog' });
+    expect(screen.getByRole('button', { name: 'Plan sprint' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Complete sprint' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start sprint' }).disabled).toBe(true);
+    expect(card('Another backlog task').getAttribute('draggable')).toBe('true');
   });
 });

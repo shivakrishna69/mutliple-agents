@@ -330,8 +330,9 @@ department; this is how a head delegates), and administrators (`MANAGE_ALL_TASK_
 | See the board, sprints, tasks, activity                            | ✓                                      | ✓                     |
 | Create tasks (members: in the backlog)                             | ✓                                      | ✓, also into a sprint |
 | Change title, description, type, priority, points, assignee, order | tasks they reported or are assigned to | any task              |
-| Change the status                                                  | tasks assigned to them                 | any task              |
-| Plan a task into or out of a sprint                                |                                        | ✓                     |
+| Change the status (not to Done)                                    | tasks assigned to them                 | any task              |
+| Mark a task done (only from In review)                             | tasks they reported                    | any task              |
+| Plan a task into or out of a sprint                                | their backlog task into the active one | ✓                     |
 | Create, edit, start and complete sprints                           |                                        | ✓                     |
 | Comment                                                            | ✓                                      | ✓                     |
 | See the team's work (`GET /tasks/metrics`)                         |                                        | ✓                     |
@@ -340,7 +341,8 @@ Tasks are assigned only to people in the department, who are notified in the app
 (`TASK_ASSIGNED`, linking to `/boards/:departmentId?task=<id>`). Sprints go `PLANNING` → `ACTIVE` →
 `COMPLETED`, one active at a time (a unique index enforces it even under concurrent starts);
 completing a sprint sends its unfinished tasks back to the backlog, and a completed sprint takes no
-more tasks. Tasks, sprints and the board are versioned: an edit based on an old version is refused
+more tasks. A task reaches Done only from In review (`TASK_DONE_NEEDS_REVIEW` otherwise), and only by
+a lead or its reporter (`TASK_DONE_NOT_ALLOWED`): nobody approves work they were only assigned. Tasks, sprints and the board are versioned: an edit based on an old version is refused
 with `STALE_VERSION`.
 
 | Endpoint                                                    | What it does                                                                                                                                                                                                                                                |

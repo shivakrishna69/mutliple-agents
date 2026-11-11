@@ -11,7 +11,12 @@
  *                                      leads    anything
  *                                      members  title, description, type, priority, points, assignee
  *                                               and order of tasks they reported or are assigned to;
- *                                               the status of tasks assigned to them; never the sprint
+ *                                               the status of tasks assigned to them; the sprint only
+ *                                               to bring a backlog task assigned to them into the
+ *                                               active sprint
+ *                                    and for everyone: a task is marked done only from In review,
+ *                                    by a lead or the person who reported it (nobody approves work
+ *                                    they were only assigned)
  *                                    every change is recorded in the activity, and a new assignee is
  *                                    notified in the app
  *   addComment(scope, ...)           anyone on the board
@@ -24,7 +29,7 @@ import { NOTIFICATION_MESSAGES } from '../../constants/messages.js';
 import { TASK_SETTINGS } from '../../constants/validation.js';
 import DepartmentBoard from '../../models/DepartmentBoard.js';
 import { NOTIFICATION_TYPES } from '../../models/Notification.js';
-import { SPRINT_STATUSES } from '../../models/Sprint.js';
+import Sprint, { SPRINT_STATUSES } from '../../models/Sprint.js';
 import Task, { TASK_STATUSES } from '../../models/Task.js';
 import TaskActivity, { TASK_ACTIVITY_TYPES } from '../../models/TaskActivity.js';
 import { notifyUsers } from '../notifications.js';
@@ -225,13 +230,35 @@ export async function createTask(scope, input, actor) {
   return (await getTask(scope, task._id)).task;
 }
 
+/** The active sprint's id in the department, or null. */
+async function activeSprintIdOf(department) {
+  const active = await Sprint.findOne({ departmentId: department._id, status: SPRINT_STATUSES.ACTIVE })
+    .select('_id')
+    .lean();
+  return idOrNull(active?._id);
+}
+
 /** Refuses the changes this person may not make (see the module comment). */
-function checkChangeRights(scope, task, changes, actorUserId) {
-  if (isLead(scope)) return;
-  if (changes.sprintId !== undefined) throw boardRefusal(HTTP_STATUS.FORBIDDEN, 'TASK_SPRINT_NOT_ALLOWED');
+async function checkChangeRights(scope, task, changes, actorUserId) {
+  const lead = isLead(scope);
   const isAssignee = idOrNull(task.assigneeId) === actorUserId;
   const isReporter = idOrNull(task.reporterId) === actorUserId;
-  if (changes.status !== undefined && changes.status !== task.status && !isAssignee) {
+  const movesStatus = changes.status !== undefined && changes.status !== task.status;
+  if (movesStatus && changes.status === TASK_STATUSES.DONE) {
+    if (task.status !== TASK_STATUSES.IN_REVIEW) throw boardRefusal(HTTP_STATUS.CONFLICT, 'TASK_DONE_NEEDS_REVIEW');
+    if (!lead && !isReporter) throw boardRefusal(HTTP_STATUS.FORBIDDEN, 'TASK_DONE_NOT_ALLOWED');
+  }
+  if (lead) return;
+  if (changes.sprintId !== undefined && comparable(changes.sprintId) !== comparable(task.sprintId)) {
+    const pullsOwnBacklogTask =
+      isAssignee &&
+      task.sprintId === null &&
+      changes.sprintId !== null &&
+      changes.sprintId === (await activeSprintIdOf(scope.department));
+    if (!pullsOwnBacklogTask) throw boardRefusal(HTTP_STATUS.FORBIDDEN, 'TASK_SPRINT_NOT_ALLOWED');
+  }
+  const marksReportedTaskDone = isReporter && changes.status === TASK_STATUSES.DONE;
+  if (movesStatus && !isAssignee && !marksReportedTaskDone) {
     throw boardRefusal(HTTP_STATUS.FORBIDDEN, 'TASK_STATUS_NOT_ALLOWED');
   }
   const editsFields = Object.keys(changes).some((field) => MEMBER_EDITABLE_FIELDS.has(field));
@@ -252,7 +279,7 @@ export async function updateTask(scope, taskId, { changes, version }, actor) {
   const { department } = scope;
   const task = await findTask(department, taskId);
   assertCurrentVersion(task, version);
-  checkChangeRights(scope, task, changes, actor.id);
+  await checkChangeRights(scope, task, changes, actor.id);
   if (changes.assigneeId !== undefined) requireMember(scope, changes.assigneeId);
   if (changes.sprintId !== undefined) await requirePlannableSprint(department, changes.sprintId);
 

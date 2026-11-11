@@ -239,15 +239,20 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
     const stranger = await change(dev3.client, reported.id, { title: 'Hijacked' });
     assert.equal(stranger.status, 403);
     assert.equal(stranger.body.error.code, 'TASK_EDIT_NOT_ALLOWED');
-    const plannedByMember = await change(dev2.client, reported.id, { sprintId });
-    assert.equal(plannedByMember.body.error.code, 'TASK_SPRINT_NOT_ALLOWED');
+    const plannedByReporter = await change(dev1.client, reported.id, { sprintId });
+    assert.equal(plannedByReporter.body.error.code, 'TASK_SPRINT_NOT_ALLOWED', 'only its assignee may pull it in');
     const outsider = await change(finDev.client, reported.id, { title: 'From finance' });
     assert.equal(outsider.status, 403);
 
-    const plannedByLead = await change(engLead.client, reported.id, { sprintId, status: 'DONE' });
+    const skipsReview = await change(engLead.client, reported.id, { status: 'DONE' });
+    assert.equal(skipsReview.status, 409);
+    assert.equal(skipsReview.body.error.code, 'TASK_DONE_NEEDS_REVIEW', 'leads too go through In review');
+    const plannedByLead = await change(engLead.client, reported.id, { sprintId, status: 'IN_REVIEW' });
     assert.equal(plannedByLead.status, 200, JSON.stringify(plannedByLead.body));
     assert.equal(plannedByLead.body.data.task.sprintId, sprintId);
-    assert.ok(plannedByLead.body.data.task.doneAt, 'reaching DONE is recorded');
+    const doneByLead = await change(engLead.client, reported.id, { status: 'DONE' });
+    assert.equal(doneByLead.status, 200, JSON.stringify(doneByLead.body));
+    assert.ok(doneByLead.body.data.task.doneAt, 'reaching DONE is recorded');
     const reopened = await change(engLead.client, reported.id, { status: 'IN_REVIEW' });
     assert.equal(reopened.body.data.task.doneAt, null);
 
@@ -261,7 +266,7 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
     const { activity } = await taskOf(dev1.client, reported.id);
     assert.deepEqual(
       activity.map((entry) => entry.type),
-      ['CREATED', 'UPDATED', 'UPDATED', 'UPDATED', 'UPDATED'],
+      ['CREATED', 'UPDATED', 'UPDATED', 'UPDATED', 'UPDATED', 'UPDATED'],
     );
     assert.deepEqual(activity[1].changes, [{ field: 'status', from: 'TODO', to: 'IN_PROGRESS' }]);
     assert.equal(activity[1].actor.name, 'Dev Two');
@@ -381,7 +386,10 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
   });
 
   it('sends unfinished tasks back to the backlog when a sprint completes, and closes the sprint to new work', async () => {
-    await change(dev3.client, leadTask.id, { status: 'DONE' });
+    await change(dev3.client, leadTask.id, { status: 'IN_REVIEW' });
+    const ownWork = await change(dev3.client, leadTask.id, { status: 'DONE' });
+    assert.equal(ownWork.body.error.code, 'TASK_DONE_NOT_ALLOWED', 'the assignee does not approve their own work');
+    assert.equal((await change(engLead.client, leadTask.id, { status: 'DONE' })).status, 200);
     const sprints = (await engLead.client.get(`${boardPath(engineering)}/sprints`)).body.data.sprints;
     const active = sprints.find((sprint) => sprint.id === sprintId);
     assert.deepEqual(active.progress.tasksByStatus, { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 1, DONE: 1 });
@@ -407,5 +415,37 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
       version: completed.body.data.sprint.version,
     });
     assert.equal(reopen.body.error.code, 'SPRINT_COMPLETED');
+  });
+
+  it('lets an assignee bring their backlog task into the active sprint, and the reporter mark it done from review', async () => {
+    const created = await create(dev2.client, { title: 'Update the runbook', assigneeId: dev1.userId });
+    const task = created.body.data.task;
+    const sprints = (await engLead.client.get(`${boardPath(engineering)}/sprints`)).body.data.sprints;
+    const planning = sprints.find((sprint) => sprint.name === 'Sprint 2');
+    const intoPlanned = await change(dev1.client, task.id, { sprintId: planning.id });
+    assert.equal(intoPlanned.body.error.code, 'TASK_SPRINT_NOT_ALLOWED', 'only into the active sprint');
+    const started = await engLead.client.patch(`${boardPath(engineering)}/sprints/${planning.id}`, {
+      status: 'ACTIVE',
+      version: planning.version,
+    });
+    assert.equal(started.status, 200, JSON.stringify(started.body));
+
+    const byOther = await change(dev3.client, task.id, { sprintId: planning.id, status: 'TODO' });
+    assert.equal(byOther.body.error.code, 'TASK_SPRINT_NOT_ALLOWED', 'not someone else’s task');
+    const pulled = await change(dev1.client, task.id, { sprintId: planning.id, status: 'TODO' });
+    assert.equal(pulled.status, 200, JSON.stringify(pulled.body));
+    assert.equal(pulled.body.data.task.sprintId, planning.id);
+    const backOut = await change(dev1.client, task.id, { sprintId: null });
+    assert.equal(backOut.body.error.code, 'TASK_SPRINT_NOT_ALLOWED', 'members do not take work out of a sprint');
+
+    assert.equal((await change(dev1.client, task.id, { status: 'IN_PROGRESS' })).status, 200);
+    assert.equal((await change(dev1.client, task.id, { status: 'DONE' })).body.error.code, 'TASK_DONE_NEEDS_REVIEW');
+    assert.equal((await change(dev1.client, task.id, { status: 'IN_REVIEW' })).status, 200);
+    assert.equal((await change(dev1.client, task.id, { status: 'DONE' })).body.error.code, 'TASK_DONE_NOT_ALLOWED');
+    const byReporter = await change(dev2.client, task.id, { status: 'DONE' });
+    assert.equal(byReporter.status, 200, JSON.stringify(byReporter.body));
+    assert.equal(byReporter.body.data.task.status, 'DONE');
+    const reopenedByReporter = await change(dev2.client, task.id, { status: 'IN_PROGRESS' });
+    assert.equal(reopenedByReporter.body.error.code, 'TASK_STATUS_NOT_ALLOWED', 'reopening stays with its assignee');
   });
 });
