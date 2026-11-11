@@ -207,9 +207,10 @@ async function deliverInvitation(invitation, rawToken, context, composeEmail = c
 
 /**
  * @param {{ inviter: { id: string, name: string, role: string }, input: object,
- *   appContext: { companyName: string, appPublicUrl: string }, validityMs?: number,
+ *   appContext: { companyName: string, appPublicUrl: string }, validityMs?: number, expiresAt?: Date,
  *   composeEmail?: Function }} request
- *   validityMs: how long the link works (default INVITATION_LIMITS.VALIDITY_DAYS); composeEmail:
+ *   validityMs: how long the link works (default INVITATION_LIMITS.VALIDITY_DAYS), or expiresAt: the
+ *   moment it stops working (an offer's deadline, say), which wins when given; composeEmail:
  *   the email to send instead of the standard invitation (see deliverInvitation)
  */
 export async function createInvitation({
@@ -217,6 +218,7 @@ export async function createInvitation({
   input,
   appContext,
   validityMs = INVITATION_VALIDITY_MS,
+  expiresAt = null,
   composeEmail = composeInvitationEmail,
 }) {
   if (!invitableRolesFor(inviter.role).includes(input.role)) {
@@ -265,7 +267,7 @@ export async function createInvitation({
       invitedUserId: provisioned.user._id,
       employeeCode: provisioned.profile.employeeCode,
       tokenHash,
-      expiresAt: new Date(now.getTime() + validityMs),
+      expiresAt: expiresAt ?? new Date(now.getTime() + validityMs),
       invitedByUserId: inviter.id,
       lastSentAt: now,
       lastDelivery: { outcome: MAIL_OUTCOMES.NOT_CONFIGURED, at: now },
@@ -311,13 +313,14 @@ async function assertInviteeStillInvited(invitation) {
 
 /**
  * New link (old links stop working), fresh expiry, email sent again. Pending or expired only.
- * `validityMs` and `composeEmail` as for createInvitation.
+ * `validityMs`, `expiresAt` and `composeEmail` as for createInvitation.
  */
 export async function resendInvitation({
   invitationId,
   inviter,
   appContext,
   validityMs = INVITATION_VALIDITY_MS,
+  expiresAt = null,
   composeEmail = composeInvitationEmail,
 }) {
   const invitation = await EmployeeInvitation.findById(invitationId).select('+tokenHash');
@@ -331,7 +334,7 @@ export async function resendInvitation({
   const { rawToken, tokenHash } = createSecureToken();
   const now = new Date();
   invitation.tokenHash = tokenHash;
-  invitation.expiresAt = new Date(now.getTime() + validityMs);
+  invitation.expiresAt = expiresAt ?? new Date(now.getTime() + validityMs);
   invitation.sendCount += 1;
   invitation.lastSentAt = now;
   const invitee = invitation.invitedUserId

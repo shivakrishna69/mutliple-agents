@@ -15,11 +15,22 @@
  *        DRAFT_FIGURES_CHANGED, so nobody sends figures they did not review
  *     3. renders the final letter, locked with the candidate's date of birth (DDMMYYYY)
  *     4. creates the employee and invitation through services/invitationService.js (employee ID
- *        from the company's short code and counter), with an activation link valid
- *        ONBOARDING_SETTINGS.ACTIVATION_VALIDITY_HOURS, and emails the offer with the letter;
+ *        from the company's short code and counter), with an activation link that works until the
+ *        end of the offer's deadline day (company time zone): activating the account is how the
+ *        candidate accepts, so the link and the letter's deadline are one date. Emails the offer
+ *        with the letter;
  *        a retry after a failed email resends through the same invitation (no second employee)
  *     5. DISPATCHED, or DISPATCH_FAILED when the email did not go out (it can be dispatched again)
  *   Anything that stops a dispatch before the email puts the draft back as it was.
+ *
+ * Each offer's terms are its own: probation and notice are the settings' when the draft is saved
+ * unless HR set others, and its acceptance deadline is the date HR set or, without one, the settings'
+ * validity from the day it is sent. A deadline already past refuses the dispatch (OFFER_EXPIRED).
+ *
+ * The candidate's lifecycle (offerLifecycleOf) follows from the draft and its invitation, so it is
+ * never stored and cannot drift: INVITED (prepared, not sent) → OFFER_SENT → ACCEPTED (they activated
+ * their account from the offer email) → PROBATION (from the joining date, for the probation months)
+ * → JOINED; WITHDRAWN when the draft was cancelled or the invitation revoked.
  */
 
 import { isDeepStrictEqual } from 'node:util';
@@ -29,12 +40,16 @@ import { ONBOARDING_MESSAGES } from '../constants/messages.js';
 import { ONBOARDING_SETTINGS } from '../constants/validation.js';
 import Department from '../models/Department.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
+import EmployeeInvitation, { INVITATION_STATUSES } from '../models/EmployeeInvitation.js';
+import LeaveType from '../models/LeaveType.js';
 import OnboardingDraft, { DISPATCHABLE_STATUSES, DRAFT_STATUSES } from '../models/OnboardingDraft.js';
 import OnboardingSettings, { ONBOARDING_SETTINGS_KEY } from '../models/OnboardingSettings.js';
 import User from '../models/User.js';
 import { PayrollInputError } from '../utils/payrollCalculator.js';
 import { logger } from '../utils/logger.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
+import { addDaysToCalendarDate } from '../utils/calendarDates.js';
+import { localDayStart, readOfficeLocalClock } from './attendancePolicy.js';
 import { getCompanySettings } from './companySettings.js';
 import { CtcStructureError, computeCtcStructure } from './ctcStructure.js';
 import { InvitationError, createInvitation, resendInvitation } from './invitationService.js';
@@ -45,9 +60,6 @@ import { PdfProtectionError } from './pdfProtection.js';
 import { PdfRenderError } from './pdfGenerationService.js';
 import { ServiceError, assertCurrentVersion, saveVersioned } from './serviceError.js';
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
-const ACTIVATION_VALIDITY_MS = ONBOARDING_SETTINGS.ACTIVATION_VALIDITY_HOURS * HOUR_MS;
 const PDF_MEDIA_TYPE = 'application/pdf';
 
 const conflict = (code) => new ServiceError(HTTP_STATUS.CONFLICT, code, ONBOARDING_MESSAGES[code]);
@@ -102,8 +114,22 @@ const plainOfferTerms = (settings) => {
     signatoryName: terms.signatoryName ?? null,
     signatoryTitle: terms.signatoryTitle ?? null,
     additionalClauses: [...terms.additionalClauses],
+    shiftTimings: terms.shiftTimings ?? null,
+    confidentialityClause: terms.confidentialityClause,
+    ipAssignmentClause: terms.ipAssignmentClause,
+    nonSolicitationClause: terms.nonSolicitationClause,
+    nonSolicitationMonths: terms.nonSolicitationMonths,
+    esopNote: terms.esopNote ?? null,
+    joiningChecklist: [...terms.joiningChecklist],
   };
 };
+
+/** An offer's own terms: what HR set, else the settings'; the deadline stays null until sent. */
+const resolvedTermsOf = (offer, settings) => ({
+  probationMonths: offer.terms?.probationMonths ?? settings.offerTerms.probationMonths,
+  noticePeriodDays: offer.terms?.noticePeriodDays ?? settings.offerTerms.noticePeriodDays,
+  offerValidUntil: offer.terms?.offerValidUntil ?? null,
+});
 
 export function toSettingsSummary(settings) {
   return { compensation: plainCompensation(settings), offerTerms: plainOfferTerms(settings), version: settings.__v };
@@ -139,7 +165,11 @@ function structureFor(offer, policy) {
     );
   } catch (structureError) {
     if (structureError instanceof CtcStructureError) {
-      throw new ServiceError(HTTP_STATUS.BAD_REQUEST, 'CTC_TOO_LOW', ONBOARDING_MESSAGES.CTC_TOO_LOW);
+      const message =
+        structureError.code === 'SPLIT_DOES_NOT_ADD_UP'
+          ? ONBOARDING_MESSAGES.SPLIT_DOES_NOT_ADD_UP(structureError.details.expectedSpecialAllowanceAnnual)
+          : ONBOARDING_MESSAGES[structureError.code];
+      throw new ServiceError(HTTP_STATUS.BAD_REQUEST, structureError.code, message);
     }
     if (structureError instanceof PayrollInputError) {
       throw new ServiceError(HTTP_STATUS.BAD_REQUEST, 'PAYROLL_INPUT_INVALID', ONBOARDING_MESSAGES.INPUT_INVALID);
@@ -164,10 +194,30 @@ async function loadPositionNames(position) {
   return { departmentName: department.name, managerName: manager?.name ?? null };
 }
 
+/** The leave a new employee earns, for the letter's terms: active leave types with a yearly quota. */
+export async function loadLeavePolicy() {
+  const leaveTypes = await LeaveType.find({ isActive: true, 'accrual.annualQuotaDays': { $gt: 0 } })
+    .select('name accrual.annualQuotaDays')
+    .sort({ name: 1 })
+    .lean();
+  return leaveTypes.map((leaveType) => ({ name: leaveType.name, annualDays: leaveType.accrual.annualQuotaDays }));
+}
+
 /** Everything compileOfferLetterHtml needs for this offer. */
 async function letterFor(offer, structure, settings, issuedOn) {
-  const [companySettings, names] = await Promise.all([getCompanySettings(), loadPositionNames(offer.position)]);
-  const terms = plainOfferTerms(settings);
+  const [companySettings, names, leavePolicy] = await Promise.all([
+    getCompanySettings(),
+    loadPositionNames(offer.position),
+    loadLeavePolicy(),
+  ]);
+  const terms = { ...plainOfferTerms(settings), ...resolvedTermsOf(offer, settings) };
+  // The last day to accept: the date HR set, else the settings' validity from the day it is issued.
+  const deadlineDate = terms.offerValidUntil
+    ? terms.offerValidUntil.toISOString().slice(0, 10)
+    : addDaysToCalendarDate(
+        readOfficeLocalClock(issuedOn, companySettings.timeZone).calendarDate,
+        terms.offerValidityDays,
+      );
   return {
     company: letterheadCompany(companySettings),
     candidate: { name: offer.candidate.name },
@@ -178,11 +228,15 @@ async function letterFor(offer, structure, settings, issuedOn) {
       dateOfJoining: offer.position.dateOfJoining,
       workLocationType: offer.position.workLocationType,
       employmentStatus: offer.position.employmentStatus,
+      employmentType: offer.position.employmentType,
     },
     structure,
+    stockOptions: { units: offer.compensation.esopUnits ?? 0, note: terms.esopNote },
     terms,
+    leavePolicy,
     issuedOn,
-    validUntil: new Date(issuedOn.getTime() + terms.offerValidityDays * DAY_MS),
+    validUntil: new Date(`${deadlineDate}T00:00:00Z`),
+    deadlineDate,
     companyTimeZone: companySettings.timeZone,
   };
 }
@@ -221,10 +275,59 @@ export async function calculateOffer(offer, { now = new Date() } = {}) {
 // Drafts
 // =================================================================================================
 
-export function toDraftSummary(draft) {
+export const OFFER_LIFECYCLE = Object.freeze({
+  INVITED: 'INVITED',
+  OFFER_SENT: 'OFFER_SENT',
+  ACCEPTED: 'ACCEPTED',
+  PROBATION: 'PROBATION',
+  JOINED: 'JOINED',
+  WITHDRAWN: 'WITHDRAWN',
+});
+
+/** The calendar date `months` after a "YYYY-MM-DD" date (the month's last day when it is shorter). */
+function addMonthsToCalendarDate(calendarDate, months) {
+  const [year, month, day] = calendarDate.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDay))).toISOString().slice(0, 10);
+}
+
+/**
+ * Where the candidate is (see the module comment), pure.
+ * @param {{ status: string, invitationStatus: string|null, dateOfJoining: string, probationMonths: number,
+ *   today: string }} facts  dates "YYYY-MM-DD"
+ */
+export function offerLifecycleOf({ status, invitationStatus, dateOfJoining, probationMonths, today }) {
+  if (status === DRAFT_STATUSES.CANCELLED || invitationStatus === INVITATION_STATUSES.REVOKED) {
+    return OFFER_LIFECYCLE.WITHDRAWN;
+  }
+  if (invitationStatus === INVITATION_STATUSES.ACCEPTED) {
+    if (today < dateOfJoining) return OFFER_LIFECYCLE.ACCEPTED;
+    return today < addMonthsToCalendarDate(dateOfJoining, probationMonths)
+      ? OFFER_LIFECYCLE.PROBATION
+      : OFFER_LIFECYCLE.JOINED;
+  }
+  return status === DRAFT_STATUSES.DISPATCHED ? OFFER_LIFECYCLE.OFFER_SENT : OFFER_LIFECYCLE.INVITED;
+}
+
+const calendarDateOf = (date) => date.toISOString().slice(0, 10);
+
+/**
+ * @param {object} draft
+ * @param {{ invitation?: { status: string, acceptedAt: Date|null }|null, now?: Date }} [context]
+ */
+export function toDraftSummary(draft, { invitation = null, now = new Date() } = {}) {
+  const dateOfJoining = calendarDateOf(draft.position.dateOfJoining);
   return {
     id: draft._id.toString(),
     status: draft.status,
+    lifecycle: offerLifecycleOf({
+      status: draft.status,
+      invitationStatus: invitation?.status ?? null,
+      dateOfJoining,
+      probationMonths: draft.terms.probationMonths,
+      today: calendarDateOf(now),
+    }),
+    acceptedAt: invitation?.acceptedAt?.toISOString() ?? null,
     candidate: {
       name: draft.candidate.name,
       personalEmail: draft.candidate.personalEmail,
@@ -243,7 +346,24 @@ export function toDraftSummary(draft) {
       jobLevel: draft.position.jobLevel,
       employmentType: draft.position.employmentType,
     },
-    compensation: { ...draft.compensation },
+    compensation: {
+      annualCtc: draft.compensation.annualCtc,
+      taxRegime: draft.compensation.taxRegime,
+      workCity: draft.compensation.workCity,
+      professionalTaxState: draft.compensation.professionalTaxState,
+      variablePayAnnual: draft.compensation.variablePayAnnual ?? 0,
+      esopUnits: draft.compensation.esopUnits ?? 0,
+      components: {
+        basicAnnual: draft.compensation.components?.basicAnnual ?? null,
+        hraAnnual: draft.compensation.components?.hraAnnual ?? null,
+        specialAllowanceAnnual: draft.compensation.components?.specialAllowanceAnnual ?? null,
+      },
+    },
+    terms: {
+      probationMonths: draft.terms.probationMonths,
+      noticePeriodDays: draft.terms.noticePeriodDays,
+      offerValidUntil: draft.terms.offerValidUntil ? calendarDateOf(draft.terms.offerValidUntil) : null,
+    },
     structure: draft.structure,
     settingsVersion: draft.settingsVersion,
     dispatch: {
@@ -264,7 +384,24 @@ const offerOf = (draft) => ({
   candidate: draft.candidate,
   position: draft.position,
   compensation: draft.compensation,
+  terms: draft.terms,
 });
+
+/** Summaries of drafts, each with its invitation's state (one query for all of them). */
+async function summarize(drafts, now = new Date()) {
+  const invitationIds = drafts.map((draft) => draft.dispatch?.invitationId).filter(Boolean);
+  const invitations = invitationIds.length
+    ? await EmployeeInvitation.find({ _id: { $in: invitationIds } })
+        .select('status acceptedAt')
+        .lean()
+    : [];
+  const invitationById = new Map(invitations.map((invitation) => [invitation._id.toString(), invitation]));
+  return drafts.map((draft) =>
+    toDraftSummary(draft, { invitation: invitationById.get(draft.dispatch?.invitationId?.toString()) ?? null, now }),
+  );
+}
+
+const summaryOf = async (draft) => (await summarize([draft]))[0];
 
 /** POST /create-draft */
 export async function createDraft({ offer, actorUserId }) {
@@ -275,17 +412,18 @@ export async function createDraft({ offer, actorUserId }) {
     candidate: offer.candidate,
     position: offer.position,
     compensation: offer.compensation,
+    terms: resolvedTermsOf(offer, settings),
     structure,
     settingsVersion: settings.__v,
     createdByUserId: actorUserId,
   });
-  return toDraftSummary(draft);
+  return summaryOf(draft);
 }
 
 export async function listDrafts({ status = null } = {}) {
   const filter = status ? { status } : {};
   const drafts = await OnboardingDraft.find(filter).sort({ createdAt: -1 }).limit(ONBOARDING_SETTINGS.DRAFT_LIST_LIMIT);
-  return drafts.map(toDraftSummary);
+  return summarize(drafts);
 }
 
 async function findDraft(draftId) {
@@ -295,7 +433,7 @@ async function findDraft(draftId) {
 }
 
 export async function getDraft(draftId) {
-  return toDraftSummary(await findDraft(draftId));
+  return summaryOf(await findDraft(draftId));
 }
 
 /** PATCH /drafts/:id: a new version of the offer, recomputed; only while it waits for review. */
@@ -310,13 +448,14 @@ export async function updateDraft({ draftId, offer, version, actorUserId }) {
     candidate: offer.candidate,
     position: offer.position,
     compensation: offer.compensation,
+    terms: resolvedTermsOf(offer, settings),
     structure,
     settingsVersion: settings.__v,
     updatedByUserId: actorUserId,
   });
   draft.markModified('structure');
   await saveVersioned(draft);
-  return toDraftSummary(draft);
+  return summaryOf(draft);
 }
 
 /** POST /drafts/:id/cancel */
@@ -326,7 +465,7 @@ export async function cancelDraft({ draftId, version, actorUserId }) {
   assertCurrentVersion(draft, version);
   draft.set({ status: DRAFT_STATUSES.CANCELLED, cancelledByUserId: actorUserId });
   await saveVersioned(draft);
-  return toDraftSummary(draft);
+  return summaryOf(draft);
 }
 
 // =================================================================================================
@@ -390,6 +529,9 @@ export async function dispatchDraft({ draftId, actor, appContext, now = new Date
   try {
     const settings = await getOnboardingSettings();
     if (!settings.offerTerms.signatoryName) throw conflict('SIGNATORY_MISSING');
+    if (before.terms?.offerValidUntil && calendarDateOf(before.terms.offerValidUntil) < calendarDateOf(now)) {
+      throw conflict('OFFER_EXPIRED');
+    }
     const structure = structureFor(offerOf(before), plainCompensation(settings));
     // The figures must be the ones that were reviewed.
     if (!isDeepStrictEqual(structure, before.structure)) throw conflict('DRAFT_FIGURES_CHANGED');
@@ -418,7 +560,9 @@ export async function dispatchDraft({ draftId, actor, appContext, now = new Date
 
   let sent;
   try {
-    const request = { inviter: actor, appContext, validityMs: ACTIVATION_VALIDITY_MS, composeEmail };
+    // The link works until the end of the deadline day, in the company's time zone.
+    const linkExpiresAt = localDayStart(addDaysToCalendarDate(letter.deadlineDate, 1), letter.companyTimeZone);
+    const request = { inviter: actor, appContext, expiresAt: linkExpiresAt, composeEmail };
     sent = before.dispatch?.invitationId
       ? await resendInvitation({ ...request, invitationId: before.dispatch.invitationId.toString() })
       : await createInvitation({ ...request, input: invitationInputOf(before) });
@@ -447,5 +591,5 @@ export async function dispatchDraft({ draftId, actor, appContext, now = new Date
     },
     { new: true },
   );
-  return { draft: toDraftSummary(draft), wasSent };
+  return { draft: await summaryOf(draft), wasSent };
 }

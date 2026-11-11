@@ -248,6 +248,99 @@ describe('onboarding offers: who may use them and what they accept', { skip: mon
     assert.equal(stale.body.error.code, 'STALE_VERSION');
   });
 
+  it('takes variable pay, stock options, a split HR sets and the offer’s own terms', async () => {
+    const calculated = await hrClient.post('/api/hr/onboarding/calculate', {
+      ...offerBody(departmentId),
+      variablePayAnnual: 2_50_000,
+      components: { basicAnnual: 10_00_000 },
+    });
+    assert.equal(calculated.status, 200, JSON.stringify(calculated.body));
+    const { structure } = calculated.body.data;
+    assert.equal(structure.fixedCtc.annual, 22_50_000);
+    assert.equal(structure.variablePay.annual, 2_50_000);
+    assert.equal(structure.earnings.basic.annual, 10_00_000);
+    assert.deepEqual(structure.splitSetBy, { basic: 'hr', hra: 'policy' });
+
+    const { offerTerms } = (await hrClient.get('/api/hr/onboarding/settings')).body.data.settings;
+    const draft = await createDraft(hrClient, departmentId, {
+      email: 'own.terms@example.com',
+      variablePayAnnual: 2_50_000,
+      esopUnits: 1_200,
+      terms: { probationMonths: 3, offerValidUntil: joiningIn(10) },
+    });
+    assert.equal(draft.lifecycle, 'INVITED');
+    assert.equal(draft.compensation.esopUnits, 1_200);
+    assert.deepEqual(draft.terms, {
+      probationMonths: 3,
+      noticePeriodDays: offerTerms.noticePeriodDays,
+      offerValidUntil: joiningIn(10),
+    });
+    const withDefaults = await createDraft(hrClient, departmentId, { email: 'default.terms@example.com' });
+    assert.equal(withDefaults.terms.probationMonths, offerTerms.probationMonths);
+    assert.equal(withDefaults.terms.offerValidUntil, null, 'the settings’ validity, counted from the day it is sent');
+  });
+
+  it('refuses a split that does not add up, naming the special allowance it would be', async () => {
+    const components = { basicAnnual: 10_00_000, hraAnnual: 4_00_000 };
+    const fitting = (await hrClient.post('/api/hr/onboarding/calculate', { ...offerBody(departmentId), components }))
+      .body.data.structure;
+    const special = fitting.earnings.specialAllowance.annual;
+    const response = await hrClient.post('/api/hr/onboarding/calculate', {
+      ...offerBody(departmentId),
+      components: { ...components, specialAllowanceAnnual: special + 500 },
+    });
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error.code, 'SPLIT_DOES_NOT_ADD_UP');
+    assert.equal(response.body.error.message, ONBOARDING_MESSAGES.SPLIT_DOES_NOT_ADD_UP(special));
+    const tooMuch = await hrClient.post('/api/hr/onboarding/calculate', {
+      ...offerBody(departmentId),
+      components: { basicAnnual: 20_00_000, hraAnnual: 5_00_000 },
+    });
+    assert.equal(tooMuch.body.error.code, 'SPLIT_EXCEEDS_GROSS');
+    const invalid = await hrClient.post('/api/hr/onboarding/calculate', {
+      ...offerBody(departmentId),
+      variablePayAnnual: 20_00_000,
+      esopUnits: -1,
+      components: { bonus: 1 },
+      terms: { probationMonths: 30, offerValidUntil: '2020-01-01' },
+    });
+    assert.deepEqual(fieldsOf(invalid), [
+      'components.bonus',
+      'esopUnits',
+      'terms.offerValidUntil',
+      'terms.probationMonths',
+      'variablePayAnnual',
+    ]);
+  });
+
+  it('lets HR word the clauses, shift timings and joining checklist, never leaving a clause empty', async () => {
+    const before = (await hrClient.get('/api/hr/onboarding/settings')).body.data.settings;
+    assert.equal(
+      before.offerTerms.confidentialityClause,
+      ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS.confidentialityClause,
+    );
+    assert.deepEqual(before.offerTerms.joiningChecklist, [...ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS.joiningChecklist]);
+    const saved = await hrClient.patch('/api/hr/onboarding/settings', {
+      offerTerms: { shiftTimings: '10 am to 7 pm', nonSolicitationMonths: 6, joiningChecklist: ['PAN card'] },
+      version: before.version,
+    });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.data.settings.offerTerms.shiftTimings, '10 am to 7 pm');
+    assert.deepEqual(saved.body.data.settings.offerTerms.joiningChecklist, ['PAN card']);
+    const emptied = await hrClient.patch('/api/hr/onboarding/settings', {
+      offerTerms: { ipAssignmentClause: '   ', joiningChecklist: 'PAN card' },
+      version: saved.body.data.settings.version,
+    });
+    assert.equal(emptied.status, 400);
+    assert.deepEqual(fieldsOf(emptied), ['offerTerms.joiningChecklist']);
+    const blankClause = await hrClient.patch('/api/hr/onboarding/settings', {
+      offerTerms: { ipAssignmentClause: '   ' },
+      version: saved.body.data.settings.version,
+    });
+    assert.equal(blankClause.status, 400);
+    assert.deepEqual(fieldsOf(blankClause), ['offerTerms.ipAssignmentClause']);
+  });
+
   it('keeps a draft for review, lets it be edited and cancelled, then no longer', async () => {
     const draft = await createDraft(hrClient, departmentId, { email: 'lifecycle@example.com' });
     assert.equal(draft.status, 'PENDING_REVIEW');
@@ -301,6 +394,14 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     } catch {
       return false;
     }
+  }
+
+  /** The number of pages of a locked PDF. */
+  async function pageCount(pdf, password) {
+    const pdfPath = path.join(workFolder, `pages-${createHash('sha256').update(pdf).digest('hex')}.pdf`);
+    await writeFile(pdfPath, pdf);
+    const { stdout } = await runFile(qpdfPath, ['--show-npages', `--password=${password}`, pdfPath]);
+    return Number(stdout.trim());
   }
 
   before(async () => {
@@ -361,7 +462,7 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     });
   });
 
-  it('sends once, creates the employee with a 48-hour link, and attaches the locked letter', async () => {
+  it('sends once, creates the employee with a link that works until the offer deadline, and attaches the locked letter', async () => {
     await setSignatory(hrClient);
     const draft = await createDraft(hrClient, departmentId, { email: 'asha.rao@example.com' });
     const codesBefore = await testServer.database
@@ -386,11 +487,14 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
       .find({ email: 'asha.rao@example.com' })
       .toArray();
     assert.equal(invitations.length, 1);
-    const validForMs = invitations[0].expiresAt.getTime() - new Date(sent.data.draft.dispatch.dispatchedAt).getTime();
-    assert.ok(
-      Math.abs(validForMs - ONBOARDING_SETTINGS.ACTIVATION_VALIDITY_HOURS * HOUR_MS) < 5_000,
-      `${validForMs} ms`,
-    );
+    // Accepting is activating, so the link works until the end of the offer's deadline day: the
+    // settings' validity from today, in the company's time zone (Asia/Kolkata, UTC+05:30).
+    const { offerValidityDays } = (await hrClient.get('/api/hr/onboarding/settings')).body.data.settings.offerTerms;
+    const todayInCompany = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const deadline = new Date(`${todayInCompany}T00:00:00Z`);
+    deadline.setUTCDate(deadline.getUTCDate() + offerValidityDays + 1);
+    const endOfDeadlineDay = new Date(`${deadline.toISOString().slice(0, 10)}T00:00:00+05:30`);
+    assert.equal(invitations[0].expiresAt.toISOString(), endOfDeadlineDay.toISOString());
 
     const [email] = await testServer.mailbox.waitForMessages('asha.rao@example.com', 1);
     assert.equal(testServer.mailbox.messagesTo('asha.rao@example.com').length, 1, 'exactly one email');
@@ -403,13 +507,15 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     assert.equal(createHash('sha256').update(letter.content).digest('hex'), sent.data.draft.dispatch.offerLetterSha256);
     assert.equal(await opens(letter.content, '15061995'), true, 'the date of birth opens it');
     assert.equal(await opens(letter.content, '01011990'), false, 'another password does not');
+    assert.equal(await pageCount(letter.content, '15061995'), 5, 'the five-page letter');
+    assert.equal(sent.data.draft.lifecycle, 'OFFER_SENT');
 
     const again = await hrClient.post(dispatchUrl, {});
     assert.equal(again.status, 409);
     assert.equal(again.body.error.code, 'DISPATCH_NOT_ALLOWED');
   });
 
-  it('activates within the 48 hours, and not after', async () => {
+  it('accepts by activating before the link ends, and not after', async () => {
     await setSignatory(hrClient);
     const manager = await onboardEmployee({
       testServer,
@@ -436,13 +542,29 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
         confirmPassword: STRONG_PASSWORD,
         acceptTerms: true,
       });
-    // 47 hours in: an hour left.
+    // An hour before the link ends.
     await invitations.updateOne(
       { email: 'on.time@example.com' },
       { $set: { expiresAt: new Date(Date.now() + HOUR_MS) } },
     );
     assert.equal((await accept(await tokenOf('on.time@example.com'))).status, 201);
-    // 49 hours in: an hour past.
+    const accepted = (await hrClient.get(`/api/hr/onboarding/drafts/${onTime.id}`)).body.data.draft;
+    assert.equal(accepted.lifecycle, 'ACCEPTED', 'activating the account accepts the offer');
+    assert.ok(accepted.acceptedAt);
+    // From the joining date, the probation months; after them, joined.
+    const drafts = testServer.database.collection('onboardingdrafts');
+    const { ObjectId } = testServer.database.base.Types;
+    await drafts.updateOne(
+      { _id: new ObjectId(onTime.id) },
+      { $set: { 'position.dateOfJoining': new Date(Date.now() - 30 * DAY_MS) } },
+    );
+    assert.equal((await hrClient.get(`/api/hr/onboarding/drafts/${onTime.id}`)).body.data.draft.lifecycle, 'PROBATION');
+    await drafts.updateOne(
+      { _id: new ObjectId(onTime.id) },
+      { $set: { 'position.dateOfJoining': new Date(Date.now() - 400 * DAY_MS) } },
+    );
+    assert.equal((await hrClient.get(`/api/hr/onboarding/drafts/${onTime.id}`)).body.data.draft.lifecycle, 'JOINED');
+    // An hour after it ended.
     await invitations.updateOne(
       { email: 'too.late@example.com' },
       { $set: { expiresAt: new Date(Date.now() - HOUR_MS) } },
@@ -450,6 +572,31 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     const refused = await accept(await tokenOf('too.late@example.com'));
     assert.notEqual(refused.status, 201);
     assert.match(JSON.stringify(refused.body), /expired/i);
+    assert.equal((await hrClient.get(`/api/hr/onboarding/drafts/${late.id}`)).body.data.draft.lifecycle, 'OFFER_SENT');
+  });
+
+  it('refuses to send an offer whose acceptance deadline has passed', async () => {
+    await setSignatory(hrClient);
+    const draft = await createDraft(hrClient, departmentId, {
+      email: 'past.deadline@example.com',
+      terms: { offerValidUntil: joiningIn(5) },
+    });
+    // Saved last week with a deadline that has since passed.
+    const { ObjectId } = testServer.database.base.Types;
+    await testServer.database
+      .collection('onboardingdrafts')
+      .updateOne(
+        { _id: new ObjectId(draft.id) },
+        { $set: { 'terms.offerValidUntil': new Date(Date.now() - 2 * DAY_MS) } },
+      );
+    const response = await hrClient.post(`/api/hr/onboarding/drafts/${draft.id}/dispatch`, {});
+    assert.equal(response.status, 409);
+    assert.equal(response.body.error.code, 'OFFER_EXPIRED');
+    assert.equal(
+      (await hrClient.get(`/api/hr/onboarding/drafts/${draft.id}`)).body.data.draft.status,
+      'PENDING_REVIEW',
+    );
+    assert.equal(testServer.mailbox.messagesTo('past.deadline@example.com').length, 0);
   });
 });
 
