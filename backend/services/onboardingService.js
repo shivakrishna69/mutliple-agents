@@ -27,6 +27,10 @@
  * unless HR set others, and its acceptance deadline is the date HR set or, without one, the settings'
  * validity from the day it is sent. A deadline already past refuses the dispatch (OFFER_EXPIRED).
  *
+ * Many offers at once (services/offerImport.js reads them from a CSV): draftFieldsFor computes a row
+ * exactly as POST /create-draft would, saveDrafts stores them all, and dispatchDrafts sends a chosen
+ * batch one by one through dispatchDraft, reporting each outcome rather than stopping at the first.
+ *
  * The candidate's lifecycle (offerLifecycleOf) follows from the draft and its invitation, so it is
  * never stored and cannot drift: INVITED (prepared, not sent) → OFFER_SENT → ACCEPTED (they activated
  * their account from the offer email) → PROBATION (from the joining date, for the probation months)
@@ -404,20 +408,36 @@ async function summarize(drafts, now = new Date()) {
 const summaryOf = async (draft) => (await summarize([draft]))[0];
 
 /** POST /create-draft */
-export async function createDraft({ offer, actorUserId }) {
-  const settings = await getOnboardingSettings();
-  const structure = structureFor(offer, plainCompensation(settings));
-  await loadPositionNames(offer.position);
-  const draft = await OnboardingDraft.create({
+/**
+ * What an offer is saved with under these settings: its inputs, resolved terms and structure.
+ * @throws {ServiceError} 400 CTC_TOO_LOW, SPLIT_EXCEEDS_GROSS, SPLIT_DOES_NOT_ADD_UP, PAYROLL_INPUT_INVALID
+ */
+export function draftFieldsFor(offer, settings) {
+  return {
     candidate: offer.candidate,
     position: offer.position,
     compensation: offer.compensation,
     terms: resolvedTermsOf(offer, settings),
-    structure,
+    structure: structureFor(offer, plainCompensation(settings)),
     settingsVersion: settings.__v,
-    createdByUserId: actorUserId,
-  });
+  };
+}
+
+/** POST /create-draft */
+export async function createDraft({ offer, actorUserId }) {
+  const settings = await getOnboardingSettings();
+  const fields = draftFieldsFor(offer, settings);
+  await loadPositionNames(offer.position);
+  const draft = await OnboardingDraft.create({ ...fields, createdByUserId: actorUserId });
   return summaryOf(draft);
+}
+
+/** Stores drafts prepared with draftFieldsFor (their departments and managers already checked), in order. */
+export async function saveDrafts(draftFields, actorUserId) {
+  const drafts = await OnboardingDraft.insertMany(
+    draftFields.map((fields) => ({ ...fields, createdByUserId: actorUserId })),
+  );
+  return summarize(drafts);
 }
 
 export async function listDrafts({ status = null } = {}) {
@@ -592,4 +612,48 @@ export async function dispatchDraft({ draftId, actor, appContext, now = new Date
     { new: true },
   );
   return { draft: await summaryOf(draft), wasSent };
+}
+
+export const BULK_SEND_OUTCOMES = Object.freeze({ SENT: 'sent', EMAIL_FAILED: 'email_failed', REFUSED: 'refused' });
+
+/**
+ * POST /drafts/bulk-send: each draft sent in turn through dispatchDraft, so every rule of a single
+ * send applies (one claim, reviewed figures, signatory, deadline). A draft that cannot be sent is
+ * reported with the reason a single send would give, and the rest still go.
+ * @param {{ draftIds: string[], actor: object, appContext: object }} request
+ * @returns {Promise<{ results: { draftId: string, outcome: string, code: string|null, message: string|null,
+ *   draft: object|null }[], counts: Record<string, number> }>}
+ */
+export async function dispatchDrafts({ draftIds, actor, appContext }) {
+  const results = [];
+  for (const draftId of draftIds) {
+    try {
+      const { draft, wasSent } = await dispatchDraft({ draftId, actor, appContext });
+      results.push({
+        draftId,
+        outcome: wasSent ? BULK_SEND_OUTCOMES.SENT : BULK_SEND_OUTCOMES.EMAIL_FAILED,
+        code: wasSent ? null : 'DISPATCH_EMAIL_FAILED',
+        message: wasSent ? null : ONBOARDING_MESSAGES.DISPATCH_EMAIL_FAILED,
+        draft,
+      });
+    } catch (sendError) {
+      if (!(sendError instanceof ServiceError)) {
+        logger.error('Offer could not be sent in a batch', { draftId, reason: sendError.message });
+      }
+      results.push({
+        draftId,
+        outcome: BULK_SEND_OUTCOMES.REFUSED,
+        code: sendError instanceof ServiceError ? sendError.code : 'UNEXPECTED_ERROR',
+        message: sendError instanceof ServiceError ? sendError.message : ONBOARDING_MESSAGES.BULK_SEND_UNEXPECTED,
+        draft: null,
+      });
+    }
+  }
+  const counts = Object.fromEntries(
+    Object.values(BULK_SEND_OUTCOMES).map((outcome) => [
+      outcome,
+      results.filter((result) => result.outcome === outcome).length,
+    ]),
+  );
+  return { results, counts };
 }
