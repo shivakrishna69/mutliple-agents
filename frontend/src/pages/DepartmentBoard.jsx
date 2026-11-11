@@ -1,22 +1,20 @@
 /**
  * A department's task board (/boards/:departmentId), for its people:
  *
- *   Active sprint   the active sprint's tasks in four columns, dragged between them by whoever may
- *                   move them (components/tasks/KanbanBoard.jsx); without an active sprint, the way to
- *                   the backlog
- *   Backlog         sprints being planned with their tasks, then the backlog; leads plan, start and
- *                   complete sprints and move tasks into them (components/tasks/BacklogPanel.jsx)
+ *   Board           everything on one screen (components/tasks/UnifiedBoard.jsx): the backlog with
+ *                   quick add and the sprints being planned on the left, the active sprint's four
+ *                   columns on the right; tasks are dragged between them as the viewer's rights allow
  *   Team overview   leads only (?view=team): each person's workload, a sprint's progress and
  *                   burndown, the unassigned backlog (components/tasks/TeamOverview.jsx)
- *   Filters         assignee (everyone, me, unassigned), status and type, on the sprint and backlog
+ *   Filters         assignee (everyone, me, unassigned), status and type, on the board
  *
- * The head (or an administrator) chooses the task leads from "Task leads" (TaskLeadsDialog). Tabs and
- * buttons follow the viewer's rights from the backend, which decides again on every request.
+ * The header shows the active sprint (name, dates, goal, days left) with the leads' Plan sprint and
+ * Complete sprint; the head (or an administrator) chooses the task leads there (TaskLeadsDialog).
+ * Tabs and buttons follow the viewer's rights from the backend, which decides again on every request.
  *
  * "Create task" opens the create dialog; any task opens its detail (?task=<id>, which is where
- * the backend's assignment notifications link). The view is kept in the address (?view=backlog).
- * A move is shown at once and sent; when the backend refuses it, the task goes back and the
- * backend's reason is shown.
+ * the backend's assignment notifications link). A move is shown at once and sent; when the backend
+ * refuses it, the task goes back and the backend's reason is shown.
  */
 
 import { useId, useMemo, useState } from 'react';
@@ -25,22 +23,32 @@ import { requestBoard, requestSprints, requestTaskUpdate, requestTasks } from '.
 import { useAuth } from '../auth/AuthContext.jsx';
 import { ArrowLeftIcon, PlusIcon, UsersIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import BacklogPanel from '../components/tasks/BacklogPanel.jsx';
-import KanbanBoard from '../components/tasks/KanbanBoard.jsx';
 import { CreateTaskDialog, SprintDialog, TaskDetailDialog } from '../components/tasks/TaskDialogs.jsx';
 import TaskLeadsDialog from '../components/tasks/TaskLeadsDialog.jsx';
 import TeamOverview from '../components/tasks/TeamOverview.jsx';
-import { Badge, Button, EmptyState, LoadingBlock, Notice, Tabs, formatDate } from '../components/ui.jsx';
+import UnifiedBoard from '../components/tasks/UnifiedBoard.jsx';
+import { Badge, Button, LoadingBlock, Notice, Tabs, formatDate } from '../components/ui.jsx';
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { ASSIGNEE_FILTERS, BOARD_COLUMNS, SPRINT_STATUSES, TASK_TYPE_OPTIONS } from '../constants/tasks.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
+import { useSprintTransition } from '../hooks/useSprintTransition.js';
+import { localToday } from '../utils/dates.js';
+import { sprintDates } from '../utils/sprintProgress.js';
 
 const VIEWS = Object.freeze([
-  { id: 'sprint', label: 'Active sprint' },
-  { id: 'backlog', label: 'Backlog' },
+  { id: 'board', label: 'Board' },
   { id: 'team', label: 'Team overview', isVisibleTo: (viewer) => viewer.canSeeTeamWork },
 ]);
-const DEFAULT_VIEW = 'sprint';
+const DEFAULT_VIEW = 'board';
+/** "Sprint 1 · 9 Nov 2026 – 20 Nov 2026 · 9 days left · Ship login", or that no sprint is active. */
+function sprintLine(sprint) {
+  if (!sprint) return 'No sprint is active';
+  const daysLeft = sprintDates(localToday(), sprint.endDate).length;
+  const left = daysLeft === 0 ? 'past its end date' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left`;
+  return [sprint.name, `${formatDate(sprint.startDate)} – ${formatDate(sprint.endDate)}`, left, sprint.goal]
+    .filter(Boolean)
+    .join(' · ');
+}
 const viewsFor = (viewer) => VIEWS.filter((candidate) => !candidate.isVisibleTo || candidate.isVisibleTo(viewer));
 const ALL = '';
 const STALE_VERSION = 'STALE_VERSION';
@@ -107,6 +115,13 @@ export default function DepartmentBoard() {
   const [dialog, setDialog] = useState(null);
   const [notice, setNotice] = useState(null);
   const [moveError, setMoveError] = useState(null);
+  const sprintTransition = useSprintTransition(departmentId, {
+    onDone: (message) => {
+      setNotice(message ?? null);
+      reloadAll();
+    },
+    onError: setMoveError,
+  });
 
   const board = boardResource.data?.board ?? null;
   const views = board ? viewsFor(board.viewer) : [];
@@ -141,13 +156,16 @@ export default function DepartmentBoard() {
     tasksResource.reload();
   }
 
-  async function moveTask(task, { status, orderIndex }) {
+  /** @param {{ status?: string, sprintId?: string|null, orderIndex?: number }} move */
+  async function moveTask(task, move) {
     setMoveError(null);
-    const changes = { orderIndex, ...(status !== task.status ? { status } : {}) };
-    replaceTask({ ...task, status, orderIndex });
+    const changes = { ...move };
+    if (changes.status === task.status) delete changes.status;
+    replaceTask({ ...task, ...move });
     try {
       const result = await requestTaskUpdate(departmentId, task.id, { ...changes, version: task.version }, csrfToken);
       replaceTask(result.task);
+      if (changes.sprintId !== undefined) sprintsResource.reload();
     } catch (updateError) {
       replaceTask(task);
       setMoveError(toDisplayError(updateError));
@@ -182,24 +200,34 @@ export default function DepartmentBoard() {
     );
   }
 
-  const sprintTasks = activeSprint ? visibleTasks.filter((task) => task.sprintId === activeSprint.id) : [];
+  const canPlan = board.viewer.canPlanSprints;
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-8">
+    <div className="mx-auto max-w-screen-2xl space-y-6 px-4 py-8 sm:px-8">
       {backLink}
       <PageHeader
         title={`${board.department.name} board`}
-        description={
-          activeSprint
-            ? `${activeSprint.name} · ${formatDate(activeSprint.startDate)} – ${formatDate(activeSprint.endDate)}${activeSprint.goal ? ` · ${activeSprint.goal}` : ''}`
-            : 'No sprint is active'
-        }
+        description={sprintLine(activeSprint)}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {board.viewer.role === 'LEAD' && <Badge tone="violet">Task lead</Badge>}
             {board.viewer.canChooseLeads && (
               <Button variant="secondary" onClick={() => setDialog({ kind: 'leads' })}>
                 <UsersIcon className="h-4 w-4" />
                 Task leads
+              </Button>
+            )}
+            {canPlan && (
+              <Button variant="secondary" onClick={() => setDialog({ kind: 'sprint' })}>
+                Plan sprint
+              </Button>
+            )}
+            {canPlan && activeSprint && (
+              <Button
+                variant="secondary"
+                onClick={() => sprintTransition.transition(activeSprint, SPRINT_STATUSES.COMPLETED)}
+                isBusy={sprintTransition.busySprintId === activeSprint.id}
+              >
+                Complete sprint
               </Button>
             )}
             <Button onClick={() => setDialog({ kind: 'create' })}>
@@ -222,46 +250,22 @@ export default function DepartmentBoard() {
       />
       {view !== 'team' && <FilterBar filters={filters} onChange={setFilters} />}
 
-      {view === 'sprint' &&
-        (activeSprint ? (
-          <KanbanBoard
-            tasks={sprintTasks}
-            viewer={board.viewer}
-            currentUserId={currentUser.id}
-            onOpen={(task) => setParameter('task', task.id)}
-            onMove={moveTask}
-          />
-        ) : (
-          <EmptyState
-            title="No sprint is active"
-            description={
-              board.viewer.canPlanSprints
-                ? 'Plan a sprint in the backlog, move tasks into it, and start it.'
-                : 'When a task lead starts a sprint, its tasks appear here.'
-            }
-            action={
-              <Button variant="secondary" onClick={() => setParameter('view', 'backlog')}>
-                Go to the backlog
-              </Button>
-            }
-          />
-        ))}
-      {view === 'backlog' && (
-        <BacklogPanel
+      {view === 'board' && (
+        <UnifiedBoard
           departmentId={departmentId}
           board={board}
           sprints={sprints}
           tasks={visibleTasks}
+          activeSprint={activeSprint}
+          currentUserId={currentUser.id}
+          busySprintId={sprintTransition.busySprintId}
           onOpen={(task) => setParameter('task', task.id)}
-          onTaskChanged={(task) => {
-            replaceTask(task);
-            sprintsResource.reload();
-          }}
-          onSprintsChanged={(message) => {
+          onMove={moveTask}
+          onStartSprint={(sprint) => sprintTransition.transition(sprint, SPRINT_STATUSES.ACTIVE)}
+          onCreated={(task, message) => {
             setNotice(message ?? null);
-            reloadAll();
+            replaceTask(task);
           }}
-          onPlanSprint={() => setDialog({ kind: 'sprint' })}
         />
       )}
       {view === 'team' && sprintsResource.data && (
@@ -291,7 +295,7 @@ export default function DepartmentBoard() {
           departmentId={departmentId}
           board={board}
           plannableSprints={plannableSprints}
-          defaultSprintId={view === 'sprint' ? (activeSprint?.id ?? null) : null}
+          defaultSprintId={null}
           onClose={() => setDialog(null)}
           onCreated={(task, message) => {
             setDialog(null);
