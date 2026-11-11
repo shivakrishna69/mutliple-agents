@@ -16,7 +16,7 @@
  * a card opens the task, where its status and sprint can be chosen.
  */
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { requestTaskCreation } from '../../api/tasksApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { BOARD_COLUMNS, SPRINT_STATUSES, TASK_LIMITS, TASK_STATUSES } from '../../constants/tasks.js';
@@ -89,6 +89,9 @@ export default function UnifiedBoard({
   onCreated,
 }) {
   const activeSprintId = activeSprint?.id ?? null;
+  // The ref answers drag-over at once (the first events come before React re-renders); the state
+  // dims the dragged card.
+  const draggedRef = useRef(null);
   const [dragged, setDragged] = useState(null);
   const [hoverKey, setHoverKey] = useState(null);
   const [folded, setFolded] = useState(() => new Set());
@@ -97,21 +100,33 @@ export default function UnifiedBoard({
   const sprintColumnTasks = (status) =>
     activeSprintId ? tasks.filter((task) => task.sprintId === activeSprintId && task.status === status) : [];
 
-  const allows = (target) => Boolean(dragged) && canDropTask(dragged, target, rightsOf(dragged), activeSprintId);
+  // Every drop target by key; elements name theirs in data-drop-target (cards also data-before-task).
+  const targetsByKey = Object.fromEntries([
+    [BACKLOG_TARGET.key, BACKLOG_TARGET],
+    ...planningSprints.map((sprint) => [sprint.id, { key: sprint.id, sprintId: sprint.id }]),
+    ...BOARD_COLUMNS.map((column) => [column.status, { key: column.status, status: column.status }]),
+  ]);
+
+  const allows = (target) => {
+    const task = draggedRef.current;
+    return Boolean(task && target) && canDropTask(task, target, rightsOf(task), activeSprintId);
+  };
 
   function startDrag(dragEvent, task) {
     dragEvent.dataTransfer.setData(DRAG_TYPE, task.id);
     dragEvent.dataTransfer.effectAllowed = 'move';
+    draggedRef.current = task;
     setDragged(task);
   }
 
   function endDrag() {
+    draggedRef.current = null;
     setDragged(null);
     setHoverKey(null);
   }
 
-  function drop(target, beforeTask = null) {
-    const task = dragged;
+  function drop(target, beforeTask) {
+    const task = draggedRef.current;
     endDrag();
     if (!task || beforeTask?.id === task.id || !canDropTask(task, target, rightsOf(task), activeSprintId)) return;
     if (target.status === undefined) {
@@ -126,35 +141,37 @@ export default function UnifiedBoard({
     });
   }
 
-  /** Drag-over and drop handlers for a target, taking the drop only when it is allowed. */
-  const dropZone = (target) => ({
-    onDragOver: (dragEvent) => {
-      if (!allows(target)) return;
-      dragEvent.preventDefault();
-      setHoverKey(target.key);
-    },
-    onDragLeave: () => setHoverKey((current) => (current === target.key ? null : current)),
-    onDrop: (dragEvent) => {
-      dragEvent.preventDefault();
-      drop(target);
-    },
-  });
-  const cardDropZone = (target, beforeTask) => ({
-    onDragOver: (dragEvent) => {
-      if (!allows(target)) return;
-      dragEvent.preventDefault();
-      setHoverKey(target.key);
-    },
-    onDrop: (dragEvent) => {
-      dragEvent.preventDefault();
-      dragEvent.stopPropagation();
-      drop(target, beforeTask);
-    },
-  });
-  const highlight = (target) =>
-    hoverKey === target.key && allows(target) ? 'bg-brand-50 ring-2 ring-brand-300 ring-inset' : '';
+  // A target takes the drag (and lights up) only when the drop is allowed there.
+  function handleDragOver(dragEvent) {
+    const target = targetsByKey[dragEvent.currentTarget.dataset.dropTarget];
+    if (!allows(target)) return;
+    dragEvent.preventDefault();
+    dragEvent.stopPropagation();
+    setHoverKey(target.key);
+  }
 
-  const card = (task, target) => (
+  function handleDragLeave(dragEvent) {
+    const key = dragEvent.currentTarget.dataset.dropTarget;
+    setHoverKey((current) => (current === key ? null : current));
+  }
+
+  function handleDrop(dragEvent) {
+    dragEvent.preventDefault();
+    dragEvent.stopPropagation();
+    const { dropTarget, beforeTask } = dragEvent.currentTarget.dataset;
+    drop(targetsByKey[dropTarget], tasks.find((task) => task.id === beforeTask) ?? null);
+  }
+
+  const dropProps = (key, beforeTaskId) => ({
+    'data-drop-target': key,
+    'data-before-task': beforeTaskId,
+    onDragOver: handleDragOver,
+    onDragLeave: handleDragLeave,
+    onDrop: handleDrop,
+  });
+  const highlight = (key) => (hoverKey === key ? 'bg-brand-50 ring-2 ring-brand-300 ring-inset' : '');
+
+  const card = (task, targetKey) => (
     <TaskCard
       key={task.id}
       task={task}
@@ -163,14 +180,14 @@ export default function UnifiedBoard({
       onOpen={onOpen}
       onDragStart={startDrag}
       onDragEnd={endDrag}
-      dropHandlers={target ? cardDropZone(target, task) : {}}
+      dropHandlers={targetKey ? dropProps(targetKey, task.id) : {}}
     />
   );
   const backlog = tasks.filter((task) => task.sprintId === null);
 
   return (
     <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 scroll-thin">
-      <div className="grid min-w-[72rem] grid-cols-[19rem_repeat(4,minmax(12rem,1fr))] divide-x divide-slate-200">
+      <div className="grid min-w-[56rem] grid-cols-[16rem_repeat(4,minmax(10rem,1fr))] divide-x divide-slate-200">
         {/* --- Backlog and planned sprints ---------------------------------------------------- */}
         <div className="flex max-h-[calc(100vh-14rem)] min-h-[28rem] flex-col bg-slate-50/70">
           <div className="space-y-3 border-b border-slate-200 p-3">
@@ -185,8 +202,8 @@ export default function UnifiedBoard({
           <div className="flex-1 space-y-3 overflow-y-auto p-3 scroll-thin">
             <section
               aria-label="Backlog"
-              {...dropZone(BACKLOG_TARGET)}
-              className={`min-h-16 rounded-xl p-1 transition ${highlight(BACKLOG_TARGET)}`}
+              {...dropProps(BACKLOG_TARGET.key)}
+              className={`min-h-16 rounded-xl p-1 transition ${highlight(BACKLOG_TARGET.key)}`}
             >
               {backlog.length === 0 ? (
                 <p className="px-2 py-3 text-sm text-slate-500">No unplanned tasks.</p>
@@ -195,7 +212,6 @@ export default function UnifiedBoard({
               )}
             </section>
             {planningSprints.map((sprint) => {
-              const target = { key: sprint.id, sprintId: sprint.id };
               const sprintTasks = tasks.filter((task) => task.sprintId === sprint.id);
               const points = sprintTasks.reduce((sum, task) => sum + (task.storyPoints ?? 0), 0);
               const isOpen = !folded.has(sprint.id);
@@ -203,8 +219,8 @@ export default function UnifiedBoard({
                 <section
                   key={sprint.id}
                   aria-label={sprint.name}
-                  {...dropZone(target)}
-                  className={`rounded-xl bg-white ring-1 ring-slate-200 transition ${highlight(target)}`}
+                  {...dropProps(sprint.id)}
+                  className={`rounded-xl bg-white ring-1 ring-slate-200 transition ${highlight(sprint.id)}`}
                 >
                   <header className="flex items-start justify-between gap-2 px-3 py-2.5">
                     <button
@@ -261,14 +277,13 @@ export default function UnifiedBoard({
 
         {/* --- The active sprint's columns ---------------------------------------------------- */}
         {BOARD_COLUMNS.map((column) => {
-          const target = { key: column.status, status: column.status };
           const columnTasks = sprintColumnTasks(column.status);
           return (
             <section
               key={column.status}
               aria-label={column.label}
-              {...dropZone(target)}
-              className={`flex max-h-[calc(100vh-14rem)] min-h-[28rem] flex-col transition ${highlight(target)}`}
+              {...dropProps(column.status)}
+              className={`flex max-h-[calc(100vh-14rem)] min-h-[28rem] flex-col transition ${highlight(column.status)}`}
             >
               <h3 className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-xs font-semibold tracking-wide text-slate-600 uppercase">
                 {column.label}
@@ -285,7 +300,9 @@ export default function UnifiedBoard({
                       : 'When a task lead starts a sprint, its tasks appear here.'}
                   </p>
                 ) : (
-                  <ul className="flex min-h-full flex-col gap-2">{columnTasks.map((task) => card(task, target))}</ul>
+                  <ul className="flex min-h-full flex-col gap-2">
+                    {columnTasks.map((task) => card(task, column.status))}
+                  </ul>
                 )}
               </div>
             </section>
