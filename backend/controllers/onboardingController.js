@@ -16,6 +16,11 @@
  *   POST  /drafts/:draftId/cancel     { version }
  *   POST  /drafts/:draftId/dispatch   send it: 200 when the email went out, 202 when the employee
  *                                     was created but the email failed (dispatch again to retry)
+ *   POST  /drafts/import              a CSV (multipart, field "file"): every row a draft for review
+ *                                     (201), or nothing created and every problem by line and column
+ *                                     (400, details { line, field, message })
+ *   POST  /drafts/bulk-send           { draftIds }: each sent in turn (as dispatch); 200 with every
+ *                                     draft's outcome (sent, email_failed, refused with its reason)
  */
 
 import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
@@ -23,11 +28,13 @@ import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ONBOARDING_MESSAGES } from '../constants/messages.js';
 import { DRAFT_STATUSES } from '../models/OnboardingDraft.js';
 import { loadEmailContext } from '../services/companySettings.js';
+import { importOfferDrafts } from '../services/offerImport.js';
 import {
   calculateOffer,
   cancelDraft,
   createDraft,
   dispatchDraft,
+  dispatchDrafts,
   getDraft,
   getOnboardingSettings,
   listDrafts,
@@ -36,6 +43,7 @@ import {
   updateOnboardingSettings,
 } from '../services/onboardingService.js';
 import {
+  validateBulkSend,
   validateOfferEdit,
   validateOfferInput,
   validateSettingsChanges,
@@ -101,6 +109,38 @@ export const postDraft = onboardingHandler('create_offer_draft', OFFERS_AUDITED,
     message: ONBOARDING_MESSAGES.DRAFT_CREATED,
     data: { draft },
     auditDetails: { draftId: draft.id },
+  };
+});
+
+/** POST /drafts/import (multipart, field "file"): every row a draft for review, or every problem. */
+export const postDraftImport = onboardingHandler('import_offer_drafts', OFFERS_AUDITED, async (req) => {
+  requireOfferManager(req);
+  const result = await importOfferDrafts(req.file.buffer, { importer: { id: req.user.id, role: req.user.role } });
+  if (result.problems) {
+    return { validationErrors: result.problems, validationMessage: ONBOARDING_MESSAGES.IMPORT_ROWS_INVALID };
+  }
+  return {
+    httpStatus: HTTP_STATUS.CREATED,
+    message: ONBOARDING_MESSAGES.IMPORTED(result.drafts.length),
+    data: { drafts: result.drafts, ignoredColumns: result.ignoredColumns },
+    auditDetails: { draftCount: result.drafts.length },
+  };
+});
+
+/** POST /drafts/bulk-send { draftIds }: each sent in turn, every outcome reported. */
+export const postBulkSend = onboardingHandler('bulk_send_offers', OFFERS_AUDITED, async (req) => {
+  requireOfferManager(req);
+  const validation = validateBulkSend(req.body);
+  if (!validation.isValid) return { validationErrors: validation.validationErrors };
+  const { results, counts } = await dispatchDrafts({
+    draftIds: validation.sanitizedInput.draftIds,
+    actor: { id: req.user.id, name: req.user.name, role: req.user.role },
+    appContext: await loadEmailContext(req.app.locals.config),
+  });
+  return {
+    message: ONBOARDING_MESSAGES.BULK_SENT(counts),
+    data: { results, counts },
+    auditDetails: { requested: results.length, ...counts },
   };
 });
 

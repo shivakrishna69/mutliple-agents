@@ -182,6 +182,20 @@ export const offerDispatchRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OFFER_DISPATCHES,
 });
 
+export const offerImportRateLimitByUser = createRateLimiter({
+  limiterName: 'offer_imports_per_user',
+  ...RATE_LIMITS.OFFER_IMPORTS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OFFER_IMPORTS,
+});
+
+export const offerBulkSendRateLimitByUser = createRateLimiter({
+  limiterName: 'offer_bulk_sends_per_user',
+  ...RATE_LIMITS.OFFER_BULK_SENDS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_OFFER_DISPATCHES,
+});
+
 export const knowledgeUploadRateLimitByUser = createRateLimiter({
   limiterName: 'knowledge_uploads_per_user',
   ...RATE_LIMITS.KNOWLEDGE_UPLOADS_PER_USER,
