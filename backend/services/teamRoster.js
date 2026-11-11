@@ -12,6 +12,7 @@ import Department from '../models/Department.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../models/EmployeeProfile.js';
 import OfficeLocation from '../models/OfficeLocation.js';
 import User, { ACCOUNT_STATUSES } from '../models/User.js';
+import { calendarDateOfUtcInstant } from '../utils/calendarDates.js';
 import { readOfficeLocalClock } from './attendancePolicy.js';
 import { getCompanySettings } from './companySettings.js';
 import { ServiceError } from './serviceError.js';
@@ -56,13 +57,13 @@ export async function resolveTeamScope(viewer, { departmentId = null, forbidden 
  * @param {{ filter: object, now?: Date }} request
  * @returns {Promise<{ people: object[], officesById: Map<string, object>, companyTimeZone: string }>}
  *   Each person: { employeeId, userId, employeeCode, name, designation, department, officeId, office,
- *   reportingManagerId }; `office` is the lean office document (name, timeZone, workday) or null.
+ *   reportingManagerId, joinedOn (calendar date) }; `office` is the lean office document (name, timeZone, workday) or null.
  */
 export async function loadTeamRoster({ filter, now = new Date() }) {
   const profiles = await EmployeeProfile.find({ ...filter, 'organizationData.dateOfJoining': { $lte: now } })
     .select(
       'userId employeeCode organizationData.designation organizationData.departmentId ' +
-        'organizationData.officeLocationId organizationData.reportingManagerId',
+        'organizationData.officeLocationId organizationData.reportingManagerId organizationData.dateOfJoining',
     )
     .lean();
   const accounts = await User.find({
@@ -102,6 +103,9 @@ export async function loadTeamRoster({ filter, now = new Date() }) {
         officeId: officesById.has(officeId) ? officeId : null,
         office: officesById.get(officeId) ?? null,
         reportingManagerId: toIdString(profile.organizationData.reportingManagerId),
+        joinedOn: profile.organizationData.dateOfJoining
+          ? calendarDateOfUtcInstant(profile.organizationData.dateOfJoining)
+          : null,
       };
     })
     .sort((first, second) => first.name.localeCompare(second.name));
