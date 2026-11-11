@@ -48,7 +48,7 @@ export const TODAY_STATUSES = Object.freeze({
   NOT_IN: 'not_in',
 });
 
-const LEAVE_HALVES = Object.freeze({ FULL: 'FULL', ...DAY_HALVES });
+export const LEAVE_HALVES = Object.freeze({ FULL: 'FULL', ...DAY_HALVES });
 
 const isoOrNull = (date) => date?.toISOString() ?? null;
 
@@ -67,7 +67,7 @@ async function loadOfficeDays(officesById, dateByOfficeId) {
 }
 
 /** Approved leave on the employees' dates: "<employeeId>|<date>" -> FULL, FIRST or SECOND. */
-async function loadApprovedLeave(employeeIds, dates) {
+export async function loadApprovedLeave(employeeIds, dates) {
   const claims = await LeaveDayClaim.find({ employeeId: { $in: employeeIds }, date: { $in: dates } })
     .select('employeeId date half leaveRequestId')
     .lean();

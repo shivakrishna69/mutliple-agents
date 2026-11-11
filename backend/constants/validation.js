@@ -617,6 +617,14 @@ export const TASK_SETTINGS = Object.freeze({
   ORDER_GAP: 1_024,
 });
 
+/** Attendance analytics (services/attendanceAnalytics.js). */
+export const ATTENDANCE_ANALYTICS = Object.freeze({
+  // Arrival times are counted per slot of this many minutes (it divides a day evenly)...
+  ARRIVAL_SLOT_MINUTES: 30,
+  // ...over this many days, to today.
+  ARRIVAL_DAYS: 7,
+});
+
 /** In-app notifications (models/Notification.js). */
 export const NOTIFICATION_SETTINGS = Object.freeze({
   LISTED: 50,

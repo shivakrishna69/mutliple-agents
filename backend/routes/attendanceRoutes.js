@@ -16,7 +16,7 @@
 
 import { Router } from 'express';
 import { punchIn, punchOut, regularizeAttendance } from '../controllers/attendanceController.js';
-import { getMyToday, getToday } from '../controllers/attendanceTodayController.js';
+import { getAnalytics, getMyToday, getToday } from '../controllers/attendanceTodayController.js';
 import {
   decideRegularizationReview,
   listRegularizationReviews,
@@ -35,6 +35,7 @@ attendanceRouter.post('/punch-in', attendancePunchRateLimitByUser, punchIn);
 attendanceRouter.post('/punch-out', attendancePunchRateLimitByUser, punchOut);
 attendanceRouter.get('/me/today', getMyToday);
 attendanceRouter.get('/today', getToday);
+attendanceRouter.get('/analytics', getAnalytics);
 attendanceRouter.post('/regularize', regularizationRateLimitByUser, regularizeAttendance);
 attendanceRouter.get('/regularization-reviews', listRegularizationReviews);
 attendanceRouter.post('/regularization-reviews/:reviewId/decision', decideRegularizationReview);
