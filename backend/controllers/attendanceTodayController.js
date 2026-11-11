@@ -8,11 +8,18 @@
  *   GET /me/today
  *       The signed-in employee's own day, for their punch screen; 404 PROFILE_NOT_FOUND without an
  *       employee profile.
+ *   GET /analytics?month=YYYY-MM&departmentId=<id>
+ *       Attendance analytics (services/attendanceAnalytics.js) over the same people as the Today
+ *       board: each person's month with completion, departments, arrival times. 403
+ *       ANALYTICS_FORBIDDEN for anyone else; a month after the current one is refused.
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { ATTENDANCE_MESSAGES } from '../constants/messages.js';
+import { getAttendanceAnalytics } from '../services/attendanceAnalytics.js';
+import { readOfficeLocalClock } from '../services/attendancePolicy.js';
 import { getMyAttendanceDay, getTodayBoard } from '../services/attendanceToday.js';
+import { getCompanySettings } from '../services/companySettings.js';
 import { ServiceError } from '../services/serviceError.js';
 import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
@@ -48,4 +55,38 @@ export const getMyToday = todayHandler('view_own_day', ANYONE_READ, async (req) 
   const day = await getMyAttendanceDay({ userId: req.user.id });
   if (!day) throw new ServiceError(HTTP_STATUS.NOT_FOUND, 'PROFILE_NOT_FOUND', ATTENDANCE_MESSAGES.PROFILE_NOT_FOUND);
   return { message: ATTENDANCE_MESSAGES.MY_DAY_RETRIEVED, data: { day } };
+});
+
+const analyticsHandler = createWorkforceHandlerFactory({
+  auditCategory: 'attendance',
+  restrictedMessage: ATTENDANCE_MESSAGES.ANALYTICS_FORBIDDEN,
+  inputInvalidMessage: ATTENDANCE_MESSAGES.ANALYTICS_QUERY_INVALID,
+});
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** GET /api/attendance/analytics */
+export const getAnalytics = analyticsHandler('view_attendance_analytics', ANYONE_READ, async (req) => {
+  const { month, departmentId } = req.query;
+  const validationErrors = [];
+  if (month !== undefined && !MONTH_PATTERN.test(month)) {
+    validationErrors.push({ field: 'month', message: 'must be a month written YYYY-MM' });
+  }
+  if (departmentId !== undefined && !isValidObjectIdString(departmentId)) {
+    validationErrors.push({ field: 'departmentId', message: 'must be a department id' });
+  }
+  if (validationErrors.length > 0) return { validationErrors };
+  if (month !== undefined) {
+    const { timeZone } = await getCompanySettings();
+    if (month > readOfficeLocalClock(new Date(), timeZone).calendarDate.slice(0, 7)) {
+      throw new ServiceError(
+        HTTP_STATUS.UNPROCESSABLE_CONTENT,
+        'ANALYTICS_MONTH_AHEAD',
+        ATTENDANCE_MESSAGES.ANALYTICS_MONTH_AHEAD,
+      );
+    }
+  }
+  return {
+    message: ATTENDANCE_MESSAGES.ANALYTICS_RETRIEVED,
+    data: await getAttendanceAnalytics({ viewer: req.user, month: month ?? null, departmentId: departmentId ?? null }),
+  };
 });
