@@ -280,3 +280,58 @@ def test_excerpts_are_cut_at_a_word():
     assert excerpt.endswith("…")
     assert not excerpt[:-1].endswith(" ")
     assert excerpt_of("short", 40) == "short"
+
+
+# --- Documents written in the company's voice (the Data Engineering refusals) ----------------------
+
+PIPELINES = passage(
+    1,
+    "We review new pipeline requests every Tuesday. Approved requests are scheduled into the next sprint, "
+    "and we create the pipeline in Airflow with alerting on failure.",
+    heading_path=["Pipeline Requests"],
+)
+ON_CALL = passage(
+    2,
+    "The on-call engineer will investigate failed jobs and will contact the pipeline owner if a fix needs their input.",
+    heading_path=["On-call"],
+)
+
+
+async def test_an_answer_restating_the_documents_company_voice_is_answered_not_refused():
+    reply = (
+        "We review new pipeline requests every Tuesday [1]. Approved requests are scheduled into the next "
+        "sprint, and we create the pipeline in Airflow with alerting on failure [1]. "
+        "The on-call engineer will investigate failed jobs and will contact the pipeline owner [2]."
+    )
+    agent, _ = answerer([[reply]], passages=(PIPELINES, ON_CALL))
+    result = await agent.answer(question("How are new pipelines handled, and who looks at failures?"))
+    assert result.outcome is AnswerOutcome.ANSWERED, result.answer
+    assert result.answer == reply
+    assert [citation.number for citation in result.citations] == [1, 2]
+
+
+async def test_an_uncited_promise_is_still_removed_without_a_support_team_line():
+    reply = "We review new pipeline requests every Tuesday [1]. Our team will review your request shortly."
+    agent, _ = answerer([[reply]], passages=(PIPELINES, ON_CALL))
+    result = await agent.answer(question("When are pipeline requests reviewed?"))
+    assert result.outcome is AnswerOutcome.ANSWERED
+    assert result.answer == "We review new pipeline requests every Tuesday [1]."
+    assert "support team" not in result.answer
+
+
+@pytest.mark.parametrize("mark", ["[Passage 1]", "[passage 1]", "[Source 1]", "[^1]", "【1】"])
+async def test_common_ways_of_writing_a_citation_are_read_as_one(mark):
+    agent, _ = answerer([[f"We review new pipeline requests every Tuesday {mark}."]], passages=(PIPELINES,))
+    result = await agent.answer(question("When are pipeline requests reviewed?"))
+    assert result.outcome is AnswerOutcome.ANSWERED
+    assert result.answer == "We review new pipeline requests every Tuesday [1]."
+
+
+async def test_the_prompt_asks_for_partial_answers_and_not_found_only_without_relevance():
+    agent, model = answerer([["You get 24 days [1]."]])
+    await agent.answer(question())
+    system = model.received_inputs[0][0].content
+    assert "answer only part of it" in system
+    assert "say plainly which part" in system
+    assert "never invent a policy" in system
+    assert "Only when no passage is relevant to the question at all" in system
