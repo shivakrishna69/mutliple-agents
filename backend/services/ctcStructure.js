@@ -3,27 +3,36 @@
  * components, and what the employee takes home. Deterministic: the same inputs and policy always
  * give the same figures, to the rupee.
  *
+ * The CTC may include a variable (performance) part, paid as the company's policy decides: it is set
+ * aside first, and the rest, the fixed CTC, is what the components below split. HR may also set
+ * Basic and HRA themselves (and state the special allowance they expect): Special allowance stays the
+ * balancing figure, so a split that cannot add up is refused rather than adjusted.
+ *
  * Statutory rules are not repeated here: rates, ceilings and city lists come from
  * utils/payroll/rules.js, and income tax, professional tax and the employee's ESI from the FY
  * 2026-27 tax engine (utils/payrollCalculator.js computeTaxLiability). The company's own choices
  * come from its compensation policy (models/OnboardingSettings.js).
  *
- *   Basic            = CTC × policy Basic share
- *   HRA              = Basic × 50% in the 8 cities of HRA_FIFTY_PERCENT_CITIES, else × 40% (policy)
+ *   Fixed CTC        = CTC − variable pay
+ *   Basic            = Fixed CTC × policy Basic share (or as HR set it)
+ *   HRA              = Basic × 50% in the 8 cities of HRA_FIFTY_PERCENT_CITIES, else × 40% (policy),
+ *                      or as HR set it
  *   Employer PF      = 12% of monthly Basic, on wages up to the EPF wage ceiling in force on the
  *                      joining date (₹15,000 before 17 Sep 2026, ₹25,000 from then), or on the
  *                      whole Basic when the policy says so; × 12. The employee pays the same.
  *   Gratuity         = Basic × 15 / (26 × 12), only when the policy counts it inside the CTC
- *   Gross            = CTC − employer PF − gratuity − employer ESI
+ *   Gross            = Fixed CTC − employer PF − gratuity − employer ESI
  *   Employer ESI     = 3.25% of gross, only while gross ≤ ₹21,000 a month (so gross is solved for)
  *   Special allowance= Gross − Basic − HRA  (the balancing figure; never negative)
  *   Take-home        = Gross − employee PF − employee ESI − professional tax − income tax
+ *                      (the variable pay is taxed when it is paid, so it is left out of both)
  *
  * Rounding: every annual figure is whole rupees and the annual figures are authoritative. Each is
  * also shown per month as ⌊annual ÷ 12⌋, with the rupees left over (annualRemainder, 0-11) shown
  * rather than lost, so monthly × 12 + annualRemainder = annual exactly. Invariants:
  *   Basic + HRA + Special allowance = Gross
- *   Gross + employer PF + gratuity + employer ESI = CTC
+ *   Gross + employer PF + gratuity + employer ESI = Fixed CTC
+ *   Fixed CTC + variable pay = CTC
  *   Gross − employee deductions = Take-home
  */
 
@@ -45,12 +54,19 @@ const SUPER_SENIOR_AGE = 80;
 
 export const HRA_CITY_KINDS = Object.freeze({ FIFTY_PERCENT_CITY: 'fifty_percent_city', OTHER_CITY: 'other_city' });
 
-/** The CTC cannot cover the policy's fixed components; `code` is CTC_TOO_LOW. */
+/**
+ * The offer cannot be split as asked; `code`:
+ *   CTC_TOO_LOW            the fixed CTC cannot cover the policy's Basic, HRA and employer contributions
+ *   SPLIT_EXCEEDS_GROSS    the Basic and HRA HR set leave a negative special allowance
+ *   SPLIT_DOES_NOT_ADD_UP  the special allowance HR stated is not the balancing figure;
+ *                          `details.expectedSpecialAllowanceAnnual` is
+ */
 export class CtcStructureError extends Error {
-  constructor(code) {
+  constructor(code, details = null) {
     super(code);
     this.name = 'CtcStructureError';
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -93,33 +109,44 @@ function grossAndEmployerEsi(amountForGrossAndEsi) {
 }
 
 /**
- * @param {{ annualCtc: number, taxRegime: 'new'|'old', workCity: string, professionalTaxState: string,
- *   gender?: string|null, dateOfBirth?: Date|null, joiningDate: Date }} offer
- *   annualCtc in whole rupees; joiningDate and dateOfBirth at midnight UTC of their day
+ * @param {{ annualCtc: number, variablePayAnnual?: number, taxRegime: 'new'|'old', workCity: string,
+ *   professionalTaxState: string, gender?: string|null, dateOfBirth?: Date|null, joiningDate: Date,
+ *   components?: { basicAnnual?: number|null, hraAnnual?: number|null, specialAllowanceAnnual?: number|null } }} offer
+ *   amounts in whole rupees a year; joiningDate and dateOfBirth at midnight UTC of their day
  * @param {{ basicShareBasisPoints: number, hraFiftyPercentCityBasisPoints: number,
  *   hraOtherCityBasisPoints: number, pfOnFullBasic: boolean, includeGratuityInCtc: boolean }} policy
  * @returns {object} the structure (see the return statement)
- * @throws {CtcStructureError} CTC_TOO_LOW
+ * @throws {CtcStructureError} CTC_TOO_LOW, SPLIT_EXCEEDS_GROSS, SPLIT_DOES_NOT_ADD_UP
  * @throws {PayrollInputError} from the tax engine (e.g. gender missing for Maharashtra PT)
  */
 export function computeCtcStructure(offer, policy) {
   const { annualCtc, taxRegime, workCity, professionalTaxState, joiningDate } = offer;
+  const variablePay = offer.variablePayAnnual ?? 0;
+  const components = offer.components ?? {};
+  const basicSet = components.basicAnnual ?? null;
+  const hraSet = components.hraAnnual ?? null;
+  const fixedCtc = annualCtc - variablePay;
 
-  const basic = roundToNearestRupee(applyRate(annualCtc, policy.basicShareBasisPoints));
+  const basic = basicSet ?? roundToNearestRupee(applyRate(fixedCtc, policy.basicShareBasisPoints));
   const isFiftyPercentCity = isHraFiftyPercentCity(workCity);
   const hraRateBasisPoints = isFiftyPercentCity
     ? policy.hraFiftyPercentCityBasisPoints
     : policy.hraOtherCityBasisPoints;
-  const hra = roundToNearestRupee(applyRate(basic, hraRateBasisPoints));
+  const hra = hraSet ?? roundToNearestRupee(applyRate(basic, hraRateBasisPoints));
   const providentFund = providentFundFor(basic, joiningDate, policy.pfOnFullBasic);
   const gratuity = policy.includeGratuityInCtc
     ? roundToNearestRupee(
         (basic * GRATUITY_RULES.daysWagesPerYear) / (GRATUITY_RULES.workingDaysPerMonth * MONTHS_PER_YEAR),
       )
     : 0;
-  const { gross, employerEsi } = grossAndEmployerEsi(annualCtc - providentFund.annual - gratuity);
+  const { gross, employerEsi } = grossAndEmployerEsi(fixedCtc - providentFund.annual - gratuity);
   const specialAllowance = gross - basic - hra;
-  if (specialAllowance < 0) throw new CtcStructureError('CTC_TOO_LOW');
+  const isSplitSet = basicSet !== null || hraSet !== null;
+  if (specialAllowance < 0) throw new CtcStructureError(isSplitSet ? 'SPLIT_EXCEEDS_GROSS' : 'CTC_TOO_LOW');
+  const specialStated = components.specialAllowanceAnnual ?? null;
+  if (specialStated !== null && specialStated !== specialAllowance) {
+    throw new CtcStructureError('SPLIT_DOES_NOT_ADD_UP', { expectedSpecialAllowanceAnnual: specialAllowance });
+  }
 
   const taxAnalysis = computeTaxLiability(
     { annualGross: gross, annualBasic: basic, annualHraReceived: hra },
@@ -140,6 +167,9 @@ export function computeCtcStructure(offer, policy) {
 
   return {
     annualCtc,
+    fixedCtc: splitAnnual(fixedCtc),
+    variablePay: splitAnnual(variablePay),
+    splitSetBy: { basic: basicSet === null ? 'policy' : 'hr', hra: hraSet === null ? 'policy' : 'hr' },
     taxRegime,
     taxYear: taxAnalysis.financialYear,
     policy: { ...policy },

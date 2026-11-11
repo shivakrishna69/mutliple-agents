@@ -38,9 +38,10 @@ function assertInvariants(structure) {
   );
   assert.equal(
     earnings.gross.annual + employer.providentFund.annual + employer.esi.annual + employer.gratuity.annual,
-    annualCtc,
+    structure.fixedCtc.annual,
     label,
   );
+  assert.equal(structure.fixedCtc.annual + structure.variablePay.annual, annualCtc, label);
   assert.equal(employer.total.annual, employer.providentFund.annual + employer.esi.annual + employer.gratuity.annual);
   assert.equal(
     employee.total.annual,
@@ -173,6 +174,49 @@ describe('computeCtcStructure: policy and statutory variations', () => {
   });
 });
 
+describe('computeCtcStructure: variable pay and a split HR sets', () => {
+  it('sets the variable pay aside and splits the fixed CTC, leaving the variable out of take-home', () => {
+    const plain = structureFor(18_00_000 - 2_00_000);
+    const withVariable = structureFor(18_00_000, { variablePayAnnual: 2_00_000 });
+    assert.equal(withVariable.annualCtc, 18_00_000);
+    assert.equal(withVariable.fixedCtc.annual, 16_00_000);
+    assert.equal(withVariable.variablePay.annual, 2_00_000);
+    assert.deepEqual(withVariable.earnings, plain.earnings, 'the fixed part splits as a CTC of that size would');
+    assert.deepEqual(withVariable.takeHome, plain.takeHome);
+    assertInvariants(withVariable);
+  });
+
+  it('takes Basic and HRA as HR set them, with the special allowance balancing', () => {
+    const structure = structureFor(12_00_000, { components: { basicAnnual: 5_40_000, hraAnnual: 2_00_000 } });
+    assert.equal(structure.earnings.basic.annual, 5_40_000);
+    assert.equal(structure.earnings.hra.annual, 2_00_000);
+    assert.deepEqual(structure.splitSetBy, { basic: 'hr', hra: 'hr' });
+    assertInvariants(structure);
+    const stated = structureFor(12_00_000, {
+      components: {
+        basicAnnual: 5_40_000,
+        hraAnnual: 2_00_000,
+        specialAllowanceAnnual: structure.earnings.specialAllowance.annual,
+      },
+    });
+    assert.deepEqual(stated.earnings, structure.earnings, 'a stated special allowance that adds up is accepted');
+    assert.deepEqual(structureFor(12_00_000).splitSetBy, { basic: 'policy', hra: 'policy' });
+  });
+
+  it('refuses a split that cannot add up, saying what the special allowance would be', () => {
+    const components = { basicAnnual: 5_40_000, hraAnnual: 2_00_000 };
+    const expected = structureFor(12_00_000, { components }).earnings.specialAllowance.annual;
+    assert.throws(
+      () => structureFor(12_00_000, { components: { ...components, specialAllowanceAnnual: expected + 1 } }),
+      (error) => error.code === 'SPLIT_DOES_NOT_ADD_UP' && error.details.expectedSpecialAllowanceAnnual === expected,
+    );
+    assert.throws(
+      () => structureFor(12_00_000, { components: { basicAnnual: 9_00_000, hraAnnual: 4_50_000 } }),
+      (error) => error instanceof CtcStructureError && error.code === 'SPLIT_EXCEEDS_GROSS',
+    );
+  });
+});
+
 describe('computeCtcStructure: no rounding leaks', () => {
   it('accounts for every rupee of a CTC that does not divide by 12', () => {
     for (const ctc of [10_00_001, 7_77_777, 12_34_567]) assertInvariants(structureFor(ctc));
@@ -189,7 +233,9 @@ describe('computeCtcStructure: no rounding leaks', () => {
     const states = ['KA', 'NONE'];
     for (let run = 0; run < 500; run += 1) {
       const ctc = 2_50_000 + Math.floor(next() * (2_00_00_000 - 2_50_000));
+      const variablePayAnnual = run % 4 === 0 ? Math.floor(ctc * next() * 0.2) : 0;
       const structure = structureFor(ctc, {
+        variablePayAnnual,
         workCity: cities[run % cities.length],
         professionalTaxState: states[run % states.length],
         taxRegime: run % 3 === 0 ? 'old' : 'new',
