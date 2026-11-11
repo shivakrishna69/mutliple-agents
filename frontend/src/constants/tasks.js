@@ -62,4 +62,10 @@ export const ACTIVITY_FIELD_LABELS = Object.freeze({
 /** Space between neighbouring tasks in a column (backend TASK_SETTINGS.ORDER_GAP). */
 export const ORDER_GAP = 1024;
 /** Limits the backend applies (TASK_SETTINGS), so the forms can say so before sending. */
-export const TASK_LIMITS = Object.freeze({ TITLE: 200, DESCRIPTION: 10_000, COMMENT: 5_000, STORY_POINTS: 100 });
+export const TASK_LIMITS = Object.freeze({
+  TITLE: 200,
+  DESCRIPTION: 10_000,
+  COMMENT: 5_000,
+  STORY_POINTS: 100,
+  LEADS: 20,
+});

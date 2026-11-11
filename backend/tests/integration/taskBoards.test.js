@@ -348,6 +348,36 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
     assert.equal(metrics.body.data.totals.points, 5);
     const all = (await engHead.client.get(`${boardPath(engineering)}/tasks/metrics`)).body.data;
     assert.equal(all.unassigned.tasksByStatus.TODO, 1);
+    assert.equal(all.sprint, null, 'no sprint chosen: no burndown');
+
+    const { sprint } = metrics.body.data;
+    assert.equal(sprint.id, sprintId);
+    assert.equal(sprint.burndown.totalPoints, 5);
+    assert.ok(
+      sprint.burndown.days.every((day) => day.remainingPoints === 5),
+      'nothing done yet',
+    );
+    assert.equal(sprint.burndown.days[0]?.date ?? '2026-11-09', '2026-11-09');
+    const lastDay = sprint.burndown.today < '2026-11-20' ? sprint.burndown.today : '2026-11-20';
+    assert.equal(sprint.burndown.days.at(-1)?.date ?? lastDay, lastDay, 'no days after today');
+  });
+
+  it('lists the unassigned backlog for leads, the most urgent first', async () => {
+    await create(engLead.client, { title: 'Urgent and unowned', priority: 'URGENT' });
+    await create(engLead.client, { title: 'Owned backlog work', assigneeId: dev1.userId });
+    const { unassignedBacklog } = (await engLead.client.get(`${boardPath(engineering)}/tasks/metrics`)).body.data;
+    assert.equal(unassignedBacklog.total, 2);
+    assert.deepEqual(
+      unassignedBacklog.tasks.map((task) => task.title),
+      ['Urgent and unowned', 'Unassigned idea'],
+    );
+    assert.equal(unassignedBacklog.tasks[0].description, undefined, 'listed without descriptions');
+    const financeBacklog = (await admin.get(`${boardPath(finance)}/tasks/metrics`)).body.data.unassignedBacklog;
+    assert.equal(
+      financeBacklog.tasks.some((task) => task.title === 'Urgent and unowned'),
+      false,
+      'per department',
+    );
   });
 
   it('sends unfinished tasks back to the backlog when a sprint completes, and closes the sprint to new work', async () => {
@@ -356,6 +386,9 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
     const active = sprints.find((sprint) => sprint.id === sprintId);
     assert.deepEqual(active.progress.tasksByStatus, { TODO: 0, IN_PROGRESS: 0, IN_REVIEW: 1, DONE: 1 });
     assert.equal(active.progress.pointsDone, 2);
+    const { burndown } = (await engLead.client.get(`${boardPath(engineering)}/tasks/metrics?sprintId=${sprintId}`)).body
+      .data.sprint;
+    if (burndown.days.length > 0) assert.equal(burndown.days.at(-1).remainingPoints, 3, 'done points burn down');
 
     const completed = await engLead.client.patch(`${boardPath(engineering)}/sprints/${sprintId}`, {
       status: 'COMPLETED',

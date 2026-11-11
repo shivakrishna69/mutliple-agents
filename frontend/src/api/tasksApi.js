@@ -6,9 +6,12 @@
  * Backend references (backend/controllers/taskBoardController.js), under /api/departments/:id:
  *   GET   /api/task-boards                the boards this person can open
  *   GET   /board                          people, leads, the viewer's rights, the active sprint
+ *   PUT   /task-leads                     the head (or an administrator) names the task leads
  *   GET   /sprints  POST /sprints  PATCH /sprints/:sprintId
  *   GET   /tasks?sprintId=&assignee=&status=   POST /tasks
  *   GET   /tasks/:taskId  PATCH /tasks/:taskId  POST /tasks/:taskId/comments
+ *   GET   /tasks/metrics?sprintId=        leads: each person's work, a sprint's burndown, the
+ *                                         unassigned backlog
  */
 
 import { sendApiRequest } from './httpClient.js';
@@ -30,6 +33,13 @@ async function change(method, endpointPath, requestPayload, csrfToken) {
 export const requestMyBoards = (callerSignal) => getData('/api/task-boards', callerSignal);
 
 export const requestBoard = (departmentId, callerSignal) => getData(`${boardPath(departmentId)}/board`, callerSignal);
+
+export const requestTaskLeadsUpdate = (departmentId, leadUserIds, version, csrfToken) =>
+  change('PUT', `${boardPath(departmentId)}/task-leads`, { leadUserIds, version }, csrfToken);
+
+/** @param {string|null} sprintId  a sprint id, "backlog", or null for all the department's work */
+export const requestTeamWork = (departmentId, sprintId, callerSignal) =>
+  getData(`${boardPath(departmentId)}/tasks/metrics${toQueryString({ sprintId })}`, callerSignal);
 
 export const requestSprints = (departmentId, callerSignal) =>
   getData(`${boardPath(departmentId)}/sprints`, callerSignal);
