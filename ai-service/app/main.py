@@ -13,6 +13,9 @@ Endpoints
                       One employee message for the attendance regularization sub-agent
                       (RegularizationTurnInput -> RegularizationTurnResponse). Same key. 503 when
                       the LLM or BACKEND_INTERNAL_URL is not configured, 504 on the turn deadline.
+    POST /ai/external-knowledge/chunks, /sources/remove, /sources/approval, /expired/remove
+                      The external knowledge index (app/knowledge/external_router.py): web pages
+                      NSK read, kept until they expire.
     POST /ai/knowledge/chunks, POST /ai/knowledge/documents/remove
                       The department knowledge index (app/knowledge/router.py): store a batch of a
                       document's chunks, or evict a document's chunks. Same key. 503 when QDRANT_URL
@@ -86,6 +89,7 @@ from app.agent import (
     RegularizationUnavailableError,
 )
 from app.config import ConfigurationError, Settings
+from app.knowledge.external_router import external_knowledge_router
 from app.knowledge.router import knowledge_router
 from app.knowledge.service import KnowledgeService, KnowledgeUnavailableError
 from app.logging_config import configure_logging
@@ -711,6 +715,11 @@ async def answer_knowledge_question(answer_input: KnowledgeAnswerInput, request:
 
 app.include_router(
     knowledge_router,
+    dependencies=[Depends(require_internal_api_key)],
+    responses={status_code: {"model": ErrorResponse} for status_code in (401, 422, 500, 503)},
+)
+app.include_router(
+    external_knowledge_router,
     dependencies=[Depends(require_internal_api_key)],
     responses={status_code: {"model": ErrorResponse} for status_code in (401, 422, 500, 503)},
 )

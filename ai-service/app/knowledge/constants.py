@@ -46,3 +46,17 @@ EMBEDDING_BATCH_SIZE = 16
 # shards start; ensure_collection waits for it this many times, this long apart.
 COLLECTION_READY_ATTEMPTS = 20
 COLLECTION_READY_DELAY_SECONDS = 0.25
+
+# External knowledge: web pages NSK read (backend services/webResearch/), one collection beside the
+# department knowledge, sharing its embedding model. Each chunk names its source (the backend's
+# ExternalSource id), URL, domain, title, when it was fetched and when it expires (seconds since the
+# epoch, for range filters), and whether it is approved for everyone.
+EXTERNAL_COLLECTION_NAME = "external_knowledge"
+EXTERNAL_POINT_ID_NAMESPACE = uuid.UUID("3c9e1f4a-7b2d-5c6e-8f0a-1d2b3c4e5f60")
+EXTERNAL_KEYWORD_FIELDS = ("source_id", "domain")
+EXTERNAL_BOOL_FIELDS = ("approved",)
+EXTERNAL_FLOAT_FIELDS = ("expires_at_ts",)
+MAX_SOURCES_PER_REQUEST = 100
+MAX_URL_CHARS = 2048
+MAX_TITLE_CHARS = 300
+MAX_DOMAIN_CHARS = 253
