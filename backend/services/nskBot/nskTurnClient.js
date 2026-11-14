@@ -23,7 +23,9 @@
  *                         { "number", "kind": "tool", "tool", "label" }
  *                         { "number", "kind": "document", "document_id", "department_id",
  *                           "chunk_index", "heading_path", "page", "excerpt", "score" }
- *                         { "number", "kind": "conversation", "session_id" } ],
+ *                         { "number", "kind": "conversation", "session_id" }
+ *                         { "number", "kind": "web", "source_id", "url", "title", "fetched_at",
+ *                           "excerpt" } ],      // a cached web page; the backend reads the rest itself
  *     "suggestions":    [ { "text", "intent" } ],
  *     "actions":        [ { "kind": "START_OFFBOARDING"|"VIEW_PROFILE", "employee_id" } ]   // optional
  *     "tools_used":     [ tool name ],
@@ -106,6 +108,16 @@ function parseSource(raw, index) {
     if (!isShortText(raw.tool, NSK_BOT_SETTINGS.TOOL_NAME_MAX_LENGTH)) throw invalid(`${at}.tool`);
     if (!isShortText(raw.label, NSK_BOT_SETTINGS.CITATION_LABEL_MAX_LENGTH)) throw invalid(`${at}.label`);
     return { number: raw.number, kind, tool: raw.tool, label: raw.label };
+  }
+  if (kind === NSK_SOURCE_KINDS.WEB) {
+    if (typeof raw.source_id !== 'string' || !OBJECT_ID_PATTERN.test(raw.source_id)) throw invalid(`${at}.source_id`);
+    if (typeof raw.excerpt !== 'string') throw invalid(`${at}.excerpt`);
+    return {
+      number: raw.number,
+      kind,
+      sourceId: raw.source_id,
+      excerpt: raw.excerpt.slice(0, NSK_BOT_SETTINGS.CITATION_EXCERPT_MAX_LENGTH),
+    };
   }
   if (kind === NSK_SOURCE_KINDS.CONVERSATION) {
     if (typeof raw.session_id !== 'string' || !OBJECT_ID_PATTERN.test(raw.session_id)) {
