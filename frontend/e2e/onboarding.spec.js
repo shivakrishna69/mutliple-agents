@@ -1,7 +1,10 @@
 /**
  * HR onboards people: one invitation by hand (activated from its link in another browser), then a
  * CSV import with a new department, a manager and their report, and a row with a problem. One
- * sign-in, because HR's logins are limited per account and the other suites use HR too.
+ * sign-in, because HR's logins are limited per account and the other suites use HR too. Then offers: a CSV
+ * of offers (a bad row listed by line and column, then two drafts), one offer by hand with its figures,
+ * and a batch send (refused here with its reason: this test server renders no letters); and the
+ * attendance charts on Attendance and the dashboard.
  */
 
 import { expect, test } from '@playwright/test';
@@ -20,8 +23,40 @@ function importFile() {
   return { name: 'new-joiners.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) };
 }
 
-test('HR invites a new joiner, then imports more from a CSV', async ({ page, browser }) => {
-  test.setTimeout(90_000);
+/** A calendar date `days` after today, as date inputs take it. */
+function daysAhead(days) {
+  const date = new Date(`${localToday()}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join('-');
+}
+
+const OFFER_HEADER =
+  'name,personal_email,department_code,designation,date_of_joining,date_of_birth,ctc,work_city,professional_tax_state';
+const offerRow = (name, departmentCode = 'ENG') =>
+  [
+    name,
+    `${name.toLowerCase().replace(' ', '.')}@example.com`,
+    departmentCode,
+    'Engineer',
+    daysAhead(30),
+    '1995-06-15',
+    '"12,00,000"',
+    'Bengaluru',
+    'KA',
+  ].join(',');
+const offerFile = (rows) => ({
+  name: 'offers.csv',
+  mimeType: 'text/csv',
+  buffer: Buffer.from([OFFER_HEADER, ...rows].join('\n')),
+});
+
+test('HR invites a new joiner, imports more from a CSV, prepares offers, and reads attendance', async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150_000);
   const problems = watchForPageProblems(page);
   await signIn(page, ACCOUNTS.hr.email);
   await page.goto('/people/onboarding');
@@ -103,6 +138,50 @@ test('HR invites a new joiner, then imports more from a CSV', async ({ page, bro
   await expect(page.getByRole('listitem').filter({ hasText: 'priya.ops@example.com' })).toContainText(
     'reports to Omar Lead',
   );
+
+  // --- Offers: a CSV of offers, one by hand, and a batch send -------------------------------------
+  await page.getByRole('tab', { name: 'Offers' }).click();
+  await page
+    .getByLabel('Offer CSV file')
+    .setInputFiles(offerFile([offerRow('Ravi Shah'), offerRow('Bad Dept', 'XYZ')]));
+  const rowsToFix = page.getByRole('table', { name: 'Rows to fix' });
+  await expect(rowsToFix.getByRole('row', { name: /3 department_code/ })).toBeVisible();
+  await page.getByLabel('Offer CSV file').setInputFiles(offerFile([offerRow('Ravi Shah'), offerRow('Sana Mir')]));
+  await expect(page.getByText('2 offer drafts saved for review')).toBeVisible();
+  await expect(page.getByRole('row', { name: 'Ravi Shah' }).getByText('Waiting for review')).toBeVisible();
+
+  await page.getByRole('button', { name: 'New offer' }).click();
+  const offerForm = page.getByRole('dialog', { name: 'New offer' });
+  await offerForm.getByLabel('Full name').fill('Tara Bose');
+  await offerForm.getByLabel('Personal email').fill('tara.bose@example.com');
+  await offerForm.getByLabel('Date of birth').fill('1996-03-05');
+  await offerForm.getByLabel('Designation').fill('Data Analyst');
+  await offerForm.getByLabel('Department').selectOption({ label: DEPARTMENT_NAME });
+  await offerForm.getByLabel('Joining date').fill(daysAhead(30));
+  await offerForm.getByLabel('Annual CTC (₹)').fill('12,00,000');
+  await offerForm.getByLabel('Work city').fill('Bengaluru');
+  await offerForm.getByLabel('Professional tax state').selectOption({ label: 'Karnataka' });
+  await offerForm.getByLabel('Basic a year (₹)').fill('6,00,000');
+  await offerForm.getByRole('button', { name: 'Work out figures' }).click();
+  await expect(offerForm.getByRole('table', { name: 'Salary structure' }).getByText('(set by HR)')).toBeVisible();
+  await offerForm.getByRole('button', { name: 'Save for review' }).click();
+  await expect(page.getByText('Offer draft saved for review')).toBeVisible();
+
+  // This test server renders no letters, so each offer comes back "Not sent" with the reason.
+  await page.getByRole('checkbox', { name: 'Select Ravi Shah' }).check();
+  await page.getByRole('checkbox', { name: 'Select Sana Mir' }).check();
+  await page.getByRole('button', { name: 'Send selected' }).click();
+  const sendResults = page.getByRole('list', { name: 'Send results' });
+  await expect(sendResults.getByRole('listitem')).toHaveCount(2);
+  await expect(sendResults.getByRole('listitem').first()).toContainText('Not sent');
+
+  // --- Attendance charts ---------------------------------------------------------------------------
+  await page.goto('/attendance');
+  await page.getByRole('tab', { name: 'Team insights' }).click();
+  await expect(page.getByRole('list', { name: 'Attendance today' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Each person this month' })).toBeVisible();
+  await page.goto('/dashboard');
+  await expect(page.getByRole('heading', { name: 'Check-in completion by department' })).toBeVisible();
 
   expect(problems, problems.join('\n')).toEqual([]);
 });
