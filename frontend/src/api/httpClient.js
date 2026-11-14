@@ -40,8 +40,10 @@ export class ApiError extends Error {
    * @param {Record<string, string>} [errorProperties.fieldErrors]  Message per form field.
    * @param {string|null} [errorProperties.code]     Backend machine-readable code (e.g. STALE_VERSION).
    * @param {object|null} [errorProperties.context]  Backend details that go with the code.
+   * @param {object[]} [errorProperties.details]     The backend's details as sent, e.g. the problems of
+   *                                                 an uploaded file with their line numbers.
    */
-  constructor({ message, status, requestId = null, fieldErrors = {}, code = null, context = null }) {
+  constructor({ message, status, requestId = null, fieldErrors = {}, code = null, context = null, details = [] }) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -49,6 +51,7 @@ export class ApiError extends Error {
     this.fieldErrors = fieldErrors;
     this.code = code;
     this.context = context;
+    this.details = details;
   }
 }
 
@@ -89,6 +92,7 @@ function toApiError(httpResponse, responseBody) {
     status: httpResponse.status,
     requestId,
     fieldErrors: convertDetailsToFieldErrors(backendError?.details),
+    details: Array.isArray(backendError?.details) ? backendError.details : [],
     code: typeof backendError?.code === 'string' ? backendError.code : null,
     context: backendError?.context && typeof backendError.context === 'object' ? backendError.context : null,
   });

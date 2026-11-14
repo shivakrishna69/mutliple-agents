@@ -14,7 +14,8 @@ import { useSearchParams } from 'react-router';
 import DocumentVaultPanel from '../components/analytics/DocumentVaultPanel.jsx';
 import OkrAlignmentCanvas from '../components/analytics/OkrAlignmentCanvas.jsx';
 import WorkforceRiskPanel from '../components/analytics/WorkforceRiskPanel.jsx';
-import { ChartIcon, DocumentIcon, TargetIcon } from '../components/Icons.jsx';
+import AttendanceInsights from '../components/attendance/AttendanceInsights.jsx';
+import { ChartIcon, ClockIcon, DocumentIcon, TargetIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import { Tabs } from '../components/ui.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -26,6 +27,7 @@ export default function AdvancedAnalyticsHub() {
   const canSeeWorkforceRisk = hasCapability(currentUser, CAPABILITIES.MANAGE_WORKFORCE);
   const tabs = [
     ...(canSeeWorkforceRisk ? [{ id: 'risk', label: 'Predictive analytics', Icon: ChartIcon }] : []),
+    ...(canSeeWorkforceRisk ? [{ id: 'attendance', label: 'Attendance', Icon: ClockIcon }] : []),
     { id: 'okrs', label: 'OKR alignment', Icon: TargetIcon },
     { id: 'vault', label: 'Document vault', Icon: DocumentIcon },
   ];
@@ -47,6 +49,7 @@ export default function AdvancedAnalyticsHub() {
       />
       <div role="tabpanel">
         {activeTabId === 'risk' && <WorkforceRiskPanel />}
+        {activeTabId === 'attendance' && <AttendanceInsights variant="compact" />}
         {activeTabId === 'okrs' && <OkrAlignmentCanvas />}
         {activeTabId === 'vault' && <DocumentVaultPanel />}
       </div>

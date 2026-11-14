@@ -12,6 +12,9 @@
  *                  The person gets an employee ID at once, and an email with a one-time link (valid
  *                  for the configured number of days).
  *   Import         many people from a CSV (components/people/EmployeeImportPanel.jsx).
+ *   Offers         offers with their salary structure and letter, prepared for review, imported from a
+ *                  CSV and sent one by one or as a batch (components/offers/OffersPanel.jsx); for
+ *                  people who may see offers (READ_OFFERS).
  *   Invitations    list with status filter (pending / expired / accepted / revoked) and actions:
  *                  resend (new link, old one stops working) and revoke.
  *
@@ -29,7 +32,18 @@ import {
   requestInvitations,
 } from '../api/peopleApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { CheckBadgeIcon, ClockIcon, DocumentIcon, PlusIcon, UserPlusIcon, UsersIcon } from '../components/Icons.jsx';
+import { hasCapability } from '../auth/capabilities.js';
+import OffersPanel from '../components/offers/OffersPanel.jsx';
+import { CAPABILITIES } from '../constants/capabilities.js';
+import {
+  CheckBadgeIcon,
+  ClockIcon,
+  CurrencyIcon,
+  DocumentIcon,
+  PlusIcon,
+  UserPlusIcon,
+  UsersIcon,
+} from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import EmployeeImportPanel from '../components/people/EmployeeImportPanel.jsx';
 import {
@@ -395,6 +409,7 @@ function InvitationRow({ invitation, jobLevels, employmentTypes, onChanged, onLi
   );
 }
 
+const OFFERS_VIEW = Object.freeze({ id: 'offers', label: 'Offers', Icon: CurrencyIcon });
 const ONBOARDING_VIEWS = Object.freeze([
   { id: 'invitations', label: 'Invitations', Icon: UserPlusIcon },
   { id: 'import', label: 'Import from CSV', Icon: DocumentIcon },
@@ -413,7 +428,11 @@ export default function PeopleOnboarding() {
   const [isComposing, setIsComposing] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [lastResult, setLastResult] = useState(null);
+  const { currentUser } = useAuth();
   const optionsResource = useApiResource((signal) => requestInvitationOptions(signal), []);
+  const views = hasCapability(currentUser, CAPABILITIES.READ_OFFERS)
+    ? [...ONBOARDING_VIEWS, OFFERS_VIEW]
+    : ONBOARDING_VIEWS;
   const allInvitationsResource = useApiResource((signal) => requestInvitations(undefined, signal), []);
   const allInvitations = allInvitationsResource.data?.invitations ?? [];
   const visibleInvitations =
@@ -473,7 +492,9 @@ export default function PeopleOnboarding() {
         />
       </div>
 
-      <Tabs tabs={ONBOARDING_VIEWS} activeTabId={view} onChange={setView} label="Onboarding sections" />
+      <Tabs tabs={views} activeTabId={view} onChange={setView} label="Onboarding sections" />
+
+      {view === OFFERS_VIEW.id && optionsResource.data && <OffersPanel options={optionsResource.data} />}
 
       {view === 'import' && <EmployeeImportPanel onImported={() => handleLinkIssued(null)} />}
       {view === 'invitations' && (

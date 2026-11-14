@@ -314,6 +314,12 @@ describe('onboarding offers: who may use them and what they accept', { skip: mon
   });
 
   it('lets HR word the clauses, shift timings and joining checklist, never leaving a clause empty', async () => {
+    const settingsAnswer = (await hrClient.get('/api/hr/onboarding/settings')).body.data;
+    assert.deepEqual(
+      settingsAnswer.choices.professionalTaxStates.map((choice) => choice.value),
+      ['KA', 'MH', 'NONE'],
+    );
+    assert.equal(settingsAnswer.choices.limits.bulkSendMax, ONBOARDING_SETTINGS.BULK_SEND_MAX);
     const before = (await hrClient.get('/api/hr/onboarding/settings')).body.data.settings;
     assert.equal(
       before.offerTerms.confidentialityClause,

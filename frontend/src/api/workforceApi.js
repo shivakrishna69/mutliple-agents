@@ -4,7 +4,7 @@
  * (api/httpClient.js). State-changing calls take the session's CSRF token.
  *
  * Backend references (backend/routes/*):
- *   /api/attendance  punch-in, AI regularization, manager reviews
+ *   /api/attendance  punch-in, AI regularization, manager reviews, the Today board, analytics
  *   /api/org         hierarchy and reporting lines (staff only)
  *   /api/payroll     tax rules and estimates, payslips, public payslip verification
  *   /api/analytics   workforce risk (HR and admins)
@@ -34,6 +34,12 @@ export const requestRegularization = ({ message, startNew }, csrfToken) =>
   sendData('POST', '/api/attendance/regularize', { message, startNew }, csrfToken);
 export const requestRegularizationReviews = (status, callerSignal) =>
   getData(`/api/attendance/regularization-reviews${toQueryString({ status })}`, callerSignal);
+/** The Today board: each person's status today and the counts (HR, admins, team leads; 403 otherwise). */
+export const requestTodayBoard = ({ date, departmentId } = {}, callerSignal) =>
+  getData(`/api/attendance/today${toQueryString({ date, departmentId })}`, callerSignal);
+/** A month's attendance per person and department, and the week's arrival times (same people as Today). */
+export const requestAttendanceAnalytics = ({ month, departmentId } = {}, callerSignal) =>
+  getData(`/api/attendance/analytics${toQueryString({ month, departmentId })}`, callerSignal);
 export const requestReviewDecision = (reviewId, decisionInput, csrfToken) =>
   sendData('POST', `/api/attendance/regularization-reviews/${encode(reviewId)}/decision`, decisionInput, csrfToken);
 
