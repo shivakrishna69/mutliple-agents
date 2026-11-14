@@ -71,7 +71,7 @@ scripts/         operational scripts
 | `/api/employees`                                                                                 | current employees for pickers (invited people included); base office assignment; bulk CSV import                                                                                                                                                                                 | HR, admin                                                                                |
 | `/api/work-calendar`                                                                             | holidays and the day-by-day calendar                                                                                                                                                                                                                                             | HR, admin edit / employees read their office                                             |
 | `/api/leave`                                                                                     | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export                                                                                                                                                       | HR, admin manage / employees their own / reporting managers decide their team's requests |
-| `/api/nsk-bot`                                                                                   | the NSK assistant: sessions (list, open, delete, resume) and turns with cited sources and suggestions                                                                                                                                                                            | everyone with `use_nsk_assistant` (every role); sessions: their owner                    |
+| `/api/nsk-bot`                                                                                   | the NSK assistant: sessions (list, open, delete, resume), turns with cited sources, suggestions and action cards; offboarding (settlement preview, start, cases, IT checklist, document downloads)                                                                                                                                                                            | everyone with `use_nsk_assistant` (every role); sessions: their owner                    |
 | `/api/internal`                                                                                  | calls from the AI service                                                                                                                                                                                                                                                        | internal API key                                                                         |
 
 ## Dashboard and service health
@@ -422,6 +422,73 @@ note for everyone else; fields not in the table (personal email, date of birth, 
 and location data) are never read. Every people tool call is audited (`nsk_bot.nsk_people_lookup`)
 with the person it acted for, their role and session, the employees or department read and the
 fields shown, never the values.
+
+**Offboarding.** "Rahul is leaving" is the `OFFBOARDING_WORKFLOW` intent, open to `run_offboarding`
+(admin, HR). Its tool, `find_offboarding_employee`, finds the person among everyone still employed
+(as the people lookup does: an employee ID wins; several matches become "Offboard {name} ({ID})"
+cards). One match answers with action cards: **Start offboarding package** (unless it has started)
+and **View profile first**. The ai-service proposes cards. The backend keeps only kinds the person may
+use (`NSK_ACTION_CAPABILITIES`), for someone still employed, with Start only before offboarding has
+started, and writes the labels itself. The card opens the preview below.
+
+| Route (under `/api/nsk-bot`)            | Who                                                   | What                                                                                                                                                                                                                                                                                  |
+| --------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /offboarding/preview`             | `run_offboarding`                                     | `{ employeeId, separation: { kind, noticeDate, lastWorkingDay, reason? }, adjustments?, version? }`. Computes the settlement and saves it as the person's draft case; previewing again replaces it (409 if `version` is stale). Returns the figures, the banner, notes and blockers. |
+| `POST /offboarding/execute`             | `run_offboarding`                                     | `{ caseId, version }`. Recomputes the settlement and refuses figures that changed since the preview (409 `PREVIEW_OUT_OF_DATE`) or still need input (422). Then 202: status Notice, documents queued. On a failed case, generates the documents again.                                |
+| `GET /offboarding/cases[/:caseId]`      | `view_final_settlement` (admin, HR, finance)          | Cases with their settlement, progress and documents (each marked downloadable or not for this role). Read-only.                                                                                                                                                                      |
+| `DELETE /offboarding/cases/:caseId`     | `run_offboarding`                                     | `?version=`. Cancels a draft.                                                                                                                                                                                                                                                         |
+| `GET /offboarding/it-checklist`         | `view_it_offboarding` (admin, HR, IT administrator)   | Everyone serving notice, their last working day, days left and work email, with the access to revoke on that day. No pay figures.                                                                                                                                                    |
+| `GET /artifacts/:artifactId/download`   | the document's roles                                  | A 60-second S3 link. Relieving letter and audit: `run_offboarding`. Settlement statement: `run_offboarding` or `view_final_settlement`. Every download is audited, allowed or refused.                                                                                                |
+
+The settlement is a pure calculator, `utils/payroll/finalSettlement.js`, with the rules in
+`FINAL_SETTLEMENT_RULES` (`utils/payroll/rules.js`):
+
+- **Salary.** It starts from the latest issued payslip (gross; Basic + DA; provident fund, ESI,
+  professional tax). Without a payslip it uses the accepted offer's structure (the dispatched draft
+  that created the account). HR may enter it instead. Notice period: the accepted offer's, else the
+  onboarding settings'. Encashable days: the available balance of every encashable leave type.
+- **Final month.** Gross ÷ calendar days × days from the 1st (or joining day) to the last working day.
+  It is 0 when that month's payslip was already issued; HR may set the days.
+- **Leave encashment.** Basic ÷ 26 × encashable days.
+- **Gratuity.** 15 ÷ 26 × Basic × completed years, from 5 completed years (1 for fixed-term, which HR
+  marks), at most ₹20 lakh. Completed years are whole years; a part year is not rounded up.
+- **Notice shortfall.** Gross ÷ 30 × the notice days not served, editable or waivable.
+- **Statutory deductions.** Provident fund and ESI are prorated to the salary days; professional tax
+  is taken whole.
+- **TDS.** The FY 2026-27 tax engine on the year's issued payslips plus the taxable settlement, under
+  the person's regime, less TDS already deducted, never below zero. Gratuity is exempt to ₹20 lakh and
+  encashment to ₹25 lakh. HR may override it; outside the engine's year they must (422
+  `TDS_REQUIRED`).
+- **HR's own lines.** Other earnings (taxable or not) and other deductions. A negative net is shown as
+  recoverable.
+- **Due date.** Every preview and statement carries the date payment is due: 2 working days after the
+  last working day (Code on Wages, 2019, s.17(2)), counted on the person's office calendar.
+
+Execute is one conditional update (status still draft at the reviewed version). It records the
+previous status and moves the person to Notice; the account stays active for IT to revoke on the last
+working day. The documents are then generated on the shared durable queue
+(`services/nskBot/offboarding/offboardingQueue.js`: BullMQ with Redis, in-process without), claimed
+with a lease, and resumed where a run stopped. Each step is pushed over Socket.IO
+(`OFFBOARDING_PROGRESS`) to the person who started it. After 3 failed attempts the case is `FAILED`
+with an error code. The documents:
+
+1. **Relieving and experience letter (PDF).** On the letterhead (`COMPANY_LEGAL_NAME`,
+   `COMPANY_REGISTERED_ADDRESS`, brand colour), dated the last working day, worded per separation,
+   signed by the onboarding settings' signatory.
+2. **Full and final settlement statement (PDF).** The person and their service, the due-date banner,
+   earnings, deductions, net payable or recoverable, how each figure was worked out, and signature
+   blocks for HR, the signatory and the employee.
+3. **Attendance and leave audit (.xlsx, exceljs).** The 3 months to the last working day (or today).
+   - `Summary`: totals.
+   - `Daily Attendance Log`: every day with status, punches in office time, hours, mode, lateness,
+     regularization, and the approved or pending leave with full or half day and reason.
+   - `Leave Breakdown`: every leave day whatever became of the request, with type, full or half day,
+     days charged, status, reason, range, applied and decided dates; sandwich days are marked.
+
+They are stored in the `OFFBOARDING_S3_*` bucket under `company-offboarding/<caseId>/` (ids only,
+server-side encryption, SHA-256 recorded). The upload and download code is shared with payslips
+(`utils/s3ObjectStore.js`). Without that bucket or a PDF browser, previews still work and execute
+answers 503. Every change and download is audited (category `offboarding`) with ids, never figures.
 
 **Citations.** Each reply's sources are checked before they are stored: a document must belong to a
 knowledge base the person may read (named, with its page), an earlier session must be one of the
