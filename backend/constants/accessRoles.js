@@ -109,6 +109,15 @@ export const CAPABILITIES = Object.freeze({
   // masked, department metrics). Department heads get the same for the departments they head,
   // without the capability (services/nskBot/nskAccess.js).
   RUN_PEOPLE_LOOKUP: 'run_people_lookup',
+  // Offboard someone through NSK: preview their full and final settlement, then start their notice
+  // period and generate the relieving letter, the settlement statement and the attendance audit.
+  RUN_OFFBOARDING: 'run_offboarding',
+  // Read offboarding cases and their settlement statements, without changing them (finance checks
+  // the figures before paying).
+  VIEW_FINAL_SETTLEMENT: 'view_final_settlement',
+  // See who is serving notice and the IT offboarding checklist for them (access to revoke on the
+  // last working day); no pay figures.
+  VIEW_IT_OFFBOARDING: 'view_it_offboarding',
 });
 
 const C = CAPABILITIES;
@@ -126,6 +135,9 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
     C.RUN_PEOPLE_LOOKUP,
+    C.RUN_OFFBOARDING,
+    C.VIEW_FINAL_SETTLEMENT,
+    C.VIEW_IT_OFFBOARDING,
     C.MANAGE_WORKFORCE,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
@@ -139,6 +151,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
     C.RUN_PEOPLE_LOOKUP,
+    C.VIEW_FINAL_SETTLEMENT,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
     C.MANAGE_COMPENSATION,
@@ -149,6 +162,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
     C.RUN_PEOPLE_LOOKUP,
+    C.VIEW_IT_OFFBOARDING,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_USERS,
     C.READ_COMPANY_SETTINGS,

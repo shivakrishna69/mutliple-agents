@@ -25,4 +25,7 @@ export const CAPABILITIES = Object.freeze({
   MANAGE_ALL_TASK_BOARDS: 'manage_all_task_boards',
   USE_NSK_ASSISTANT: 'use_nsk_assistant',
   RUN_PEOPLE_LOOKUP: 'run_people_lookup',
+  RUN_OFFBOARDING: 'run_offboarding',
+  VIEW_FINAL_SETTLEMENT: 'view_final_settlement',
+  VIEW_IT_OFFBOARDING: 'view_it_offboarding',
 });
