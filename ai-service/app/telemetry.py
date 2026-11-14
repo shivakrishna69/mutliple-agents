@@ -85,6 +85,7 @@ WORKFLOW_SUPPORT = "support"
 WORKFLOW_REGULARIZATION = "regularization"
 WORKFLOW_LEAVE_ASSISTANT = "leave_assistant"
 WORKFLOW_KNOWLEDGE_ANSWER = "knowledge_answer"
+WORKFLOW_NSK_ASSISTANT = "nsk_assistant"
 
 MAX_QUEUED_EVENTS = 2000
 BATCH_SIZE = 100  # the backend accepts up to 200 per request
