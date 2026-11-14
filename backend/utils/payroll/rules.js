@@ -139,6 +139,27 @@ export const ESI_RULES = Object.freeze({
  */
 export const GRATUITY_RULES = Object.freeze({ daysWagesPerYear: 15, workingDaysPerMonth: 26 });
 
+/**
+ * Full and final settlement (utils/payroll/finalSettlement.js), as the company's policy and the law set it:
+ *   gratuityMinimumYears            completed years of service before gratuity is payable (s.53(1))
+ *   fixedTermGratuityMinimumYears   the same for fixed-term employment (s.53(1), proviso)
+ *   gratuityCeiling                 the most gratuity payable, and exempt from tax (s.53(3); s.10(10)(iii))
+ *   leaveEncashmentDaysPerMonth     earned leave is encashed at Basic ÷ 26 a day (company policy)
+ *   leaveEncashmentExemptionLimit   leave encashed at separation is exempt from tax up to this (s.10(10AA))
+ *   noticeRecoveryDaysPerMonth      notice not served is recovered at Gross ÷ 30 a day (company policy)
+ *   settlementWorkingDays           wages are due within this many working days of the last day
+ *                                   (Code on Wages, 2019, s.17(2))
+ */
+export const FINAL_SETTLEMENT_RULES = Object.freeze({
+  gratuityMinimumYears: 5,
+  fixedTermGratuityMinimumYears: 1,
+  gratuityCeiling: 2_000_000,
+  leaveEncashmentDaysPerMonth: 26,
+  leaveEncashmentExemptionLimit: 2_500_000,
+  noticeRecoveryDaysPerMonth: 30,
+  settlementWorkingDays: 2,
+});
+
 export const PROFESSIONAL_TAX_STATES = Object.freeze({ KARNATAKA: 'KA', MAHARASHTRA: 'MH', NONE: 'NONE' });
 export const PROFESSIONAL_TAX_ANNUAL_CAP = 2_500;
 
