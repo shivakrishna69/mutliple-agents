@@ -11,6 +11,13 @@ a person: the actor token fixes whose data it is.
   list_my_leave_requests        leave requests, newest first                (my_leave_requests)
   search_company_docs           passages of the knowledge bases the person may read, closest to a
                                 query, each with its document              (knowledge_scope)
+  lookup_employee_profile       a colleague by name, employee ID or work email; several matches come
+                                back as candidates to pick from           (lookup_employee_profile)
+  get_department_metrics        a department's headcount, attendance today, sprint and pending
+                                approvals                                  (get_department_metrics)
+
+When a lookup returns several candidates, they are kept on the turn (clarification_candidates), so
+the reply can offer each as a card to pick.
 
 Sources. Every tool result the backend labels, and every passage a search returns, becomes a
 numbered source; the result handed to the model carries its number ("source": 3), and the model
@@ -41,7 +48,11 @@ BACKEND_TOOLS = {
     "get_my_attendance_month": "my_attendance_month",
     "get_my_leave_balances": "my_leave_balances",
     "list_my_leave_requests": "my_leave_requests",
+    "lookup_employee_profile": "lookup_employee_profile",
+    "get_department_metrics": "get_department_metrics",
 }
+PEOPLE_QUERY_MAX_LENGTH = 100
+DEPARTMENT_QUERY_MAX_LENGTH = 120
 KNOWLEDGE_SCOPE_TOOL = "knowledge_scope"
 
 
@@ -68,6 +79,8 @@ class NskTurnState:
     tools_used: list[str] = field(default_factory=list)
     readable_department_ids: list[str] | None = None
     searched_documents: bool = False
+    # People a lookup could not tell apart: [{"name", "employee_code", ...}], offered as cards.
+    clarification_candidates: list[dict[str, Any]] = field(default_factory=list)
 
     def add_source(self, build: Any, evidence: str) -> int:
         number = len(self.sources) + 1
@@ -116,6 +129,22 @@ class SearchQuery(BaseModel):
     )
 
 
+class PeopleQuery(BaseModel):
+    query: str = Field(
+        min_length=2,
+        max_length=PEOPLE_QUERY_MAX_LENGTH,
+        description="The colleague's name (or part of it), employee ID (e.g. NSK0104) or work email.",
+    )
+
+
+class DepartmentQuery(BaseModel):
+    department: str | None = Field(
+        default=None,
+        max_length=DEPARTMENT_QUERY_MAX_LENGTH,
+        description="The department's name or code; omit to get the departments that can be chosen.",
+    )
+
+
 # =================================================================================================
 # Tools
 # =================================================================================================
@@ -141,6 +170,8 @@ def build_nsk_tools(
         except NskToolRefusedError as refused_error:
             return _for_model({"refused": {"code": refused_error.code, "message": refused_error.message}})
         result, label = response.get("result"), response.get("source")
+        if isinstance(result, dict) and isinstance(result.get("candidates"), list):
+            state.clarification_candidates = result["candidates"]
         if not label:
             return _for_model({"data": result})
         evidence = json.dumps(result, ensure_ascii=False, default=str)
@@ -243,6 +274,27 @@ def build_nsk_tools(
                 description="Search the company's policies, handbooks and HR documents the person may read. "
                 "Returns numbered passages to cite.",
                 args_schema=SearchQuery,
+            ),
+        ),
+    ]
+    candidates += [
+        (
+            "lookup_employee_profile",
+            backend_tool(
+                "lookup_employee_profile",
+                "Look up a colleague's work profile by name, employee ID or work email: role, department, manager, "
+                "joining date, office, shift, attendance today and leave balances. The phone number comes masked and "
+                "salary only when this person may see it. Several matches come back as candidates to choose from.",
+                PeopleQuery,
+            ),
+        ),
+        (
+            "get_department_metrics",
+            backend_tool(
+                "get_department_metrics",
+                "A department's headcount, attendance today by status, its active sprint and open tasks, and its "
+                "pending approvals (leave and attendance regularizations).",
+                DepartmentQuery,
             ),
         ),
     ]

@@ -36,7 +36,7 @@ SUGGESTION_HISTORY_MESSAGES = 4
 SUGGESTION_HISTORY_CHARACTERS = 400
 
 INTENT_DESCRIPTIONS = {
-    Intent.PROFILE_LOOKUP: "look up a colleague's work profile",
+    Intent.PROFILE_LOOKUP: "look up a colleague's work profile, or a department's headcount, attendance and approvals",
     Intent.OFFBOARDING_WORKFLOW: "prepare an employee's exit: relieving letter, full and final settlement",
     Intent.ATTENDANCE_AUDIT: "attendance (punch times, late days, a month) and leave (balances, requests)",
     Intent.POLICY_QA: "company policies, handbooks and HR rules, from the company's documents",
@@ -48,7 +48,7 @@ FALLBACK_SUGGESTIONS = {
     Intent.ATTENDANCE_AUDIT: ("How many leave days do I have left?", "Show my attendance this month"),
     Intent.POLICY_QA: ("What is the notice period policy?", "What are the company holidays this year?"),
     Intent.GENERAL_HELP: ("What can you help me with?",),
-    Intent.PROFILE_LOOKUP: ("Look up a colleague's profile",),
+    Intent.PROFILE_LOOKUP: ("Show my department's attendance today", "Look up a colleague's profile"),
     Intent.OFFBOARDING_WORKFLOW: ("Start an offboarding package",),
     Intent.WEB_MARKET_RESEARCH: ("What are today's IT hiring trends?",),
 }

@@ -47,7 +47,8 @@ CLASSIFIER_HISTORY_CHARACTERS = 600
 CLASSIFIER_SYSTEM_PROMPT = """You read one message sent to NSK, the assistant inside a company's HR portal, and classify it.
 
 Intents (pick one):
-- PROFILE_LOOKUP: about another employee: who they are, their role, department, manager, joining date, contact.
+- PROFILE_LOOKUP: about another employee (who they are, their role, department, manager, joining date, contact), or
+  a department's people and numbers (headcount, who is in today, its sprint, pending approvals).
 - OFFBOARDING_WORKFLOW: someone leaving the company: resignation, relieving or experience letter, last working day,
   notice period, full and final settlement, exit formalities.
 - ATTENDANCE_AUDIT: attendance, punch in or out, late days, working hours, leave balances, leave requests and leave
