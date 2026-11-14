@@ -130,10 +130,11 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
 
 export default async function globalSetup() {
   // The stand-in starts first: the backend needs its address; it reads the backend's when asked.
+  // The backend may call it while starting (its external knowledge cleanup), before testServer is set.
   let testServer;
   const standIn = await startStandInAiService({
-    backendUrl: () => testServer.baseUrl,
-    internalApiKey: () => testServer.internalApiKey,
+    backendUrl: () => testServer?.baseUrl,
+    internalApiKey: () => testServer?.internalApiKey,
   });
   try {
     testServer = await startTestServer({
