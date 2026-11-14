@@ -16,7 +16,8 @@
  *        fresh actor token (actorToken.js); the tools check the person again on every call
  *     4. the reply's sources are checked: a document must belong to a knowledge base the person may
  *        read, a session must be one of the memories sent; anything else is dropped. Suggestions
- *        outside the person's intents are dropped.
+ *        outside the person's intents are dropped, and so are action cards they may not use or
+ *        whose person does not qualify (checkedActions); the backend writes the cards' labels.
  *     5. both messages are stored, the session remembers the turn's topic and names, and the cached
  *        context is updated
  *   When the ai-service fails, nothing of the turn is kept and the quota is given back.
@@ -26,16 +27,21 @@ import { ROLE_DEFINITIONS } from '../../constants/accessRoles.js';
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import { NSK_BOT_MESSAGES } from '../../constants/messages.js';
 import {
+  NSK_ACTION_CAPABILITIES,
+  NSK_ACTION_KINDS,
   NSK_ESCALATING_SENTIMENTS,
   NSK_MESSAGE_ROLES,
   NSK_SOURCE_KINDS,
   allowedIntentsFor,
+  nskHasCapability,
 } from '../../constants/nskBot.js';
 import { NSK_BOT_SETTINGS } from '../../constants/validation.js';
 import AgentDocument from '../../models/AgentDocument.js';
 import ChatMessage from '../../models/ChatMessage.js';
 import ChatSession from '../../models/ChatSession.js';
-import EmployeeProfile from '../../models/EmployeeProfile.js';
+import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../../models/EmployeeProfile.js';
+import OffboardingCase, { EXECUTED_STATUSES } from '../../models/OffboardingCase.js';
+import User from '../../models/User.js';
 import NskBotUsage from '../../models/NskBotUsage.js';
 import { logger } from '../../utils/logger.js';
 import { readOfficeLocalClock } from '../attendancePolicy.js';
@@ -113,6 +119,13 @@ export function toMessageSummary(message) {
       : null,
     citations: (message.citations ?? []).map(toCitationSummary),
     suggestions: (message.suggestions ?? []).map(({ text, intent }) => ({ text, intent })),
+    actions: (message.actions ?? []).map(({ kind, label, employeeId, employeeCode, employeeName }) => ({
+      kind,
+      label,
+      employeeId: employeeId.toString(),
+      employeeCode,
+      employeeName,
+    })),
     escalation: isAssistant && message.escalation ? { hint: NSK_BOT_MESSAGES.ESCALATION_HINT } : null,
     createdAt: message.createdAt,
   };
@@ -279,6 +292,62 @@ async function checkedCitations(user, sources, memories) {
   return citations;
 }
 
+/**
+ * The action cards to store: each kind once per person, only kinds this person may use, for someone
+ * still employed; Start offboarding also needs no offboarding started for them. Labels are the
+ * backend's own (NSK_BOT_MESSAGES.ACTION_LABELS). Anything else is dropped and logged.
+ */
+async function checkedActions(user, access, actions) {
+  const unique = new Map(actions.map((action) => [`${action.kind}:${action.employeeId}`, action]));
+  const usable = [...unique.values()].filter((action) =>
+    nskHasCapability(user.role, NSK_ACTION_CAPABILITIES[action.kind], access),
+  );
+  if (usable.length === 0) {
+    if (actions.length)
+      logger.warn('NSK proposed actions the person may not use; dropped them', { dropped: actions.length });
+    return [];
+  }
+  const employeeIds = [...new Set(usable.map((action) => action.employeeId))];
+  const [profiles, startedCases] = await Promise.all([
+    EmployeeProfile.find({
+      _id: { $in: employeeIds },
+      'organizationData.employmentStatus': { $ne: EMPLOYMENT_STATUSES.TERMINATED },
+    })
+      .select('userId employeeCode')
+      .lean(),
+    OffboardingCase.find({ employeeId: { $in: employeeIds }, isActive: true, status: { $in: EXECUTED_STATUSES } })
+      .select('employeeId')
+      .lean(),
+  ]);
+  const names = new Map(
+    (
+      await User.find({ _id: { $in: profiles.map((profile) => profile.userId) } })
+        .select('name')
+        .lean()
+    ).map((person) => [person._id.toString(), person.name]),
+  );
+  const profileById = new Map(profiles.map((profile) => [profile._id.toString(), profile]));
+  const started = new Set(startedCases.map((item) => item.employeeId.toString()));
+  const checked = [];
+  for (const action of usable) {
+    const profile = profileById.get(action.employeeId);
+    if (!profile) continue;
+    if (action.kind === NSK_ACTION_KINDS.START_OFFBOARDING && started.has(action.employeeId)) continue;
+    const employeeName = names.get(profile.userId.toString()) ?? profile.employeeCode;
+    checked.push({
+      kind: action.kind,
+      label: NSK_BOT_MESSAGES.ACTION_LABELS[action.kind](employeeName, profile.employeeCode),
+      employeeId: profile._id,
+      employeeCode: profile.employeeCode,
+      employeeName,
+    });
+  }
+  if (checked.length < actions.length) {
+    logger.warn('NSK proposed actions that do not apply; dropped them', { dropped: actions.length - checked.length });
+  }
+  return checked;
+}
+
 /** What the session remembers after a turn: the topic and names, newest last, deduplicated. */
 function rememberedAfter(session, classification) {
   const topics = [...(session?.topics ?? [])];
@@ -398,6 +467,7 @@ export async function sendMessage(user, { message, sessionId }, { config, reques
       outcome: turn.outcome,
       citations: await checkedCitations(user, turn.sources, memories),
       suggestions,
+      actions: await checkedActions(user, access, turn.actions),
       escalation: NSK_ESCALATING_SENTIMENTS.includes(classification.sentiment),
       toolsUsed: turn.toolsUsed,
       usage: turn.usage ?? { inputTokens: null, outputTokens: null },
