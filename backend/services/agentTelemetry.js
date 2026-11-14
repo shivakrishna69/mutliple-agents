@@ -65,7 +65,13 @@ export const THINKING_PHASES = Object.freeze([
 ]);
 
 /** The ai-service's workflows (ai-service/app/telemetry.py WORKFLOW_*); a backend test keeps them equal. */
-export const TELEMETRY_WORKFLOWS = Object.freeze(['support', 'regularization', 'leave_assistant', 'knowledge_answer']);
+export const TELEMETRY_WORKFLOWS = Object.freeze([
+  'support',
+  'regularization',
+  'leave_assistant',
+  'knowledge_answer',
+  'nsk_assistant',
+]);
 export const TELEMETRY_STATUSES = Object.freeze(['success', 'error']);
 
 export const TELEMETRY_LIMITS = Object.freeze({

@@ -223,6 +223,7 @@ export default function AgentTelemetryConsole() {
             <option value="regularization">regularization</option>
             <option value="leave_assistant">leave_assistant</option>
             <option value="knowledge_answer">knowledge_answer</option>
+            <option value="nsk_assistant">nsk_assistant</option>
           </select>
           <input
             value={searchText}
