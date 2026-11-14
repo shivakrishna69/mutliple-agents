@@ -4,3 +4,10 @@ import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 afterEach(cleanup);
+
+// jsdom has no ResizeObserver; charts (Recharts) observe their container's size with it.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};

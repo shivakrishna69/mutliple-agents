@@ -14,7 +14,7 @@
  * figure is the server's; "—" means there is nothing to measure yet.
  */
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { requestConversationList } from '../api/conversationsApi.js';
 import { requestDashboardOverview } from '../api/dashboardApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -40,11 +40,15 @@ import {
 } from '../components/dashboard/SupportSections.jsx';
 import { SERVICE_STATE_TONES } from '../constants/dashboardDisplay.js';
 import { hasCapability } from '../auth/capabilities.js';
+import { LoadingBlock } from '../components/ui.jsx';
 import { CAPABILITIES } from '../constants/capabilities.js';
 import { USER_ROLES } from '../constants/routes.js';
 import { useApiResource } from '../hooks/useApiResource.js';
 import { useSystemHealth } from '../hooks/useSystemHealth.js';
 import { greetingFor } from '../utils/dashboardFormat.js';
+
+// Loaded only for people who see the charts, so the charting library stays out of the main bundle.
+const AttendanceInsights = lazy(() => import('../components/attendance/AttendanceInsights.jsx'));
 
 const DEFAULT_RANGE = 'today';
 
@@ -174,6 +178,14 @@ export default function Dashboard() {
           <div className={statGrid(4)}>
             <PeopleStats people={people} />
           </div>
+        </section>
+      )}
+
+      {people && (
+        <section aria-label="Attendance this month">
+          <Suspense fallback={<LoadingBlock label="Loading attendance analytics…" />}>
+            <AttendanceInsights variant="compact" />
+          </Suspense>
         </section>
       )}
 

@@ -10,6 +10,9 @@
  *   Manager reviews requests the agent escalated (GET /api/attendance/regularization-reviews), with
  *                   approve/reject. Visible to everyone; the backend returns 403 for people who
  *                   manage no one, which the tab shows as "nothing to review".
+ *   Team insights   for HR, administrators and team leads (shown when GET /api/attendance/today
+ *                   answers): today's donut, departments, arrival times and each person's month
+ *                   (components/attendance/AttendanceInsights.jsx).
  *
  * Device fingerprint: a random 32-byte token generated once and kept in localStorage. It identifies
  * this browser, not the person, and carries no personal data; HR registers it as the employee's device.
@@ -22,9 +25,11 @@ import {
   requestRegularization,
   requestRegularizationReviews,
   requestReviewDecision,
+  requestTodayBoard,
 } from '../api/workforceApi.js';
+import AttendanceInsights from '../components/attendance/AttendanceInsights.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { CheckBadgeIcon, ClockIcon, InboxIcon, MapPinIcon, SparklesIcon } from '../components/Icons.jsx';
+import { ChartIcon, CheckBadgeIcon, ClockIcon, InboxIcon, MapPinIcon, SparklesIcon } from '../components/Icons.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import {
   Badge,
@@ -556,8 +561,13 @@ const TABS = [
   { id: 'reviews', label: 'Manager reviews', Icon: InboxIcon },
 ];
 
+const INSIGHTS_TAB = Object.freeze({ id: 'insights', label: 'Team insights', Icon: ChartIcon });
+
 export default function AttendanceCenter() {
   const [activeTabId, setActiveTabId] = useState('punch');
+  // The Today board answers HR, administrators and team leads only: its answer decides the tab.
+  const todayBoard = useApiResource((signal) => requestTodayBoard({}, signal), []);
+  const tabs = todayBoard.data ? [...TABS, INSIGHTS_TAB] : TABS;
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-8">
       <PageHeader title="Attendance" description="Geofenced punch-in, AI-assisted corrections and manager approvals." />
@@ -578,10 +588,11 @@ export default function AttendanceCenter() {
         />
         <StatTile label="Approvals" value="One click" hint="For managers and HR" Icon={ClockIcon} accent="amber" />
       </div>
-      <Tabs tabs={TABS} activeTabId={activeTabId} onChange={setActiveTabId} label="Attendance tools" />
+      <Tabs tabs={tabs} activeTabId={activeTabId} onChange={setActiveTabId} label="Attendance tools" />
       {activeTabId === 'punch' && <PunchInPanel />}
       {activeTabId === 'regularize' && <RegularizationChat />}
       {activeTabId === 'reviews' && <ManagerReviews />}
+      {activeTabId === INSIGHTS_TAB.id && todayBoard.data && <AttendanceInsights todayBoard={todayBoard.data} />}
     </div>
   );
 }
