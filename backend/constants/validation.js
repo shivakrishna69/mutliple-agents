@@ -635,6 +635,44 @@ export const AGENT_CHAT_SETTINGS = Object.freeze({
   USAGE_RETENTION_DAYS: 7,
 });
 
+/** The NSK assistant (services/nskBot/, models/ChatSession.js, models/ChatMessage.js). */
+export const NSK_BOT_SETTINGS = Object.freeze({
+  MESSAGE_MAX_LENGTH: 2_000,
+  // Earlier messages of the session sent with each turn; the active ones are cached in Redis.
+  HISTORY_MESSAGES: 10,
+  CONTEXT_CACHE_TTL_SECONDS: 6 * 60 * 60,
+  // Sessions and their messages are deleted this long after their last message.
+  RETENTION_DAYS: 90,
+  TITLE_MAX_LENGTH: 80,
+  SESSIONS_LISTED: 50,
+  MESSAGES_PER_SESSION_LISTED: 200,
+  // What a session remembers for later: its topics and the people, dates and departments named.
+  TOPICS_KEPT: 8,
+  TOPIC_MAX_LENGTH: 80,
+  ENTITIES_KEPT: 12,
+  ENTITY_VALUE_MAX_LENGTH: 80,
+  // Earlier sessions sent with a turn so "what did we check yesterday?" can be answered: the most
+  // recent ones, plus those matching the message's words.
+  MEMORY_SESSIONS: 5,
+  // The latest session is offered to resume when the person comes back within this time.
+  RESUME_WINDOW_HOURS: 7 * 24,
+  SUGGESTIONS_MAX: 3,
+  SUGGESTION_MAX_LENGTH: 160,
+  CITATIONS_MAX: 12,
+  CITATION_LABEL_MAX_LENGTH: 200,
+  CITATION_EXCERPT_MAX_LENGTH: 1_200,
+  TOOLS_USED_MAX: 20,
+  TOOL_NAME_MAX_LENGTH: 64,
+  REPLY_MAX_LENGTH: 8_000,
+  // How long the ai-service may use a turn's actor token to call the tools (the whole turn).
+  ACTOR_TOKEN_TTL_SECONDS: 120,
+  // Own attendance: at most one month per read, and no further back than this.
+  ATTENDANCE_MONTHS_BACK: 12,
+  LEAVE_REQUESTS_SHOWN: 20,
+  // Daily usage counters are kept this long, then deleted.
+  USAGE_RETENTION_DAYS: 7,
+});
+
 /** Department task boards: sprints, tasks and their activity (models/Sprint.js, Task.js, TaskActivity.js). */
 export const TASK_SETTINGS = Object.freeze({
   TITLE_MAX_LENGTH: 200,

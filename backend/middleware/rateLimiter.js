@@ -245,6 +245,20 @@ export const agentQuestionRateLimitByUser = createRateLimiter({
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_AGENT_QUESTIONS,
 });
 
+export const nskMessageRateLimitByUser = createRateLimiter({
+  limiterName: 'nsk_messages_per_user',
+  ...RATE_LIMITS.NSK_MESSAGES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_NSK_MESSAGES,
+});
+
+export const nskWriteRateLimitByUser = createRateLimiter({
+  limiterName: 'nsk_writes_per_user',
+  ...RATE_LIMITS.NSK_WRITES_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_NSK_CHANGES,
+});
+
 export const agentChatWriteRateLimitByUser = createRateLimiter({
   limiterName: 'agent_chat_writes_per_user',
   ...RATE_LIMITS.AGENT_CHAT_WRITES_PER_USER,

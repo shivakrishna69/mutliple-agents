@@ -4,6 +4,8 @@
  * switched off when their variables are unset.
  */
 
+import { hkdfSync } from 'node:crypto';
+
 import { EMAIL_PATTERN, HEX_COLOR_PATTERN } from '../constants/validation.js';
 
 // ---------------------------------------------------------------------------
@@ -27,6 +29,11 @@ const IMPORT_EMAILS_PER_MINUTE_BOUNDS = Object.freeze({ MIN: 1, MAX: 600, DEFAUL
 const REMEMBERED_SESSION_DAYS_BOUNDS = Object.freeze({ MIN: 1, MAX: 90, DEFAULT: 30 });
 // Questions one person may ask department agents per day (UTC); each is a model call.
 const AGENT_DAILY_QUESTION_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 50 });
+// Messages one person may send the NSK assistant per UTC day (each costs several model calls).
+const NSK_DAILY_MESSAGE_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 100 });
+// The NSK actor token key is derived from JWT_SECRET for this one purpose (HKDF), so it needs no
+// secret of its own and a token for one use can never be read as the other.
+const NSK_ACTOR_KEY_INFO = 'nsk-assistant-actor-token-v1';
 
 /** A whole-number setting within `bounds` ({ MIN, MAX, DEFAULT }); refuses startup otherwise. */
 function readBoundedInteger(variableName, bounds) {
@@ -375,6 +382,10 @@ export function loadConfig() {
   // when the browser closes (and at JWT_EXPIRES_IN at the latest).
   const rememberedSessionDays = readBoundedInteger('REMEMBERED_SESSION_DAYS', REMEMBERED_SESSION_DAYS_BOUNDS);
   const agentDailyQuestionLimit = readBoundedInteger('AGENT_DAILY_QUESTION_LIMIT', AGENT_DAILY_QUESTION_LIMIT_BOUNDS);
+  const nskDailyMessageLimit = readBoundedInteger('NSK_DAILY_MESSAGE_LIMIT', NSK_DAILY_MESSAGE_LIMIT_BOUNDS);
+  const nskActorTokenKey = Buffer.from(
+    hkdfSync('sha256', process.env.JWT_SECRET, Buffer.alloc(0), NSK_ACTOR_KEY_INFO, 32),
+  );
 
   // Optional. Employee document vault storage; null disables the vault.
   const vaultStorage = loadS3StorageConfig(env, 'VAULT');
@@ -407,6 +418,8 @@ export function loadConfig() {
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
     rememberedSessionDays,
     agentDailyQuestionLimit,
+    nskDailyMessageLimit,
+    nskActorTokenKey,
     corsOrigins,
     mail,
     appPublicUrl,

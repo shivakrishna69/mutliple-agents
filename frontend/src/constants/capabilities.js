@@ -23,4 +23,5 @@ export const CAPABILITIES = Object.freeze({
   ASK_DEPARTMENT_AGENTS: 'ask_department_agents',
   USE_TASK_BOARDS: 'use_task_boards',
   MANAGE_ALL_TASK_BOARDS: 'manage_all_task_boards',
+  USE_NSK_ASSISTANT: 'use_nsk_assistant',
 });
