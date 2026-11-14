@@ -13,6 +13,7 @@ import {
   computeFinalSettlement,
   defaultSalaryDays,
   financialYearOf,
+  gratuityYearsOf,
   serviceLength,
   settlementDueDate,
   TDS_SOURCES,
@@ -89,13 +90,34 @@ describe('final settlement: earnings', () => {
     assert.equal(result.gratuity.amount, Math.round((15 / 26) * 50000 * 6));
     assert.equal(line(result.earnings, 'GRATUITY').amount, 173077);
 
-    const almostFive = settle({ dateOfJoining: '2021-11-21', lastWorkingDay: '2026-11-19' });
-    assert.equal(almostFive.gratuity.completedYears, 4);
-    assert.equal(almostFive.gratuity.eligible, false);
-    assert.equal(line(almostFive.earnings, 'GRATUITY'), undefined);
+    // 4 years and exactly 6 months: the part year is not more than six months.
+    const fourAndAHalf = settle({ dateOfJoining: '2022-05-20', lastWorkingDay: '2026-11-19' });
+    assert.deepEqual(fourAndAHalf.service, { years: 4, months: 6, days: 0 });
+    assert.equal(fourAndAHalf.gratuity.completedYears, 4);
+    assert.equal(fourAndAHalf.gratuity.eligible, false);
+    assert.equal(line(fourAndAHalf.earnings, 'GRATUITY'), undefined);
     const exactlyFive = settle({ dateOfJoining: '2021-11-20', lastWorkingDay: '2026-11-19' });
     assert.equal(exactlyFive.gratuity.eligible, true);
     assert.equal(exactlyFive.gratuity.amount, Math.round((15 / 26) * 50000 * 5));
+  });
+
+  it('counts a final part year of more than six months as a full year', () => {
+    // 4 years, 6 months and 1 day: more than six months, so 5 years and eligible.
+    const justOver = settle({ dateOfJoining: '2022-05-19', lastWorkingDay: '2026-11-19' });
+    assert.deepEqual(justOver.service, { years: 4, months: 6, days: 1 });
+    assert.equal(justOver.gratuity.completedYears, 5);
+    assert.equal(justOver.gratuity.eligible, true);
+    assert.equal(justOver.gratuity.amount, Math.round((15 / 26) * 50000 * 5));
+    // 240 days into the fifth year.
+    const twoForty = settle({ dateOfJoining: '2021-11-21', lastWorkingDay: '2026-07-18' });
+    assert.equal(twoForty.gratuity.completedYears, 5);
+    assert.equal(twoForty.gratuity.eligible, true);
+    // The rule applies to every year: 6 years and 7 months count as 7.
+    const sixAndSeven = settle({ dateOfJoining: '2020-04-01', lastWorkingDay: '2026-10-31' });
+    assert.equal(sixAndSeven.gratuity.completedYears, 7);
+    assert.equal(sixAndSeven.gratuity.amount, Math.round((15 / 26) * 50000 * 7));
+    assert.equal(gratuityYearsOf({ years: 2, months: 6, days: 0 }), 2);
+    assert.equal(gratuityYearsOf({ years: 2, months: 7, days: 0 }), 3);
   });
 
   it('pays fixed-term gratuity from 1 year, and never more than ₹20 lakh', () => {
@@ -103,6 +125,8 @@ describe('final settlement: earnings', () => {
     assert.equal(fixedTerm.gratuity.eligible, true);
     assert.equal(fixedTerm.gratuity.minimumYears, 1);
     assert.equal(settle({ dateOfJoining: '2025-06-01' }).gratuity.eligible, false);
+    // Fixed-term needs a whole year first: 8 months is not rounded up to qualify.
+    assert.equal(settle({ dateOfJoining: '2026-03-21', isFixedTerm: true }).gratuity.eligible, false);
 
     const senior = settle({ dateOfJoining: '1990-01-01', salary: { monthlyGross: 900000, monthlyBasic: 500000 } });
     assert.ok(senior.gratuity.uncapped > 2_000_000);

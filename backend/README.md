@@ -451,7 +451,9 @@ The settlement is a pure calculator, `utils/payroll/finalSettlement.js`, with th
   It is 0 when that month's payslip was already issued; HR may set the days.
 - **Leave encashment.** Basic ÷ 26 × encashable days.
 - **Gratuity.** 15 ÷ 26 × Basic × completed years, from 5 completed years (1 for fixed-term, which HR
-  marks), at most ₹20 lakh. Completed years are whole years; a part year is not rounded up.
+  marks), at most ₹20 lakh. A final part year of more than six months counts as a full year
+  (Payment of Gratuity Act, s.4(2)), so 4 years and 7 months qualifies as 5; fixed-term needs one
+  whole year first.
 - **Notice shortfall.** Gross ÷ 30 × the notice days not served, editable or waivable.
 - **Statutory deductions.** Provident fund and ESI are prorated to the salary days; professional tax
   is taken whole.

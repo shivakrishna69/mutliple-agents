@@ -13,7 +13,10 @@
  *   Gratuity                     15 ÷ 26 × last Basic × completed years, once the person has
  *                                completed 5 years (1 year in fixed-term employment), at most ₹20 lakh.
  *                                Completed years are whole years from the joining day to the end of
- *                                the last working day.
+ *                                the last working day, with a final part year of more than six months
+ *                                counted as a full year (Payment of Gratuity Act, s.4(2)): 4 years and
+ *                                7 months is 5 years, and eligible. Fixed-term employment still needs
+ *                                one whole year before the part year is counted.
  *   Notice shortfall recovery    Gross ÷ 30 × the notice days not served (the notice period less the
  *                                days from the resignation to the last working day). HR may edit the
  *                                days or waive the recovery.
@@ -114,9 +117,16 @@ export function defaultSalaryDays(dateOfJoining, lastWorkingDay) {
   return Math.max(daysBetweenCalendarDates(start, lastWorkingDay) + 1, 0);
 }
 
-function gratuityOf({ monthlyBasic, completedYears, isFixedTerm }) {
+/** Years of service gratuity counts: whole years, plus one for a final part year of more than six months. */
+export function gratuityYearsOf(service) {
+  const moreThanSixMonths = service.months > 6 || (service.months === 6 && service.days > 0);
+  return service.years + (moreThanSixMonths ? 1 : 0);
+}
+
+function gratuityOf({ monthlyBasic, service, isFixedTerm }) {
   const minimumYears = isFixedTerm ? R.fixedTermGratuityMinimumYears : R.gratuityMinimumYears;
-  const eligible = completedYears >= minimumYears;
+  const completedYears = gratuityYearsOf(service);
+  const eligible = isFixedTerm ? service.years >= minimumYears : completedYears >= minimumYears;
   const uncapped = eligible
     ? roundToNearestRupee(
         (GRATUITY_RULES.daysWagesPerYear / GRATUITY_RULES.workingDaysPerMonth) * monthlyBasic * completedYears,
@@ -223,7 +233,7 @@ export function computeFinalSettlement({
 
   const service = serviceLength(dateOfJoining, lastWorkingDay);
   const encashment = roundToNearestRupee((monthlyBasic / R.leaveEncashmentDaysPerMonth) * encashableDays);
-  const gratuity = gratuityOf({ monthlyBasic, completedYears: service.years, isFixedTerm });
+  const gratuity = gratuityOf({ monthlyBasic, service, isFixedTerm });
   const notice = noticeOf({
     noticePeriodDays,
     resignationDate,
