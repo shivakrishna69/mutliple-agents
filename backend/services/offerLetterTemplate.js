@@ -23,32 +23,12 @@
  */
 
 import { escapeHtml } from '../utils/html.js';
+import { cssString, detail, formatDate, formatMoney, plural } from './documentParts.js';
 import { brandMarkSvg } from './payslipHtmlTemplate.js';
 
-const moneyFormatter = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-});
 const countFormatter = new Intl.NumberFormat('en-IN');
-const formatMoney = (amount) => moneyFormatter.format(amount);
-const dateFormatter = new Intl.DateTimeFormat('en-IN', { dateStyle: 'long', timeZone: 'UTC' });
-const formatDate = (date) => dateFormatter.format(date);
-/**
- * A CSS string for the page footer. Every character but letters, digits and spaces is written as a
- * CSS escape, so no text can end the string or the style element (HTML escaping does not apply there).
- */
-const cssString = (text) =>
-  `"${[...text]
-    .map((character) => (/[\p{L}\p{N} ]/u.test(character) ? character : `\\${character.codePointAt(0).toString(16)} `))
-    .join('')}"`;
-const plural = (count, unit) => `${count} ${unit}${count === 1 ? '' : 's'}`;
 
 const EMPLOYMENT_TYPE_LABELS = Object.freeze({ full_time: 'Full-time', contractor: 'Contractor', intern: 'Intern' });
-
-function detail(label, value) {
-  return `<div class="detail"><span class="detail-label">${escapeHtml(label)}</span><span class="detail-value">${escapeHtml(value)}</span></div>`;
-}
 
 function moneyRow(label, split, { emphasis = false, monthly = true } = {}) {
   return `<tr class="${emphasis ? 'emphasis' : ''}"><td>${escapeHtml(label)}</td><td class="amount">${

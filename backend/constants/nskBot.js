@@ -85,9 +85,28 @@ export const NSK_ENTITY_KINDS = Object.freeze({
  */
 export const NSK_INTENT_CAPABILITIES = Object.freeze({
   [NSK_INTENTS.PROFILE_LOOKUP]: CAPABILITIES.RUN_PEOPLE_LOOKUP,
+  [NSK_INTENTS.OFFBOARDING_WORKFLOW]: CAPABILITIES.RUN_OFFBOARDING,
   [NSK_INTENTS.ATTENDANCE_AUDIT]: CAPABILITIES.USE_NSK_ASSISTANT,
   [NSK_INTENTS.POLICY_QA]: CAPABILITIES.USE_NSK_ASSISTANT,
   [NSK_INTENTS.GENERAL_HELP]: CAPABILITIES.USE_NSK_ASSISTANT,
+});
+
+/**
+ * Action cards under a reply, for one resolved person (the client turns each into a button):
+ *   START_OFFBOARDING  open the offboarding preview for them (POST /api/nsk-bot/offboarding/preview)
+ *   VIEW_PROFILE       ask NSK for their profile first
+ * The ai-service proposes them; the backend keeps only those the person may use, for someone who
+ * exists (and, to start offboarding, is still employed with no offboarding started), and writes the
+ * labels itself (NSK_BOT_MESSAGES.ACTION_LABELS).
+ */
+export const NSK_ACTION_KINDS = Object.freeze({
+  START_OFFBOARDING: 'START_OFFBOARDING',
+  VIEW_PROFILE: 'VIEW_PROFILE',
+});
+
+export const NSK_ACTION_CAPABILITIES = Object.freeze({
+  [NSK_ACTION_KINDS.START_OFFBOARDING]: CAPABILITIES.RUN_OFFBOARDING,
+  [NSK_ACTION_KINDS.VIEW_PROFILE]: CAPABILITIES.RUN_PEOPLE_LOOKUP,
 });
 
 /** Capabilities a department head has for the departments they head, whatever their role. */

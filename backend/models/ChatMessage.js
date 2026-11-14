@@ -10,6 +10,8 @@
  *                   written: a tool read (its name and what it read), a document passage (document,
  *                   headings, page, a quoted excerpt) or an earlier session. Never a whole document.
  *   suggestions     ASSISTANT only: the likely next questions, offered as cards
+ *   actions         ASSISTANT only: buttons for one resolved person (start their offboarding, view
+ *                   their profile), as checked by the backend when the reply was stored
  *   escalation      ASSISTANT only: true when the message sounded urgent, frustrated or sensitive, so
  *                   the reply also shows how to reach a person
  *   toolsUsed       ASSISTANT only: the tools the turn called, by name
@@ -18,7 +20,14 @@
  */
 
 import mongoose from 'mongoose';
-import { NSK_INTENTS, NSK_MESSAGE_ROLES, NSK_OUTCOMES, NSK_SENTIMENTS, NSK_SOURCE_KINDS } from '../constants/nskBot.js';
+import {
+  NSK_ACTION_KINDS,
+  NSK_INTENTS,
+  NSK_MESSAGE_ROLES,
+  NSK_OUTCOMES,
+  NSK_SENTIMENTS,
+  NSK_SOURCE_KINDS,
+} from '../constants/nskBot.js';
 import { NSK_BOT_SETTINGS } from '../constants/validation.js';
 import { entitySchema, suggestionSchema } from './ChatSession.js';
 
@@ -44,6 +53,17 @@ const citationSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const actionSchema = new mongoose.Schema(
+  {
+    kind: { type: String, enum: Object.values(NSK_ACTION_KINDS), required: true },
+    label: { type: String, required: true, maxlength: NSK_BOT_SETTINGS.SUGGESTION_MAX_LENGTH * 2 },
+    employeeId: { type: ObjectId, ref: 'EmployeeProfile', required: true },
+    employeeCode: { type: String, required: true },
+    employeeName: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const chatMessageSchema = new mongoose.Schema(
   {
     sessionId: { type: ObjectId, ref: 'ChatSession', required: true, immutable: true },
@@ -65,6 +85,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     citations: { type: [citationSchema], default: [] },
     suggestions: { type: [suggestionSchema], default: [] },
+    actions: { type: [actionSchema], default: [] },
     escalation: { type: Boolean, default: false },
     toolsUsed: { type: [String], default: [] },
     usage: {

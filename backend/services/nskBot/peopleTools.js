@@ -63,7 +63,7 @@ function scopeFilter(scope) {
 // =================================================================================================
 
 /** The profiles in scope matching `query`: an exact employee ID alone when there is one. */
-async function findMatches(scope, query) {
+export async function findMatches(scope, query) {
   const filter = scopeFilter(scope);
   const exactly = new RegExp(`^${escapeRegularExpression(query)}$`, 'i');
   const byCode = await EmployeeProfile.find({ ...filter, employeeCode: exactly })
@@ -94,14 +94,14 @@ async function namesOf(profiles) {
   return new Map(users.map((user) => [user._id.toString(), user]));
 }
 
-async function departmentNames(ids) {
+export async function departmentNames(ids) {
   const departments = await Department.find({ _id: { $in: ids.filter(Boolean) } })
     .select('name code')
     .lean();
   return new Map(departments.map((department) => [department._id.toString(), department]));
 }
 
-async function candidatesOf(profiles) {
+export async function candidatesOf(profiles) {
   const [users, departments] = await Promise.all([
     namesOf(profiles),
     departmentNames(profiles.map((profile) => profile.organizationData.departmentId)),

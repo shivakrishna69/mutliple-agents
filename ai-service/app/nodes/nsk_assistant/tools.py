@@ -15,9 +15,13 @@ a person: the actor token fixes whose data it is.
                                 back as candidates to pick from           (lookup_employee_profile)
   get_department_metrics        a department's headcount, attendance today, sprint and pending
                                 approvals                                  (get_department_metrics)
+  find_offboarding_employee     the person someone says is leaving, with the action cards to offer
+                                (start their offboarding package, view their profile first)
+                                                                           (find_offboarding_employee)
 
-When a lookup returns several candidates, they are kept on the turn (clarification_candidates), so
-the reply can offer each as a card to pick.
+When a lookup returns several candidates, they are kept on the turn (clarification_candidates, with
+the tool that found them), so the reply can offer each as a card to pick. Action cards a tool
+returns are kept too (proposed_actions); the backend checks them again before showing them.
 
 Sources. Every tool result the backend labels, and every passage a search returns, becomes a
 numbered source; the result handed to the model carries its number ("source": 3), and the model
@@ -36,7 +40,14 @@ from pydantic import BaseModel, Field
 
 from app.knowledge.service import KnowledgeUnavailableError
 from app.nodes.knowledge_agent.citations import excerpt_of
-from app.nodes.nsk_assistant.schemas import ConversationSource, DocumentSource, MemorySession, ToolSource
+from app.nodes.nsk_assistant.schemas import (
+    ACTIONS_MAX,
+    Action,
+    ConversationSource,
+    DocumentSource,
+    MemorySession,
+    ToolSource,
+)
 from app.nodes.nsk_assistant.systems import DocumentSearch, NskSystems, NskToolRefusedError
 
 MAX_TOOL_RESULT_CHARACTERS = 12_000
@@ -50,6 +61,7 @@ BACKEND_TOOLS = {
     "list_my_leave_requests": "my_leave_requests",
     "lookup_employee_profile": "lookup_employee_profile",
     "get_department_metrics": "get_department_metrics",
+    "find_offboarding_employee": "find_offboarding_employee",
 }
 PEOPLE_QUERY_MAX_LENGTH = 100
 DEPARTMENT_QUERY_MAX_LENGTH = 120
@@ -81,6 +93,21 @@ class NskTurnState:
     searched_documents: bool = False
     # People a lookup could not tell apart: [{"name", "employee_code", ...}], offered as cards.
     clarification_candidates: list[dict[str, Any]] = field(default_factory=list)
+    # The backend tool that found them (a lookup, or finding someone to offboard).
+    clarification_tool: str | None = None
+    # Action cards the tools proposed for one resolved person, at most ACTIONS_MAX.
+    proposed_actions: list[Action] = field(default_factory=list)
+
+    def propose_actions(self, raw_actions: list[Any]) -> None:
+        for raw in raw_actions:
+            if len(self.proposed_actions) >= ACTIONS_MAX:
+                return
+            try:
+                action = Action.model_validate(raw)
+            except ValueError:
+                continue
+            if action not in self.proposed_actions:
+                self.proposed_actions.append(action)
 
     def add_source(self, build: Any, evidence: str) -> int:
         number = len(self.sources) + 1
@@ -172,6 +199,9 @@ def build_nsk_tools(
         result, label = response.get("result"), response.get("source")
         if isinstance(result, dict) and isinstance(result.get("candidates"), list):
             state.clarification_candidates = result["candidates"]
+            state.clarification_tool = backend_name
+        if isinstance(result, dict) and isinstance(result.get("actions"), list):
+            state.propose_actions(result["actions"])
         if not label:
             return _for_model({"data": result})
         evidence = json.dumps(result, ensure_ascii=False, default=str)
@@ -295,6 +325,17 @@ def build_nsk_tools(
                 "A department's headcount, attendance today by status, its active sprint and open tasks, and its "
                 "pending approvals (leave and attendance regularizations).",
                 DepartmentQuery,
+            ),
+        ),
+        (
+            "find_offboarding_employee",
+            backend_tool(
+                "find_offboarding_employee",
+                "Find the employee someone says is leaving (resigning, serving notice, being let go) by name, employee "
+                "ID or work email: who they are, their status, and whether offboarding has already started. The "
+                "portal then shows cards to start their offboarding package or view their profile first. Several "
+                "matches come back as candidates to choose from.",
+                PeopleQuery,
             ),
         ),
     ]

@@ -25,16 +25,19 @@
  *                           "chunk_index", "heading_path", "page", "excerpt", "score" }
  *                         { "number", "kind": "conversation", "session_id" } ],
  *     "suggestions":    [ { "text", "intent" } ],
+ *     "actions":        [ { "kind": "START_OFFBOARDING"|"VIEW_PROFILE", "employee_id" } ]   // optional
  *     "tools_used":     [ tool name ],
  *     "usage":          { "input_tokens", "output_tokens" } | null
  *   }
  *
  * requestNskTurn checks the response against this contract and returns it in camelCase with the
  * backend's enum values; any deviation is an AiServiceError(invalid_response). What a source may
- * point at (the person's own documents and sessions) is checked by the caller.
+ * point at (the person's own documents and sessions), and which actions they may use, is checked by
+ * the caller.
  */
 
 import {
+  NSK_ACTION_KINDS,
   NSK_ENTITY_KINDS,
   NSK_INTENTS,
   NSK_OUTCOMES,
@@ -56,6 +59,7 @@ const SOURCE_KINDS = Object.freeze(
 const ENTITY_KINDS = Object.values(NSK_ENTITY_KINDS);
 const INTENTS = Object.values(NSK_INTENTS);
 const SENTIMENTS = Object.values(NSK_SENTIMENTS);
+const ACTION_KINDS = Object.values(NSK_ACTION_KINDS);
 
 const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isShortText = (value, maxLength) => typeof value === 'string' && value.trim() !== '' && value.length <= maxLength;
@@ -137,6 +141,16 @@ function parseSuggestion(raw, index) {
   return { text: raw.text.trim(), intent: raw.intent };
 }
 
+function parseAction(raw, index) {
+  const at = `actions[${index}]`;
+  if (!isPlainObject(raw)) throw invalid(at);
+  if (!ACTION_KINDS.includes(raw.kind)) throw invalid(`${at}.kind`);
+  if (typeof raw.employee_id !== 'string' || !OBJECT_ID_PATTERN.test(raw.employee_id)) {
+    throw invalid(`${at}.employee_id`);
+  }
+  return { kind: raw.kind, employeeId: raw.employee_id.toLowerCase() };
+}
+
 /** The response in this backend's shape; throws invalid_response naming the first bad field. */
 export function parseNskTurnResponse(body) {
   if (!isPlainObject(body)) throw invalid('body is not a JSON object');
@@ -158,6 +172,8 @@ export function parseNskTurnResponse(body) {
       throw invalid('usage');
     }
   }
+  const actions = body.actions ?? [];
+  if (!Array.isArray(actions) || actions.length > NSK_BOT_SETTINGS.ACTIONS_MAX) throw invalid('actions');
   const sources = body.sources.map(parseSource);
   if (new Set(sources.map((source) => source.number)).size !== sources.length) throw invalid('sources repeat a number');
   return {
@@ -166,6 +182,7 @@ export function parseNskTurnResponse(body) {
     classification: parseClassification(body.classification),
     sources,
     suggestions: body.suggestions.map(parseSuggestion),
+    actions: actions.map(parseAction),
     toolsUsed: body.tools_used,
     usage: usage ? { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens } : null,
   };

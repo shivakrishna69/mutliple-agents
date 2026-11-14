@@ -49,8 +49,8 @@ CLASSIFIER_SYSTEM_PROMPT = """You read one message sent to NSK, the assistant in
 Intents (pick one):
 - PROFILE_LOOKUP: about another employee (who they are, their role, department, manager, joining date, contact), or
   a department's people and numbers (headcount, who is in today, its sprint, pending approvals).
-- OFFBOARDING_WORKFLOW: someone leaving the company: resignation, relieving or experience letter, last working day,
-  notice period, full and final settlement, exit formalities.
+- OFFBOARDING_WORKFLOW: someone leaving the company (e.g. "Rahul is leaving"): resignation, relieving or
+  experience letter, last working day, notice period, full and final settlement, exit formalities.
 - ATTENDANCE_AUDIT: attendance, punch in or out, late days, working hours, leave balances, leave requests and leave
   history (the person's own or someone else's).
 - POLICY_QA: company policies, handbooks, rules, benefits, procedures, holidays, HR norms, how something works here.

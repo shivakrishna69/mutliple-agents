@@ -590,6 +590,7 @@ async def run_nsk_turn(turn_input: NskTurnInput, request: Request) -> NskTurnRes
         classification=result.classification,
         sources=result.sources,
         suggestions=result.suggestions,
+        actions=result.actions,
         tools_used=result.tools_used,
         usage=result.usage,
     )

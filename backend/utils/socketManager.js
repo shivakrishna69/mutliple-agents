@@ -518,3 +518,24 @@ export function emitNotification(userId, notificationPayload) {
     return false;
   }
 }
+
+/**
+ * Pushes an offboarding case's progress (services/nskBot/offboarding/offboardingRunner.js) to every
+ * open session of the person who started it. Never throws; returns false when nothing could be sent
+ * (the case's state is in MongoDB either way, so GET /api/nsk-bot/offboarding/cases/:id shows it).
+ * @param {string} userId
+ * @param {{ caseId: string, status: string, progress: object, artifacts: object[], lastErrorCode: string|null }} progressPayload
+ */
+export function emitOffboardingProgress(userId, progressPayload) {
+  if (!socketIoInstance) return false;
+  try {
+    socketIoInstance.to(ROOM_NAMES.user(userId)).emit(SOCKET_EVENTS.OFFBOARDING_PROGRESS, progressPayload);
+    return true;
+  } catch (emitError) {
+    logger.error('Failed to emit OFFBOARDING_PROGRESS', {
+      userId,
+      error: { name: emitError.name, message: emitError.message, stack: emitError.stack },
+    });
+    return false;
+  }
+}

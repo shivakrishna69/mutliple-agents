@@ -27,8 +27,11 @@
  *                         profileMasking.js)                                   RUN_PEOPLE_LOOKUP or head
  *   get_department_metrics    one department's headcount, attendance today, sprint and pending
  *                         approvals (?department= name or code)                 RUN_PEOPLE_LOOKUP or head
+ *   find_offboarding_employee the person someone says is leaving (?query=), among everyone still
+ *                         employed, with the action cards to offer (offboarding/offboardingTool.js)
+ *                                                                               RUN_OFFBOARDING
  *
- * The people tools answer with an `audit` too: whom or which department they read and the fields
+ * The people tools and find_offboarding_employee answer with an `audit` too: whom or which department they read and the fields
  * shown, recorded by the controller for every call (category "nsk_bot").
  *
  * Attendance and leave tools need an employee record; without one they answer
@@ -54,6 +57,7 @@ import { listEmployeeLeaveRequests } from '../leaveRequests.js';
 import { ServiceError } from '../serviceError.js';
 import { verifyActorToken } from './actorToken.js';
 import { headedDepartmentIdsOf, peopleScopeOf } from './nskAccess.js';
+import { findOffboardingEmployee } from './offboarding/offboardingTool.js';
 import { departmentMetrics, lookupEmployeeProfile } from './peopleTools.js';
 
 export const NSK_TOOLS = Object.freeze({
@@ -64,6 +68,7 @@ export const NSK_TOOLS = Object.freeze({
   KNOWLEDGE_SCOPE: 'knowledge_scope',
   LOOKUP_EMPLOYEE_PROFILE: 'lookup_employee_profile',
   GET_DEPARTMENT_METRICS: 'get_department_metrics',
+  FIND_OFFBOARDING_EMPLOYEE: 'find_offboarding_employee',
 });
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -276,6 +281,17 @@ const TOOL_DEFINITIONS = Object.freeze({
       textArgument(args, 'department', { maxLength: NSK_BOT_SETTINGS.DEPARTMENT_QUERY_MAX_LENGTH, optional: true }),
     run: ({ actor, input, now }) =>
       departmentMetrics({ scope: peopleScopeOf(actor), department: input.department, now }),
+  },
+
+  [NSK_TOOLS.FIND_OFFBOARDING_EMPLOYEE]: {
+    capability: CAPABILITIES.RUN_OFFBOARDING,
+    needsProfile: false,
+    validate: (args) =>
+      textArgument(args, 'query', {
+        minLength: NSK_BOT_SETTINGS.LOOKUP_QUERY_MIN_LENGTH,
+        maxLength: NSK_BOT_SETTINGS.LOOKUP_QUERY_MAX_LENGTH,
+      }),
+    run: ({ input }) => findOffboardingEmployee({ query: input.query }),
   },
 });
 
