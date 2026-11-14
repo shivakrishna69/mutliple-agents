@@ -28,7 +28,7 @@ from app.nodes.nsk_assistant import (
 from app.nodes.nsk_assistant.assistant import NOT_FOUND_REPLY, REFUSED_REPLY, split_marker
 from app.nodes.nsk_assistant.classifier import apply_tone_rules, fallback_classification, parse_classification
 from app.nodes.nsk_assistant.grounding import check_numbers, numbers_in
-from app.nodes.nsk_assistant.schemas import Classification, Intent, Sentiment, TurnOutcome
+from app.nodes.nsk_assistant.schemas import Action, ActionKind, Classification, Intent, Sentiment, TurnOutcome
 from app.nodes.nsk_assistant.suggestions import fallback_suggestions, parse_suggestions
 from tests.conftest import TEST_INTERNAL_API_KEY
 from tests.fakes import ScriptedChatModel, json_reply, text_reply, tool_call_reply
@@ -579,3 +579,126 @@ async def test_people_tools_are_not_offered_to_self_service():
     await nsk.answer(turn_input("hi"))
     assert "lookup_employee_profile" not in answer_model.bound_tool_names
     assert "get_department_metrics" not in answer_model.bound_tool_names
+
+
+# =================================================================================================
+# Offboarding: "Rahul is leaving"
+# =================================================================================================
+
+HR_INTENTS = ["OFFBOARDING_WORKFLOW", *PEOPLE_INTENTS]
+HR_TOOLS = [*PEOPLE_TOOLS, "find_offboarding_employee"]
+RAHUL_ID = "0123456789abcdef01234567"
+FOUND_RAHUL = {
+    "result": {
+        "matches": 1,
+        "employee": {
+            "employee_id": RAHUL_ID,
+            "employee_code": "NSK0104",
+            "name": "Rahul Sharma",
+            "designation": "Data Engineer",
+            "employment_status": "Active",
+            "offboarding": None,
+        },
+        "actions": [
+            {"kind": "START_OFFBOARDING", "employee_id": RAHUL_ID},
+            {"kind": "VIEW_PROFILE", "employee_id": RAHUL_ID},
+            {"kind": "VIEW_PROFILE", "employee_id": RAHUL_ID},
+            {"kind": "UNKNOWN", "employee_id": RAHUL_ID},
+        ],
+    },
+    "source": "Profile: Rahul Sharma (NSK0104)",
+}
+
+
+async def test_someone_leaving_is_found_and_the_cards_are_offered():
+    systems = FakeNskSystems({"find_offboarding_employee": FOUND_RAHUL})
+    nsk, answer_model, _ = assistant(
+        [
+            tool_call_reply("find_offboarding_employee", {"query": "Rahul Sharma"}),
+            text_reply(
+                "That is Rahul Sharma (NSK0104), Data Engineer [1]. Use the cards below to start the offboarding "
+                "package or view the profile first."
+            ),
+        ],
+        [classification("OFFBOARDING_WORKFLOW"), suggestions()],
+        systems,
+    )
+    result = await nsk.answer(turn_input("Rahul Sharma is leaving", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS))
+    assert result.outcome is TurnOutcome.ANSWERED
+    assert systems.calls == [("find_offboarding_employee", {"query": "Rahul Sharma"}, ACTOR_TOKEN)]
+    assert [(action.kind.value, action.employee_id) for action in result.actions] == [
+        ("START_OFFBOARDING", RAHUL_ID),
+        ("VIEW_PROFILE", RAHUL_ID),
+    ]
+    assert [source.tool for source in result.sources] == ["find_offboarding_employee"]
+    assert "find_offboarding_employee" in answer_model.bound_tool_names
+    assert "Never say\n  offboarding has started" in answer_model.received_inputs[0][0].content
+
+
+async def test_an_ambiguous_leaver_is_offered_as_offboarding_cards():
+    systems = FakeNskSystems(
+        {
+            "find_offboarding_employee": {
+                "result": {"matches": 2, "candidates": CANDIDATES, "more_not_shown": 0},
+                "source": 'People matching "Rahul"',
+            }
+        }
+    )
+    nsk, _, _ = assistant(
+        [
+            tool_call_reply("find_offboarding_employee", {"query": "Rahul"}),
+            text_reply("CLARIFY: I found Rahul Sharma and Rahul Verma [1]. Which one is leaving?"),
+        ],
+        [classification("OFFBOARDING_WORKFLOW"), suggestions()],
+        systems,
+    )
+    result = await nsk.answer(turn_input("Rahul is leaving", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS))
+    assert result.outcome is TurnOutcome.CLARIFY
+    assert [(suggestion.text, suggestion.intent) for suggestion in result.suggestions] == [
+        ("Offboard Rahul Sharma (NSK0104)", Intent.OFFBOARDING_WORKFLOW),
+        ("Offboard Rahul Verma (NSK0233)", Intent.OFFBOARDING_WORKFLOW),
+    ]
+    assert result.actions == []
+
+
+async def test_a_refused_reply_offers_no_cards_and_the_endpoint_returns_them():
+    systems = FakeNskSystems({"find_offboarding_employee": FOUND_RAHUL})
+    nsk, _, _ = assistant(
+        [
+            tool_call_reply("find_offboarding_employee", {"query": "Rahul Sharma"}),
+            text_reply("Rahul's last working day is 31 December 2026 [1]."),
+        ],
+        [classification("OFFBOARDING_WORKFLOW"), suggestions()],
+        systems,
+    )
+    refused = await nsk.answer(
+        turn_input("Rahul Sharma is leaving", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS)
+    )
+    assert refused.outcome is TurnOutcome.REFUSED
+    assert refused.actions == []
+
+
+def test_the_endpoint_returns_the_action_cards(client, monkeypatch):
+    async def answered(received):
+        return NskTurnResult(
+            outcome=TurnOutcome.ANSWERED,
+            reply="That is Rahul Sharma [1].",
+            classification=Classification(
+                intent=Intent.OFFBOARDING_WORKFLOW, sentiment=Sentiment.NEUTRAL, confidence=0.9
+            ),
+            sources=[],
+            suggestions=[],
+            tools_used=["find_offboarding_employee"],
+            usage=None,
+            actions=[Action(kind=ActionKind.START_OFFBOARDING, employee_id=RAHUL_ID)],
+        )
+
+    monkeypatch.setattr(app.state.agent_runtime, "process_nsk_turn", answered)
+    body = client.post("/ai/nsk/turn", json=VALID_TURN, headers=AUTHORISED).json()
+    assert body["actions"] == [{"kind": "START_OFFBOARDING", "employee_id": RAHUL_ID}]
+
+
+async def test_the_offboarding_tool_is_not_offered_without_it():
+    nsk, answer_model, _ = assistant([text_reply("Hello!")], [classification("GENERAL_HELP"), suggestions()])
+    await nsk.answer(turn_input("hi", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS))
+    assert "find_offboarding_employee" not in answer_model.bound_tool_names

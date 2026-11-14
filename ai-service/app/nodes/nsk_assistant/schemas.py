@@ -168,6 +168,23 @@ class Suggestion(BaseModel):
     intent: Intent
 
 
+ACTIONS_MAX = 4
+
+
+class ActionKind(str, Enum):
+    """Buttons for one resolved person; the backend keeps only those the person may use."""
+
+    START_OFFBOARDING = "START_OFFBOARDING"
+    VIEW_PROFILE = "VIEW_PROFILE"
+
+
+class Action(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: ActionKind
+    employee_id: ObjectIdString
+
+
 class TokenUsage(BaseModel):
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
@@ -179,5 +196,6 @@ class NskTurnResponse(BaseModel):
     classification: Classification
     sources: list[Source] = Field(default_factory=list, max_length=SOURCES_MAX)
     suggestions: list[Suggestion] = Field(default_factory=list, max_length=SUGGESTIONS_MAX)
+    actions: list[Action] = Field(default_factory=list, max_length=ACTIONS_MAX)
     tools_used: list[ToolName] = Field(default_factory=list, max_length=TOOLS_USED_MAX)
     usage: TokenUsage | None = None
