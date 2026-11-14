@@ -5,8 +5,9 @@
  */
 
 import { hkdfSync } from 'node:crypto';
+import { BlockList, isIP } from 'node:net';
 
-import { EMAIL_PATTERN, HEX_COLOR_PATTERN } from '../constants/validation.js';
+import { EMAIL_PATTERN, HEX_COLOR_PATTERN, WEB_RESEARCH_SETTINGS } from '../constants/validation.js';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -35,6 +36,23 @@ const NSK_DAILY_MESSAGE_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAUL
 // secret of its own and a token for one use can never be read as the other.
 const NSK_ACTOR_KEY_INFO = 'nsk-assistant-actor-token-v1';
 
+// Web research (services/webResearch/): how long fetched pages are kept, and each person's daily use.
+const EXTERNAL_KNOWLEDGE_TTL_DAYS_BOUNDS = Object.freeze({ MIN: 1, MAX: 90, DEFAULT: 7 });
+const WEB_FETCH_DAILY_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 40 });
+const WEB_SEARCH_DAILY_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 60 });
+const STOCK_QUOTE_DAILY_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 20 });
+// Private ranges a deployment may let the page fetcher reach (an intranet), never these: loopback,
+// link-local (cloud metadata at 169.254.169.254), "this network" and multicast.
+const NEVER_FETCHABLE_CIDRS = Object.freeze([
+  '127.0.0.0/8',
+  '169.254.0.0/16',
+  '0.0.0.0/8',
+  '224.0.0.0/4',
+  '::1/128',
+  'fe80::/10',
+  'ff00::/8',
+]);
+
 /** A whole-number setting within `bounds` ({ MIN, MAX, DEFAULT }); refuses startup otherwise. */
 function readBoundedInteger(variableName, bounds) {
   const value = Number(process.env[variableName] ?? bounds.DEFAULT);
@@ -42,6 +60,95 @@ function readBoundedInteger(variableName, bounds) {
     throw new Error(`${variableName} must be a whole number from ${bounds.MIN} to ${bounds.MAX}`);
   }
   return value;
+}
+
+/** An optional http(s) service address without a trailing slash, or null when the variable is empty. */
+function readServiceUrl(variableName) {
+  const raw = (process.env[variableName] ?? '').trim();
+  if (!raw) return null;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`${variableName} must be an absolute URL`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`${variableName} must use http or https`);
+  if (parsed.username || parsed.password) throw new Error(`${variableName} must not contain credentials`);
+  return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
+}
+
+/**
+ * CIDR ranges in WEB_FETCH_ALLOWED_PRIVATE_CIDRS ("10.20.0.0/16,192.168.5.0/24"): private networks the
+ * page fetcher may reach, e.g. an intranet. Empty by default: every private address is refused. In
+ * production, loopback, link-local (cloud metadata), "this network" and multicast are refused at
+ * startup; elsewhere they may be listed for local testing.
+ */
+export function loadAllowedPrivateCidrs(env) {
+  const entries = (process.env.WEB_FETCH_ALLOWED_PRIVATE_CIDRS ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  for (const entry of entries) {
+    const [address, prefix] = entry.split('/');
+    const family = isIP(address);
+    const maxPrefix = family === 6 ? 128 : 32;
+    if (!family || !/^\d+$/.test(prefix ?? '') || Number(prefix) > maxPrefix) {
+      throw new Error(`WEB_FETCH_ALLOWED_PRIVATE_CIDRS has an invalid range: ${entry}`);
+    }
+    if (env === 'production') {
+      const never = new BlockList();
+      for (const cidr of NEVER_FETCHABLE_CIDRS) {
+        const [neverAddress, neverPrefix] = cidr.split('/');
+        never.addSubnet(neverAddress, Number(neverPrefix), isIP(neverAddress) === 6 ? 'ipv6' : 'ipv4');
+      }
+      if (never.check(address, family === 6 ? 'ipv6' : 'ipv4')) {
+        throw new Error(`WEB_FETCH_ALLOWED_PRIVATE_CIDRS cannot include ${entry} in production`);
+      }
+    }
+  }
+  return entries;
+}
+
+/** WEB_FETCH_ALLOWED_PORTS ("80,443" by default): the ports the page fetcher may connect to. */
+function loadAllowedPorts() {
+  const raw = (process.env.WEB_FETCH_ALLOWED_PORTS ?? '').trim();
+  if (!raw) return [...WEB_RESEARCH_SETTINGS.ALLOWED_PORTS];
+  const ports = raw.split(',').map((entry) => Number(entry.trim()));
+  if (ports.some((port) => !Number.isInteger(port) || port < 1 || port > 65535)) {
+    throw new Error('WEB_FETCH_ALLOWED_PORTS must list ports from 1 to 65535, separated by commas');
+  }
+  return [...new Set(ports)];
+}
+
+/**
+ * Web research (services/webResearch/), all optional:
+ *   SEARXNG_URL                  the self-hosted SearXNG (docker-compose*.yml); without it, no web search
+ *   ALPHA_VANTAGE_API_KEY        NSE/BSE quotes; without it, quotes fall back to search snippets
+ *   ALPHA_VANTAGE_BASE_URL       default https://www.alphavantage.co
+ *   EXTERNAL_KNOWLEDGE_TTL_DAYS  how long a fetched page is kept (default 7)
+ *   WEB_FETCH_DAILY_LIMIT, WEB_SEARCH_DAILY_LIMIT, STOCK_QUOTE_DAILY_LIMIT   per person per UTC day
+ *   WEB_FETCH_ALLOWED_PRIVATE_CIDRS   see loadAllowedPrivateCidrs
+ *   WEB_FETCH_ALLOWED_PORTS      the ports pages may be read from (default "80,443")
+ */
+function loadWebResearchConfig(env) {
+  const alphaVantageKey = (process.env.ALPHA_VANTAGE_API_KEY ?? '').trim() || null;
+  return {
+    searxngUrl: readServiceUrl('SEARXNG_URL'),
+    alphaVantage: alphaVantageKey
+      ? {
+          apiKey: alphaVantageKey,
+          baseUrl: readServiceUrl('ALPHA_VANTAGE_BASE_URL') ?? 'https://www.alphavantage.co',
+        }
+      : null,
+    cacheTtlDays: readBoundedInteger('EXTERNAL_KNOWLEDGE_TTL_DAYS', EXTERNAL_KNOWLEDGE_TTL_DAYS_BOUNDS),
+    dailyLimits: {
+      fetch: readBoundedInteger('WEB_FETCH_DAILY_LIMIT', WEB_FETCH_DAILY_LIMIT_BOUNDS),
+      search: readBoundedInteger('WEB_SEARCH_DAILY_LIMIT', WEB_SEARCH_DAILY_LIMIT_BOUNDS),
+      quote: readBoundedInteger('STOCK_QUOTE_DAILY_LIMIT', STOCK_QUOTE_DAILY_LIMIT_BOUNDS),
+    },
+    allowedPrivateCidrs: loadAllowedPrivateCidrs(env),
+    allowedPorts: loadAllowedPorts(),
+  };
 }
 
 /** Bounds for AI_SERVICE_TIMEOUT_MS: long enough for an LLM round trip, short enough not to hang webhooks. */
@@ -412,6 +519,7 @@ export function loadConfig() {
     vaultStorage,
     payslips,
     offboarding,
+    webResearch: loadWebResearchConfig(env),
     pdfBrowser,
     offerLetters: loadOfferLetterConfig(),
     bootstrapAdminEmail,

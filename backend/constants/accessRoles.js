@@ -118,6 +118,10 @@ export const CAPABILITIES = Object.freeze({
   // See who is serving notice and the IT offboarding checklist for them (access to revoke on the
   // last working day); no pay figures.
   VIEW_IT_OFFBOARDING: 'view_it_offboarding',
+  // Ask NSK to research the web live: search (SearXNG), read a page (cached for everyone as external
+  // knowledge when its domain is approved), and NSE/BSE stock quotes. Without it, NSK answers from
+  // approved cached pages only.
+  RUN_WEB_RESEARCH: 'run_web_research',
 });
 
 const C = CAPABILITIES;
@@ -138,6 +142,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.RUN_OFFBOARDING,
     C.VIEW_FINAL_SETTLEMENT,
     C.VIEW_IT_OFFBOARDING,
+    C.RUN_WEB_RESEARCH,
     C.MANAGE_WORKFORCE,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
@@ -152,6 +157,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.USE_NSK_ASSISTANT,
     C.RUN_PEOPLE_LOOKUP,
     C.VIEW_FINAL_SETTLEMENT,
+    C.RUN_WEB_RESEARCH,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
     C.MANAGE_COMPENSATION,
@@ -163,6 +169,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.USE_NSK_ASSISTANT,
     C.RUN_PEOPLE_LOOKUP,
     C.VIEW_IT_OFFBOARDING,
+    C.RUN_WEB_RESEARCH,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_USERS,
     C.READ_COMPANY_SETTINGS,
