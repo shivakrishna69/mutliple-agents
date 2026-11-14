@@ -78,11 +78,16 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
     assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), [
       CAPABILITIES.ASK_DEPARTMENT_AGENTS,
       CAPABILITIES.USE_TASK_BOARDS,
+      CAPABILITIES.USE_NSK_ASSISTANT,
       CAPABILITIES.USE_SUPPORT_CHAT,
     ]);
     assert.ok(
       ALL_ROLES.every((role) => capabilitiesOf(role).includes(CAPABILITIES.ASK_DEPARTMENT_AGENTS)),
       'every role may ask department agents (which ones is decided per agent)',
+    );
+    assert.ok(
+      ALL_ROLES.every((role) => capabilitiesOf(role).includes(CAPABILITIES.USE_NSK_ASSISTANT)),
+      'every role may use the NSK assistant (what it reads follows their other capabilities)',
     );
   });
 
