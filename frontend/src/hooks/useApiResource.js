@@ -25,9 +25,18 @@ export function toDisplayError(caughtError) {
       status: caughtError.status,
       requestId: caughtError.status >= 500 ? caughtError.requestId : null,
       fieldErrors: caughtError.fieldErrors ?? {},
+      code: caughtError.code ?? null,
+      details: caughtError.details ?? [],
     };
   }
-  return { message: API_MESSAGES.UNEXPECTED_SERVER_ERROR, status: 0, requestId: null, fieldErrors: {} };
+  return {
+    message: API_MESSAGES.UNEXPECTED_SERVER_ERROR,
+    status: 0,
+    requestId: null,
+    fieldErrors: {},
+    code: null,
+    details: [],
+  };
 }
 
 export function useApiResource(loadResource, dependencies, { enabled = true } = {}) {
