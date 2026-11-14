@@ -15,6 +15,7 @@ import {
   USER_FIELD_LIMITS,
   WEBHOOK_FIELD_LIMITS,
 } from './validation.js';
+import { PROFESSIONAL_TAX_STATES, TAX_REGIMES } from '../utils/payroll/rules.js';
 
 export const AUTH_MESSAGES = Object.freeze({
   REGISTRATION_SUCCESSFUL: 'Account created successfully',
@@ -569,6 +570,14 @@ export const PASSWORD_RULE_MESSAGES = Object.freeze({
 });
 
 /** The gender choices the sign-up screen lists, in this order (GET /api/auth/options). */
+/** How the offer form names the professional tax states and tax regimes (utils/payroll/rules.js values). */
+export const PROFESSIONAL_TAX_STATE_LABELS = Object.freeze({
+  [PROFESSIONAL_TAX_STATES.KARNATAKA]: 'Karnataka',
+  [PROFESSIONAL_TAX_STATES.MAHARASHTRA]: 'Maharashtra',
+  [PROFESSIONAL_TAX_STATES.NONE]: 'No professional tax',
+});
+export const TAX_REGIME_LABELS = Object.freeze({ [TAX_REGIMES.NEW]: 'New regime', [TAX_REGIMES.OLD]: 'Old regime' });
+
 export const GENDER_LABELS = Object.freeze({
   [GENDERS.MALE]: 'Male',
   [GENDERS.FEMALE]: 'Female',

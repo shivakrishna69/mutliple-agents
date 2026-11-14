@@ -25,7 +25,13 @@
 
 import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { ONBOARDING_MESSAGES } from '../constants/messages.js';
+import {
+  GENDER_LABELS,
+  ONBOARDING_MESSAGES,
+  PROFESSIONAL_TAX_STATE_LABELS,
+  TAX_REGIME_LABELS,
+} from '../constants/messages.js';
+import { ONBOARDING_SETTINGS } from '../constants/validation.js';
 import { DRAFT_STATUSES } from '../models/OnboardingDraft.js';
 import { loadEmailContext } from '../services/companySettings.js';
 import { importOfferDrafts } from '../services/offerImport.js';
@@ -72,9 +78,28 @@ const requireOfferManager = (req) => requireCapability(req, CAPABILITIES.MANAGE_
 const requireCompensationManager = (req) =>
   requireCapability(req, CAPABILITIES.MANAGE_COMPENSATION, 'COMPENSATION_MANAGERS_ONLY');
 
+const asChoices = (labels) => Object.entries(labels).map(([value, label]) => ({ value, label }));
+
+/** What the offer form offers and allows: the choices with their labels, and the limits. */
+const OFFER_FORM_CHOICES = Object.freeze({
+  professionalTaxStates: asChoices(PROFESSIONAL_TAX_STATE_LABELS),
+  taxRegimes: asChoices(TAX_REGIME_LABELS),
+  genders: asChoices(GENDER_LABELS),
+  limits: {
+    ctcMin: ONBOARDING_SETTINGS.CTC_LIMITS.MIN,
+    ctcMax: ONBOARDING_SETTINGS.CTC_LIMITS.MAX,
+    variablePayMaxBasisPoints: ONBOARDING_SETTINGS.VARIABLE_PAY_MAX_BASIS_POINTS,
+    esopUnitsMax: ONBOARDING_SETTINGS.ESOP_UNITS_MAX,
+    probationMonthsMax: ONBOARDING_SETTINGS.OFFER_TERM_LIMITS.PROBATION_MONTHS_MAX,
+    noticePeriodDaysMax: ONBOARDING_SETTINGS.OFFER_TERM_LIMITS.NOTICE_PERIOD_DAYS_MAX,
+    offerValidityDaysMax: ONBOARDING_SETTINGS.OFFER_TERM_LIMITS.OFFER_VALIDITY_DAYS_MAX,
+    bulkSendMax: ONBOARDING_SETTINGS.BULK_SEND_MAX,
+  },
+});
+
 export const getSettings = onboardingHandler('view_onboarding_settings', OFFERS_READ, async () => ({
   message: ONBOARDING_MESSAGES.SETTINGS_RETRIEVED,
-  data: { settings: toSettingsSummary(await getOnboardingSettings()) },
+  data: { settings: toSettingsSummary(await getOnboardingSettings()), choices: OFFER_FORM_CHOICES },
 }));
 
 export const patchSettings = onboardingHandler('update_onboarding_settings', OFFERS_AUDITED, async (req) => {
