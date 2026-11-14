@@ -6,7 +6,9 @@
  *   - ServiceError mapped to its status and stable code;
  *   - every change audited with its outcome (allowed, denied, rejected).
  *
- * A handler body returns { validationErrors } or { httpStatus?, message, data, auditDetails? }.
+ * A handler body returns { validationErrors, validationMessage? } or { httpStatus?, message, data,
+ * auditDetails? }; validationMessage replaces the general input message (e.g. a file whose rows need
+ * fixing).
  */
 
 import mongoose from 'mongoose';
@@ -59,7 +61,13 @@ export function createWorkforceHandlerFactory({ auditCategory, restrictedMessage
         try {
           const handlerResult = await handlerBody(req);
           if (handlerResult.validationErrors) {
-            return sendError(req, res, HTTP_STATUS.BAD_REQUEST, inputInvalidMessage, handlerResult.validationErrors);
+            return sendError(
+              req,
+              res,
+              HTTP_STATUS.BAD_REQUEST,
+              handlerResult.validationMessage ?? inputInvalidMessage,
+              handlerResult.validationErrors,
+            );
           }
           if (isWrite) audit(req, action, AUDIT_OUTCOMES.ALLOWED, handlerResult.auditDetails);
           return sendSuccess(

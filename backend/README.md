@@ -205,7 +205,19 @@ HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
 | `POST /create-draft`                                                          | saves the offer for review (`PENDING_REVIEW`) with the structure as calculated, and its terms: the settings' probation and notice unless HR set others, and its deadline (null: the settings' validity from the day it is sent)                                                                                                                                                                                       |
 | `GET /drafts?status=`, `GET` / `PATCH /drafts/:id`, `POST /drafts/:id/cancel` | list, read, change while waiting for review, cancel (`version` required); each with its `lifecycle` (below) and `acceptedAt`                                                                                                                                                                                                                                                                                          |
 | `POST /drafts/:id/dispatch`                                                   | recalculates and refuses (`DRAFT_FIGURES_CHANGED`) if the figures moved since review, refuses an offer whose deadline has passed (`OFFER_EXPIRED`), then creates the employee, renders the final letter, locks it and emails it with an activation link that works until the end of the deadline day (company time zone). 200 when sent; 202 when the employee exists but the email failed (dispatch again to resend) |
+| `POST /drafts/import` (multipart, field `file`)                               | offers from a CSV (at most `IMPORT_MAX_ROWS`): every row a draft waiting for review, worked out exactly as `create-draft` would (201); nobody is invited and nothing is sent. When any row has a problem, nothing is created and every problem is returned (400, `details` of `{ line, field, message }`, the field being the column)                                                                                 |
+| `POST /drafts/bulk-send` `{ draftIds }`                                       | sends 1 to `BULK_SEND_MAX` chosen drafts one by one, each as `dispatch` would (the same rules: one claim, reviewed figures, signatory, deadline); 200 with every draft's outcome (`sent`, `email_failed`, `refused` with the code and message a single send gives) and the counts                                                                                                                                     |
 
+- **Offer CSV columns** (case, spaces and hyphens do not matter; `services/offerImport.js`):
+  `name`, `personal_email`, `department_code` (an active department), `designation`,
+  `date_of_joining` (or `joining_date`), `date_of_birth`, `ctc` (`annual_ctc`), `work_city` and
+  `professional_tax_state` (KA, MH, NONE) are required; `company_email`, `role`, `manager_email` (a
+  current employee), `work_type`, `employment_status`, `job_level`, `employment_type`, `gender`,
+  `tax_regime`, `fixed_base` (Basic), `hra`, `special_allowance`, `variable_pay`, `esop_units`,
+  `probation_months`, `notice_period_days` and `offer_valid_until` are optional. Amounts may be written
+  "25,00,000" or "₹ 25,00,000". A row is refused for anything a single offer is refused for (with the
+  same words, such as a split that does not add up), and for the same email twice in the file, an
+  email that already has an account or an offer not yet settled, or a role the importer may not give.
 - **The letter has five pages**, each section starting a page (a long one continues; the footer
   counts the pages as printed): 1 the letter of appointment (role and pay at a glance, the deadline),
   2 Annexure A (the structure, variable pay, stock options), 3 terms of employment (probation, hours

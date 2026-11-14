@@ -41,6 +41,10 @@ export const RATE_LIMITS = Object.freeze({
   // Offer calculations (each preview renders a PDF) and dispatches (each sends an email).
   OFFER_CALCULATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
   OFFER_DISPATCHES_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 30 }),
+  // Offer CSVs (each row is checked and its salary structure computed) and bulk sends (up to
+  // ONBOARDING_SETTINGS.BULK_SEND_MAX letters each).
+  OFFER_IMPORTS_PER_USER: Object.freeze({ windowMs: 10 * 60 * 1000, maxRequests: 20 }),
+  OFFER_BULK_SENDS_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 5 }),
   // Knowledge base uploads (each is read and indexed in the background) and other changes.
   KNOWLEDGE_UPLOADS_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 60 }),
   KNOWLEDGE_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),

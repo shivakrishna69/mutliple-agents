@@ -30,7 +30,7 @@ import { isRealCalendarDate } from '../utils/calendarDates.js';
 import { invitableRolesFor } from './invitationService.js';
 
 /** A cell matching a definition's value or label, ignoring case, spaces and hyphens; null when none. */
-function choiceOf(cellText, definitions) {
+export function choiceOf(cellText, definitions) {
   const normalize = (text) => text.toLowerCase().replace(/[\s-]+/g, '_');
   const wanted = normalize(cellText);
   return (
@@ -55,7 +55,8 @@ export function firstRowByEmail(rows) {
 }
 
 /** "onsite" / "ONSITE" -> "Onsite"; null when it is none of the allowed values. */
-const matchChoice = (value, choices) => choices.find((choice) => choice.toLowerCase() === value.toLowerCase()) ?? null;
+export const matchChoice = (value, choices) =>
+  choices.find((choice) => choice.toLowerCase() === value.toLowerCase()) ?? null;
 
 function isAllowedJoiningDate(calendarDate, now) {
   if (!isRealCalendarDate(calendarDate) || calendarDate < EMPLOYEE_IMPORT_LIMITS.EARLIEST_JOINING_DATE) return false;

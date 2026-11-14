@@ -192,6 +192,31 @@ export function validateOfferEdit(requestBody, options) {
   return validationResult(validationErrors, offer.isValid ? { ...offer.sanitizedInput, version } : undefined);
 }
 
+/** POST /drafts/bulk-send: { draftIds: [id] }, 1 to ONBOARDING_SETTINGS.BULK_SEND_MAX different drafts. */
+export function validateBulkSend(requestBody) {
+  if (!isPlainObject(requestBody)) return bodyNotObjectResult();
+  const { draftIds } = requestBody;
+  const validationErrors = [];
+  if (
+    !Array.isArray(draftIds) ||
+    draftIds.length === 0 ||
+    draftIds.length > ONBOARDING_SETTINGS.BULK_SEND_MAX ||
+    !draftIds.every((draftId) => typeof draftId === 'string' && /^[0-9a-f]{24}$/i.test(draftId)) ||
+    new Set(draftIds.map((draftId) => draftId.toLowerCase())).size !== draftIds.length
+  ) {
+    validationErrors.push({
+      field: 'draftIds',
+      message: `must list 1 to ${ONBOARDING_SETTINGS.BULK_SEND_MAX} different draft ids`,
+    });
+  }
+  for (const field of Object.keys(requestBody).filter((key) => key !== 'draftIds')) {
+    validationErrors.push({ field, message: 'is not expected here' });
+  }
+  return validationResult(validationErrors, {
+    draftIds: validationErrors.length ? [] : draftIds.map((id) => id.toLowerCase()),
+  });
+}
+
 /** POST /drafts/:id/cancel: the version it was based on. */
 export function validateVersionOnly(requestBody) {
   if (!isPlainObject(requestBody)) return bodyNotObjectResult();

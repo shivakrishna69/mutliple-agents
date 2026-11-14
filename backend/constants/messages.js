@@ -55,6 +55,7 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
   TOO_MANY_OFFER_CALCULATIONS: 'Too many offer calculations in a short time. Please wait a minute and try again',
   TOO_MANY_OFFER_DISPATCHES: 'Too many offers sent in a short time. Please wait a few minutes and try again',
+  TOO_MANY_OFFER_IMPORTS: 'Too many offer files uploaded in a short time. Please wait a few minutes and try again',
   TOO_MANY_KNOWLEDGE_UPLOADS: 'Too many documents uploaded in a short time. Please wait a few minutes and try again',
   TOO_MANY_KNOWLEDGE_CHANGES: 'Too many knowledge base changes in a short time. Please wait a moment and try again',
   TOO_MANY_VERIFICATIONS: 'Too many verification requests. Please wait a minute and try again',
@@ -663,6 +664,11 @@ export const ONBOARDING_MESSAGES = Object.freeze({
   OFFER_EXPIRED:
     'This offer’s acceptance deadline has passed. Set a later date and save the draft again before sending',
   INPUT_INVALID: 'Some details need fixing',
+  IMPORT_ROWS_INVALID: 'Some rows need fixing. No offers were created; correct the file and upload it again',
+  IMPORTED: (count) => `${count} offer ${count === 1 ? 'draft' : 'drafts'} saved for review`,
+  BULK_SENT: (counts) =>
+    `${counts.sent} sent, ${counts.email_failed} created but not emailed, ${counts.refused} not sent`,
+  BULK_SEND_UNEXPECTED: 'This offer could not be sent because of an unexpected problem. Try sending it on its own',
   PREVIEW_WATERMARK: 'DRAFT – NOT AN OFFER',
 });
 
