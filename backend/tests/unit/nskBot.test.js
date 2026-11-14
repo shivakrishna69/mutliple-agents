@@ -60,18 +60,26 @@ describe('the actor token', () => {
 
 describe('what each role may use', () => {
   const SELF_INTENTS = [NSK_INTENTS.ATTENDANCE_AUDIT, NSK_INTENTS.POLICY_QA, NSK_INTENTS.GENERAL_HELP];
-  const SELF_TOOLS = Object.values(NSK_TOOLS).filter((tool) => !PEOPLE_TOOLS.includes(tool));
+  const OFFBOARDING_TOOL = NSK_TOOLS.FIND_OFFBOARDING_EMPLOYEE;
+  const SELF_TOOLS = Object.values(NSK_TOOLS).filter(
+    (tool) => !PEOPLE_TOOLS.includes(tool) && tool !== OFFBOARDING_TOOL,
+  );
+  const LOOKUP_TOOLS = Object.values(NSK_TOOLS).filter((tool) => tool !== OFFBOARDING_TOOL);
   const PEOPLE_ROLES = [ROLES.ADMIN, ROLES.HR, ROLES.FINANCE, ROLES.IT_ADMIN];
+  const OFFBOARDING_ROLES = [ROLES.ADMIN, ROLES.HR];
 
-  it('gives the people tools to admin, HR, finance and IT, self-service to the others', () => {
+  it('gives the people tools to admin, HR, finance and IT, offboarding to admin and HR, self-service to the others', () => {
     for (const role of Object.values(ROLES)) {
       const looksUp = PEOPLE_ROLES.includes(role);
-      assert.deepEqual(
-        allowedIntentsFor(role),
-        looksUp ? [NSK_INTENTS.PROFILE_LOOKUP, ...SELF_INTENTS] : SELF_INTENTS,
-        role,
-      );
-      assert.deepEqual(toolsAvailableTo(role), looksUp ? Object.values(NSK_TOOLS) : SELF_TOOLS, role);
+      const offboards = OFFBOARDING_ROLES.includes(role);
+      let intents = SELF_INTENTS;
+      if (offboards) intents = [NSK_INTENTS.PROFILE_LOOKUP, NSK_INTENTS.OFFBOARDING_WORKFLOW, ...SELF_INTENTS];
+      else if (looksUp) intents = [NSK_INTENTS.PROFILE_LOOKUP, ...SELF_INTENTS];
+      assert.deepEqual(allowedIntentsFor(role), intents, role);
+      let tools = SELF_TOOLS;
+      if (offboards) tools = Object.values(NSK_TOOLS);
+      else if (looksUp) tools = LOOKUP_TOOLS;
+      assert.deepEqual(toolsAvailableTo(role), tools, role);
     }
   });
 
@@ -80,12 +88,12 @@ describe('what each role may use', () => {
       NSK_INTENTS.PROFILE_LOOKUP,
       ...SELF_INTENTS,
     ]);
-    assert.deepEqual(toolsAvailableTo(ROLES.AGENT, { headsDepartment: true }), Object.values(NSK_TOOLS));
+    assert.deepEqual(toolsAvailableTo(ROLES.AGENT, { headsDepartment: true }), LOOKUP_TOOLS);
     assert.equal(nskHasCapability(ROLES.EMPLOYEE, CAPABILITIES.MANAGE_COMPENSATION, { headsDepartment: true }), false);
     assert.equal(nskHasCapability('superuser', CAPABILITIES.RUN_PEOPLE_LOOKUP, { headsDepartment: true }), false);
     for (const role of Object.values(ROLES)) {
       const intents = allowedIntentsFor(role, { headsDepartment: true });
-      assert.equal(intents.includes(NSK_INTENTS.OFFBOARDING_WORKFLOW), false);
+      assert.equal(intents.includes(NSK_INTENTS.OFFBOARDING_WORKFLOW), OFFBOARDING_ROLES.includes(role));
       assert.equal(intents.includes(NSK_INTENTS.WEB_MARKET_RESEARCH), false);
     }
   });
