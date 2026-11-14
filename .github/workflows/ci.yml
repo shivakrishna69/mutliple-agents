@@ -75,8 +75,20 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
+      # qpdf from its own release, pinned and checked against its published SHA-256, rather than from
+      # apt: the runner image's extra apt sources can make `apt-get update` fail (it did when
+      # ubuntu-latest moved to Ubuntu 26). The release zip carries its own libraries.
       - name: Install qpdf
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends qpdf && qpdf --version
+        env:
+          QPDF_VERSION: 12.4.2
+          QPDF_SHA256: db367d897829f22c4198ce1094143c9d467bd6ee7dfabc44ba6f02056b24f8b1
+        run: |
+          curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/qpdf.zip" \
+            "https://github.com/qpdf/qpdf/releases/download/v${QPDF_VERSION}/qpdf-${QPDF_VERSION}-bin-linux-x86_64.zip"
+          echo "${QPDF_SHA256}  $RUNNER_TEMP/qpdf.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/qpdf.zip" -d "$RUNNER_TEMP/qpdf"
+          echo "$RUNNER_TEMP/qpdf/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/qpdf/bin/qpdf" --version
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
