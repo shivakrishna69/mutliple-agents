@@ -315,6 +315,10 @@ export class TestClient {
     return this.request('PATCH', requestPath, { ...options, body });
   }
 
+  put(requestPath, body, options) {
+    return this.request('PUT', requestPath, { ...options, body });
+  }
+
   /** Uploads one file in the multipart field "file", as a browser form would. */
   upload(requestPath, { fileName, content, contentType = 'text/csv' }) {
     const form = new FormData();

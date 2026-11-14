@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import SystemMessage
 
 from app.agent import AgentTimeoutError
+from app.knowledge.external_schemas import ExternalPassage
 from app.knowledge.schemas import RetrievedPassage
 from app.main import app
 from app.nodes.nsk_assistant import (
@@ -88,9 +89,15 @@ class FakeNskSystems:
 
 
 class FakeSearch:
-    def __init__(self, passages: list[RetrievedPassage]) -> None:
+    def __init__(self, passages: list[RetrievedPassage], external: list[ExternalPassage] | None = None) -> None:
         self.passages = passages
+        self.external = external or []
         self.searches: list[dict[str, Any]] = []
+        self.external_searches: list[dict[str, Any]] = []
+
+    async def search_external_passages(self, *, question: str, include_unapproved: bool, limit: int):
+        self.external_searches.append({"question": question, "include_unapproved": include_unapproved, "limit": limit})
+        return self.external
 
     async def search_department_passages(self, *, department_ids: list[str], question: str, limit: int):
         self.searches.append({"department_ids": department_ids, "question": question, "limit": limit})
@@ -702,3 +709,118 @@ async def test_the_offboarding_tool_is_not_offered_without_it():
     nsk, answer_model, _ = assistant([text_reply("Hello!")], [classification("GENERAL_HELP"), suggestions()])
     await nsk.answer(turn_input("hi", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS))
     assert "find_offboarding_employee" not in answer_model.bound_tool_names
+
+
+# =================================================================================================
+# Web research
+# =================================================================================================
+
+WEB_SOURCE_ID = "64b0000000000000000000a9"
+FETCHED_AT = "2026-11-14T09:30:00+00:00"
+RESEARCH_TOOLS = [*SELF_TOOLS, "external_knowledge_scope", "web_search", "fetch_web_page", "get_stock_quote"]
+WEB_INTENTS = ["WEB_MARKET_RESEARCH", *SELF_SERVICE]
+
+
+def external_passage(score: float = 0.8) -> ExternalPassage:
+    return ExternalPassage(
+        source_id=WEB_SOURCE_ID,
+        source_url="https://www.rbi.org.in/press/rates",
+        domain="www.rbi.org.in",
+        title="RBI policy rates",
+        fetched_at=FETCHED_AT,
+        chunk_index=0,
+        text="The Reserve Bank of India kept the repo rate unchanged at 5.25 percent.",
+        heading_path=[],
+        score=score,
+    )
+
+
+async def test_a_read_page_is_cited_as_a_web_source_with_its_address_and_fetch_date():
+    systems = FakeNskSystems(
+        {
+            "fetch_web_page": {
+                "result": {
+                    "source_id": WEB_SOURCE_ID,
+                    "url": "https://www.rbi.org.in/press/rates",
+                    "final_url": "https://www.rbi.org.in/press/rates",
+                    "title": "RBI policy rates",
+                    "domain": "www.rbi.org.in",
+                    "fetched_at": FETCHED_AT,
+                    "approved": True,
+                    "cached": False,
+                    "text": "The Reserve Bank of India kept the repo rate unchanged at 5.25 percent.",
+                },
+                "source": "RBI policy rates (www.rbi.org.in), fetched 2026-11-14",
+            }
+        }
+    )
+    nsk, answer_model, _ = assistant(
+        [
+            tool_call_reply("read_web_page", {"url": "https://www.rbi.org.in/press/rates"}),
+            text_reply("The repo rate is 5.25 percent [1], from the RBI page fetched on 14 November."),
+        ],
+        [classification("WEB_MARKET_RESEARCH"), suggestions()],
+        systems,
+    )
+    result = await nsk.answer(
+        turn_input("What is the repo rate?", allowed_intents=WEB_INTENTS, allowed_tools=RESEARCH_TOOLS)
+    )
+    assert result.outcome is TurnOutcome.ANSWERED
+    [source] = result.sources
+    assert (source.kind, source.source_id, source.url, source.fetched_at) == (
+        "web",
+        WEB_SOURCE_ID,
+        "https://www.rbi.org.in/press/rates",
+        FETCHED_AT,
+    )
+    assert systems.calls[0] == ("fetch_web_page", {"url": "https://www.rbi.org.in/press/rates"}, ACTOR_TOKEN)
+    assert {"search_the_web", "read_web_page", "get_stock_quote", "search_external_knowledge"} <= set(
+        answer_model.bound_tool_names
+    )
+    assert "not a live price" in answer_model.received_inputs[0][0].content
+
+
+async def test_saved_pages_are_searched_within_the_backend_scope_and_cited():
+    for include_unapproved in (False, True):
+        systems = FakeNskSystems({"external_knowledge_scope": {"result": {"include_unapproved": include_unapproved}}})
+        search = FakeSearch([], [external_passage(), external_passage(score=0.1)])
+        nsk, answer_model, _ = assistant(
+            [
+                tool_call_reply("search_external_knowledge", {"query": "repo rate"}),
+                text_reply("The repo rate is 5.25 percent [1]."),
+            ],
+            [classification("WEB_MARKET_RESEARCH"), suggestions()],
+            systems,
+            search,
+        )
+        allowed = [*SELF_TOOLS, "external_knowledge_scope"]
+        result = await nsk.answer(turn_input("Repo rate?", allowed_intents=WEB_INTENTS, allowed_tools=allowed))
+        assert result.outcome is TurnOutcome.ANSWERED
+        assert search.external_searches == [
+            {"question": "repo rate", "include_unapproved": include_unapproved, "limit": 5}
+        ]
+        [source] = result.sources
+        assert (source.kind, source.source_id) == ("web", WEB_SOURCE_ID)
+        # The passage below the relevance threshold is never shown.
+        assert len(json.loads(answer_model.received_inputs[1][-1].content)["passages"]) == 1
+        assert "web_search" not in answer_model.bound_tool_names
+
+
+async def test_an_answer_from_saved_pages_that_cites_nothing_is_refused():
+    systems = FakeNskSystems({"external_knowledge_scope": {"result": {"include_unapproved": False}}})
+    nsk, _, _ = assistant(
+        [tool_call_reply("search_external_knowledge", {"query": "repo rate"}), text_reply("It is 5.25 percent.")],
+        [classification("WEB_MARKET_RESEARCH"), suggestions()],
+        systems,
+        FakeSearch([], [external_passage()]),
+    )
+    allowed = [*SELF_TOOLS, "external_knowledge_scope"]
+    result = await nsk.answer(turn_input("Repo rate?", allowed_intents=WEB_INTENTS, allowed_tools=allowed))
+    assert result.outcome is TurnOutcome.REFUSED
+
+
+async def test_web_tools_are_not_offered_without_them():
+    nsk, answer_model, _ = assistant([text_reply("Hello!")], [classification("GENERAL_HELP"), suggestions()])
+    await nsk.answer(turn_input("hi"))
+    for name in ("search_the_web", "read_web_page", "get_stock_quote", "search_external_knowledge"):
+        assert name not in answer_model.bound_tool_names

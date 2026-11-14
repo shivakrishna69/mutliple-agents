@@ -4,7 +4,7 @@
  * with the turn's actor token as the real service does.
  *
  *   const standIn = await startNskStandIn();
- *   standIn.respond = async (body) => ({ body: turnResponse({ ... }) });   // or { status, body }
+ *   standIn.respond = async (body, path) => ({ body: turnResponse({ ... }) });   // or { status, body }
  *   standIn.turns       every request: { path, body }
  *   callNskTool(testServer, tool, { actorToken, args, key })   a tool call as the ai-service makes it
  */
@@ -22,7 +22,7 @@ export async function startNskStandIn() {
       const body = rawBody ? JSON.parse(rawBody) : null;
       standIn.turns.push({ path: request.url, body });
       try {
-        const { status = 200, body: answer } = await standIn.respond(body);
+        const { status = 200, body: answer } = await standIn.respond(body, request.url);
         response.writeHead(status, { 'Content-Type': 'application/json' });
         response.end(JSON.stringify(answer));
       } catch (standInError) {
