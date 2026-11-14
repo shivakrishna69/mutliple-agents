@@ -64,8 +64,10 @@ export default function ArrivalDistributionChart({ arrivals }) {
         {medians.map((day) => (
           <li key={day.date} className="rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-slate-200">
             <span className="block text-slate-500">{dayLabel(day.date)}</span>
-            <span className="font-semibold text-slate-900 tabular-nums">{day.median ?? '—'}</span>
-            <span className="text-slate-500"> · {day.count}</span>
+            <span className="block font-semibold text-slate-900 tabular-nums">{day.median ?? '—'}</span>
+            <span className="block text-slate-500">
+              {day.count} {day.count === 1 ? 'arrival' : 'arrivals'}
+            </span>
           </li>
         ))}
       </ul>

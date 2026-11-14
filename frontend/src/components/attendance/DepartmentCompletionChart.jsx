@@ -55,14 +55,8 @@ export default function DepartmentCompletionChart({ departments }) {
               tickLine={false}
             />
             <Tooltip content={<DepartmentTooltip />} cursor={{ fill: '#f1f5f9' }} />
-            <Bar dataKey="percent" fill={SERIES_COLOR} radius={[0, 4, 4, 0]} isAnimationActive={false}>
-              <LabelList
-                dataKey="percent"
-                position="right"
-                formatter={(value) => (value === null ? '—' : `${value}%`)}
-                fill={CHART_INK.primary}
-                fontSize={12}
-              />
+            <Bar dataKey="drawnPercent" fill={SERIES_COLOR} radius={[0, 4, 4, 0]} isAnimationActive={false}>
+              <LabelList dataKey="label" position="right" fill={CHART_INK.primary} fontSize={12} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

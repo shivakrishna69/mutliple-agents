@@ -29,14 +29,22 @@ export function todaySlices(counts) {
 
 const NO_DEPARTMENT = 'No department';
 
-/** Bars in percent, most complete first. */
+/**
+ * Bars in percent, most complete first. A department with nothing expected yet is drawn at 0 and
+ * labelled "—" rather than left without a bar.
+ */
 export function departmentBars(departments) {
   return departments
-    .map((entry) => ({
-      name: entry.department?.name ?? NO_DEPARTMENT,
-      percent: entry.completion === null ? null : Math.round(entry.completion * 100),
-      ...entry,
-    }))
+    .map((entry) => {
+      const percent = entry.completion === null ? null : Math.round(entry.completion * 100);
+      return {
+        name: entry.department?.name ?? NO_DEPARTMENT,
+        percent,
+        drawnPercent: percent ?? 0,
+        label: percent === null ? '—' : `${percent}%`,
+        ...entry,
+      };
+    })
     .sort((first, second) => (second.percent ?? -1) - (first.percent ?? -1));
 }
 

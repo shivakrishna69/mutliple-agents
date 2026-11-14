@@ -27,6 +27,7 @@ function SliceTooltip({ active, payload, total }) {
 export default function StatusDonut({ counts }) {
   const slices = todaySlices(counts);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const shown = slices.filter((slice) => slice.value > 0);
   return (
     <figure className="grid items-center gap-6 sm:grid-cols-[minmax(0,14rem)_1fr]">
       <div className="relative mx-auto aspect-square w-full max-w-56" aria-hidden="true">
@@ -34,21 +35,20 @@ export default function StatusDonut({ counts }) {
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 224, height: 224 }}>
             <PieChart>
               <Pie
-                data={slices.filter((slice) => slice.value > 0)}
+                data={shown}
                 dataKey="value"
                 nameKey="label"
                 innerRadius="62%"
                 outerRadius="100%"
-                paddingAngle={2}
+                // A gap between slices, none around a single slice.
+                paddingAngle={shown.length > 1 ? 2 : 0}
                 stroke={CHART_INK.surface}
-                strokeWidth={2}
+                strokeWidth={shown.length > 1 ? 2 : 0}
                 isAnimationActive={false}
               >
-                {slices
-                  .filter((slice) => slice.value > 0)
-                  .map((slice) => (
-                    <Cell key={slice.key} fill={slice.color} />
-                  ))}
+                {shown.map((slice) => (
+                  <Cell key={slice.key} fill={slice.color} />
+                ))}
               </Pie>
               <Tooltip content={<SliceTooltip total={total} />} />
             </PieChart>
