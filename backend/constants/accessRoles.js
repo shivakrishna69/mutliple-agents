@@ -105,6 +105,10 @@ export const CAPABILITIES = Object.freeze({
   MANAGE_ALL_TASK_BOARDS: 'manage_all_task_boards',
   // Use the NSK assistant: what it may read and do follows the person's other capabilities.
   USE_NSK_ASSISTANT: 'use_nsk_assistant',
+  // Ask NSK about colleagues and departments across the company (profiles with sensitive fields
+  // masked, department metrics). Department heads get the same for the departments they head,
+  // without the capability (services/nskBot/nskAccess.js).
+  RUN_PEOPLE_LOOKUP: 'run_people_lookup',
 });
 
 const C = CAPABILITIES;
@@ -121,6 +125,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
+    C.RUN_PEOPLE_LOOKUP,
     C.MANAGE_WORKFORCE,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
@@ -133,6 +138,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
+    C.RUN_PEOPLE_LOOKUP,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
     C.MANAGE_COMPENSATION,
@@ -142,6 +148,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
+    C.RUN_PEOPLE_LOOKUP,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_USERS,
     C.READ_COMPANY_SETTINGS,

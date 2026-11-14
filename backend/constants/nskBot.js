@@ -80,19 +80,35 @@ export const NSK_ENTITY_KINDS = Object.freeze({
 
 /**
  * The capability each usable intent needs. An intent that is not listed has no tools yet, so it is
- * closed to everyone (the assistant says what it can help with instead). ATTENDANCE_AUDIT is the
- * person's own attendance here; looking at other people's comes with the people tools.
+ * closed to everyone (the assistant says what it can help with instead). RUN_PEOPLE_LOOKUP is also
+ * open to department heads, for the departments they head (NSK_HEAD_CAPABILITIES).
  */
 export const NSK_INTENT_CAPABILITIES = Object.freeze({
+  [NSK_INTENTS.PROFILE_LOOKUP]: CAPABILITIES.RUN_PEOPLE_LOOKUP,
   [NSK_INTENTS.ATTENDANCE_AUDIT]: CAPABILITIES.USE_NSK_ASSISTANT,
   [NSK_INTENTS.POLICY_QA]: CAPABILITIES.USE_NSK_ASSISTANT,
   [NSK_INTENTS.GENERAL_HELP]: CAPABILITIES.USE_NSK_ASSISTANT,
 });
 
-/** The intents `role` may use, in NSK_INTENTS order. */
-export function allowedIntentsFor(role) {
+/** Capabilities a department head has for the departments they head, whatever their role. */
+export const NSK_HEAD_CAPABILITIES = Object.freeze([CAPABILITIES.RUN_PEOPLE_LOOKUP]);
+
+/**
+ * True when someone with `role` (heading departments or not) has `capability` in NSK: through their
+ * role, or, for NSK_HEAD_CAPABILITIES, by heading at least one department (who also needs the
+ * assistant itself).
+ */
+export function nskHasCapability(role, capability, { headsDepartment = false } = {}) {
+  if (hasCapability(role, capability)) return true;
+  return (
+    headsDepartment && NSK_HEAD_CAPABILITIES.includes(capability) && hasCapability(role, CAPABILITIES.USE_NSK_ASSISTANT)
+  );
+}
+
+/** The intents someone with `role` may use, in NSK_INTENTS order. */
+export function allowedIntentsFor(role, { headsDepartment = false } = {}) {
   return Object.values(NSK_INTENTS).filter((intent) => {
     const capability = NSK_INTENT_CAPABILITIES[intent];
-    return capability !== undefined && hasCapability(role, capability);
+    return capability !== undefined && nskHasCapability(role, capability, { headsDepartment });
   });
 }
