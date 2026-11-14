@@ -47,6 +47,9 @@ import { dispatchDocumentIngestion } from './ingestionQueue.js';
 import { decideKnowledgeAccess } from './knowledgeAccess.js';
 import { removeDocumentChunks } from './knowledgeIndexClient.js';
 
+// Shared with the web research (services/webResearch/), which chunks pages exactly like documents.
+export { chunkBlocks } from './chunking.js';
+
 const refusal = (httpStatus, code) => new ServiceError(httpStatus, code, KNOWLEDGE_MESSAGES[code]);
 
 // How each content check failure is answered.

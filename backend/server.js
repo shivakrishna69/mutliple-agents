@@ -56,6 +56,11 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import taskBoardListRoutes from './routes/taskBoardListRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import nskBotRoutes from './routes/nskBotRoutes.js';
+import webResearchRoutes from './routes/webResearchRoutes.js';
+import {
+  startExternalKnowledgeCleanup,
+  stopExternalKnowledgeCleanup,
+} from './services/webResearch/externalKnowledgeJob.js';
 import { closeVaultStorage, initVaultStorage } from './services/vaultStorage.js';
 import { closePayslipServices, initPayslipServices } from './services/payslipService.js';
 import { initPdfRenderer } from './services/pdfGenerationService.js';
@@ -182,6 +187,7 @@ export function createApp(config) {
   app.use('/api/presence', presenceRoutes);
   // The NSK assistant: sessions and turns (its tools are internal routes the ai-service calls).
   app.use('/api/nsk-bot', nskBotRoutes);
+  app.use('/api/web-research', webResearchRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -276,6 +282,8 @@ async function start() {
     initKnowledgeIngestionQueue(config);
     // Offboarding documents (relieving letter, settlement statement, attendance audit), the same way.
     initOffboardingQueue(config);
+    // Expired web pages (external knowledge): now and hourly (idempotent).
+    startExternalKnowledgeCleanup(config);
   });
 
   /**
@@ -298,6 +306,7 @@ async function start() {
       stopLeaveScheduler();
       stopAttendanceScheduler();
       stopPresenceJobs();
+      stopExternalKnowledgeCleanup();
       await closeEmployeeImportQueue();
       await closeKnowledgeIngestionQueue();
       await closeOffboardingQueue();
