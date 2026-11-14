@@ -82,6 +82,7 @@ from app.agent import (
     KnowledgeAnswerUnavailableError,
     LeaveAssistantUnavailableError,
     LLMNotConfiguredError,
+    NskAssistantUnavailableError,
     RegularizationUnavailableError,
 )
 from app.config import ConfigurationError, Settings
@@ -90,6 +91,7 @@ from app.knowledge.service import KnowledgeService, KnowledgeUnavailableError
 from app.logging_config import configure_logging
 from app.nodes.knowledge_agent import KnowledgeAnswerInput, KnowledgeAnswerResponse
 from app.nodes.leave_assistant import LeaveAssistantInput, LeaveAssistantResponse
+from app.nodes.nsk_assistant import NskTurnInput, NskTurnResponse
 from app.schemas import (
     AIProcessResponse,
     ChatRole,
@@ -175,6 +177,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.knowledge_service = knowledge_service
     knowledge_service.start()
     agent_runtime.attach_knowledge_retriever(knowledge_service)
+    agent_runtime.attach_document_search(knowledge_service)
     eviction_task = asyncio.create_task(run_thread_eviction_loop(agent_runtime), name="thread-eviction")
 
     if agent_runtime.is_llm_configured:
@@ -537,6 +540,59 @@ async def answer_leave_question(turn_input: LeaveAssistantInput, request: Reques
         },
     )
     return LeaveAssistantResponse(reply=result.reply, draft=result.draft, tools_used=result.tools_used)
+
+
+@app.post(
+    "/ai/nsk/turn",
+    response_model=NskTurnResponse,
+    responses=ERROR_RESPONSES,
+    dependencies=[Depends(require_internal_api_key)],
+    tags=["agent"],
+)
+async def run_nsk_turn(turn_input: NskTurnInput, request: Request) -> NskTurnResponse:
+    """One NSK assistant turn: classification, a reply traced to its sources, and next suggestions."""
+    agent_runtime: AgentRuntime = request.app.state.agent_runtime
+    log_context = {"requestId": getattr(request.state, "request_id", None)}
+    started_at = time.perf_counter()
+
+    try:
+        result = await agent_runtime.process_nsk_turn(turn_input)
+    except LLMNotConfiguredError as not_configured_error:
+        logger.error("NSK turn rejected: LLM not configured", extra=log_context)
+        raise ServiceError(status.HTTP_503_SERVICE_UNAVAILABLE, "AI model is not configured") from not_configured_error
+    except NskAssistantUnavailableError as unavailable_error:
+        logger.error(
+            "NSK turn rejected: backend data unavailable",
+            extra={**log_context, "reason": unavailable_error.failure_kind},
+        )
+        raise ServiceError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "The NSK assistant is unavailable"
+        ) from unavailable_error
+    except AgentTimeoutError as timeout_error:
+        logger.error("NSK turn timed out", extra={**log_context, "detail": timeout_error.detail})
+        raise ServiceError(status.HTTP_504_GATEWAY_TIMEOUT, "AI processing timed out") from timeout_error
+
+    logger.info(
+        "NSK turn answered",
+        extra={
+            **log_context,
+            "outcome": result.outcome.value,
+            "intent": result.classification.intent.value,
+            "sentiment": result.classification.sentiment.value,
+            "tools_used": result.tools_used,
+            "sources": len(result.sources),
+            "duration_ms": round((time.perf_counter() - started_at) * 1000, 1),
+        },
+    )
+    return NskTurnResponse(
+        outcome=result.outcome,
+        reply=result.reply,
+        classification=result.classification,
+        sources=result.sources,
+        suggestions=result.suggestions,
+        tools_used=result.tools_used,
+        usage=result.usage,
+    )
 
 
 NDJSON_MEDIA_TYPE = "application/x-ndjson"

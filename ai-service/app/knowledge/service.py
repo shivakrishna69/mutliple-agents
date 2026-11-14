@@ -8,6 +8,8 @@ Qdrant (app/knowledge/store.py).
     index_chunks   ensures the collection exists (once), embeds, upserts; returns the count
     remove_document  evicts a document's chunks; returns how many there were
     search_passages  the passages of one department closest to a question, most relevant first
+    search_department_passages  the same across several departments (the NSK assistant), each
+                   passage naming its department
 
 Qdrant being unreachable, or the model failing to load, raises KnowledgeUnavailableError (503): the
 backend then retries the document later. Nothing here logs chunk text.
@@ -146,6 +148,34 @@ class KnowledgeService:
                 heading_path=point.payload.get("heading_path") or [],
                 page=point.payload.get("page"),
                 score=point.score,
+            )
+            for point in points
+        ]
+
+    async def search_department_passages(
+        self, *, department_ids: list[str], question: str, limit: int
+    ) -> list[RetrievedPassage]:
+        """Up to `limit` passages across `department_ids`, most relevant first, each naming its department."""
+        if not department_ids:
+            return []
+        store = await self._ready_store()
+        try:
+            vector = await self._embedder.embed_query(question)
+        except EmbeddingModelError as model_error:
+            raise KnowledgeUnavailableError("embedding model unavailable") from model_error
+        try:
+            points = await store.search_departments(vector, department_ids=department_ids, limit=limit)
+        except INDEX_FAILURES as index_error:
+            raise KnowledgeUnavailableError(type(index_error).__name__) from index_error
+        return [
+            RetrievedPassage(
+                document_id=point.payload["document_id"],
+                chunk_index=point.payload["chunk_index"],
+                text=point.payload["text"],
+                heading_path=point.payload.get("heading_path") or [],
+                page=point.payload.get("page"),
+                score=point.score,
+                department_id=point.payload["department_id"],
             )
             for point in points
         ]

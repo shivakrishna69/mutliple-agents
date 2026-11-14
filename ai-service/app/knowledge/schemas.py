@@ -78,3 +78,5 @@ class RetrievedPassage(BaseModel):
     heading_path: list[str]
     page: int | None
     score: float
+    # The department whose knowledge base holds the passage (set by searches across departments).
+    department_id: str | None = None

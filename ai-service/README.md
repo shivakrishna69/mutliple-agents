@@ -38,6 +38,23 @@ API for any change.
   With `"stream": true` it is sent as NDJSON as the model writes: `delta` events, then `final`
   (authoritative: it replaces the deltas) or `error`. Nothing is stored; the backend sends recent
   history (`KNOWLEDGE_ANSWER_HISTORY_MESSAGES`) and decides who may ask which agent.
+- **NSK assistant** (`POST /ai/nsk/turn`, app/nodes/nsk_assistant/): one turn of the HR portal's
+  assistant. The message is classified first (JSON mode: intent, sentiment, entities, a short topic);
+  deterministic tone rules can only raise the sentiment (harassment or burnout -> `SENSITIVE_HR`,
+  "urgent" or "!!" -> `URGENT`, "still not working" -> `FRUSTRATED`). An intent the backend did not
+  allow, classified with confidence of at least 0.6, gets a fixed reply listing what the person can
+  ask, and no tool runs. Otherwise the model answers with only the tools the backend listed; each
+  tool call goes to the backend's `/api/internal/nsk/tools/:tool` with the turn's actor token, so the
+  backend decides whose data it is and checks access again; `search_company_docs` asks the backend
+  which departments the person may read and searches only those (`search_department_passages`, one
+  Qdrant query with `MatchAny`). Tool results, passages and earlier sessions are numbered sources the
+  reply cites as [n]. The reply is then checked: `CLARIFY:`/`NOT_FOUND:` markers set the outcome,
+  marks pointing nowhere are removed, the output guard runs, and every number must appear in the
+  evidence (grounding.py: digit-group commas and leading zeros ignored); sentences with other numbers
+  are removed and a reply that loses too much is `refused`, as is a document answer that cites
+  nothing. The three next suggestions are predicted in parallel from the intent, sentiment and recent
+  conversation, limited to the allowed intents, with fixed ones when the model fails. Nothing is
+  stored. Needs `BACKEND_INTERNAL_URL`.
 - **Agent telemetry**: node, model and tool timings are posted to the backend for the admin console;
   conversation content is never included.
 
@@ -85,13 +102,14 @@ docker run --rm -v "$PWD/app:/src/app:ro" -v "$PWD/tests:/src/tests:ro" -v "$PWD
 | `test_support_graph.py` | Whole support turns with scripted models: tool use, two-topic messages, guard escalation, fallbacks |
 | `test_attendance_agent.py` | The evidence rule, date resolution, and full regularization conversations, including prompt injection |
 | `test_leave_assistant.py` | Tools scoped to the backend's employee, pricing and drafting without sending, refusals and mistakes returned to the model, bounded rounds, guarded replies, the endpoint's statuses |
+| `test_nsk_assistant.py` | The NSK assistant with scripted models: classification and tone rules, the number check, tool calls carrying the actor token, only allowed tools offered, a disallowed intent answered without tools, invented numbers and uncited policy refused, markers, earlier sessions as sources, refused tool calls, the urgent tone, fallbacks, suggestions, the endpoint |
 | `test_api.py` | Internal API key, 422 shape, 503 without Groq, 504 on timeout |
 | `test_knowledge_api.py` | The knowledge endpoints: internal key, every malformed batch refused before embedding, 503 without Qdrant |
 | `test_knowledge_unit.py` | Stable point ids, headings in the embedded text, Qdrant and offline-model settings |
 | `test_knowledge_agent.py` | The department agent with a scripted streaming model: no model call without relevant passages, cited answers, invented citations removed, NOT_FOUND (also split across pieces, never streamed), refusals, the output guard (answers restating documents in the company's voice are answered, not refused), citation variants, partial answers in the prompt, the prompt's tags defused, recent history only |
 | `test_knowledge_answer_api.py` | `POST /ai/knowledge/answer`: internal key, invalid requests, 503 without a model or index, the JSON answer, the NDJSON stream (deltas, final, error events), 503/504 mapping |
 | `test_knowledge_retrieval_eval.py` | A fixed set of handbook and Data Engineering questions (an exact heading, paraphrases) against a real Qdrant and the real model: each finds the passage that answers it above `KNOWLEDGE_MIN_RELEVANCE`; unrelated questions stay below it |
-| `test_knowledge_index.py` | Against a real Qdrant and the real model (`TEST_QDRANT_URL`, `TEST_QDRANT_API_KEY`; skipped without, required in CI): collection and indexes created once even by two instances at once, overwrite, remove, department isolation, the closest chunk answering a question |
+| `test_knowledge_index.py` | Against a real Qdrant and the real model (`TEST_QDRANT_URL`, `TEST_QDRANT_API_KEY`; skipped without, required in CI): collection and indexes created once even by two instances at once, overwrite, remove, department isolation, a search across several departments staying within them, the closest chunk answering a question |
 | `test_config.py` | Unsafe settings (simulated tools or plain HTTP in production, short keys) stop the service |
 
 `tests/fakes.py` holds the scripted chat model and in-memory attendance systems used in place of
@@ -103,7 +121,8 @@ Groq and the backend.
 app/main.py              FastAPI app, endpoints, error mapping, lifespan
 app/agent.py             AgentRuntime: models, compiled graph, per-thread memory limits
 app/graph.py             LangGraph topology (supervisor ↔ workers loop)
-app/nodes/               supervisor, workers (+ tools), attendance agent, leave assistant, knowledge agent
+app/nodes/               supervisor, workers (+ tools), attendance agent, leave assistant, knowledge agent,
+                         NSK assistant
 app/guards/              output guardrails
 app/services/            client for the backend internal API
 app/knowledge/           department knowledge index: endpoints, embeddings (fastembed), Qdrant store,

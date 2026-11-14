@@ -103,6 +103,8 @@ export const CAPABILITIES = Object.freeze({
   USE_TASK_BOARDS: 'use_task_boards',
   // See and manage every department's task board.
   MANAGE_ALL_TASK_BOARDS: 'manage_all_task_boards',
+  // Use the NSK assistant: what it may read and do follows the person's other capabilities.
+  USE_NSK_ASSISTANT: 'use_nsk_assistant',
 });
 
 const C = CAPABILITIES;
@@ -118,6 +120,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
   [ROLES.HR]: Object.freeze([
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
+    C.USE_NSK_ASSISTANT,
     C.MANAGE_WORKFORCE,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
@@ -129,6 +132,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
   [ROLES.FINANCE]: Object.freeze([
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
+    C.USE_NSK_ASSISTANT,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_PAYSLIPS,
     C.MANAGE_COMPENSATION,
@@ -137,6 +141,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
   [ROLES.IT_ADMIN]: Object.freeze([
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
+    C.USE_NSK_ASSISTANT,
     C.READ_EMPLOYEE_DIRECTORY,
     C.MANAGE_USERS,
     C.READ_COMPANY_SETTINGS,
@@ -144,8 +149,13 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.VIEW_SYSTEM_HEALTH,
     C.VIEW_AGENT_TELEMETRY,
   ]),
-  [ROLES.AGENT]: Object.freeze([C.ASK_DEPARTMENT_AGENTS, C.USE_TASK_BOARDS, C.STAFF_SUPPORT]),
-  [ROLES.EMPLOYEE]: Object.freeze([C.ASK_DEPARTMENT_AGENTS, C.USE_TASK_BOARDS, C.USE_SUPPORT_CHAT]),
+  [ROLES.AGENT]: Object.freeze([C.ASK_DEPARTMENT_AGENTS, C.USE_TASK_BOARDS, C.USE_NSK_ASSISTANT, C.STAFF_SUPPORT]),
+  [ROLES.EMPLOYEE]: Object.freeze([
+    C.ASK_DEPARTMENT_AGENTS,
+    C.USE_TASK_BOARDS,
+    C.USE_NSK_ASSISTANT,
+    C.USE_SUPPORT_CHAT,
+  ]),
 });
 
 /** True when `role` may do `capability`. An unknown role may do nothing. */

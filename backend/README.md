@@ -71,6 +71,7 @@ scripts/         operational scripts
 | `/api/employees`                                                                                 | current employees for pickers (invited people included); base office assignment; bulk CSV import                                                                                                                                                                                 | HR, admin                                                                                |
 | `/api/work-calendar`                                                                             | holidays and the day-by-day calendar                                                                                                                                                                                                                                             | HR, admin edit / employees read their office                                             |
 | `/api/leave`                                                                                     | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export                                                                                                                                                       | HR, admin manage / employees their own / reporting managers decide their team's requests |
+| `/api/nsk-bot`                                                                                   | the NSK assistant: sessions (list, open, delete, resume) and turns with cited sources and suggestions                                                                                                                                                                            | everyone with `use_nsk_assistant` (every role); sessions: their owner                    |
 | `/api/internal`                                                                                  | calls from the AI service                                                                                                                                                                                                                                                        | internal API key                                                                         |
 
 ## Dashboard and service health
@@ -359,6 +360,55 @@ answer it next time; leads see and delete it with the other documents.
 closed; open ones stay until handled; notifications after 90 days. Every question, deletion, rating
 and inbox action is audited (categories `agent_chat` and `agent_questions`) with ids and outcomes,
 never the text.
+
+## The NSK assistant
+
+The HR portal's assistant (`routes/nskBotRoutes.js`, `services/nskBot/`), for every role with
+`use_nsk_assistant` (route check, 403 otherwise). It answers from the person's own data and the
+documents they may read; what it may do follows their other capabilities.
+
+| Endpoint                                              | What it does                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GET /api/nsk-bot/sessions`                           | their sessions, newest first, and `resume`: the latest one (within 7 days) with starter chips           |
+| `GET /api/nsk-bot/sessions/:sessionId`                | one session with its messages                                                                           |
+| `DELETE /api/nsk-bot/sessions/:sessionId`             | delete one, with its messages and its cached context                                                    |
+| `POST /api/nsk-bot/message` `{ message, sessionId? }` | one turn: the reply with its outcome, citations, three suggestions and, when urgent, an escalation hint |
+
+**A turn.** The daily quota (`NSK_DAILY_MESSAGE_LIMIT`, default 100 per UTC day, its own counter) and
+the per-minute rate limit apply. The ai-service (`POST /ai/nsk/turn`) gets the person's name, role
+label, today and time zone, the session's recent messages (cached in Redis for 6 hours, from MongoDB
+on a miss), the memory of earlier sessions (the most recent and those whose title, topics or names
+match the message, by a text index), the intents and tools this role may use, and a fresh **actor
+token**. It classifies the message (intent `PROFILE_LOOKUP`, `OFFBOARDING_WORKFLOW`,
+`ATTENDANCE_AUDIT`, `POLICY_QA`, `WEB_MARKET_RESEARCH`, `GENERAL_HELP`; sentiment `POSITIVE`,
+`NEUTRAL`, `URGENT`, `FRUSTRATED`, `SENSITIVE_HR`; entities; a short topic), answers with tools, and
+predicts the next three questions. Outcomes: `ANSWERED`, `CLARIFY`, `NOT_FOUND` (says what is
+missing), `NOT_ALLOWED` (an intent this role may not use), `REFUSED` (an answer whose numbers or
+policy could not be traced to a source is not sent). When the ai-service fails, nothing of the turn
+is kept and the quota is given back.
+
+**Tools and access.** Tools run in this backend, through `POST /api/internal/nsk/tools/:tool` (internal
+API key) with the actor token: `v1.<payload>.<HMAC-SHA256>`, naming the person and their session,
+valid for 120 seconds, signed with a key derived from `JWT_SECRET` (HKDF, so no new secret). On every
+call the token is checked (401), the account must be active and own the session (401), the tool must
+exist (404), and the role must have the tool's capability, read from the database then (403,
+audited as denied). No tool takes a person as an argument. In this release every role has the
+self-service tools: `my_attendance_today`, `my_attendance_month` (`month`, up to 12 months back),
+`my_leave_balances`, `my_leave_requests` (`status`), and `knowledge_scope` (the departments whose
+knowledge bases the person may read, by the department agents' audience rules; the ai-service
+searches only those). People lookup, offboarding and web research come with their own capabilities.
+
+**Citations.** Each reply's sources are checked before they are stored: a document must belong to a
+knowledge base the person may read (named, with its page), an earlier session must be one of the
+memories sent (labelled with its title and date), and tool reads keep the tool's label ("Your leave
+balances, 2026-04-01 to 2027-03-31"). Anything else is dropped. Suggestions outside the person's
+intents are dropped too.
+
+**Memory and retention.** A session keeps its last 8 topics and 12 names (people, dates, departments,
+tickers) and its last suggestions, which are offered again as starter chips when it is resumed.
+Sessions and messages are deleted 90 days after their last message (`NSK_BOT_SETTINGS.RETENTION_DAYS`,
+MongoDB TTL indexes). Every turn and deletion is audited (category `nsk_bot`) with the session, the
+intent, the sentiment, the outcome and the tools used, never the text.
 
 ## Department task boards
 

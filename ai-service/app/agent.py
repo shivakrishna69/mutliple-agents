@@ -85,6 +85,15 @@ from app.nodes.leave_assistant import (
     LeaveAssistantResult,
     LeaveDataUnavailableError,
 )
+from app.nodes.nsk_assistant import (
+    BackendNskSystems,
+    DocumentSearch,
+    NskAssistant,
+    NskDataUnavailableError,
+    NskTurnInput,
+    NskTurnResult,
+    SearchSettings,
+)
 from app.nodes.supervisor import create_supervisor_model
 from app.nodes.transcript import replies_given_this_turn
 from app.schemas import MESSAGE_CONTENT_MAX_LENGTH, EmployeeContext
@@ -92,6 +101,7 @@ from app.services.backend_client import BackendInternalClient
 from app.telemetry import (
     WORKFLOW_KNOWLEDGE_ANSWER,
     WORKFLOW_LEAVE_ASSISTANT,
+    WORKFLOW_NSK_ASSISTANT,
     WORKFLOW_REGULARIZATION,
     WORKFLOW_SUPPORT,
     TelemetryPublisher,
@@ -136,6 +146,10 @@ class KnowledgeAnswerUnavailableError(AgentError):
 
 class LeaveAssistantUnavailableError(AgentError):
     """The leave assistant cannot answer: BACKEND_INTERNAL_URL is not set, or the backend is down."""
+
+
+class NskAssistantUnavailableError(AgentError):
+    """The NSK assistant cannot answer: BACKEND_INTERNAL_URL is not set, or the backend is down."""
 
 
 @dataclass(frozen=True)
@@ -265,6 +279,9 @@ class AgentRuntime:
         self.regularization_agent: RegularizationAgent | None = None
         # The leave assistant reads leave through the backend's internal API; None without it.
         self.leave_assistant: LeaveAssistant | None = None
+        # The NSK assistant reads through the backend's internal tool endpoint (with each turn's actor
+        # token) and searches the knowledge index once it is attached; None without the backend.
+        self.nsk_assistant: NskAssistant | None = None
         # Answers from department knowledge; built by attach_knowledge_retriever once the knowledge
         # index exists, and only with a model. Its model runs at KNOWLEDGE_ANSWER_TEMPERATURE.
         self.knowledge_answerer: KnowledgeAnswerer | None = None
@@ -294,6 +311,17 @@ class AgentRuntime:
                     idle_ttl_seconds=settings.thread_idle_ttl_seconds,
                 )
                 self.leave_assistant = LeaveAssistant(self._response_model, BackendLeaveSystems(self._backend_client))
+                self.nsk_assistant = NskAssistant(
+                    answer_model=self._knowledge_model,
+                    json_model=self._create_json_model(),
+                    systems=BackendNskSystems(self._backend_client),
+                    search=None,
+                    search_settings=SearchSettings(
+                        top_k=settings.knowledge_answer_top_k,
+                        min_relevance=settings.knowledge_min_relevance,
+                        excerpt_chars=settings.knowledge_excerpt_chars,
+                    ),
+                )
             # Dependencies handed to nodes through LangGraph's runtime context on every run;
             # never written to the checkpointer.
             self._agent_context = AgentContext(
@@ -321,6 +349,11 @@ class AgentRuntime:
                 excerpt_chars=self._settings.knowledge_excerpt_chars,
             ),
         )
+
+    def attach_document_search(self, search: DocumentSearch) -> None:
+        """Lets the NSK assistant search department knowledge (the knowledge service)."""
+        if self.nsk_assistant is not None:
+            self.nsk_assistant.attach_search(search)
 
     def start(self) -> None:
         """Starts background work that needs the running event loop (called on application startup)."""
@@ -369,6 +402,27 @@ class AgentRuntime:
             max_tokens=self._settings.llm_max_output_tokens,
             timeout=self._settings.llm_request_timeout_seconds,
             max_retries=self._settings.llm_max_retries,
+            **optional_client_settings,
+        )
+
+    def _create_json_model(self) -> ChatGroq:
+        """
+        The NSK assistant's classification and suggestion model: the main model at temperature 0 in
+        JSON mode, so its replies parse.
+        """
+        optional_client_settings: dict[str, Any] = {}
+        if self._settings.groq_base_url:
+            optional_client_settings["base_url"] = self._settings.groq_base_url
+        if self._settings.llm_reasoning_effort:
+            optional_client_settings["reasoning_effort"] = self._settings.llm_reasoning_effort
+        return ChatGroq(
+            model=self._settings.groq_model,
+            api_key=self._settings.groq_api_key,
+            temperature=0.0,
+            max_tokens=self._settings.llm_max_output_tokens,
+            timeout=self._settings.llm_request_timeout_seconds,
+            max_retries=self._settings.llm_max_retries,
+            model_kwargs={"response_format": {"type": "json_object"}},
             **optional_client_settings,
         )
 
@@ -572,6 +626,29 @@ class AgentRuntime:
             raise AgentTimeoutError(
                 "turn_timeout", f"knowledge answer exceeded {self._settings.process_timeout_seconds} s"
             ) from timeout_error
+
+    async def process_nsk_turn(self, turn_input: NskTurnInput) -> NskTurnResult:
+        """
+        One NSK assistant turn, bounded by AI_PROCESS_TIMEOUT_SECONDS. It only reads, so a timeout or a
+        retry is always safe.
+        """
+        if not self.is_llm_configured:
+            raise LLMNotConfiguredError("llm_not_configured", "GROQ_API_KEY is not set")
+        if self.nsk_assistant is None:
+            raise NskAssistantUnavailableError("nsk_assistant_not_configured", "BACKEND_INTERNAL_URL is not set")
+        try:
+            async with telemetry_turn(self.telemetry_publisher, workflow=WORKFLOW_NSK_ASSISTANT) as turn_telemetry:
+                async with asyncio.timeout(self._settings.process_timeout_seconds):
+                    result = await self.nsk_assistant.answer(turn_input)
+                if turn_telemetry is not None:
+                    turn_telemetry.route_decision = result.classification.intent.value
+                return result
+        except TimeoutError as timeout_error:
+            raise AgentTimeoutError(
+                "turn_timeout", f"NSK turn exceeded {self._settings.process_timeout_seconds} s"
+            ) from timeout_error
+        except NskDataUnavailableError as unavailable_error:
+            raise NskAssistantUnavailableError("nsk_data_unavailable", str(unavailable_error)) from unavailable_error
 
     async def process_leave_question(self, turn_input: LeaveAssistantInput) -> LeaveAssistantResult:
         """

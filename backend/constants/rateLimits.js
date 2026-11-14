@@ -65,6 +65,10 @@ export const RATE_LIMITS = Object.freeze({
   AGENT_QUESTIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
   // Feedback, clearing conversations, and a lead's work in the Questions Inbox.
   AGENT_CHAT_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // Messages to the NSK assistant (each costs several model calls); the daily quota is separate
+  // (NSK_DAILY_MESSAGE_LIMIT). Deleting sessions is a light write.
+  NSK_MESSAGES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 10 }),
+  NSK_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Creating and changing tasks, sprints and comments (a board drag is one change).
   TASK_WRITES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 120 }),
   // Invitations send email: generous for onboarding a batch, low enough to stop mail abuse.

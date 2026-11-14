@@ -10,14 +10,14 @@ import { QUESTION_STATUSES } from '../models/AgentQuestion.js';
 import { isValidObjectIdString } from './conversationValidators.js';
 import { bodyNotObjectResult, isPlainObject, validationResult } from './requestShape.js';
 
-function refuseUnknownFields(requestBody, allowedFields, validationErrors) {
+export function refuseUnknownFields(requestBody, allowedFields, validationErrors) {
   for (const field of Object.keys(requestBody)) {
     if (!allowedFields.includes(field)) validationErrors.push({ field, message: 'is not expected' });
   }
 }
 
 /** Trimmed text of 1..maxLength characters, or an error; `optional` allows it to be absent or null. */
-function readText(value, field, maxLength, validationErrors, { optional = false } = {}) {
+export function readText(value, field, maxLength, validationErrors, { optional = false } = {}) {
   if (optional && (value === undefined || value === null)) return null;
   if (typeof value !== 'string' || value.trim().length === 0) {
     validationErrors.push({ field, message: 'is required' });
@@ -28,7 +28,7 @@ function readText(value, field, maxLength, validationErrors, { optional = false 
   return text;
 }
 
-function readOptionalId(value, field, validationErrors) {
+export function readOptionalId(value, field, validationErrors) {
   if (value === undefined || value === null) return null;
   if (!isValidObjectIdString(value)) {
     validationErrors.push({ field, message: 'must be an id' });

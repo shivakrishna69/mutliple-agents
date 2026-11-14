@@ -38,8 +38,8 @@ import AgentQuestion, { QUESTION_REASONS } from '../../models/AgentQuestion.js';
 import Department from '../../models/Department.js';
 import DepartmentAgent, { AGENT_STATUSES } from '../../models/DepartmentAgent.js';
 import User from '../../models/User.js';
-import { isDuplicateKeyError } from '../../utils/mongoErrors.js';
 import { managesKnowledgeBase } from '../knowledge/knowledgeBaseService.js';
+import { reserveDailyUsage } from '../dailyUsageQuota.js';
 import { ServiceError } from '../serviceError.js';
 import { askRefusalReason, effectiveAudienceOf, loadAskerMembership } from './agentAudience.js';
 import { escalateQuestion } from './agentQuestionService.js';
@@ -129,48 +129,20 @@ export async function loadAskScope(user, departmentId) {
 // The daily quota
 // =================================================================================================
 
-const utcDay = (date = new Date()) => date.toISOString().slice(0, 10);
-
 /** Counts one question for today; refuses (429) past the limit. Returns how to give it back. */
-async function reserveDailyQuestion(userId, limit) {
-  const day = utcDay();
-  const increment = () =>
-    AgentChatUsage.findOneAndUpdate(
-      { userId, day },
-      {
-        $inc: { questions: 1 },
-        $setOnInsert: { expiresAt: new Date(Date.now() + (AGENT_CHAT_SETTINGS.USAGE_RETENTION_DAYS + 1) * DAY_MS) },
-      },
-      { upsert: true, new: true },
-    ).lean();
-  let usage;
-  try {
-    usage = await increment();
-  } catch (incrementError) {
-    // Two first questions of the day at once: the second upsert finds the first one's counter.
-    if (!isDuplicateKeyError(incrementError)) throw incrementError;
-    usage = await increment();
-  }
-  const giveBack = () => AgentChatUsage.updateOne({ userId, day }, { $inc: { questions: -1 } });
-  if (usage.questions > limit) {
-    await giveBack();
-    throw new ServiceError(
-      HTTP_STATUS.TOO_MANY_REQUESTS,
-      'DAILY_LIMIT_REACHED',
-      AGENT_CHAT_MESSAGES.DAILY_LIMIT_REACHED(limit),
-    );
-  }
-  return {
-    giveBack,
-    recordTokens: (usageReport) =>
-      usageReport
-        ? AgentChatUsage.updateOne(
-            { userId, day },
-            { $inc: { inputTokens: usageReport.inputTokens, outputTokens: usageReport.outputTokens } },
-          )
-        : null,
-  };
-}
+const reserveDailyQuestion = (userId, limit) =>
+  reserveDailyUsage({
+    usageModel: AgentChatUsage,
+    userId,
+    limit,
+    retentionDays: AGENT_CHAT_SETTINGS.USAGE_RETENTION_DAYS,
+    limitError: () =>
+      new ServiceError(
+        HTTP_STATUS.TOO_MANY_REQUESTS,
+        'DAILY_LIMIT_REACHED',
+        AGENT_CHAT_MESSAGES.DAILY_LIMIT_REACHED(limit),
+      ),
+  });
 
 // =================================================================================================
 // Summaries

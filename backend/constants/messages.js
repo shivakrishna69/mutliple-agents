@@ -67,6 +67,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_LEAVE_ASSISTANT_MESSAGES: 'Too many questions to the leave assistant in a short time. Please wait a moment',
   TOO_MANY_AGENT_QUESTIONS: 'Too many questions to department agents in a short time. Please wait a moment',
   TOO_MANY_AGENT_CHAT_CHANGES: 'Too many changes in a short time. Please wait a moment and try again',
+  TOO_MANY_NSK_MESSAGES: 'Too many messages to NSK in a short time. Please wait a moment',
+  TOO_MANY_NSK_CHANGES: 'Too many changes in a short time. Please wait a moment and try again',
   TOO_MANY_TASK_CHANGES: 'Too many task changes in a short time. Please wait a moment and try again',
   TOO_MANY_LEAVE_REQUEST_UPDATES:
     'Too many leave requests or decisions in a short time. Please wait a moment and try again',
@@ -766,6 +768,42 @@ export const AGENT_CHAT_MESSAGES = Object.freeze({
     `I couldn't find this in the ${departmentName} knowledge base, so I sent your question to the ${departmentName} team. You'll be notified when they reply.`,
   REPLY_REFUSED: (departmentName) =>
     `I couldn't find a reliable answer to this in the ${departmentName} knowledge base, so I sent your question to the ${departmentName} team. You'll be notified when they reply.`,
+});
+
+/** The NSK assistant (services/nskBot/). */
+export const NSK_BOT_MESSAGES = Object.freeze({
+  SESSIONS_RETRIEVED: 'Your NSK sessions',
+  SESSION_RETRIEVED: 'NSK session',
+  SESSION_DELETED: 'Session deleted',
+  REPLIED: 'NSK replied',
+  INPUT_INVALID: 'Some details need fixing',
+  ACCESS_DENIED: 'Your role cannot use the NSK assistant',
+  SESSION_NOT_FOUND: 'Session not found',
+  AI_UNAVAILABLE: 'NSK could not answer right now. Please try again in a moment',
+  DAILY_LIMIT_REACHED: (limit) =>
+    `You have sent NSK ${limit} messages today, the daily limit. You can continue tomorrow (UTC)`,
+  // Shown above the latest session when the person comes back to it.
+  RESUME_PROMPT: (title) => `Pick up where you left off: ${title}`,
+  RESUME_CONTINUE: (title) => `Continue: ${title}`,
+  // When the message sounds urgent, frustrated or sensitive: how to reach a person.
+  ESCALATION_HINT: 'Need a person? Contact HR directly, and they will help you',
+  // Internal tool calls from the ai-service.
+  TOOL_RESULT: 'Tool result',
+  ACTOR_INVALID: 'The assistant session is not valid. Ask again',
+  TOOL_NOT_FOUND: 'There is no such tool',
+  TOOL_FORBIDDEN: 'This needs access the person does not have',
+  NO_EMPLOYEE_PROFILE: 'Your account is not linked to an employee record, so there is no attendance or leave to show',
+  ATTENDANCE_MONTH_OUT_OF_RANGE: (monthsBack) => `Choose this month or one of the ${monthsBack} months before it`,
+  // What an answer's citation badges say.
+  SOURCE_LABELS: Object.freeze({
+    ATTENDANCE_TODAY: (date) => `Your attendance on ${date}`,
+    ATTENDANCE_MONTH: (month) => `Your attendance, ${month}`,
+    LEAVE_BALANCES: (firstDate, lastDate) => `Your leave balances, ${firstDate} to ${lastDate}`,
+    LEAVE_REQUESTS: 'Your leave requests',
+    DOCUMENT: (documentName, page) => (page ? `${documentName}, p. ${page}` : documentName),
+    DOCUMENT_UNNAMED: 'Company document',
+    CONVERSATION: (title, date) => `Earlier session: ${title} (${date})`,
+  }),
 });
 
 /** In-app notifications. */

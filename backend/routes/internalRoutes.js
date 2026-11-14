@@ -11,6 +11,8 @@
  *   GET  /leave/employees/:id/requests       employee the backend asked about, and what a leave would
  *   GET  /leave/employees/:id/calendar       cost; nothing is written
  *   POST /leave/employees/:id/preview
+ *   POST /nsk/tools/:tool                    one NSK assistant tool call, for the person its actor
+ *                                            token names (controllers/internalNskController.js)
  *
  * In production these routes should also be unreachable from the public internet (expose them
  * only on the internal network, or block /api/internal at the load balancer); the key is the
@@ -28,6 +30,7 @@ import {
   getAssistantRequests,
   postAssistantPreview,
 } from '../controllers/internalLeaveController.js';
+import { postNskToolCall } from '../controllers/internalNskController.js';
 import { requireInternalApiKey } from '../middleware/requireInternalApiKey.js';
 
 const internalRouter = Router();
@@ -45,5 +48,6 @@ internalRouter.get('/leave/employees/:employeeId/balances', getAssistantBalances
 internalRouter.get('/leave/employees/:employeeId/requests', getAssistantRequests);
 internalRouter.get('/leave/employees/:employeeId/calendar', getAssistantCalendar);
 internalRouter.post('/leave/employees/:employeeId/preview', postAssistantPreview);
+internalRouter.post('/nsk/tools/:tool', postNskToolCall);
 
 export default internalRouter;

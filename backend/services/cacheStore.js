@@ -216,6 +216,22 @@ export async function setCachedJson(cacheKey, cacheValue, ttlSeconds) {
   }
 }
 
+/** Removes a value. Returns true when the cache answered (whether or not the key existed). */
+export async function deleteCachedJson(cacheKey) {
+  if (!activeBackend) return false;
+  try {
+    if (activeBackend.kind === 'redis') {
+      await withTimeout('del', activeBackend.client.del(cacheKey));
+    } else {
+      activeBackend.entries.delete(cacheKey);
+    }
+    return true;
+  } catch (deleteError) {
+    logger.warn('Cache delete failed', { cacheKey, error: deleteError.message });
+    return false;
+  }
+}
+
 /**
  * Reads an integer counter (used as a cache generation number). A missing counter is 0.
  * Returns null when the cache cannot be read, so the caller can skip caching entirely.

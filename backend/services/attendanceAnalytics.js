@@ -18,12 +18,15 @@
  *   arrivals      punch-in times over the last ARRIVAL_DAYS days (to today), in each person's office
  *                 time (the company's for people without an office), counted per ARRIVAL_SLOT_MINUTES
  *                 slot and day, with each day's median arrival
+ *
+ * getOwnAttendanceMonth gives one person the same month for themselves, with their punch times.
  */
 
 import { DAY_KINDS } from '../constants/calendarDays.js';
 import { ATTENDANCE_MESSAGES } from '../constants/messages.js';
 import { ATTENDANCE_ANALYTICS } from '../constants/validation.js';
 import Attendance, { ATTENDANCE_STATUSES } from '../models/Attendance.js';
+import EmployeeProfile from '../models/EmployeeProfile.js';
 import { addDaysToCalendarDate, listCalendarDates } from '../utils/calendarDates.js';
 import { readOfficeLocalClock } from './attendancePolicy.js';
 import { LEAVE_HALVES, loadApprovedLeave } from './attendanceToday.js';
@@ -55,7 +58,8 @@ function datesOfMonth(month) {
   const dayCount = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
   return listCalendarDates(`${month}-01`, `${month}-${String(dayCount).padStart(2, '0')}`);
 }
-const asClockTime = (minutes) =>
+/** "HH:MM" for minutes since midnight. */
+export const asClockTime = (minutes) =>
   `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
 /**
@@ -237,5 +241,66 @@ export async function getAttendanceAnalytics({ viewer, month = null, departmentI
       .map((entry) => ({ ...entry, completion: roundShare(entry.presentDays, entry.expectedDays) }))
       .sort((first, second) => (first.department?.name ?? '').localeCompare(second.department?.name ?? '')),
     arrivals: bucketArrivals({ dates: arrivalDates, arrivals, slotMinutes: ATTENDANCE_ANALYTICS.ARRIVAL_SLOT_MINUTES }),
+  };
+}
+
+/**
+ * One person's own month, for themselves (the NSK assistant): every day judged as in the analytics
+ * above, with the punch-in and punch-out times in their office's time (the company's without an
+ * office) and how long they worked.
+ * @param {{ userId: string, month?: string|null, now?: Date }} request  month "YYYY-MM" (default: current)
+ * @returns {Promise<object|null>} null when no employee profile is linked to the account; `person`
+ *   null (and no days) when they have not joined yet
+ */
+export async function getOwnAttendanceMonth({ userId, month = null, now = new Date() }) {
+  const profile = await EmployeeProfile.findOne({ userId }).select('_id').lean();
+  if (!profile) return null;
+  const { people, officesById, companyTimeZone } = await loadTeamRoster({ filter: { _id: profile._id }, now });
+  const companyToday = readOfficeLocalClock(now, companyTimeZone).calendarDate;
+  const chosenMonth = month ?? companyToday.slice(0, 7);
+  const [person] = people;
+  if (!person) return { month: chosenMonth, person: null, expectedDays: 0, presentDays: 0, lateDays: 0, days: [] };
+
+  const monthDates = datesOfMonth(chosenMonth);
+  const timeZone = person.office?.timeZone ?? companyTimeZone;
+  const [punches, leaveByKey, calendars] = await Promise.all([
+    Attendance.find({ employeeId: profile._id, date: { $gte: monthDates[0], $lte: monthDates.at(-1) } })
+      .select('date calculationStatus checkInTime checkOutTime workedMinutes workMode')
+      .lean(),
+    loadApprovedLeave([profile._id], monthDates),
+    loadCalendars(officesById, monthDates[0], monthDates.at(-1)),
+  ]);
+  const punchByDate = new Map(punches.map((punch) => [punch.date, punch]));
+  const calendar = person.officeId ? calendars.get(person.officeId) : null;
+  const judged = judgeMonth({
+    dates: monthDates,
+    today: readOfficeLocalClock(now, timeZone).calendarDate,
+    joinedOn: person.joinedOn,
+    hasOffice: Boolean(calendar),
+    dayKindOf: (date) => classifyCalendarDay(date, calendar).kind,
+    leaveOf: (date) => leaveByKey.get(`${person.employeeId}|${date}`) ?? null,
+    punchOf: (date) => punchByDate.get(date) ?? null,
+  });
+  const localTime = (instant) =>
+    instant ? asClockTime(readOfficeLocalClock(instant, timeZone).minutesSinceMidnight) : null;
+  return {
+    month: chosenMonth,
+    timeZone,
+    person: toPersonView(person),
+    expectedDays: judged.expectedDays,
+    presentDays: judged.presentDays,
+    lateDays: judged.lateDays,
+    completion: judged.completion,
+    days: judged.days.map((day) => {
+      const punch = punchByDate.get(day.date);
+      return {
+        ...day,
+        leave: leaveByKey.get(`${person.employeeId}|${day.date}`) ?? null,
+        punchIn: localTime(punch?.checkInTime),
+        punchOut: localTime(punch?.checkOutTime),
+        workedMinutes: punch?.workedMinutes ?? null,
+        workMode: punch?.workMode ?? null,
+      };
+    }),
   };
 }
