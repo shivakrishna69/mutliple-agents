@@ -64,6 +64,8 @@ import { closeMailService, initMailService } from './services/mailService.js';
 import { configureAccountCodeKey } from './services/accountTokens.js';
 import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/employeeImportQueue.js';
 import { closeKnowledgeIngestionQueue, initKnowledgeIngestionQueue } from './services/knowledge/ingestionQueue.js';
+import { closeOffboardingQueue, initOffboardingQueue } from './services/nskBot/offboarding/offboardingQueue.js';
+import { offboardingStore } from './services/nskBot/offboarding/offboardingStorage.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { startAttendanceScheduler, stopAttendanceScheduler } from './services/attendanceScheduler.js';
@@ -232,6 +234,7 @@ async function start() {
     initPdfRenderer(config.pdfBrowser);
     initOfferLetters(config.offerLetters);
     initPayslipServices(config.payslips);
+    offboardingStore.init(config.offboarding.storage);
     initMailService(config.mail);
     configureAccountCodeKey(config.jwtSecret);
   } catch (err) {
@@ -271,6 +274,8 @@ async function start() {
     initEmployeeImportQueue(config);
     // Knowledge base documents: read, chunked and indexed in the background, on the same kind of queue.
     initKnowledgeIngestionQueue(config);
+    // Offboarding documents (relieving letter, settlement statement, attendance audit), the same way.
+    initOffboardingQueue(config);
   });
 
   /**
@@ -295,9 +300,11 @@ async function start() {
       stopPresenceJobs();
       await closeEmployeeImportQueue();
       await closeKnowledgeIngestionQueue();
+      await closeOffboardingQueue();
       await closeSocketServer();
       await closeCacheStore();
       closeVaultStorage();
+      offboardingStore.close();
       await closePayslipServices();
       closeMailService();
       await mongoose.connection.close();

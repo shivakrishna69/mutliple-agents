@@ -813,6 +813,68 @@ export const NSK_BOT_MESSAGES = Object.freeze({
   SALARY_NOT_ISSUED: 'No payslip has been issued for this person yet, so there is no salary to show',
   PEOPLE_OUT_OF_SCOPE: 'You can look up people in the departments you head only',
   DEPARTMENT_NOT_FOUND: 'No department you can look at matches this; pick one of the departments listed',
+  // The action cards under a reply; the person's name and employee ID follow.
+  ACTION_LABELS: Object.freeze({
+    START_OFFBOARDING: (name, employeeCode) => `Start offboarding package: ${name} (${employeeCode})`,
+    VIEW_PROFILE: (name, employeeCode) => `View profile first: ${name} (${employeeCode})`,
+  }),
+  OFFBOARDING_ALREADY_STARTED_NOTE: 'Offboarding has already started for this person; open their case instead',
+});
+
+/** Offboarding through NSK: settlement previews, starting the notice period, the documents. */
+export const OFFBOARDING_MESSAGES = Object.freeze({
+  PREVIEWED: 'Settlement preview ready',
+  STARTED: 'Offboarding started; the documents are being prepared',
+  RETRY_STARTED: 'Preparing the documents again',
+  CASE_RETRIEVED: 'Offboarding case',
+  CASES_RETRIEVED: 'Offboarding cases',
+  CANCELLED: 'Offboarding draft cancelled',
+  CHECKLIST_RETRIEVED: 'IT offboarding checklist',
+  DOWNLOAD_READY: 'Download link ready',
+  INPUT_INVALID: 'Some details need fixing',
+  NOT_ALLOWED: 'Your role cannot offboard people',
+  VIEW_NOT_ALLOWED: 'Your role cannot see offboarding settlements',
+  CHECKLIST_NOT_ALLOWED: 'Your role cannot see the IT offboarding checklist',
+  EMPLOYEE_NOT_FOUND: 'Employee not found',
+  CASE_NOT_FOUND: 'Offboarding case not found',
+  ARTIFACT_NOT_FOUND: 'Document not found',
+  ARTIFACT_NOT_ALLOWED: 'Your role cannot download this document',
+  NOT_OFFBOARDABLE: 'This person is no longer employed, so they cannot be offboarded',
+  CANNOT_OFFBOARD_SELF: 'You cannot offboard yourself; ask another HR colleague',
+  ALREADY_STARTED: 'Offboarding has already started for this person',
+  NOT_A_DRAFT: 'Only a draft that has not started can be changed or cancelled',
+  VERSION_CONFLICT: 'Someone changed this preview since you opened it; preview it again',
+  PREVIEW_OUT_OF_DATE: 'The figures changed since this preview (a new payslip, say); preview it again before starting',
+  SALARY_REQUIRED: 'No payslip or accepted offer was found; enter the monthly gross and Basic in the preview',
+  TDS_REQUIRED: 'The tax engine does not cover this financial year; enter the TDS in the preview',
+  LAST_DAY_BEFORE_NOTICE: 'The last working day cannot be before the notice date',
+  LAST_DAY_BEFORE_JOINING: 'The last working day cannot be before the joining date',
+  LAST_DAY_TOO_FAR: (days) => `The last working day must be within ${days} days from today`,
+  UNAVAILABLE: 'Offboarding documents cannot be generated on this server (storage or the PDF renderer is not set up)',
+  NOT_GENERATED_YET: 'The documents are still being prepared',
+  // The banner over every settlement preview and statement (Code on Wages, 2019, s.17(2)).
+  SETTLEMENT_DEADLINE_NOTE: (dueDate) =>
+    `Pay the full and final settlement by ${dueDate}: wages are due within 2 working days of the last working day (Code on Wages, 2019, s.17(2)).`,
+  SALARY_SOURCE_NOTES: Object.freeze({
+    payslip: (period) => `Salary from the latest issued payslip (${period})`,
+    offer: () => 'Salary from the accepted offer (no payslip has been issued)',
+    none: () => 'No payslip or accepted offer: enter the salary',
+  }),
+  FINAL_MONTH_PAID_NOTE: 'The payslip for the final month has already been issued, so no salary days are owed for it',
+  TDS_NOTES: Object.freeze({
+    computed: (financialYear, regime) =>
+      `TDS from the ${financialYear} tax engine, ${regime} regime, less the tax already deducted this year`,
+    override: () => 'TDS as entered by HR',
+    unavailable: (financialYear) => `The tax engine does not cover ${financialYear}; HR must enter the TDS`,
+  }),
+  // The IT checklist card for someone serving notice: what to revoke on the last working day.
+  IT_CHECKLIST_ITEMS: Object.freeze([
+    'Disable the portal account, company email and single sign-on at the end of the last working day',
+    'Revoke VPN, Wi-Fi certificates and remote-access tokens',
+    'Collect the laptop, access card and any other company devices',
+    'Remove from groups, shared drives and distribution lists; transfer file ownership to the manager',
+    'Rotate any shared credentials or API keys the person held',
+  ]),
 });
 
 /** In-app notifications. */

@@ -680,6 +680,32 @@ export const NSK_BOT_SETTINGS = Object.freeze({
   DEPARTMENT_CHOICES_MAX: 25,
   // Daily usage counters are kept this long, then deleted.
   USAGE_RETENTION_DAYS: 7,
+  // Action cards under one reply (a resolved person: start offboarding, view the profile).
+  ACTIONS_MAX: 4,
+});
+
+/** Offboarding through NSK (services/nskBot/offboarding/). */
+export const OFFBOARDING_SETTINGS = Object.freeze({
+  // How far ahead a last working day may be set.
+  LAST_WORKING_DAY_MAX_DAYS_AHEAD: 180,
+  SEPARATION_REASON_MAX_LENGTH: 300,
+  // HR's own settlement lines (a bonus, an asset not returned) per side.
+  OTHER_LINES_MAX: 10,
+  OTHER_LINE_LABEL_MAX_LENGTH: 80,
+  // Any one amount HR enters, in rupees.
+  AMOUNT_MAX: 100_000_000,
+  ENCASHABLE_DAYS_MAX: 400,
+  NOTICE_SHORTFALL_DAYS_MAX: 365,
+  // The attendance and leave audit covers this many months up to the last working day (or today).
+  AUDIT_MONTHS: 3,
+  // Generated documents are well under these; anything larger means a template went wrong.
+  PDF_MAX_BYTES: 5 * 1024 * 1024,
+  WORKBOOK_MAX_BYTES: 10 * 1024 * 1024,
+  // The background job: a worker's claim, the sweep, and the attempts before a case is marked failed.
+  LEASE_MS: 5 * 60 * 1000,
+  SWEEP_INTERVAL_MS: 60 * 1000,
+  MAX_ATTEMPTS: 3,
+  CASES_LISTED: 50,
 });
 
 /** Department task boards: sprints, tasks and their activity (models/Sprint.js, Task.js, TaskActivity.js). */
