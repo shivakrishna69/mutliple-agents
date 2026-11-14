@@ -132,6 +132,24 @@ async def test_a_department_never_finds_another_departments_chunks(knowledge):
         await store.search(query, department_id="", limit=10)
 
 
+async def test_a_search_across_departments_stays_within_them_and_names_each_passages_department(knowledge):
+    service, store, _client = knowledge
+    department_c = object_id()
+    await service.index_chunks(batch(object_id(), DEPARTMENT_A, ["The notice period is 60 days."]))
+    await service.index_chunks(batch(object_id(), DEPARTMENT_B, ["Notice period for interns is 15 days."]))
+    await service.index_chunks(batch(object_id(), department_c, ["Notice period for executives is 90 days."]))
+
+    passages = await service.search_department_passages(
+        department_ids=[DEPARTMENT_A, DEPARTMENT_B], question="What is the notice period?", limit=10
+    )
+    assert {passage.department_id for passage in passages} == {DEPARTMENT_A, DEPARTMENT_B}
+    assert all("executives" not in passage.text for passage in passages)
+    assert await service.search_department_passages(department_ids=[], question="notice", limit=10) == []
+    query = (await service._embedder.embed_passages(["notice"]))[0]
+    with pytest.raises(ValueError, match="department"):
+        await store.search_departments(query, department_ids=[], limit=10)
+
+
 async def test_the_closest_chunk_answers_the_question(knowledge):
     service, store, _client = knowledge
     await service.index_chunks(

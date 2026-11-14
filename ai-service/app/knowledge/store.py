@@ -135,3 +135,20 @@ class KnowledgeStore:
             with_payload=True,
         )
         return result.points
+
+    async def search_departments(
+        self, vector: list[float], *, department_ids: list[str], limit: int
+    ) -> list[models.ScoredPoint]:
+        """The closest points among several departments' knowledge (the NSK assistant's reach)."""
+        if not department_ids:
+            raise ValueError("at least one department is required to search knowledge")
+        result = await self._client.query_points(
+            self._collection_name,
+            query=vector,
+            query_filter=models.Filter(
+                must=[models.FieldCondition(key=TENANT_FIELD, match=models.MatchAny(any=list(department_ids)))]
+            ),
+            limit=limit,
+            with_payload=True,
+        )
+        return result.points
