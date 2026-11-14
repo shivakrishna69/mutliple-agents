@@ -392,11 +392,36 @@ API key) with the actor token: `v1.<payload>.<HMAC-SHA256>`, naming the person a
 valid for 120 seconds, signed with a key derived from `JWT_SECRET` (HKDF, so no new secret). On every
 call the token is checked (401), the account must be active and own the session (401), the tool must
 exist (404), and the role must have the tool's capability, read from the database then (403,
-audited as denied). No tool takes a person as an argument. In this release every role has the
-self-service tools: `my_attendance_today`, `my_attendance_month` (`month`, up to 12 months back),
-`my_leave_balances`, `my_leave_requests` (`status`), and `knowledge_scope` (the departments whose
-knowledge bases the person may read, by the department agents' audience rules; the ai-service
-searches only those). People lookup, offboarding and web research come with their own capabilities.
+audited as denied). No tool takes a person as an argument. Every role has the self-service tools:
+`my_attendance_today`, `my_attendance_month` (`month`, up to 12 months back), `my_leave_balances`,
+`my_leave_requests` (`status`), and `knowledge_scope` (the departments whose knowledge bases the
+person may read, by the department agents' audience rules; the ai-service searches only those).
+Offboarding and web research come with their own capabilities.
+
+**People tools.** `run_people_lookup` (admin, HR, finance, IT administrator) gives the whole company;
+a **department head** of any role gets the same tools for the departments they head
+(`Department.departmentHeadId`, read on every call, not the units under them), and the
+`PROFILE_LOOKUP` intent with them (`services/nskBot/nskAccess.js`).
+
+- `lookup_employee_profile` (`query`: a name or part of one, an employee ID, a work email): among
+  current employees in scope. One match (an employee ID always wins) gives the profile: name, employee
+  ID, role, designation, department, reporting manager, joining date, employment status, work
+  location type, office, shift, attendance today, leave balances, phone, salary. Several give up to 8
+  candidates (name, ID, designation, department) to pick from; the AI service offers each as a card.
+  None gives nothing (a head is told only their departments are searched; nothing reveals people
+  elsewhere).
+- `get_department_metrics` (`department`: name or code, optional for a head of one department):
+  headcount, attendance today by status (and late), the active sprint with its tasks by status, open
+  tasks, and pending approvals (leave requests, leave changes, attendance regularizations). Without a
+  match: the departments in scope to choose from.
+
+What a profile shows is one table, `services/nskBot/profileMasking.js`: the phone number is masked for
+every role (`+••••••••••10`); salary (the latest issued payslip: gross, deductions, net, earnings) is
+read and shown only for roles with `manage_compensation` (admin, HR, finance), and replaced by a
+note for everyone else; fields not in the table (personal email, date of birth, bank, identity, device
+and location data) are never read. Every people tool call is audited (`nsk_bot.nsk_people_lookup`)
+with the person it acted for, their role and session, the employees or department read and the
+fields shown, never the values.
 
 **Citations.** Each reply's sources are checked before they are stored: a document must belong to a
 knowledge base the person may read (named, with its page), an earlier session must be one of the

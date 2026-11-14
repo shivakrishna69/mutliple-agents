@@ -485,3 +485,97 @@ def test_a_timed_out_turn_returns_504(client, monkeypatch):
 
     monkeypatch.setattr(app.state.agent_runtime, "process_nsk_turn", timing_out)
     assert client.post("/ai/nsk/turn", json=VALID_TURN, headers=AUTHORISED).status_code == 504
+
+
+# =================================================================================================
+# People tools
+# =================================================================================================
+
+PEOPLE_INTENTS = ["PROFILE_LOOKUP", *SELF_SERVICE]
+PEOPLE_TOOLS = [*SELF_TOOLS, "lookup_employee_profile", "get_department_metrics"]
+CANDIDATES = [
+    {"employee_code": "NSK0104", "name": "Rahul Sharma", "designation": "Data Engineer", "department": "Data"},
+    {"employee_code": "NSK0233", "name": "Rahul Verma", "designation": "Analyst", "department": "Finance"},
+]
+
+
+async def test_an_ambiguous_name_asks_which_person_and_offers_each_as_a_card():
+    systems = FakeNskSystems(
+        {
+            "lookup_employee_profile": {
+                "result": {"matches": 2, "candidates": CANDIDATES, "more_not_shown": 0},
+                "source": 'People matching "Rahul"',
+            }
+        }
+    )
+    nsk, answer_model, _ = assistant(
+        [
+            tool_call_reply("lookup_employee_profile", {"query": "Rahul"}),
+            text_reply("CLARIFY: I found Rahul Sharma and Rahul Verma [1]. Which one do you mean?"),
+        ],
+        [classification("PROFILE_LOOKUP"), suggestions(("Show Rahul's leave", "PROFILE_LOOKUP"))],
+        systems,
+    )
+    result = await nsk.answer(
+        turn_input("Show me Rahul's profile", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS)
+    )
+
+    assert result.outcome is TurnOutcome.CLARIFY
+    assert systems.calls == [("lookup_employee_profile", {"query": "Rahul"}, ACTOR_TOKEN)]
+    assert [(suggestion.text, suggestion.intent) for suggestion in result.suggestions] == [
+        ("Look up Rahul Sharma (NSK0104)", Intent.PROFILE_LOOKUP),
+        ("Look up Rahul Verma (NSK0233)", Intent.PROFILE_LOOKUP),
+    ]
+    assert {"lookup_employee_profile", "get_department_metrics"} <= set(answer_model.bound_tool_names)
+    assert "never try to complete them" in answer_model.received_inputs[0][0].content
+
+
+async def test_a_profile_answer_may_give_the_masked_phone_but_not_invent_a_salary():
+    profile = {
+        "matches": 1,
+        "profile": {
+            "name": "Rahul Sharma",
+            "employee_code": "NSK0104",
+            "phone": "+••••••••••10",
+            "salary": {"hidden": True, "note": "Salary is not shown to your role"},
+        },
+    }
+    systems = FakeNskSystems(
+        {"lookup_employee_profile": {"result": profile, "source": "Profile: Rahul Sharma (NSK0104)"}}
+    )
+    nsk, _, _ = assistant(
+        [
+            tool_call_reply("lookup_employee_profile", {"query": "NSK0104"}),
+            text_reply("Rahul Sharma (NSK0104) can be reached on +••••••••••10 [1]."),
+        ],
+        [classification("PROFILE_LOOKUP"), suggestions()],
+        systems,
+    )
+    answered = await nsk.answer(
+        turn_input("Rahul Sharma's phone?", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS)
+    )
+    assert answered.outcome is TurnOutcome.ANSWERED
+    assert answered.reply == "Rahul Sharma (NSK0104) can be reached on +••••••••••10 [1]."
+
+    systems = FakeNskSystems(
+        {"lookup_employee_profile": {"result": profile, "source": "Profile: Rahul Sharma (NSK0104)"}}
+    )
+    nsk, _, _ = assistant(
+        [
+            tool_call_reply("lookup_employee_profile", {"query": "NSK0104"}),
+            text_reply("Rahul earns 95,000 a month [1]."),
+        ],
+        [classification("PROFILE_LOOKUP"), suggestions()],
+        systems,
+    )
+    invented = await nsk.answer(
+        turn_input("What does Rahul earn?", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS)
+    )
+    assert invented.outcome is TurnOutcome.REFUSED
+
+
+async def test_people_tools_are_not_offered_to_self_service():
+    nsk, answer_model, _ = assistant([text_reply("Hello!")], [classification("GENERAL_HELP"), suggestions()])
+    await nsk.answer(turn_input("hi"))
+    assert "lookup_employee_profile" not in answer_model.bound_tool_names
+    assert "get_department_metrics" not in answer_model.bound_tool_names

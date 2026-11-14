@@ -669,6 +669,15 @@ export const NSK_BOT_SETTINGS = Object.freeze({
   // Own attendance: at most one month per read, and no further back than this.
   ATTENDANCE_MONTHS_BACK: 12,
   LEAVE_REQUESTS_SHOWN: 20,
+  // People lookup: a name, employee ID or work email; more matches than this are listed to pick from.
+  LOOKUP_QUERY_MIN_LENGTH: 2,
+  LOOKUP_QUERY_MAX_LENGTH: 100,
+  LOOKUP_CANDIDATES_MAX: 8,
+  // A masked phone number keeps only its last digits.
+  PHONE_VISIBLE_DIGITS: 2,
+  // Department metrics: a department named by its name or code; without one, the choices listed.
+  DEPARTMENT_QUERY_MAX_LENGTH: 120,
+  DEPARTMENT_CHOICES_MAX: 25,
   // Daily usage counters are kept this long, then deleted.
   USAGE_RETENTION_DAYS: 7,
 });

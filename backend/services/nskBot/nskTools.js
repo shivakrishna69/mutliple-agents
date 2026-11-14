@@ -6,7 +6,8 @@
  *   1. the token is genuine, unexpired, and names the person's own session       401 ACTOR_INVALID
  *   2. the account is still active                                                 401 ACTOR_INVALID
  *   3. the tool exists                                                             404 TOOL_NOT_FOUND
- *   4. the person's role has the tool's capability (read now, not from the token) 403 TOOL_FORBIDDEN
+ *   4. the person has the tool's capability, read now (not from the token): by role,
+ *      or, for the people tools, by heading a department (nskAccess.js)           403 TOOL_FORBIDDEN
  *   5. the arguments are valid                                                     400 with details
  *
  * Then the tool runs for that person only: no tool takes a person as an argument. Each answers
@@ -21,12 +22,21 @@
  *   my_leave_requests     requests, newest first (?status=), at most LEAVE_REQUESTS_SHOWN
  *   knowledge_scope       the departments whose knowledge bases the person may read (the department
  *                         agents' audience rules); the ai-service searches only those
+ *   lookup_employee_profile   a colleague by name, employee ID or work email (?query=), within the
+ *                         person's people scope; sensitive fields masked (peopleTools.js,
+ *                         profileMasking.js)                                   RUN_PEOPLE_LOOKUP or head
+ *   get_department_metrics    one department's headcount, attendance today, sprint and pending
+ *                         approvals (?department= name or code)                 RUN_PEOPLE_LOOKUP or head
+ *
+ * The people tools answer with an `audit` too: whom or which department they read and the fields
+ * shown, recorded by the controller for every call (category "nsk_bot").
  *
  * Attendance and leave tools need an employee record; without one they answer
  * { available: false, reason } so the assistant can say so.
  */
 
 import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
+import { nskHasCapability } from '../../constants/nskBot.js';
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import { NSK_BOT_MESSAGES } from '../../constants/messages.js';
 import { NSK_BOT_SETTINGS } from '../../constants/validation.js';
@@ -43,6 +53,8 @@ import { getEmployeeBalances } from '../leaveBalances.js';
 import { listEmployeeLeaveRequests } from '../leaveRequests.js';
 import { ServiceError } from '../serviceError.js';
 import { verifyActorToken } from './actorToken.js';
+import { headedDepartmentIdsOf, peopleScopeOf } from './nskAccess.js';
+import { departmentMetrics, lookupEmployeeProfile } from './peopleTools.js';
 
 export const NSK_TOOLS = Object.freeze({
   MY_ATTENDANCE_TODAY: 'my_attendance_today',
@@ -50,6 +62,8 @@ export const NSK_TOOLS = Object.freeze({
   MY_LEAVE_BALANCES: 'my_leave_balances',
   MY_LEAVE_REQUESTS: 'my_leave_requests',
   KNOWLEDGE_SCOPE: 'knowledge_scope',
+  LOOKUP_EMPLOYEE_PROFILE: 'lookup_employee_profile',
+  GET_DEPARTMENT_METRICS: 'get_department_metrics',
 });
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -64,6 +78,18 @@ const invalid = (field, message) => ({ isValid: false, validationErrors: [{ fiel
 
 function noArguments(args) {
   return Object.keys(args).length === 0 ? valid() : invalid(Object.keys(args)[0], 'is not an argument of this tool');
+}
+
+/** A required (or optional) trimmed text argument of at most `maxLength` characters. */
+function textArgument(args, field, { minLength = 1, maxLength, optional = false }) {
+  const unknown = onlyKnownArguments(args, [field]);
+  if (unknown) return unknown;
+  const value = args[field];
+  if (optional && (value === undefined || value === null || value === '')) return valid({ [field]: null });
+  if (typeof value !== 'string' || value.trim().length < minLength || value.trim().length > maxLength) {
+    return invalid(field, `must be text of ${minLength} to ${maxLength} characters`);
+  }
+  return valid({ [field]: value.trim() });
 }
 
 function onlyKnownArguments(args, known) {
@@ -230,6 +256,27 @@ const TOOL_DEFINITIONS = Object.freeze({
       return { result: { departments }, source: null };
     },
   },
+
+  [NSK_TOOLS.LOOKUP_EMPLOYEE_PROFILE]: {
+    capability: CAPABILITIES.RUN_PEOPLE_LOOKUP,
+    needsProfile: false,
+    validate: (args) =>
+      textArgument(args, 'query', {
+        minLength: NSK_BOT_SETTINGS.LOOKUP_QUERY_MIN_LENGTH,
+        maxLength: NSK_BOT_SETTINGS.LOOKUP_QUERY_MAX_LENGTH,
+      }),
+    run: ({ actor, input, now }) =>
+      lookupEmployeeProfile({ actor, scope: peopleScopeOf(actor), query: input.query, now }),
+  },
+
+  [NSK_TOOLS.GET_DEPARTMENT_METRICS]: {
+    capability: CAPABILITIES.RUN_PEOPLE_LOOKUP,
+    needsProfile: false,
+    validate: (args) =>
+      textArgument(args, 'department', { maxLength: NSK_BOT_SETTINGS.DEPARTMENT_QUERY_MAX_LENGTH, optional: true }),
+    run: ({ actor, input, now }) =>
+      departmentMetrics({ scope: peopleScopeOf(actor), department: input.department, now }),
+  },
 });
 
 /** The departments whose knowledge bases this person may read: { id, name }, by name. */
@@ -239,10 +286,10 @@ export async function readableKnowledgeDepartments(actor) {
   return agents.map(({ department }) => ({ id: department.id, name: department.name }));
 }
 
-/** The tools `role` may call, by name: sent with each turn so the model is only offered those. */
-export function toolsAvailableTo(role) {
+/** The tools someone may call, by name: sent with each turn so the model is only offered those. */
+export function toolsAvailableTo(role, { headsDepartment = false } = {}) {
   return Object.entries(TOOL_DEFINITIONS)
-    .filter(([, definition]) => hasCapability(role, definition.capability))
+    .filter(([, definition]) => nskHasCapability(role, definition.capability, { headsDepartment }))
     .map(([name]) => name);
 }
 
@@ -257,20 +304,28 @@ async function loadActor(key, token, now) {
   if (!user || user.status !== ACCOUNT_STATUSES.ACTIVE || !ownsSession) {
     throw refusal(HTTP_STATUS.UNAUTHORIZED, 'ACTOR_INVALID');
   }
-  return { id: user._id.toString(), name: user.name, role: user.role, sessionId: claims.sessionId };
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    role: user.role,
+    sessionId: claims.sessionId,
+    headedDepartmentIds: await headedDepartmentIdsOf(user._id),
+  };
 }
 
 /**
  * Runs one tool call from the ai-service.
  * @param {{ key: Buffer, token: unknown, toolName: string, args: object, now?: Date }} call
- * @returns {Promise<{ validationErrors: object[] } | { actor: object, result: object, source: string|null }>}
+ * @returns {Promise<{ validationErrors: object[] } | { actor: object, result: object, source: string|null,
+ *   audit: object|null }>}  audit: what a people tool read, for the audit log
  * @throws {ServiceError} 401 / 403 / 404 as listed above; the tool's own refusals
  */
 export async function runNskTool({ key, token, toolName, args, now = new Date() }) {
   const actor = await loadActor(key, token, now);
   const definition = Object.hasOwn(TOOL_DEFINITIONS, toolName) ? TOOL_DEFINITIONS[toolName] : null;
   if (!definition) throw refusal(HTTP_STATUS.NOT_FOUND, 'TOOL_NOT_FOUND');
-  if (!hasCapability(actor.role, definition.capability)) {
+  const headsDepartment = actor.headedDepartmentIds.length > 0;
+  if (!nskHasCapability(actor.role, definition.capability, { headsDepartment })) {
     const forbidden = refusal(HTTP_STATUS.FORBIDDEN, 'TOOL_FORBIDDEN');
     forbidden.actor = actor;
     throw forbidden;
@@ -285,9 +340,19 @@ export async function runNskTool({ key, token, toolName, args, now = new Date() 
         actor,
         result: { available: false, reason: NSK_BOT_MESSAGES.NO_EMPLOYEE_PROFILE },
         source: null,
+        audit: null,
       };
     }
   }
-  const { result, source } = await definition.run({ actor, profile, input: validation.sanitizedInput, now });
-  return { actor, result, source };
+  const {
+    result,
+    source,
+    audit = null,
+  } = await definition.run({
+    actor,
+    profile,
+    input: validation.sanitizedInput,
+    now,
+  });
+  return { actor, result, source, audit };
 }

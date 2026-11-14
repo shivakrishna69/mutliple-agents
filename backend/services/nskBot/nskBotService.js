@@ -45,6 +45,7 @@ import { reserveDailyUsage } from '../dailyUsageQuota.js';
 import { loadEmployeeLeaveContext } from '../leaveSettings.js';
 import { ServiceError } from '../serviceError.js';
 import { issueActorToken } from './actorToken.js';
+import { headedDepartmentIdsOf } from './nskAccess.js';
 import { readableKnowledgeDepartments, toolsAvailableTo } from './nskTools.js';
 import { requestNskTurn } from './nskTurnClient.js';
 
@@ -347,7 +348,8 @@ export async function sendMessage(user, { message, sessionId }, { config, reques
     })
   ).toObject();
 
-  const allowedIntents = allowedIntentsFor(user.role);
+  const access = { headsDepartment: (await headedDepartmentIdsOf(user.id)).length > 0 };
+  const allowedIntents = allowedIntentsFor(user.role, access);
   let turn;
   try {
     turn = await requestNskTurn(
@@ -372,7 +374,7 @@ export async function sendMessage(user, { message, sessionId }, { config, reques
           entities: (memory.entities ?? []).map(({ kind, value }) => ({ kind, value })),
         })),
         allowed_intents: allowedIntents,
-        allowed_tools: toolsAvailableTo(user.role),
+        allowed_tools: toolsAvailableTo(user.role, access),
       },
       { config, requestId },
     );

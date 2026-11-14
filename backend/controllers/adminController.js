@@ -23,6 +23,7 @@ import { ADMIN_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { sendError, sendSuccess } from '../utils/apiResponse.js';
 import { logger } from '../utils/logger.js';
+import { escapeRegularExpression } from '../utils/regularExpressions.js';
 import { SOCKET_ERROR_CODES, disconnectUserSockets } from '../utils/socketManager.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 
@@ -38,11 +39,6 @@ function toAdminUserSummary(userRecord) {
     role: userRecord.role,
     createdAt: userRecord.createdAt,
   };
-}
-
-/** Escapes text so it matches literally inside a RegExp (search input is never a pattern). */
-function escapeRegularExpression(searchText) {
-  return searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** GET /api/admin/users */

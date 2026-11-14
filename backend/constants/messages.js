@@ -803,7 +803,16 @@ export const NSK_BOT_MESSAGES = Object.freeze({
     DOCUMENT: (documentName, page) => (page ? `${documentName}, p. ${page}` : documentName),
     DOCUMENT_UNNAMED: 'Company document',
     CONVERSATION: (title, date) => `Earlier session: ${title} (${date})`,
+    PEOPLE_SEARCH: (query) => `People matching "${query}"`,
+    EMPLOYEE_PROFILE: (name, employeeCode) => `Profile: ${name} (${employeeCode})`,
+    DEPARTMENTS: 'Departments you can look at',
+    DEPARTMENT_METRICS: (name, date) => `${name} metrics on ${date}`,
   }),
+  // Notes inside tool results, for the assistant to pass on.
+  SALARY_HIDDEN: 'Salary is not shown to your role',
+  SALARY_NOT_ISSUED: 'No payslip has been issued for this person yet, so there is no salary to show',
+  PEOPLE_OUT_OF_SCOPE: 'You can look up people in the departments you head only',
+  DEPARTMENT_NOT_FOUND: 'No department you can look at matches this; pick one of the departments listed',
 });
 
 /** In-app notifications. */

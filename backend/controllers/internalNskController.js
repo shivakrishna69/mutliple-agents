@@ -8,7 +8,9 @@
  *   400 invalid arguments (details)    401 ACTOR_INVALID    403 TOOL_FORBIDDEN    404 TOOL_NOT_FOUND
  *
  * A refused tool call is audited (category "nsk_bot", action "nsk_tool_call", outcome denied) with
- * the person and the tool, since it means the model asked for more than the person may read.
+ * the person and the tool, since it means the model asked for more than the person may read. Every
+ * people tool call is audited as allowed (action "nsk_people_lookup") with the person it acted for,
+ * the employees or department it read, and the fields shown; never the values.
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
@@ -35,6 +37,21 @@ export async function postNskToolCall(req, res, next) {
     });
     if (outcome.validationErrors) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, NSK_BOT_MESSAGES.INPUT_INVALID, outcome.validationErrors);
+    }
+    if (outcome.audit) {
+      recordAuditEvent(req, {
+        category: NSK_BOT_AUDIT_CATEGORY,
+        action: 'nsk_people_lookup',
+        outcome: AUDIT_OUTCOMES.ALLOWED,
+        tool: toolName,
+        onBehalfOfUserId: outcome.actor.id,
+        onBehalfOfRole: outcome.actor.role,
+        sessionId: outcome.actor.sessionId,
+        matches: outcome.audit.matches ?? null,
+        targetEmployeeIds: outcome.audit.targetEmployeeIds ?? [],
+        targetDepartmentIds: outcome.audit.targetDepartmentIds ?? [],
+        fieldsShown: outcome.audit.fieldsShown,
+      });
     }
     return sendSuccess(res, HTTP_STATUS.OK, NSK_BOT_MESSAGES.TOOL_RESULT, {
       result: outcome.result,
