@@ -7,21 +7,25 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 
-import { ROLES } from '../../constants/accessRoles.js';
+import { CAPABILITIES, ROLES, hasCapability } from '../../constants/accessRoles.js';
 import { NSK_BOT_MESSAGES } from '../../constants/messages.js';
-import { NSK_INTENTS, allowedIntentsFor } from '../../constants/nskBot.js';
+import { NSK_INTENTS, allowedIntentsFor, nskHasCapability } from '../../constants/nskBot.js';
 import { NSK_BOT_SETTINGS } from '../../constants/validation.js';
 import { AI_FAILURE_KIND, AiServiceError } from '../../services/aiServiceClient.js';
 import { issueActorToken, verifyActorToken } from '../../services/nskBot/actorToken.js';
+import { PEOPLE_SCOPES, peopleScopeOf, scopeCoversDepartment } from '../../services/nskBot/nskAccess.js';
 import { resumeOffer } from '../../services/nskBot/nskBotService.js';
 import { NSK_TOOLS, toolsAvailableTo } from '../../services/nskBot/nskTools.js';
 import { parseNskTurnResponse } from '../../services/nskBot/nskTurnClient.js';
+import { matchDepartment } from '../../services/nskBot/peopleTools.js';
+import { maskPhone, revealProfile } from '../../services/nskBot/profileMasking.js';
 import { validateNskMessage, validateNskToolCall } from '../../validators/nskBotValidators.js';
 
 const KEY = randomBytes(32);
 const USER_ID = '64b0000000000000000000a1';
 const SESSION_ID = '64b0000000000000000000b1';
 const NOW = new Date('2026-11-14T10:00:00Z');
+const PEOPLE_TOOLS = [NSK_TOOLS.LOOKUP_EMPLOYEE_PROFILE, NSK_TOOLS.GET_DEPARTMENT_METRICS];
 
 describe('the actor token', () => {
   const token = issueActorToken({ key: KEY, userId: USER_ID, sessionId: SESSION_ID, ttlSeconds: 120, now: NOW });
@@ -55,20 +59,106 @@ describe('the actor token', () => {
 });
 
 describe('what each role may use', () => {
-  it('gives every role the self-service intents and tools, and nothing not built yet', () => {
+  const SELF_INTENTS = [NSK_INTENTS.ATTENDANCE_AUDIT, NSK_INTENTS.POLICY_QA, NSK_INTENTS.GENERAL_HELP];
+  const SELF_TOOLS = Object.values(NSK_TOOLS).filter((tool) => !PEOPLE_TOOLS.includes(tool));
+  const PEOPLE_ROLES = [ROLES.ADMIN, ROLES.HR, ROLES.FINANCE, ROLES.IT_ADMIN];
+
+  it('gives the people tools to admin, HR, finance and IT, self-service to the others', () => {
     for (const role of Object.values(ROLES)) {
-      assert.deepEqual(allowedIntentsFor(role), [
-        NSK_INTENTS.ATTENDANCE_AUDIT,
-        NSK_INTENTS.POLICY_QA,
-        NSK_INTENTS.GENERAL_HELP,
-      ]);
-      assert.deepEqual(toolsAvailableTo(role), Object.values(NSK_TOOLS));
+      const looksUp = PEOPLE_ROLES.includes(role);
+      assert.deepEqual(
+        allowedIntentsFor(role),
+        looksUp ? [NSK_INTENTS.PROFILE_LOOKUP, ...SELF_INTENTS] : SELF_INTENTS,
+        role,
+      );
+      assert.deepEqual(toolsAvailableTo(role), looksUp ? Object.values(NSK_TOOLS) : SELF_TOOLS, role);
+    }
+  });
+
+  it('gives a department head the people tools whatever their role, and nothing that is not built yet', () => {
+    assert.deepEqual(allowedIntentsFor(ROLES.EMPLOYEE, { headsDepartment: true }), [
+      NSK_INTENTS.PROFILE_LOOKUP,
+      ...SELF_INTENTS,
+    ]);
+    assert.deepEqual(toolsAvailableTo(ROLES.AGENT, { headsDepartment: true }), Object.values(NSK_TOOLS));
+    assert.equal(nskHasCapability(ROLES.EMPLOYEE, CAPABILITIES.MANAGE_COMPENSATION, { headsDepartment: true }), false);
+    assert.equal(nskHasCapability('superuser', CAPABILITIES.RUN_PEOPLE_LOOKUP, { headsDepartment: true }), false);
+    for (const role of Object.values(ROLES)) {
+      const intents = allowedIntentsFor(role, { headsDepartment: true });
+      assert.equal(intents.includes(NSK_INTENTS.OFFBOARDING_WORKFLOW), false);
+      assert.equal(intents.includes(NSK_INTENTS.WEB_MARKET_RESEARCH), false);
     }
   });
 
   it('gives an unknown role nothing', () => {
     assert.deepEqual(allowedIntentsFor('superuser'), []);
     assert.deepEqual(toolsAvailableTo('superuser'), []);
+  });
+});
+
+describe('people scope', () => {
+  it('is the organisation with the capability, the headed departments for a head, otherwise none', () => {
+    assert.deepEqual(peopleScopeOf({ role: ROLES.IT_ADMIN, headedDepartmentIds: ['d1'] }), {
+      kind: PEOPLE_SCOPES.ORGANISATION,
+    });
+    const headScope = peopleScopeOf({ role: ROLES.EMPLOYEE, headedDepartmentIds: ['d1', 'd2'] });
+    assert.deepEqual(headScope, { kind: PEOPLE_SCOPES.DEPARTMENTS, departmentIds: ['d1', 'd2'] });
+    assert.equal(peopleScopeOf({ role: ROLES.EMPLOYEE, headedDepartmentIds: [] }), null);
+    assert.equal(scopeCoversDepartment(headScope, 'd2'), true);
+    assert.equal(scopeCoversDepartment(headScope, 'd3'), false);
+    assert.equal(scopeCoversDepartment({ kind: PEOPLE_SCOPES.ORGANISATION }, 'd3'), true);
+    assert.equal(scopeCoversDepartment(null, 'd1'), false);
+  });
+
+  it('finds a department by code, exact name, or one partial name', () => {
+    const departments = [
+      { name: 'Data Engineering', code: 'DE' },
+      { name: 'Engineering', code: 'ENG' },
+      { name: 'Finance', code: 'FIN' },
+    ];
+    assert.equal(matchDepartment(departments, 'fin').code, 'FIN');
+    assert.equal(matchDepartment(departments, 'engineering').code, 'ENG');
+    assert.equal(matchDepartment(departments, 'nance').code, 'FIN');
+    assert.equal(matchDepartment(departments, 'eng').code, 'ENG');
+    assert.equal(matchDepartment(departments, 'gineer'), null, 'two partial matches: ask');
+    assert.equal(matchDepartment(departments, null), null);
+    assert.equal(matchDepartment([departments[1]], null).code, 'ENG', 'the only one');
+  });
+});
+
+describe('profile masking', () => {
+  const full = {
+    name: 'Rahul Sharma',
+    employee_code: 'NSK0104',
+    phone: '+919876543210',
+    salary: { gross_monthly: 75000 },
+    personal_email: 'rahul@personal.example',
+  };
+
+  it('masks the phone for every role and keeps only its last digits', () => {
+    assert.equal(maskPhone('+919876543210'), '+••••••••••10');
+    assert.equal(maskPhone('98765 43210'), '••••••••10');
+    assert.equal(maskPhone(null), null);
+    assert.equal(maskPhone('  '), null);
+    for (const role of Object.values(ROLES)) assert.equal(revealProfile(full, role).profile.phone, '+••••••••••10');
+  });
+
+  it('shows salary only to roles that manage compensation, and drops fields it does not know', () => {
+    for (const role of Object.values(ROLES)) {
+      const { profile, fieldsShown } = revealProfile(full, role);
+      const seesSalary = hasCapability(role, CAPABILITIES.MANAGE_COMPENSATION);
+      assert.deepEqual(
+        profile.salary,
+        seesSalary ? { gross_monthly: 75000 } : { hidden: true, note: NSK_BOT_MESSAGES.SALARY_HIDDEN },
+        role,
+      );
+      assert.equal(fieldsShown.includes('salary'), seesSalary, role);
+      assert.equal(profile.personal_email, undefined);
+      assert.deepEqual(
+        fieldsShown.filter((field) => field !== 'salary'),
+        ['name', 'employee_code', 'phone'],
+      );
+    }
   });
 });
 

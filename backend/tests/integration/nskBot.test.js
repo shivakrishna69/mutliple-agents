@@ -10,15 +10,20 @@
 
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
 
 import { NSK_BOT_MESSAGES } from '../../constants/messages.js';
 import { insertDepartment, onboardEmployee } from './fixtures.js';
+import {
+  callNskTool,
+  classification,
+  serverLogMatching as logMatching,
+  startNskStandIn,
+  turnResponse,
+} from './nskStandIn.js';
 import { createSignedInClient, mongoUnavailableReason, startTestServer } from './testServer.js';
 
 const skipReason = await mongoUnavailableReason();
 const DAILY_LIMIT = 6;
-const LOG_WAIT_MS = 3_000;
 const SELF_TOOLS = [
   'my_attendance_today',
   'my_attendance_month',
@@ -26,53 +31,6 @@ const SELF_TOOLS = [
   'my_leave_requests',
   'knowledge_scope',
 ];
-
-/** A stand-in for the ai-service: records each turn and answers with `respond(body)`. */
-async function startStandInAiService() {
-  const standIn = { turns: [], respond: null };
-  const server = createServer((request, response) => {
-    let rawBody = '';
-    request.on('data', (chunk) => {
-      rawBody += chunk;
-    });
-    request.on('end', async () => {
-      const body = rawBody ? JSON.parse(rawBody) : null;
-      standIn.turns.push({ path: request.url, body });
-      try {
-        const { status = 200, body: answer } = await standIn.respond(body);
-        response.writeHead(status, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify(answer));
-      } catch (standInError) {
-        response.writeHead(500, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ detail: standInError.message }));
-      }
-    });
-  });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  standIn.url = `http://127.0.0.1:${server.address().port}`;
-  standIn.close = () => new Promise((resolve) => server.close(resolve));
-  return standIn;
-}
-
-const classification = (intent, sentiment = 'NEUTRAL', extra = {}) => ({
-  intent,
-  sentiment,
-  confidence: 0.9,
-  topic: null,
-  entities: [],
-  ...extra,
-});
-
-const turnResponse = (overrides = {}) => ({
-  outcome: 'answered',
-  reply: 'Hello! I can help with your attendance, leave and company policies.',
-  classification: classification('GENERAL_HELP'),
-  sources: [],
-  suggestions: [],
-  tools_used: [],
-  usage: { input_tokens: 120, output_tokens: 30 },
-  ...overrides,
-});
 
 describe('NSK assistant', { skip: skipReason ?? false }, () => {
   let testServer;
@@ -89,6 +47,12 @@ describe('NSK assistant', { skip: skipReason ?? false }, () => {
 
   const asId = (id) => new testServer.database.base.Types.ObjectId(id);
   const send = (client, body) => client.post('/api/nsk-bot/message', body);
+  const callTool = (tool, options) => callNskTool(testServer, tool, options);
+  async function serverLogMatching(pattern) {
+    const output = await logMatching(testServer, pattern);
+    assert.match(output, pattern);
+    return output;
+  }
   let peopleCreated = 0;
   /** A new employee, signed in: each test that sends messages has its own (messages are rate limited per person). */
   const newEmployee = () => {
@@ -101,27 +65,6 @@ describe('NSK assistant', { skip: skipReason ?? false }, () => {
       name: `Person ${peopleCreated}`,
     });
   };
-
-  /** The server's log once it holds a line matching `pattern` (its output arrives a moment after the response). */
-  async function serverLogMatching(pattern) {
-    const deadline = Date.now() + LOG_WAIT_MS;
-    while (!pattern.test(testServer.output()) && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    const output = testServer.output();
-    assert.match(output, pattern);
-    return output;
-  }
-
-  /** A tool call as the ai-service makes it. */
-  async function callTool(tool, { actorToken, args = {}, key = testServer.internalApiKey } = {}) {
-    const response = await fetch(`${testServer.baseUrl}/api/internal/nsk/tools/${tool}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(key ? { 'X-Internal-Api-Key': key } : {}) },
-      body: JSON.stringify({ actor_token: actorToken, arguments: args }),
-    });
-    return { status: response.status, body: await response.json() };
-  }
 
   async function insertKnowledgeBase(name, code, { audience }) {
     const departmentId = await insertDepartment(testServer.database, { name, code, budgetCode: `CC-${code}` });
@@ -144,7 +87,7 @@ describe('NSK assistant', { skip: skipReason ?? false }, () => {
   }
 
   before(async () => {
-    standIn = await startStandInAiService();
+    standIn = await startNskStandIn();
     testServer = await startTestServer({
       aiServiceUrl: standIn.url,
       environment: { LOG_LEVEL: 'info', NSK_DAILY_MESSAGE_LIMIT: String(DAILY_LIMIT) },
