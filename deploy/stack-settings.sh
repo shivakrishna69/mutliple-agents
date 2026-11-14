@@ -21,4 +21,6 @@ ensure_generated_stack_settings() {
   local file="$1"
   # The key the AI service uses for Qdrant (docker-compose.prod.yml).
   add_missing_setting "$file" QDRANT_API_KEY "$(openssl rand -hex 32)"
+  # SearXNG's secret key (the web search for the NSK assistant, docker-compose.prod.yml).
+  add_missing_setting "$file" SEARXNG_SECRET "$(openssl rand -hex 32)"
 }

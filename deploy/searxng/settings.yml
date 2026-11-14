@@ -1,0 +1,35 @@
+# SearXNG (https://docs.searxng.org, AGPL-3.0): the company's own web search for the NSK assistant
+# (backend services/webResearch/webSearch.js). It runs inside the compose network only: the backend
+# calls its JSON API (/search?format=json) and no port is published, so no visitor reaches it.
+#
+# Everything not set here keeps SearXNG's defaults. The secret key comes from the SEARXNG_SECRET
+# environment variable (generated on the server by deploy/stack-settings.sh).
+use_default_settings:
+  engines:
+    # Tor-only engines: nothing here routes through Tor, so they cannot load.
+    remove:
+      - ahmia
+      - torch
+
+general:
+  instance_name: "NSK research"
+  enable_metrics: false
+
+search:
+  safe_search: 1
+  autocomplete: ""
+  # The backend reads JSON; html stays for an operator checking it from inside the network.
+  formats:
+    - html
+    - json
+
+server:
+  # Internal service: the bot limiter and the image proxy are for public instances.
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  method: "GET"
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 6.0

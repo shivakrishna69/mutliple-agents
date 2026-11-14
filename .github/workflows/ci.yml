@@ -249,6 +249,7 @@ jobs:
           touch "$AI_SERVICE_ENV_FILE"
           # Compose passes it to Qdrant and the AI service.
           echo "QDRANT_API_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - run: docker compose --profile mail config --quiet
       # The AI service is left out: without a Groq key it reports itself unhealthy by design, and
       # nothing the web stack needs depends on it.
@@ -317,7 +318,7 @@ jobs:
           set -euo pipefail
           printf '%s\n' APP_DOMAIN=ci.example.com ACME_EMAIL=ci@example.com MONGO_ROOT_USERNAME=nsk \
             "MONGO_ROOT_PASSWORD=$(openssl rand -hex 24)" "REDIS_PASSWORD=$(openssl rand -hex 24)" \
-            "QDRANT_API_KEY=$(openssl rand -hex 32)" > "$STACK_ENV_FILE"
+            "QDRANT_API_KEY=$(openssl rand -hex 32)" "SEARXNG_SECRET=$(openssl rand -hex 32)" > "$STACK_ENV_FILE"
           touch "$BACKEND_ENV_FILE" "$AI_SERVICE_ENV_FILE"
           docker compose -f docker-compose.prod.yml --env-file "$STACK_ENV_FILE" config --quiet
       - name: Check the Caddy configuration
