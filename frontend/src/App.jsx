@@ -20,6 +20,8 @@
  *   /admin/company -> CompanySettings MANAGE_COMPANY_SETTINGS (name, employee ID format, email domain)
  *   /people/onboarding -> PeopleOnboarding MANAGE_WORKFORCE (invite new joiners, import a CSV)
  *   /workplace    -> WorkplaceSetup   MANAGE_WORKFORCE (departments, offices, holidays, base offices)
+ *   /people/offboarding -> OffboardingCenter   VIEW_FINAL_SETTLEMENT or VIEW_IT_OFFBOARDING (settlements
+ *                    read-only, and who is serving notice for IT)
  *   /leave        -> LeaveCenter      everyone: My leave (index), /leave/calendar, /leave/approvals,
  *                                     and /leave/admin with MANAGE_WORKFORCE (policies, balances, payroll)
  *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  MANAGE_KNOWLEDGE_BASES
@@ -77,6 +79,7 @@ const LeaveCalendarPanel = lazy(() => import('./components/leave/LeaveCalendarPa
 const ApprovalsPanel = lazy(() => import('./components/leave/ApprovalsPanel.jsx'));
 const LeaveAdministrationPanel = lazy(() => import('./components/leave/LeaveAdministrationPanel.jsx'));
 const WorkplaceSetup = lazy(() => import('./pages/WorkplaceSetup.jsx'));
+const OffboardingCenter = lazy(() => import('./pages/OffboardingCenter.jsx'));
 const KnowledgeBases = lazy(() => import('./pages/KnowledgeBases.jsx'));
 const KnowledgeBaseDetail = lazy(() => import('./pages/KnowledgeBaseDetail.jsx'));
 const AgentDirectory = lazy(() => import('./pages/AgentDirectory.jsx'));
@@ -157,6 +160,14 @@ export default function App() {
             <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_WORKFORCE} />}>
               <Route path={ROUTE_PATHS.ONBOARDING} element={<PeopleOnboarding />} />
               <Route path={ROUTE_PATHS.WORKPLACE} element={<WorkplaceSetup />} />
+            </Route>
+
+            <Route
+              element={
+                <CapabilityRoute anyOf={[CAPABILITIES.VIEW_FINAL_SETTLEMENT, CAPABILITIES.VIEW_IT_OFFBOARDING]} />
+              }
+            >
+              <Route path={ROUTE_PATHS.OFFBOARDING} element={<OffboardingCenter />} />
             </Route>
 
             <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_USERS} />}>

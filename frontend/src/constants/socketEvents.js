@@ -12,6 +12,8 @@ export const SOCKET_EVENTS = Object.freeze({
   SESSION_ENDED: 'SESSION_ENDED',
   // Server -> client: a new in-app notification for this user (backend models/Notification.js)
   NOTIFICATION_CREATED: 'NOTIFICATION_CREATED',
+  // Server -> client: an offboarding case's documents moved on a step (to the person who started it)
+  OFFBOARDING_PROGRESS: 'OFFBOARDING_PROGRESS',
   // Server -> client, agent telemetry channel (admins; backend services/agentTelemetry.js)
   AGENT_THINKING_EVENT: 'AGENT_THINKING_EVENT',
   TOOL_EXECUTION_STARTED: 'TOOL_EXECUTION_STARTED',
