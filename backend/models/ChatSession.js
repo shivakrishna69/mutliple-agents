@@ -21,7 +21,7 @@
  */
 
 import mongoose from 'mongoose';
-import { NSK_ENTITY_KINDS, NSK_INTENTS } from '../constants/nskBot.js';
+import { NSK_ACTION_KINDS, NSK_ENTITY_KINDS, NSK_INTENTS } from '../constants/nskBot.js';
 import { NSK_BOT_SETTINGS } from '../constants/validation.js';
 
 const { ObjectId } = mongoose.Schema.Types;
@@ -38,6 +38,10 @@ export const suggestionSchema = new mongoose.Schema(
   {
     text: { type: String, required: true, trim: true, maxlength: NSK_BOT_SETTINGS.SUGGESTION_MAX_LENGTH },
     intent: { type: String, enum: Object.values(NSK_INTENTS), required: true },
+    // A chip that does what one of the reply's action cards does (the "Yes, start offboarding for …"
+    // confirmation): the card's kind and person. Null for a chip that sends its text.
+    actionKind: { type: String, enum: [...Object.values(NSK_ACTION_KINDS), null], default: null },
+    employeeId: { type: ObjectId, ref: 'EmployeeProfile', default: null },
   },
   { _id: false },
 );

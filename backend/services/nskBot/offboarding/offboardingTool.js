@@ -1,11 +1,14 @@
 /**
  * find_offboarding_employee: the NSK tool behind "Rahul is leaving" (RUN_OFFBOARDING). It finds the
- * person among everyone still employed, as the people lookup does (peopleTools.js findMatches: an
- * employee ID always wins, a name must match every word):
+ * person among everyone still employed, as the people lookup does (peopleTools.js findPeople: an
+ * employee ID always wins, a name must match every word, and when nobody matches, the closest
+ * spellings of the name are offered, marked approximate):
  *
  *   one match   who they are (name, ID, designation, department, status, joining date), whether
  *               offboarding has started for them, and the action cards to offer: Start offboarding
- *               package (unless it has started) and View profile first
+ *               package (unless it has started) and View profile first. With the cards comes
+ *               confirm_prompt, the "Did you mean: Start offboarding for …?" line the reply opens
+ *               with, so HR confirms the person before anything starts
  *   several     the candidates to pick from
  *   none        nothing
  *
@@ -20,7 +23,7 @@ import OffboardingCase, { EXECUTED_STATUSES } from '../../../models/OffboardingC
 import User from '../../../models/User.js';
 import { calendarDateOfUtcInstant } from '../../../utils/calendarDates.js';
 import { PEOPLE_SCOPES } from '../nskAccess.js';
-import { candidatesOf, departmentNames, findMatches } from '../peopleTools.js';
+import { candidatesOf, departmentNames, findPeople } from '../peopleTools.js';
 
 const LABELS = NSK_BOT_MESSAGES.SOURCE_LABELS;
 const FIELDS_SHOWN = Object.freeze([
@@ -38,7 +41,10 @@ const FIELDS_SHOWN = Object.freeze([
  * @returns {Promise<{ result: object, source: string|null, audit: object }>}
  */
 export async function findOffboardingEmployee({ query }) {
-  const matches = await findMatches({ kind: PEOPLE_SCOPES.ORGANISATION }, query);
+  const { profiles: matches, approximate } = await findPeople({ kind: PEOPLE_SCOPES.ORGANISATION }, query);
+  const approximateNote = approximate
+    ? { approximate: true, note: NSK_BOT_MESSAGES.PEOPLE_APPROXIMATE_NOTE(query) }
+    : {};
   if (matches.length === 0) {
     return {
       result: { matches: 0 },
@@ -53,6 +59,7 @@ export async function findOffboardingEmployee({ query }) {
         matches: matches.length,
         candidates: candidates.slice(0, NSK_BOT_SETTINGS.LOOKUP_CANDIDATES_MAX),
         more_not_shown: Math.max(candidates.length - NSK_BOT_SETTINGS.LOOKUP_CANDIDATES_MAX, 0),
+        ...approximateNote,
       },
       source: LABELS.PEOPLE_SEARCH(query),
       audit: {
@@ -95,7 +102,10 @@ export async function findOffboardingEmployee({ query }) {
           ? { case_status: openCase.status, last_working_day: openCase.separation?.lastWorkingDay ?? null }
           : null,
       },
-      ...(started ? { note: NSK_BOT_MESSAGES.OFFBOARDING_ALREADY_STARTED_NOTE } : {}),
+      ...(approximate ? { approximate: true } : {}),
+      ...(started
+        ? { note: NSK_BOT_MESSAGES.OFFBOARDING_ALREADY_STARTED_NOTE }
+        : { confirm_prompt: NSK_BOT_MESSAGES.OFFBOARDING_CONFIRM_PROMPT(name, profile.employeeCode) }),
       actions,
     },
     source: LABELS.EMPLOYEE_PROFILE(name, profile.employeeCode),

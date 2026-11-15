@@ -427,7 +427,21 @@ fields shown, never the values.
 (admin, HR). Its tool, `find_offboarding_employee`, finds the person among everyone still employed
 (as the people lookup does: an employee ID wins; several matches become "Offboard {name} ({ID})"
 cards). One match answers with action cards: **Start offboarding package** (unless it has started)
-and **View profile first**. The ai-service proposes cards. The backend keeps only kinds the person may
+and **View profile first**, and `confirm_prompt` ("Did you mean: Start offboarding for {name}
+({ID})?"), which the reply opens with. When the backend keeps a Start card, the reply's first chip is
+**Yes, start offboarding for {name}**: it carries the card's `actionKind` and `employeeId`, so the
+drawer opens the same form.
+
+**Misspelled names.** When no name matches exactly, both people tools fall back to the closest
+spellings (`utils/fuzzyNames.js`: edit distance with swapped letters; 1 edit for words of up to 4
+letters, 2 up to 8, 3 beyond; only the closest names kept), among people whose name has a word
+starting with the same three letters (`NSK_BOT_SETTINGS.FUZZY_PREFIX_CHARS`), still within the
+person's scope. Such matches are marked `approximate` with a note. A profile lookup then offers them
+as candidates to confirm and never shows the profile straight away. `find_offboarding_employee`
+gives the cards and the "Did you mean" line, so nothing starts until HR confirms.
+
+**Type-ahead.** `GET /api/nsk-bot/sessions` also returns `promptHelpers`: the sentence starters
+(`NSK_BOT_MESSAGES.PROMPT_HELPERS`: label, fill text, keywords) for the intents this person may use. The ai-service proposes cards. The backend keeps only kinds the person may
 use (`NSK_ACTION_CAPABILITIES`), for someone still employed, with Start only before offboarding has
 started, and writes the labels itself. The card opens the preview below.
 
