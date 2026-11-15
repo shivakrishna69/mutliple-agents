@@ -3,7 +3,8 @@
  * tokens (from turns answered by a stand-in AI service): who may look people up (roles with
  * RUN_PEOPLE_LOOKUP, department heads for their own departments only, nobody else), what a profile
  * shows (phone masked for everyone, salary from the latest payslip only for roles with
- * MANAGE_COMPENSATION), ambiguous names answered with candidates, department metrics (headcount,
+ * MANAGE_COMPENSATION), ambiguous names answered with candidates, misspelled names answered with the
+ * closest spellings as candidates to confirm (within the scope only), department metrics (headcount,
  * attendance today, sprint and tasks, pending approvals) within the requester's departments, and the
  * audit entry of every lookup (fields shown, never the values).
  */
@@ -230,6 +231,21 @@ describe('NSK people tools', { skip: skipReason ?? false }, () => {
     assert.equal(fullName.matches, 1);
     assert.equal(fullName.profile.name, 'Rahul Sharma');
     assert.equal(source, NSK_BOT_MESSAGES.SOURCE_LABELS.PEOPLE_SEARCH('rahul'));
+  });
+
+  it('answers a misspelled name with the closest spelling as a candidate to confirm, never the profile', async () => {
+    const typo = (await lookup(hr.client, 'Rahul Shrma')).body.data.result;
+    assert.equal(typo.approximate, true);
+    assert.equal(typo.note, NSK_BOT_MESSAGES.PEOPLE_APPROXIMATE_NOTE('Rahul Shrma'));
+    assert.deepEqual(
+      typo.candidates.map((candidate) => candidate.name),
+      ['Rahul Sharma'],
+    );
+    assert.equal(typo.profile, undefined);
+
+    // A head's guesses stay within their departments: Rahul Verma is in Finance.
+    const outside = (await lookup(head.client, 'Rahul Vrma')).body.data.result;
+    assert.deepEqual(outside, { matches: 0, note: NSK_BOT_MESSAGES.PEOPLE_OUT_OF_SCOPE });
   });
 
   it('shows HR the full profile with the phone masked and the latest payslip, and audits the fields', async () => {

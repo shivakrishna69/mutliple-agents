@@ -166,8 +166,13 @@ export function SuggestionChips({ suggestions, onSelect, disabled, label = NSK_L
             key={suggestion.text}
             type="button"
             disabled={disabled}
-            onClick={() => onSelect(suggestion.text)}
-            className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-800 ring-1 ring-brand-200 transition hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none disabled:opacity-60"
+            onClick={() => onSelect(suggestion.text, suggestion)}
+            data-action={suggestion.actionKind ?? undefined}
+            className={`rounded-full px-3 py-1 text-xs font-medium ring-1 transition focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none disabled:opacity-60 ${
+              suggestion.actionKind
+                ? 'bg-brand-600 text-white ring-brand-600 hover:bg-brand-500'
+                : 'bg-brand-50 text-brand-800 ring-brand-200 hover:bg-brand-100'
+            }`}
           >
             {suggestion.text}
           </button>
@@ -179,7 +184,9 @@ export function SuggestionChips({ suggestions, onSelect, disabled, label = NSK_L
 
 /**
  * @param {{ message: object, isLatest: boolean, isBusy: boolean, onSuggestion: (text: string) => void,
- *   onAction: (action: object) => void }} props  suggestions and actions show on the latest reply only
+ *   onAction: (action: object) => void }} props  suggestions and actions show on the latest reply only.
+ *   A chip tied to one of the reply's cards ("Yes, start offboarding for …": actionKind and
+ *   employeeId) does what that card does instead of sending its text.
  */
 export default function NskMessage({ message, isLatest, isBusy, onSuggestion, onAction }) {
   if (message.role === NSK_MESSAGE_ROLES.USER) {
@@ -192,6 +199,15 @@ export default function NskMessage({ message, isLatest, isBusy, onSuggestion, on
     );
   }
   const citationNumbers = new Set(message.citations.map((citation) => citation.number));
+  const chooseSuggestion = (text, suggestion) => {
+    const action = suggestion?.actionKind
+      ? message.actions?.find(
+          (candidate) => candidate.kind === suggestion.actionKind && candidate.employeeId === suggestion.employeeId,
+        )
+      : null;
+    if (action) onAction(action);
+    else onSuggestion(text);
+  };
   const outcome = OUTCOME_DISPLAY[message.outcome];
   return (
     <li className="flex justify-start" data-role="assistant" data-outcome={message.outcome}>
@@ -218,7 +234,9 @@ export default function NskMessage({ message, isLatest, isBusy, onSuggestion, on
         {isLatest && message.actions?.length > 0 && (
           <ActionCards actions={message.actions} onAction={onAction} disabled={isBusy} />
         )}
-        {isLatest && <SuggestionChips suggestions={message.suggestions} onSelect={onSuggestion} disabled={isBusy} />}
+        {isLatest && (
+          <SuggestionChips suggestions={message.suggestions} onSelect={chooseSuggestion} disabled={isBusy} />
+        )}
       </div>
     </li>
   );

@@ -2,7 +2,8 @@
  * How an NSK reply is shown (NskMessage.jsx): its citation marks linked to source badges of every kind
  * (live data, a policy document with its page, an earlier conversation, a web page with its address and
  * fetch date, an unverified search snippet), the outcome tag, the escalation banner, and the
- * suggestion chips and action cards of the latest reply, which hand their choice back.
+ * suggestion chips and action cards of the latest reply, which hand their choice back (a confirmation
+ * chip tied to a card hands back that card).
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
@@ -96,6 +97,34 @@ describe('an NSK reply', () => {
     expect(onSuggestion).toHaveBeenCalledWith('Show my leave requests');
     fireEvent.click(screen.getByRole('button', { name: /Start offboarding package/ }));
     expect(onAction).toHaveBeenCalledWith(REPLY.actions[0]);
+  });
+
+  it('makes a confirmation chip do what its card does, and sends its text when the card is gone', () => {
+    const confirm = {
+      text: 'Yes, start offboarding for Rahul Sharma',
+      intent: 'OFFBOARDING_WORKFLOW',
+      actionKind: 'START_OFFBOARDING',
+      employeeId: 'e1',
+    };
+    const { onSuggestion, onAction } = renderReply({ suggestions: [confirm] });
+    const chip = screen.getByRole('button', { name: confirm.text });
+    expect(chip.dataset.action).toBe('START_OFFBOARDING');
+    fireEvent.click(chip);
+    expect(onAction).toHaveBeenCalledWith(REPLY.actions[0]);
+    expect(onSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('sends a confirmation chip’s text when its card is not on the reply', () => {
+    const confirm = {
+      text: 'Yes, start offboarding for Rahul Sharma',
+      intent: 'OFFBOARDING_WORKFLOW',
+      actionKind: 'START_OFFBOARDING',
+      employeeId: 'someone-else',
+    };
+    const { onSuggestion, onAction } = renderReply({ suggestions: [confirm] });
+    fireEvent.click(screen.getByRole('button', { name: confirm.text }));
+    expect(onSuggestion).toHaveBeenCalledWith(confirm.text);
+    expect(onAction).not.toHaveBeenCalled();
   });
 
   it('tags a reply that did not answer, and offers chips and cards on the latest reply only', () => {

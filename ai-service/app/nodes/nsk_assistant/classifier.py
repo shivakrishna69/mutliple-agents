@@ -11,6 +11,10 @@ departments and tickers it names) and how it sounds (sentiment). Runs first on e
      GENERAL_HELP with confidence 0 and the rules' sentiment, so the answer step decides with all
      the person's tools.
 
+The prompt asks the model to read past typos, broken grammar and informal HR words first ("deboard
+Rajeshwari" is OFFBOARDING_WORKFLOW about Rajeshwari; "leaves left" is ATTENDANCE_AUDIT), and to give
+names cleaned up (capitalised, without the words around them) so the tools can find the person.
+
 Entities of unknown kinds and empty values are dropped; values are trimmed and de-duplicated.
 """
 
@@ -46,6 +50,18 @@ CLASSIFIER_HISTORY_CHARACTERS = 600
 
 CLASSIFIER_SYSTEM_PROMPT = """You read one message sent to NSK, the assistant inside a company's HR portal, and classify it.
 
+People type fast: expect typos, missing words, lower case, Indian English and informal HR words. First work out
+what the person means, then classify that meaning, not the exact words.
+
+Words that mean each intent, even misspelled or in a broken sentence:
+- OFFBOARDING_WORKFLOW: deboard, offboard, remove an employee, exit, resign, resignation, let go, terminate, fire,
+  relieve, relieving, separation, last day, serving notice, F&F, FnF, full and final. "i want to deboard Rajeshwari"
+  and "rahul resgined" are OFFBOARDING_WORKFLOW with high confidence (0.9 or more).
+- PROFILE_LOOKUP: who is, details of, contact of, manager of, reports to, team size, headcount, strength, who is in
+  (today), how many people in a department.
+- ATTENDANCE_AUDIT: leaves left, leave balance, punches, punch in, late today, absent, present, working hours,
+  my attendance.
+
 Intents (pick one):
 - PROFILE_LOOKUP: about another employee (who they are, their role, department, manager, joining date, contact), or
   a department's people and numbers (headcount, who is in today, its sprint, pending approvals).
@@ -62,7 +78,9 @@ Sentiment (pick one): POSITIVE, NEUTRAL, URGENT (needs it now, a deadline), FRUS
 failing), SENSITIVE_HR (harassment, discrimination, health, a grievance, anything personal and delicate).
 
 Entities: only what the message (or the conversation it continues) actually names, as written:
-- employeeName: a person's name. Not "me" or "my manager".
+- employeeName: a person's name, cleaned up: only the name, capitalised, without the words around it ("deboard
+  rajeshwari pls" gives "Rajeshwari"). Keep the spelling the person typed: never correct it to a name you guess.
+  Not "me" or "my manager".
 - date: a date or period as written ("yesterday", "October", "2026-11-03").
 - stockTicker: a company's stock symbol or name ("TCS", "Infosys").
 - department: a department or team name.

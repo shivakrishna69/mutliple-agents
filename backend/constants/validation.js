@@ -673,6 +673,11 @@ export const NSK_BOT_SETTINGS = Object.freeze({
   LOOKUP_QUERY_MIN_LENGTH: 2,
   LOOKUP_QUERY_MAX_LENGTH: 100,
   LOOKUP_CANDIDATES_MAX: 8,
+  // When no name matches exactly, the closest spellings (utils/fuzzyNames.js) among the people whose
+  // name has a word starting with the same FUZZY_PREFIX_CHARS letters, reading at most
+  // FUZZY_USERS_MAX of them.
+  FUZZY_PREFIX_CHARS: 3,
+  FUZZY_USERS_MAX: 500,
   // A masked phone number keeps only its last digits.
   PHONE_VISIBLE_DIGITS: 2,
   // Department metrics: a department named by its name or code; without one, the choices listed.

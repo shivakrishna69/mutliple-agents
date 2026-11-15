@@ -1,10 +1,13 @@
 /**
  * "Rahul is leaving" against the real server: the find_offboarding_employee tool through the
  * internal endpoint with real actor tokens (HR and administrators only; ambiguous names answered
- * with candidates; one match answered with the action cards), what each turn offers the ai-service
+ * with candidates; one match answered with the action cards and the "Did you mean" line; a misspelled
+ * name answered with the closest spellings, marked approximate), what each turn offers the ai-service
  * (the offboarding intent and tool for HR only), and the action cards the backend keeps from a reply:
  * only kinds the person may use, for people who exist and are still employed, Start offboarding only
- * while it has not started, with the backend's own labels.
+ * while it has not started, with the backend's own labels, and the one-tap confirmation chip that
+ * goes with a Start offboarding card. The session list carries the type-ahead prompt helpers of the
+ * person's own intents.
  */
 
 import { after, before, describe, it } from 'node:test';
@@ -136,10 +139,16 @@ describe('NSK offboarding cards', { skip: skipReason ?? false }, () => {
       { kind: 'VIEW_PROFILE', employee_id: rahulSharma.profileId },
     ]);
     assert.doesNotMatch(JSON.stringify(one.body), /salary|phone/i);
+    assert.equal(
+      one.body.data.result.confirm_prompt,
+      NSK_BOT_MESSAGES.OFFBOARDING_CONFIRM_PROMPT('Rahul Sharma', await codeOf(rahulSharma)),
+    );
+    assert.equal(one.body.data.result.approximate, undefined);
 
     const started = await find(hr, 'Lena Leaving');
     assert.equal(started.body.data.result.employee.offboarding.case_status, 'COMPLETED');
     assert.equal(started.body.data.result.note, NSK_BOT_MESSAGES.OFFBOARDING_ALREADY_STARTED_NOTE);
+    assert.equal(started.body.data.result.confirm_prompt, undefined);
     assert.deepEqual(
       started.body.data.result.actions.map((action) => action.kind),
       ['VIEW_PROFILE'],
@@ -151,6 +160,43 @@ describe('NSK offboarding cards', { skip: skipReason ?? false }, () => {
 
     const log = await serverLogMatching(testServer, /"tool":"find_offboarding_employee"/);
     assert.match(log, /"action":"nsk_people_lookup".*"tool":"find_offboarding_employee"/);
+  });
+
+  it('finds a misspelled name by its closest spelling, marked approximate, for confirmation', async () => {
+    const typo = (await find(hr, 'rahul sharmaa')).body.data.result;
+    assert.equal(typo.matches, 1);
+    assert.equal(typo.approximate, true);
+    assert.equal(typo.employee.name, 'Rahul Sharma');
+    assert.equal(
+      typo.confirm_prompt,
+      NSK_BOT_MESSAGES.OFFBOARDING_CONFIRM_PROMPT('Rahul Sharma', await codeOf(rahulSharma)),
+    );
+    assert.deepEqual(
+      typo.actions.map((action) => action.kind),
+      ['START_OFFBOARDING', 'VIEW_PROFILE'],
+    );
+
+    // Equally close spellings are candidates to pick from.
+    const both = (await find(hr, 'Rahool')).body.data.result;
+    assert.equal(both.approximate, true);
+    assert.equal(both.note, NSK_BOT_MESSAGES.PEOPLE_APPROXIMATE_NOTE('Rahool'));
+    assert.deepEqual(
+      both.candidates.map((candidate) => candidate.name),
+      ['Rahul Sharma', 'Rahul Verma'],
+    );
+    assert.equal(both.actions, undefined);
+
+    assert.deepEqual((await find(hr, 'Zubair Khan')).body.data.result, { matches: 0 });
+  });
+
+  it('lists the type-ahead prompt helpers of the person’s own intents with the sessions', async () => {
+    const intentsOf = async (client) =>
+      new Set((await client.get('/api/nsk-bot/sessions')).body.data.promptHelpers.map((helper) => helper.intent));
+    assert.ok((await intentsOf(hr)).has('OFFBOARDING_WORKFLOW'));
+    const forEmployee = await intentsOf(employee);
+    assert.ok(forEmployee.has('ATTENDANCE_AUDIT'));
+    assert.ok(!forEmployee.has('OFFBOARDING_WORKFLOW'));
+    assert.ok(!forEmployee.has('PROFILE_LOOKUP'));
   });
 
   it('keeps only the cards that apply, with the backend’s labels', async () => {
@@ -168,6 +214,7 @@ describe('NSK offboarding cards', { skip: skipReason ?? false }, () => {
           entities: [{ kind: 'employeeName', value: 'Rahul' }],
         }),
         actions: proposed,
+        suggestions: [{ text: 'Show attendance today for Engineering', intent: 'PROFILE_LOOKUP' }],
         tools_used: ['find_offboarding_employee'],
       });
     const byHr = await turn(hr, 'Rahul Sharma is leaving', answer);
@@ -188,15 +235,31 @@ describe('NSK offboarding cards', { skip: skipReason ?? false }, () => {
         employeeName: 'Rahul Sharma',
       },
     ]);
+    // The first chip confirms the Start offboarding card in one tap.
+    const confirmChip = {
+      text: NSK_BOT_MESSAGES.OFFBOARDING_CONFIRM_CHIP('Rahul Sharma'),
+      intent: 'OFFBOARDING_WORKFLOW',
+      actionKind: 'START_OFFBOARDING',
+      employeeId: rahulSharma.profileId,
+    };
+    assert.deepEqual(byHr.body.data.message.suggestions, [
+      confirmChip,
+      { text: 'Show attendance today for Engineering', intent: 'PROFILE_LOOKUP' },
+    ]);
     // Stored with the message, so the session shows them again.
     const session = await hr.get(`/api/nsk-bot/sessions/${byHr.body.data.session.id}`);
     assert.equal(session.body.data.messages.at(-1).actions.length, 2);
+    assert.deepEqual(session.body.data.messages.at(-1).suggestions[0], confirmChip);
 
     // Finance may look people up, not offboard them: only the profile card is kept.
     const byFinance = await turn(finance, 'Rahul Sharma is leaving', answer);
     assert.deepEqual(
       byFinance.body.data.message.actions.map((action) => action.kind),
       ['VIEW_PROFILE'],
+    );
+    assert.deepEqual(
+      byFinance.body.data.message.suggestions.map((suggestion) => suggestion.actionKind ?? null),
+      [null],
     );
     const byEmployee = await turn(employee, 'Rahul Sharma is leaving', answer);
     assert.deepEqual(byEmployee.body.data.message.actions, []);

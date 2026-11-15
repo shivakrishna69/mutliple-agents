@@ -1,12 +1,16 @@
 /**
  * Pure helpers for the NSK assistant (components/nskBot/): reading a reply's citation marks, the kind
- * of badge each source gets, the offboarding form's request body, and merging live progress into a case.
+ * of badge each source gets, the offboarding form's request body, merging live progress into a case,
+ * and matching the type-ahead sentence starters to what is being typed.
  */
 
 import {
   CITATION_MARK_PATTERN,
   NSK_SOURCE_KINDS,
   OFFBOARDING_STATUSES,
+  PROMPT_HELPERS_SHOWN,
+  PROMPT_HELPER_MAX_CHARS,
+  PROMPT_HELPER_MIN_CHARS,
   QUOTE_TOOL,
   SNIPPET_TOOLS,
   WEB_SEARCH_LABEL_PREFIX,
@@ -123,3 +127,53 @@ export function mergeProgress(offboardingCase, event) {
 /** True while the documents are still being prepared. */
 export const isGenerating = (offboardingCase) =>
   [OFFBOARDING_STATUSES.QUEUED, OFFBOARDING_STATUSES.GENERATING].includes(offboardingCase?.status);
+
+// A word typed before the last one counts this much less than the last word (the one being typed).
+const EARLIER_WORD_PENALTY = 100;
+const MIN_WORD_LENGTH = 3;
+
+/** How close one typed word is to a helper's keywords: 0 is exact, larger is further; null for none. */
+function wordScore(word, keywords) {
+  let best = null;
+  for (const keyword of keywords) {
+    let score = null;
+    if (keyword.startsWith(word)) score = keyword.length - word.length;
+    else if (word.startsWith(keyword) && keyword.length >= MIN_WORD_LENGTH) score = word.length - keyword.length;
+    if (score !== null && (best === null || score < best)) best = score;
+  }
+  return best;
+}
+
+/**
+ * The sentence starters to offer for `draft`, closest first, at most PROMPT_HELPERS_SHOWN. A helper
+ * matches when the draft begins its text ("check my le") or a typed word begins one of its keywords
+ * ("debo" → deboard; "leav" prefers leave over leaving); the word being typed (the last) counts most.
+ * Nothing is offered for a draft too short or too long, or once the draft starts with any helper's
+ * text (a starter was picked: the person is finishing it).
+ * @param {string} draft
+ * @param {{ label: string, fill: string, keywords: string[] }[]} helpers
+ */
+export function matchPromptHelpers(draft, helpers) {
+  const typed = draft.trim().toLowerCase();
+  if (typed.length < PROMPT_HELPER_MIN_CHARS || typed.length > PROMPT_HELPER_MAX_CHARS || !helpers?.length) {
+    return [];
+  }
+  const words = typed.split(/[^\p{L}\p{N}&]+/u).filter((word) => word.length >= MIN_WORD_LENGTH || word.includes('&'));
+  if (helpers.some((helper) => typed.startsWith(helper.fill.trim().toLowerCase()))) return [];
+  const scored = [];
+  helpers.forEach((helper, order) => {
+    const fill = helper.fill.trim().toLowerCase();
+    let best = fill.startsWith(typed) ? -1 : null;
+    words.forEach((word, index) => {
+      const score = wordScore(word, helper.keywords);
+      if (score === null) return;
+      const weighted = score + (index === words.length - 1 ? 0 : EARLIER_WORD_PENALTY);
+      if (best === null || weighted < best) best = weighted;
+    });
+    if (best !== null) scored.push({ helper, best, order });
+  });
+  return scored
+    .sort((first, second) => first.best - second.best || first.order - second.order)
+    .slice(0, PROMPT_HELPERS_SHOWN)
+    .map((item) => item.helper);
+}

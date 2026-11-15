@@ -4,7 +4,9 @@
  *
  *   listSessions(user)        their sessions, newest first, and `resume`: the latest one when they
  *                             come back within NSK_BOT_SETTINGS.RESUME_WINDOW_HOURS, with its topics
- *                             and the suggestions its last answer made (offered as starter chips)
+ *                             and the suggestions its last answer made (offered as starter chips);
+ *                             and `promptHelpers`: the sentence starters the drawer offers as they
+ *                             type, only for the intents they may use (promptHelpersFor)
  *   getSession(user, id)      one session with its messages
  *   deleteSession(user, id)   a session and its messages (and its cached context)
  *   sendMessage(user, input)  one turn:
@@ -19,6 +21,8 @@
  *        approved (or read by someone with live research); anything else is dropped. Suggestions
  *        outside the person's intents are dropped, and so are action cards they may not use or
  *        whose person does not qualify (checkedActions); the backend writes the cards' labels.
+ *        When a Start offboarding package card is kept, the first chip confirms it in one tap
+ *        ("Yes, start offboarding for …", withConfirmationChip).
  *     5. both messages are stored, the session remembers the turn's topic and names, and the cached
  *        context is updated
  *   When the ai-service fails, nothing of the turn is kept and the quota is given back.
@@ -31,6 +35,7 @@ import {
   NSK_ACTION_CAPABILITIES,
   NSK_ACTION_KINDS,
   NSK_ESCALATING_SENTIMENTS,
+  NSK_INTENTS,
   NSK_MESSAGE_ROLES,
   NSK_SOURCE_KINDS,
   allowedIntentsFor,
@@ -107,6 +112,10 @@ function toCitationSummary(citation) {
   };
 }
 
+function toSuggestionSummary({ text, intent, actionKind, employeeId }) {
+  return actionKind && employeeId ? { text, intent, actionKind, employeeId: employeeId.toString() } : { text, intent };
+}
+
 export function toMessageSummary(message) {
   const isAssistant = message.role === NSK_MESSAGE_ROLES.ASSISTANT;
   return {
@@ -123,7 +132,7 @@ export function toMessageSummary(message) {
         }
       : null,
     citations: (message.citations ?? []).map(toCitationSummary),
-    suggestions: (message.suggestions ?? []).map(({ text, intent }) => ({ text, intent })),
+    suggestions: (message.suggestions ?? []).map(toSuggestionSummary),
     actions: (message.actions ?? []).map(({ kind, label, employeeId, employeeCode, employeeName }) => ({
       kind,
       label,
@@ -160,12 +169,24 @@ export function resumeOffer(latest, now = new Date()) {
   };
 }
 
+/** The sentence starters (NSK_BOT_MESSAGES.PROMPT_HELPERS) for the intents a person may use. */
+export function promptHelpersFor(allowedIntents) {
+  return NSK_BOT_MESSAGES.PROMPT_HELPERS.filter((helper) => allowedIntents.includes(helper.intent)).map(
+    ({ intent, label, fill, keywords }) => ({ intent, label, fill, keywords: [...keywords] }),
+  );
+}
+
 export async function listSessions(user, { now = new Date() } = {}) {
-  const sessions = await ChatSession.find({ userId: user.id })
-    .sort({ lastMessageAt: -1 })
-    .limit(S.SESSIONS_LISTED)
-    .lean();
-  return { sessions: sessions.map(toSessionSummary), resume: resumeOffer(sessions[0] ?? null, now) };
+  const [sessions, headedDepartmentIds] = await Promise.all([
+    ChatSession.find({ userId: user.id }).sort({ lastMessageAt: -1 }).limit(S.SESSIONS_LISTED).lean(),
+    headedDepartmentIdsOf(user.id),
+  ]);
+  const allowedIntents = allowedIntentsFor(user.role, { headsDepartment: headedDepartmentIds.length > 0 });
+  return {
+    sessions: sessions.map(toSessionSummary),
+    resume: resumeOffer(sessions[0] ?? null, now),
+    promptHelpers: promptHelpersFor(allowedIntents),
+  };
 }
 
 export async function getSession(user, sessionId) {
@@ -382,6 +403,23 @@ async function checkedActions(user, access, actions) {
   return checked;
 }
 
+/**
+ * The chips under a reply with a Start offboarding package card: first, one that confirms it in a tap
+ * (it opens the same form as the card), then the predicted ones, SUGGESTIONS_MAX in all.
+ */
+export function withConfirmationChip(suggestions, actions) {
+  const start = actions.find((action) => action.kind === NSK_ACTION_KINDS.START_OFFBOARDING);
+  if (!start) return suggestions;
+  const chip = {
+    text: NSK_BOT_MESSAGES.OFFBOARDING_CONFIRM_CHIP(start.employeeName),
+    intent: NSK_INTENTS.OFFBOARDING_WORKFLOW,
+    actionKind: start.kind,
+    employeeId: start.employeeId,
+  };
+  const others = suggestions.filter((suggestion) => suggestion.text.toLowerCase() !== chip.text.toLowerCase());
+  return [chip, ...others].slice(0, S.SUGGESTIONS_MAX);
+}
+
 /** What the session remembers after a turn: the topic and names, newest last, deduplicated. */
 function rememberedAfter(session, classification) {
   const topics = [...(session?.topics ?? [])];
@@ -491,7 +529,11 @@ export async function sendMessage(user, { message, sessionId }, { config, reques
 
   const answeredAt = new Date(Math.max(Date.now(), now.getTime() + 1));
   const { classification } = turn;
-  const suggestions = turn.suggestions.filter((suggestion) => allowedIntents.includes(suggestion.intent));
+  const actions = await checkedActions(user, access, turn.actions);
+  const suggestions = withConfirmationChip(
+    turn.suggestions.filter((suggestion) => allowedIntents.includes(suggestion.intent)),
+    actions,
+  );
   const assistantMessage = (
     await ChatMessage.create({
       sessionId: session._id,
@@ -501,7 +543,7 @@ export async function sendMessage(user, { message, sessionId }, { config, reques
       outcome: turn.outcome,
       citations: await checkedCitations(user, turn.sources, memories),
       suggestions,
-      actions: await checkedActions(user, access, turn.actions),
+      actions,
       escalation: NSK_ESCALATING_SENTIMENTS.includes(classification.sentiment),
       toolsUsed: turn.toolsUsed,
       usage: turn.usage ?? { inputTokens: null, outputTokens: null },

@@ -52,6 +52,16 @@ export const NSK_ACTION_KINDS = Object.freeze({ START_OFFBOARDING: 'START_OFFBOA
 /** What a View profile first card asks NSK (the person's words, sent as their message). */
 export const viewProfileMessage = (name, employeeCode) => `Show the profile of ${name} (${employeeCode})`;
 
+/**
+ * The type-ahead bar above the message box: the backend's sentence starters (GET /api/nsk-bot/sessions
+ * promptHelpers, already limited to the person's intents) matched on the device against the words
+ * typed. Shown for drafts of PROMPT_HELPER_MIN_CHARS to PROMPT_HELPER_MAX_CHARS characters, at most
+ * PROMPT_HELPERS_SHOWN at a time.
+ */
+export const PROMPT_HELPERS_SHOWN = 3;
+export const PROMPT_HELPER_MIN_CHARS = 3;
+export const PROMPT_HELPER_MAX_CHARS = 80;
+
 /** The longest message the backend takes (NSK_BOT_SETTINGS.MESSAGE_MAX_LENGTH). */
 export const NSK_MESSAGE_MAX_LENGTH = 2000;
 /** Citation marks in a reply: [1], [2]. */
@@ -75,6 +85,7 @@ export const NSK_LABELS = Object.freeze({
   SUGGESTED: 'You might ask',
   FETCHED: 'fetched',
   OPEN_SOURCE: 'Open the page',
+  PROMPT_HELPERS: 'Suggested questions',
 });
 
 // =================================================================================================

@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import SystemMessage
+from pydantic import Field
 
 from app.agent import AgentTimeoutError
 from app.knowledge.external_schemas import ExternalPassage
@@ -639,7 +640,7 @@ async def test_someone_leaving_is_found_and_the_cards_are_offered():
     ]
     assert [source.tool for source in result.sources] == ["find_offboarding_employee"]
     assert "find_offboarding_employee" in answer_model.bound_tool_names
-    assert "Never say\n  offboarding has started" in answer_model.received_inputs[0][0].content
+    assert "HR does that from the cards" in answer_model.received_inputs[0][0].content
 
 
 async def test_an_ambiguous_leaver_is_offered_as_offboarding_cards():
@@ -868,3 +869,297 @@ async def test_the_backend_client_applies_a_per_call_timeout():
         await client.aclose()
     assert seen[0]["read"] == 30.0
     assert seen[1]["read"] == REQUEST_TIMEOUT_SECONDS
+
+
+# =================================================================================================
+# Informal requests: "i want to deboard Rajeshwari", the confirmation, chips on the subject, time
+# =================================================================================================
+
+RAJESHWARI_ID = "0123456789abcdef0123abcd"
+CONFIRM_RAJESHWARI = "Did you mean: Start offboarding for Rajeshwari Rao (NSK0150)?"
+FOUND_RAJESHWARI = {
+    "result": {
+        "matches": 1,
+        "approximate": True,
+        "employee": {
+            "employee_id": RAJESHWARI_ID,
+            "employee_code": "NSK0150",
+            "name": "Rajeshwari Rao",
+            "designation": "Analyst",
+            "employment_status": "Active",
+            "offboarding": None,
+        },
+        "confirm_prompt": CONFIRM_RAJESHWARI,
+        "actions": [
+            {"kind": "START_OFFBOARDING", "employee_id": RAJESHWARI_ID},
+            {"kind": "VIEW_PROFILE", "employee_id": RAJESHWARI_ID},
+        ],
+    },
+    "source": "Profile: Rajeshwari Rao (NSK0150)",
+}
+
+
+def deboard_classification(confidence: float = 0.92, names: tuple[str, ...] = ("Rajeshwary",)) -> Any:
+    return classification(
+        "OFFBOARDING_WORKFLOW",
+        confidence=confidence,
+        topic="offboarding",
+        entities=[{"kind": "employeeName", "value": name} for name in names],
+    )
+
+
+def test_the_classifier_is_told_to_decode_informal_hr_words_and_clean_names():
+    from app.nodes.nsk_assistant.classifier import CLASSIFIER_SYSTEM_PROMPT
+
+    for word in ("deboard", "offboard", "let go", "terminate", "relieve", "F&F", "headcount", "leaves left", "punches"):
+        assert word in CLASSIFIER_SYSTEM_PROMPT, word
+    assert '"i want to deboard Rajeshwari"' in CLASSIFIER_SYSTEM_PROMPT
+    assert "never correct it to a name you guess" in CLASSIFIER_SYSTEM_PROMPT
+    parsed = parse_classification(
+        '{"intent": "OFFBOARDING_WORKFLOW", "confidence": 0.95, "sentiment": "NEUTRAL", "topic": "offboarding",'
+        ' "entities": [{"kind": "employeeName", "value": "  Rajeshwari "}]}',
+        "i want to deboard Rajeshwari",
+    )
+    assert parsed.intent is Intent.OFFBOARDING_WORKFLOW
+    assert [entity.value for entity in parsed.entities] == ["Rajeshwari"]
+
+
+async def test_a_named_leaver_is_looked_up_first_and_the_reply_asks_to_confirm():
+    systems = FakeNskSystems({"find_offboarding_employee": FOUND_RAJESHWARI})
+    nsk, answer_model, _ = assistant(
+        [
+            text_reply(
+                "That is Rajeshwari Rao (NSK0150), Analyst [1]. Use the cards below to start or view the profile."
+            )
+        ],
+        [deboard_classification(), suggestions()],
+        systems,
+    )
+    result = await nsk.answer(
+        turn_input("i want to deboard Rajeshwary", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS)
+    )
+    # Looked up before the model's first round, with the name as the classifier cleaned it.
+    assert systems.calls == [("find_offboarding_employee", {"query": "Rajeshwary"}, ACTOR_TOKEN)]
+    first_round = answer_model.received_inputs[0]
+    assert first_round[-2].tool_calls[0]["name"] == "find_offboarding_employee"
+    assert first_round[-1].tool_call_id == first_round[-2].tool_calls[0]["id"]
+    assert '"confirm_prompt"' in first_round[-1].content
+    assert len(answer_model.received_inputs) == 1
+    # The reply opens with the backend's confirmation line, and the cards go with it.
+    assert result.reply.startswith(CONFIRM_RAJESHWARI + "\n\n")
+    assert result.reply.count("Did you mean") == 1
+    assert result.outcome is TurnOutcome.ANSWERED
+    assert [action.kind.value for action in result.actions] == ["START_OFFBOARDING", "VIEW_PROFILE"]
+    assert "open your reply with that line" in first_round[0].content
+    assert "says approximate" in first_round[0].content
+
+
+async def test_a_reply_that_already_asks_to_confirm_is_not_given_the_line_twice():
+    systems = FakeNskSystems({"find_offboarding_employee": FOUND_RAJESHWARI})
+    nsk, _, _ = assistant(
+        [text_reply(f"{CONFIRM_RAJESHWARI} That is an Analyst [1].")],
+        [deboard_classification(), suggestions()],
+        systems,
+    )
+    result = await nsk.answer(turn_input("deboard Rajeshwary", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS))
+    assert result.reply.count("Did you mean") == 1
+
+
+async def test_a_refused_reply_gets_no_confirmation_line():
+    systems = FakeNskSystems({"find_offboarding_employee": FOUND_RAJESHWARI})
+    nsk, _, _ = assistant(
+        [text_reply("Rajeshwari Rao earns 99999 a month [1].")],
+        [deboard_classification(), suggestions()],
+        systems,
+    )
+    result = await nsk.answer(turn_input("deboard Rajeshwary", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS))
+    assert result.outcome is TurnOutcome.REFUSED
+    assert "Did you mean" not in result.reply
+    assert result.actions == []
+
+
+async def test_nobody_is_looked_up_first_when_unsure_or_two_people_are_named():
+    for classified in (deboard_classification(confidence=0.4), deboard_classification(names=("Rahul", "Priya"))):
+        systems = FakeNskSystems({"find_offboarding_employee": FOUND_RAJESHWARI})
+        nsk, _, _ = assistant([text_reply("CLARIFY: Who is leaving?")], [classified, suggestions()], systems)
+        result = await nsk.answer(turn_input("deboard", allowed_intents=HR_INTENTS, allowed_tools=HR_TOOLS))
+        assert systems.calls == []
+        assert result.outcome is TurnOutcome.CLARIFY
+    # Nor without the tool: someone who may not offboard gets only what they may use.
+    systems = FakeNskSystems({})
+    nsk, _, _ = assistant(
+        [text_reply("CLARIFY: What would you like to know?")],
+        [deboard_classification(confidence=0.5), suggestions()],
+        systems,
+    )
+    await nsk.answer(turn_input("deboard Rajeshwary"))
+    assert systems.calls == []
+
+
+async def test_a_named_colleague_is_looked_up_first_for_a_profile_question():
+    systems = FakeNskSystems(
+        {
+            "lookup_employee_profile": {
+                "result": {"matches": 1, "candidates": CANDIDATES[:1], "approximate": True, "more_not_shown": 0},
+                "source": 'People matching "Rahul Shrma"',
+            }
+        }
+    )
+    nsk, _, _ = assistant(
+        [text_reply("CLARIFY: Did you mean Rahul Sharma (NSK0104) [1]?")],
+        [
+            classification("PROFILE_LOOKUP", entities=[{"kind": "employeeName", "value": "Rahul Shrma"}]),
+            suggestions(),
+        ],
+        systems,
+    )
+    result = await nsk.answer(
+        turn_input("details of rahul shrma", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS)
+    )
+    assert systems.calls == [("lookup_employee_profile", {"query": "Rahul Shrma"}, ACTOR_TOKEN)]
+    assert result.outcome is TurnOutcome.CLARIFY
+    assert [suggestion.text for suggestion in result.suggestions] == ["Look up Rahul Sharma (NSK0104)"]
+
+
+def test_the_confirmation_line_needs_a_start_offboarding_card():
+    from app.nodes.nsk_assistant.assistant import with_confirmation
+
+    start = Action(kind=ActionKind.START_OFFBOARDING, employee_id=RAJESHWARI_ID)
+    view = Action(kind=ActionKind.VIEW_PROFILE, employee_id=RAJESHWARI_ID)
+    assert with_confirmation("An Analyst.", CONFIRM_RAJESHWARI, [view]) == "An Analyst."
+    assert with_confirmation("An Analyst.", None, [start]) == "An Analyst."
+    assert with_confirmation("An Analyst.", CONFIRM_RAJESHWARI, [start]) == f"{CONFIRM_RAJESHWARI}\n\nAn Analyst."
+    assert with_confirmation(f"x {CONFIRM_RAJESHWARI.lower()}", CONFIRM_RAJESHWARI, [start]).count("did you mean") == 1
+
+
+class ChoiceRecordingModel(ScriptedChatModel):
+    """A scripted model that also records the tool_choice of every bind_tools call."""
+
+    tool_choices: list[Any] = Field(default_factory=list)
+
+    def bind_tools(self, tools: Any, **kwargs: Any) -> ScriptedChatModel:
+        self.tool_choices.append(kwargs.get("tool_choice"))
+        return super().bind_tools(tools, **kwargs)
+
+
+class SteppingClock:
+    """A clock that moves `step` seconds every time it is read."""
+
+    def __init__(self, step: float) -> None:
+        self.now = 0.0
+        self.step = step
+
+    def __call__(self) -> float:
+        current = self.now
+        self.now += self.step
+        return current
+
+
+async def test_tool_rounds_stop_when_the_time_budget_is_used_and_the_model_answers_with_what_it_has():
+    systems = FakeNskSystems({"my_leave_balances": {"result": BALANCES, "source": "Your leave balances"}})
+    answer_model = ScriptedChatModel(
+        replies=[
+            tool_call_reply("get_my_leave_balances", {}),
+            tool_call_reply("get_my_leave_balances", {}, call_id="call-2"),
+            text_reply("You have 6 casual leave days left [1]."),
+        ]
+    )
+    nsk = NskAssistant(
+        answer_model,
+        ScriptedChatModel(replies=[classification("ATTENDANCE_AUDIT"), suggestions()]),
+        systems,
+        None,
+        SEARCH,
+        tool_rounds_budget_seconds=25.0,
+        clock=SteppingClock(10.0),
+    )
+    result = await nsk.answer(turn_input("leaves left?"))
+    # The turn starts at 0 s; rounds start at 10 s and 20 s; at 30 s the budget (25 s) is used, so the
+    # third call is the final answer without tools.
+    assert len(answer_model.received_inputs) == 3
+    assert len(systems.calls) == 2
+    assert result.outcome is TurnOutcome.ANSWERED
+
+    hurried = ChoiceRecordingModel(replies=[text_reply("NOT_FOUND: There was no time to check your balances.")])
+    late = NskAssistant(
+        hurried,
+        ScriptedChatModel(replies=[classification("ATTENDANCE_AUDIT"), suggestions()]),
+        FakeNskSystems({}),
+        None,
+        SEARCH,
+        tool_rounds_budget_seconds=5.0,
+        clock=SteppingClock(10.0),
+    )
+    answered = await late.answer(turn_input("leaves left?"))
+    # Out of time before the first round: one final answer, asked with tools turned off.
+    assert len(hurried.received_inputs) == 1
+    assert hurried.tool_choices == [None, "none"]
+    assert answered.outcome is TurnOutcome.NOT_FOUND
+
+
+def test_the_tool_round_budget_leaves_room_for_one_final_answer():
+    from app.nodes.nsk_assistant.assistant import FINAL_ANSWER_MARGIN_SECONDS, tool_rounds_budget
+
+    assert tool_rounds_budget(85.0, 8.0, 2) == 85.0 - 16.0 - FINAL_ANSWER_MARGIN_SECONDS
+    assert tool_rounds_budget(85.0, 8.0, 0) == 85.0 - 8.0 - FINAL_ANSWER_MARGIN_SECONDS
+    assert tool_rounds_budget(10.0, 8.0, 2) == 0.0
+
+
+async def test_follow_up_chips_stay_on_the_department_the_message_named():
+    nsk, _, json_model = assistant(
+        [text_reply("Here is Data Engineering.")],
+        [
+            classification(
+                "PROFILE_LOOKUP",
+                topic="department headcount",
+                entities=[{"kind": "department", "value": "Data Engineering"}],
+            ),
+            RuntimeError("suggester down"),
+        ],
+        FakeNskSystems({}),
+    )
+    result = await nsk.answer(
+        turn_input("headcount data engg?", allowed_intents=PEOPLE_INTENTS, allowed_tools=PEOPLE_TOOLS)
+    )
+    assert [suggestion.text for suggestion in result.suggestions] == [
+        "Show attendance today for Data Engineering",
+        "Check pending leave approvals in Data Engineering",
+        "Show the headcount of Data Engineering",
+    ]
+    prompt = json_model.received_inputs[1][0].content
+    assert 'department "Data Engineering"' in prompt
+    assert "(department headcount)" in prompt
+    assert "Stay on this message's subject" in prompt
+
+
+def test_anchored_chips_follow_the_allowed_intents_with_the_current_one_first():
+    from app.nodes.nsk_assistant.schemas import Entity, EntityKind
+    from app.nodes.nsk_assistant.suggestions import anchored_suggestions
+
+    named = Classification(
+        intent=Intent.OFFBOARDING_WORKFLOW,
+        sentiment=Sentiment.NEUTRAL,
+        confidence=0.9,
+        topic=None,
+        entities=[
+            Entity(kind=EntityKind.EMPLOYEE_NAME, value="Rajeshwari"),
+            Entity(kind=EntityKind.DATE, value="today"),
+        ],
+    )
+    both = [Intent.PROFILE_LOOKUP, Intent.OFFBOARDING_WORKFLOW]
+    assert [suggestion.text for suggestion in anchored_suggestions(named, both)] == [
+        "Start offboarding for Rajeshwari",
+        "Show the profile of Rajeshwari",
+        "Who is Rajeshwari's manager?",
+    ]
+    as_lookup = named.model_copy(update={"intent": Intent.PROFILE_LOOKUP})
+    assert [suggestion.text for suggestion in anchored_suggestions(as_lookup, both)] == [
+        "Show the profile of Rajeshwari",
+        "Who is Rajeshwari's manager?",
+        "Start offboarding for Rajeshwari",
+    ]
+    assert anchored_suggestions(named, [Intent.ATTENDANCE_AUDIT]) == []
+    # Without names, the fixed ones are the intents' own.
+    unnamed = named.model_copy(update={"entities": []})
+    fixed = fallback_suggestions([Intent.OFFBOARDING_WORKFLOW], Intent.OFFBOARDING_WORKFLOW, unnamed)
+    assert [suggestion.text for suggestion in fixed] == ["Start an offboarding package"]

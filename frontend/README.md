@@ -264,7 +264,13 @@ page for people with `use_nsk_assistant` (`components/nskBot/`). The drawer:
 - **Banners and tags:** urgent, frustrated or sensitive messages get the backend's escalation banner.
   A reply that needs a detail, found nothing or was refused gets a tag.
 - **Cards:** suggestion chips send their text. **Start offboarding package** opens the offboarding
-  form in the conversation (`OffboardingPanel.jsx`); **View profile first** asks for the profile.
+  form in the conversation (`OffboardingPanel.jsx`); **View profile first** asks for the profile. The
+  **Yes, start offboarding for …** chip that comes with a Start card does what the card does.
+- **Type-ahead:** as the person types, up to three sentence starters show above the box ("debo" →
+  *Start offboarding for [name]*, "leav" → *Check my leave balances*). They are the backend's
+  `promptHelpers` (sent with the sessions, only for the person's own intents), matched on the device
+  (`utils/nskBot.js` `matchPromptHelpers`), so they cost no request. A click puts the starter in the
+  box to finish with a name or send.
 
 **The offboarding form** (`run_offboarding`) takes the separation, the resignation date, the last
 working day, the exit reason and HR's adjustments: salary, salary days, encashable leave, notice

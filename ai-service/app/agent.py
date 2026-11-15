@@ -93,6 +93,7 @@ from app.nodes.nsk_assistant import (
     NskTurnInput,
     NskTurnResult,
     SearchSettings,
+    tool_rounds_budget,
 )
 from app.nodes.supervisor import create_supervisor_model
 from app.nodes.transcript import replies_given_this_turn
@@ -320,6 +321,12 @@ class AgentRuntime:
                         top_k=settings.knowledge_answer_top_k,
                         min_relevance=settings.knowledge_min_relevance,
                         excerpt_chars=settings.knowledge_excerpt_chars,
+                    ),
+                    # Tool rounds stop in time for one final answer within NSK_TURN_TIMEOUT_SECONDS.
+                    tool_rounds_budget_seconds=tool_rounds_budget(
+                        settings.nsk_turn_timeout_seconds,
+                        settings.llm_request_timeout_seconds,
+                        settings.llm_max_retries + 1,
                     ),
                 )
             # Dependencies handed to nodes through LangGraph's runtime context on every run;

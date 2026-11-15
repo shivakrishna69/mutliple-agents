@@ -1,6 +1,7 @@
 /**
  * The NSK assistant's pure pieces: the actor token (genuine, unexpired, unforgeable), the ai-service
- * response contract, which intents and tools each role gets, the resume offer, and request validation.
+ * response contract, which intents and tools each role gets, the resume offer, the type-ahead prompt
+ * helpers and the offboarding confirmation chip, and request validation.
  */
 
 import { describe, it } from 'node:test';
@@ -14,7 +15,7 @@ import { NSK_BOT_SETTINGS } from '../../constants/validation.js';
 import { AI_FAILURE_KIND, AiServiceError } from '../../services/aiServiceClient.js';
 import { issueActorToken, verifyActorToken } from '../../services/nskBot/actorToken.js';
 import { PEOPLE_SCOPES, peopleScopeOf, scopeCoversDepartment } from '../../services/nskBot/nskAccess.js';
-import { resumeOffer } from '../../services/nskBot/nskBotService.js';
+import { promptHelpersFor, resumeOffer, withConfirmationChip } from '../../services/nskBot/nskBotService.js';
 import { NSK_TOOLS, toolsAvailableTo } from '../../services/nskBot/nskTools.js';
 import { parseNskTurnResponse } from '../../services/nskBot/nskTurnClient.js';
 import { matchDepartment } from '../../services/nskBot/peopleTools.js';
@@ -288,6 +289,53 @@ describe('the resume offer', () => {
     };
     assert.equal(resumeOffer(old, NOW), null);
     assert.equal(resumeOffer(null, NOW), null);
+  });
+});
+
+describe('prompt helpers and the confirmation chip', () => {
+  it('offers only the sentence starters of the intents a role may use', () => {
+    const employee = promptHelpersFor(allowedIntentsFor(ROLES.EMPLOYEE));
+    const hr = promptHelpersFor(allowedIntentsFor(ROLES.HR));
+    assert.ok(employee.length > 0);
+    assert.ok(employee.every((helper) => allowedIntentsFor(ROLES.EMPLOYEE).includes(helper.intent)));
+    assert.ok(!employee.some((helper) => helper.intent === NSK_INTENTS.OFFBOARDING_WORKFLOW));
+    assert.ok(hr.some((helper) => helper.intent === NSK_INTENTS.OFFBOARDING_WORKFLOW));
+    assert.ok(hr.some((helper) => helper.intent === NSK_INTENTS.PROFILE_LOOKUP));
+    assert.deepEqual(promptHelpersFor([]), []);
+    for (const helper of NSK_BOT_MESSAGES.PROMPT_HELPERS) {
+      assert.ok(Object.values(NSK_INTENTS).includes(helper.intent), helper.label);
+      assert.ok(helper.keywords.length > 0 && helper.fill.length > 0 && helper.label.length > 0, helper.label);
+      assert.ok(
+        helper.keywords.every((keyword) => keyword === keyword.toLowerCase()),
+        helper.label,
+      );
+    }
+    // A copy: the drawer cannot change the shared table.
+    hr[0].keywords.push('x');
+    assert.ok(!NSK_BOT_MESSAGES.PROMPT_HELPERS[0].keywords.includes('x'));
+  });
+
+  it('puts a one-tap confirmation first when a reply offers to start offboarding', () => {
+    const predicted = [
+      { text: 'Show attendance today for Data Engineering', intent: NSK_INTENTS.PROFILE_LOOKUP },
+      { text: 'Yes, start offboarding for Rajeshwari Rao', intent: NSK_INTENTS.OFFBOARDING_WORKFLOW },
+      { text: 'Check pending leave approvals', intent: NSK_INTENTS.PROFILE_LOOKUP },
+      { text: 'Another one', intent: NSK_INTENTS.PROFILE_LOOKUP },
+    ];
+    const start = { kind: 'START_OFFBOARDING', employeeId: 'e1', employeeName: 'Rajeshwari Rao', employeeCode: 'NSK1' };
+    const view = { kind: 'VIEW_PROFILE', employeeId: 'e1', employeeName: 'Rajeshwari Rao', employeeCode: 'NSK1' };
+    assert.deepEqual(withConfirmationChip(predicted, [view, start]), [
+      {
+        text: NSK_BOT_MESSAGES.OFFBOARDING_CONFIRM_CHIP('Rajeshwari Rao'),
+        intent: NSK_INTENTS.OFFBOARDING_WORKFLOW,
+        actionKind: 'START_OFFBOARDING',
+        employeeId: 'e1',
+      },
+      predicted[0],
+      predicted[2],
+    ]);
+    assert.equal(withConfirmationChip(predicted, [view]), predicted);
+    assert.equal(withConfirmationChip(predicted, []), predicted);
   });
 });
 

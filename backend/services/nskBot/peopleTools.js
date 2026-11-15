@@ -3,8 +3,12 @@
  * with RUN_PEOPLE_LOOKUP, the departments they head for department heads. Called by nskTools.js after
  * it has checked the actor; every answer here is also audited there with the fields shown.
  *
+ *   findPeople              the people in scope a query names (findMatches: an employee ID always
+ *                           wins, a name must contain every word); when nobody matches, the closest
+ *                           spellings of the name (utils/fuzzyNames.js), marked approximate
  *   lookupEmployeeProfile   one person by name, employee ID or work email, among the current
- *                           employees in scope:
+ *                           employees in scope (a guessed spelling is always offered as a candidate
+ *                           to confirm, never shown straight away):
  *                             exactly one match (an employee ID always wins)  their profile, as
  *                                                                              profileMasking.js lets
  *                                                                              this role see it
@@ -35,6 +39,7 @@ import Sprint, { SPRINT_STATUSES } from '../../models/Sprint.js';
 import Task, { TASK_STATUSES } from '../../models/Task.js';
 import User from '../../models/User.js';
 import { calendarDateOfUtcInstant } from '../../utils/calendarDates.js';
+import { closestNames, nameWords } from '../../utils/fuzzyNames.js';
 import { escapeRegularExpression } from '../../utils/regularExpressions.js';
 import { asClockTime } from '../attendanceAnalytics.js';
 import { readOfficeLocalClock } from '../attendancePolicy.js';
@@ -85,6 +90,43 @@ export async function findMatches(scope, query) {
   return EmployeeProfile.find({ ...filter, userId: { $in: users.map((user) => user._id) } })
     .limit(S.LOOKUP_CANDIDATES_MAX * 10)
     .lean();
+}
+
+/**
+ * The people in scope whose name is the closest spelling of `query` ("Rajeshwary" finds Rajeshwari).
+ * Only names with a word starting like one of the query's words are read: the first letters of a
+ * name are rarely the misspelled ones, and this keeps the read small.
+ */
+async function closestSpellings(scope, query) {
+  const words = nameWords(query).filter((word) => word.length >= S.FUZZY_PREFIX_CHARS && !/\d/.test(word));
+  if (words.length === 0) return [];
+  const starts = [...new Set(words.map((word) => word.slice(0, S.FUZZY_PREFIX_CHARS)))];
+  const users = await User.find({
+    $or: starts.map((start) => ({ name: new RegExp(`(^|[\\s.'-])${escapeRegularExpression(start)}`, 'i') })),
+  })
+    .select('_id name')
+    .limit(S.FUZZY_USERS_MAX)
+    .lean();
+  if (users.length === 0) return [];
+  const profiles = await EmployeeProfile.find({ ...scopeFilter(scope), userId: { $in: users.map((user) => user._id) } })
+    .limit(S.FUZZY_USERS_MAX)
+    .lean();
+  const nameByUser = new Map(users.map((user) => [user._id.toString(), user.name]));
+  return closestNames(query, profiles, (profile) => nameByUser.get(profile.userId.toString())).slice(
+    0,
+    S.LOOKUP_CANDIDATES_MAX * 10,
+  );
+}
+
+/**
+ * The people in scope `query` names, or else the closest spellings of the name.
+ * @returns {Promise<{ profiles: object[], approximate: boolean }>}
+ */
+export async function findPeople(scope, query) {
+  const profiles = await findMatches(scope, query);
+  if (profiles.length > 0) return { profiles, approximate: false };
+  const closest = await closestSpellings(scope, query);
+  return { profiles: closest, approximate: closest.length > 0 };
 }
 
 async function namesOf(profiles) {
@@ -202,7 +244,7 @@ async function fullProfile(profile, actor, now) {
  * @returns {Promise<{ result: object, source: string|null, audit: object }>}
  */
 export async function lookupEmployeeProfile({ actor, scope, query, now }) {
-  const matches = await findMatches(scope, query);
+  const { profiles: matches, approximate } = await findPeople(scope, query);
   if (matches.length === 0) {
     return {
       result: {
@@ -213,13 +255,15 @@ export async function lookupEmployeeProfile({ actor, scope, query, now }) {
       audit: { query, matches: 0, targetEmployeeIds: [], fieldsShown: [] },
     };
   }
-  if (matches.length > 1) {
+  // Several people, or a spelling NSK only guessed: the person picks (or confirms) whom they meant.
+  if (matches.length > 1 || approximate) {
     const candidates = await candidatesOf(matches);
     return {
       result: {
         matches: matches.length,
         candidates: candidates.slice(0, S.LOOKUP_CANDIDATES_MAX),
         more_not_shown: Math.max(candidates.length - S.LOOKUP_CANDIDATES_MAX, 0),
+        ...(approximate ? { approximate: true, note: NSK_BOT_MESSAGES.PEOPLE_APPROXIMATE_NOTE(query) } : {}),
       },
       source: LABELS.PEOPLE_SEARCH(query),
       audit: {

@@ -1,6 +1,7 @@
 /**
  * The NSK assistant's pure helpers (utils/nskBot.js): citation marks, the badge each source gets
- * (unverified search snippets included), the offboarding form's request body, and live progress.
+ * (unverified search snippets included), the offboarding form's request body, live progress, and the
+ * type-ahead sentence starters.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -8,6 +9,7 @@ import {
   emptyOffboardingForm,
   hostOf,
   isGenerating,
+  matchPromptHelpers,
   mergeProgress,
   sourceBadgeKind,
   splitCitations,
@@ -135,5 +137,86 @@ describe('live progress', () => {
       artifacts: [{ id: 'a1', kind: 'RELIEVING_LETTER', fileName: 'letter.pdf', sizeBytes: 10 }],
     });
     expect(merged.artifacts[0].downloadable).toBe(false);
+  });
+});
+
+const HELPERS = [
+  {
+    intent: 'ATTENDANCE_AUDIT',
+    label: 'Check my leave balances',
+    fill: 'Check my leave balances',
+    keywords: ['leave', 'balance'],
+  },
+  {
+    intent: 'ATTENDANCE_AUDIT',
+    label: 'Show my leave requests',
+    fill: 'Show my leave requests',
+    keywords: ['leave', 'request'],
+  },
+  {
+    intent: 'ATTENDANCE_AUDIT',
+    label: 'Show my attendance this month',
+    fill: 'Show my attendance this month',
+    keywords: ['attendance', 'punch'],
+  },
+  {
+    intent: 'OFFBOARDING_WORKFLOW',
+    label: 'Start offboarding for [name]',
+    fill: 'Start offboarding for ',
+    keywords: ['deboard', 'offboard', 'leaving'],
+  },
+  {
+    intent: 'OFFBOARDING_WORKFLOW',
+    label: 'Prepare the F&F for [name]',
+    fill: 'Prepare the F&F for ',
+    keywords: ['f&f'],
+  },
+  {
+    intent: 'PROFILE_LOOKUP',
+    label: 'Show department headcount for [department]',
+    fill: 'Show the headcount for ',
+    keywords: ['headcount', 'head'],
+  },
+  {
+    intent: 'POLICY_QA',
+    label: 'What is the leave policy?',
+    fill: 'What is the leave policy?',
+    keywords: ['policy', 'leave'],
+  },
+];
+const labelsFor = (draft) => matchPromptHelpers(draft, HELPERS).map((helper) => helper.label);
+
+describe('type-ahead sentence starters', () => {
+  it('completes the word being typed, closest keyword first, at most three', () => {
+    expect(labelsFor('debo')).toEqual(['Start offboarding for [name]']);
+    expect(labelsFor('OFFB')).toEqual(['Start offboarding for [name]']);
+    expect(labelsFor('head')).toEqual(['Show department headcount for [department]']);
+    expect(labelsFor('atte')).toEqual(['Show my attendance this month']);
+    // "leav" is closer to leave than to leaving: the leave starters win the three places.
+    expect(labelsFor('leav')).toEqual([
+      'Check my leave balances',
+      'Show my leave requests',
+      'What is the leave policy?',
+    ]);
+    expect(labelsFor('f&f')).toEqual(['Prepare the F&F for [name]']);
+    // A whole word that contains a keyword counts too.
+    expect(labelsFor('offboarding')).toEqual(['Start offboarding for [name]']);
+  });
+
+  it('prefers the starter the draft begins, and the last word over earlier ones', () => {
+    expect(labelsFor('show my le')[0]).toBe('Show my leave requests');
+    expect(labelsFor('deboard punch')).toEqual(['Show my attendance this month', 'Start offboarding for [name]']);
+    expect(labelsFor('punch deboard')).toEqual(['Start offboarding for [name]', 'Show my attendance this month']);
+    expect(labelsFor('i want to deboard raj')).toEqual(['Start offboarding for [name]']);
+  });
+
+  it('offers nothing for short, long or unmatched drafts, or once a starter is in the box', () => {
+    expect(labelsFor('sh')).toEqual([]);
+    expect(labelsFor('x'.repeat(81))).toEqual([]);
+    expect(labelsFor('hello there')).toEqual([]);
+    expect(labelsFor('Start offboarding for Raj')).toEqual([]);
+    expect(labelsFor('Check my leave balances')).toEqual([]);
+    expect(matchPromptHelpers('debo', [])).toEqual([]);
+    expect(matchPromptHelpers('debo', undefined)).toEqual([]);
   });
 });

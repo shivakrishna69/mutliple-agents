@@ -822,6 +822,118 @@ export const NSK_BOT_MESSAGES = Object.freeze({
     VIEW_PROFILE: (name, employeeCode) => `View profile first: ${name} (${employeeCode})`,
   }),
   OFFBOARDING_ALREADY_STARTED_NOTE: 'Offboarding has already started for this person; open their case instead',
+  // Nobody is named exactly as asked: the closest spellings come back as candidates to confirm.
+  PEOPLE_APPROXIMATE_NOTE: (query) =>
+    `Nobody is named exactly "${query}"; these are the closest spellings. Ask which one was meant`,
+  // The line a reply opens with when it found the person to offboard, and the one-tap chip that
+  // opens their offboarding form (the same as the Start offboarding package card).
+  OFFBOARDING_CONFIRM_PROMPT: (name, employeeCode) => `Did you mean: Start offboarding for ${name} (${employeeCode})?`,
+  OFFBOARDING_CONFIRM_CHIP: (name) => `Yes, start offboarding for ${name}`,
+  /**
+   * Sentence starters offered above the message box as the person types (the drawer matches the
+   * words typed against `keywords`, on the device). Each is shown only to people who may use its
+   * intent (nskBotService.js promptHelpersFor). `label` is what the chip shows; `fill` is what it
+   * puts in the box: ending in a space when a name or department is still to be typed.
+   */
+  PROMPT_HELPERS: Object.freeze([
+    {
+      intent: 'ATTENDANCE_AUDIT',
+      label: 'Check my leave balances',
+      fill: 'Check my leave balances',
+      keywords: ['leave', 'leaves', 'balance', 'left', 'remaining', 'cl', 'sick'],
+    },
+    {
+      intent: 'ATTENDANCE_AUDIT',
+      label: 'Show my leave requests',
+      fill: 'Show my leave requests',
+      keywords: ['leave', 'request', 'applied', 'pending', 'status'],
+    },
+    {
+      intent: 'ATTENDANCE_AUDIT',
+      label: 'Show my attendance this month',
+      fill: 'Show my attendance this month',
+      keywords: ['attendance', 'punch', 'punches', 'late', 'absent', 'present', 'hours', 'checkin'],
+    },
+    {
+      intent: 'OFFBOARDING_WORKFLOW',
+      label: 'Start offboarding for [name]',
+      fill: 'Start offboarding for ',
+      keywords: [
+        'deboard',
+        'offboard',
+        'offboarding',
+        'exit',
+        'resign',
+        'resignation',
+        'relieve',
+        'relieving',
+        'terminate',
+        'leaving',
+        'separation',
+        'remove',
+      ],
+    },
+    {
+      intent: 'OFFBOARDING_WORKFLOW',
+      label: 'Prepare the full and final settlement for [name]',
+      fill: 'Prepare the full and final settlement for ',
+      keywords: ['f&f', 'fnf', 'full', 'final', 'settlement', 'gratuity', 'encashment'],
+    },
+    {
+      intent: 'PROFILE_LOOKUP',
+      label: 'Show department headcount for [department]',
+      fill: 'Show the headcount for ',
+      keywords: ['headcount', 'head', 'team', 'size', 'strength', 'department'],
+    },
+    {
+      intent: 'PROFILE_LOOKUP',
+      label: 'Who is in today in [department]?',
+      fill: 'Who is in today in ',
+      keywords: ['who', 'today', 'present', 'office'],
+    },
+    {
+      intent: 'PROFILE_LOOKUP',
+      label: 'Look up the profile of [name]',
+      fill: 'Look up the profile of ',
+      keywords: ['profile', 'details', 'contact', 'manager', 'lookup', 'find', 'employee'],
+    },
+    {
+      intent: 'PROFILE_LOOKUP',
+      label: 'Show pending approvals in [department]',
+      fill: 'Show pending approvals in ',
+      keywords: ['pending', 'approvals', 'approve', 'regularization'],
+    },
+    {
+      intent: 'POLICY_QA',
+      label: 'What is the notice period policy?',
+      fill: 'What is the notice period policy?',
+      keywords: ['notice', 'policy', 'period'],
+    },
+    {
+      intent: 'POLICY_QA',
+      label: 'What are the company holidays this year?',
+      fill: 'What are the company holidays this year?',
+      keywords: ['holiday', 'holidays', 'festival'],
+    },
+    {
+      intent: 'POLICY_QA',
+      label: 'What is the leave policy?',
+      fill: 'What is the leave policy?',
+      keywords: ['policy', 'rules', 'leave', 'handbook'],
+    },
+    {
+      intent: 'WEB_MARKET_RESEARCH',
+      label: 'What is the latest share price of [company]?',
+      fill: 'What is the latest share price of ',
+      keywords: ['stock', 'share', 'price', 'nse', 'bse', 'market'],
+    },
+    {
+      intent: 'WEB_MARKET_RESEARCH',
+      label: 'What are the latest IT hiring trends?',
+      fill: 'What are the latest IT hiring trends?',
+      keywords: ['hiring', 'trends', 'market', 'salary', 'benchmark'],
+    },
+  ]),
 });
 
 /** Web research through NSK, and the admin's settings for it. */
