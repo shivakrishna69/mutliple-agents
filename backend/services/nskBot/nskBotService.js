@@ -15,7 +15,8 @@
  *     3. the ai-service turn (nskTurnClient.js) with the intents and tools this person may use and a
  *        fresh actor token (actorToken.js); the tools check the person again on every call
  *     4. the reply's sources are checked: a document must belong to a knowledge base the person may
- *        read, a session must be one of the memories sent; anything else is dropped. Suggestions
+ *        read, a session must be one of the memories sent, a web page must still be cached and
+ *        approved (or read by someone with live research); anything else is dropped. Suggestions
  *        outside the person's intents are dropped, and so are action cards they may not use or
  *        whose person does not qualify (checkedActions); the backend writes the cards' labels.
  *     5. both messages are stored, the session remembers the turn's topic and names, and the cached
@@ -23,7 +24,7 @@
  *   When the ai-service fails, nothing of the turn is kept and the quota is given back.
  */
 
-import { ROLE_DEFINITIONS } from '../../constants/accessRoles.js';
+import { CAPABILITIES, ROLE_DEFINITIONS, hasCapability } from '../../constants/accessRoles.js';
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import { NSK_BOT_MESSAGES } from '../../constants/messages.js';
 import {
@@ -40,6 +41,7 @@ import AgentDocument from '../../models/AgentDocument.js';
 import ChatMessage from '../../models/ChatMessage.js';
 import ChatSession from '../../models/ChatSession.js';
 import EmployeeProfile, { EMPLOYMENT_STATUSES } from '../../models/EmployeeProfile.js';
+import ExternalSource from '../../models/ExternalSource.js';
 import OffboardingCase, { EXECUTED_STATUSES } from '../../models/OffboardingCase.js';
 import User from '../../models/User.js';
 import NskBotUsage from '../../models/NskBotUsage.js';
@@ -98,6 +100,9 @@ function toCitationSummary(citation) {
     headingPath: citation.headingPath ?? [],
     page: citation.page ?? null,
     sessionId: citation.sessionId?.toString() ?? null,
+    externalSourceId: citation.externalSourceId?.toString() ?? null,
+    sourceUrl: citation.sourceUrl ?? null,
+    fetchedAt: citation.fetchedAt ?? null,
     excerpt: citation.excerpt ?? null,
   };
 }
@@ -236,6 +241,19 @@ async function personalDay(userId, now) {
 // =================================================================================================
 
 /**
+ * The cached web pages the reply cites that this person may read: still fresh, and approved, unless
+ * they have live research (RUN_WEB_RESEARCH), by id.
+ */
+async function readableWebSources(user, sources) {
+  const ids = sources.filter((source) => source.kind === NSK_SOURCE_KINDS.WEB).map((source) => source.sourceId);
+  if (ids.length === 0) return new Map();
+  const filter = { _id: { $in: ids }, expiresAt: { $gt: new Date() } };
+  if (!hasCapability(user.role, CAPABILITIES.RUN_WEB_RESEARCH)) filter.approved = true;
+  const pages = await ExternalSource.find(filter).select('title domain finalUrl fetchedAt').lean();
+  return new Map(pages.map((page) => [page._id.toString(), page]));
+}
+
+/**
  * The reply's sources as citations to store: documents the person may read (named), sessions among
  * the memories sent, tool reads as labelled by the tools. Anything else is dropped and logged.
  */
@@ -249,12 +267,28 @@ async function checkedCitations(user, sources, memories) {
     : [];
   const documentById = new Map(documents.map((document) => [document._id.toString(), document]));
   const memoryById = new Map(memories.map((session) => [session._id.toString(), session]));
+  const webById = await readableWebSources(user, sources);
 
   const citations = [];
   let dropped = 0;
   for (const source of sources) {
     if (source.kind === NSK_SOURCE_KINDS.TOOL) {
       citations.push({ number: source.number, kind: source.kind, label: source.label, tool: source.tool });
+    } else if (source.kind === NSK_SOURCE_KINDS.WEB) {
+      const page = webById.get(source.sourceId);
+      if (!page) {
+        dropped += 1;
+        continue;
+      }
+      citations.push({
+        number: source.number,
+        kind: source.kind,
+        label: NSK_BOT_MESSAGES.SOURCE_LABELS.WEB_PAGE(page.title, page.domain, calendarDateOf(page.fetchedAt)),
+        externalSourceId: page._id,
+        sourceUrl: page.finalUrl,
+        fetchedAt: page.fetchedAt,
+        excerpt: source.excerpt,
+      });
     } else if (source.kind === NSK_SOURCE_KINDS.CONVERSATION) {
       const session = memoryById.get(source.sessionId);
       if (!session) {

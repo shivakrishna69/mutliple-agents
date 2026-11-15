@@ -59,16 +59,29 @@ describe('the actor token', () => {
 });
 
 describe('what each role may use', () => {
-  const SELF_INTENTS = [NSK_INTENTS.ATTENDANCE_AUDIT, NSK_INTENTS.POLICY_QA, NSK_INTENTS.GENERAL_HELP];
+  // Everyone may ask about the outside world (from approved cached pages); only some research live.
+  const SELF_INTENTS = [
+    NSK_INTENTS.ATTENDANCE_AUDIT,
+    NSK_INTENTS.POLICY_QA,
+    NSK_INTENTS.WEB_MARKET_RESEARCH,
+    NSK_INTENTS.GENERAL_HELP,
+  ];
   const OFFBOARDING_TOOL = NSK_TOOLS.FIND_OFFBOARDING_EMPLOYEE;
-  const SELF_TOOLS = Object.values(NSK_TOOLS).filter(
-    (tool) => !PEOPLE_TOOLS.includes(tool) && tool !== OFFBOARDING_TOOL,
-  );
-  const LOOKUP_TOOLS = Object.values(NSK_TOOLS).filter((tool) => tool !== OFFBOARDING_TOOL);
+  const WEB_TOOLS = [NSK_TOOLS.WEB_SEARCH, NSK_TOOLS.FETCH_WEB_PAGE, NSK_TOOLS.GET_STOCK_QUOTE];
   const PEOPLE_ROLES = [ROLES.ADMIN, ROLES.HR, ROLES.FINANCE, ROLES.IT_ADMIN];
   const OFFBOARDING_ROLES = [ROLES.ADMIN, ROLES.HR];
+  const WEB_ROLES = [ROLES.ADMIN, ROLES.HR, ROLES.FINANCE, ROLES.IT_ADMIN];
+  /** The tools in NSK_TOOLS order, keeping only the groups given. */
+  const toolsWith = ({ people = false, offboarding = false, web = false }) =>
+    Object.values(NSK_TOOLS).filter((tool) => {
+      if (PEOPLE_TOOLS.includes(tool)) return people;
+      if (tool === OFFBOARDING_TOOL) return offboarding;
+      if (WEB_TOOLS.includes(tool)) return web;
+      return true;
+    });
+  const LOOKUP_TOOLS = toolsWith({ people: true });
 
-  it('gives the people tools to admin, HR, finance and IT, offboarding to admin and HR, self-service to the others', () => {
+  it('gives each role the tools of its capabilities: people, offboarding, live research, self-service', () => {
     for (const role of Object.values(ROLES)) {
       const looksUp = PEOPLE_ROLES.includes(role);
       const offboards = OFFBOARDING_ROLES.includes(role);
@@ -76,11 +89,14 @@ describe('what each role may use', () => {
       if (offboards) intents = [NSK_INTENTS.PROFILE_LOOKUP, NSK_INTENTS.OFFBOARDING_WORKFLOW, ...SELF_INTENTS];
       else if (looksUp) intents = [NSK_INTENTS.PROFILE_LOOKUP, ...SELF_INTENTS];
       assert.deepEqual(allowedIntentsFor(role), intents, role);
-      let tools = SELF_TOOLS;
-      if (offboards) tools = Object.values(NSK_TOOLS);
-      else if (looksUp) tools = LOOKUP_TOOLS;
-      assert.deepEqual(toolsAvailableTo(role), tools, role);
+      assert.deepEqual(
+        toolsAvailableTo(role),
+        toolsWith({ people: looksUp, offboarding: offboards, web: WEB_ROLES.includes(role) }),
+        role,
+      );
     }
+    // Searching approved cached pages is open to everyone.
+    assert.ok(toolsAvailableTo(ROLES.EMPLOYEE).includes(NSK_TOOLS.EXTERNAL_KNOWLEDGE_SCOPE));
   });
 
   it('gives a department head the people tools whatever their role, and nothing that is not built yet', () => {
@@ -94,7 +110,9 @@ describe('what each role may use', () => {
     for (const role of Object.values(ROLES)) {
       const intents = allowedIntentsFor(role, { headsDepartment: true });
       assert.equal(intents.includes(NSK_INTENTS.OFFBOARDING_WORKFLOW), OFFBOARDING_ROLES.includes(role));
-      assert.equal(intents.includes(NSK_INTENTS.WEB_MARKET_RESEARCH), false);
+      // Heading a department gives no live research.
+      const tools = toolsAvailableTo(role, { headsDepartment: true });
+      assert.equal(tools.includes(NSK_TOOLS.WEB_SEARCH), WEB_ROLES.includes(role), role);
     }
   });
 

@@ -138,7 +138,9 @@ export async function startStandInAiService(backend) {
     request.on('end', async () => {
       const isLeaveQuestion = request.method === 'POST' && request.url === '/ai/leave/assistant';
       const isKnowledgeCall = request.method === 'POST' && KNOWLEDGE_PATHS.has(request.url);
-      const keyMatches = request.headers['x-internal-api-key'] === backend.internalApiKey();
+      // Before the backend has started, no key is known and nothing matches.
+      const expectedKey = backend.internalApiKey();
+      const keyMatches = Boolean(expectedKey) && request.headers['x-internal-api-key'] === expectedKey;
       if (request.method === 'POST' && request.url === '/ai/knowledge/answer' && keyMatches) {
         await streamAnswer(response, JSON.parse(rawBody));
         return;

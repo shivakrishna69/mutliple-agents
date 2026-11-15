@@ -11,6 +11,12 @@ Qdrant (app/knowledge/store.py).
     search_department_passages  the same across several departments (the NSK assistant), each
                    passage naming its department
 
+External knowledge (web pages NSK read; collection external_knowledge, app/knowledge/external_store.py)
+shares the client and the embedding model:
+    index_external_chunks, remove_external_sources, set_external_approval, remove_expired_external
+    search_external_passages   fresh pages closest to a question; approved ones only unless the
+                               person has live research
+
 Qdrant being unreachable, or the model failing to load, raises KnowledgeUnavailableError (503): the
 backend then retries the document later. Nothing here logs chunk text.
 """
@@ -20,14 +26,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import warnings
+from datetime import UTC, datetime
 
 import httpx
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import ApiException
 
 from app.config import Settings
-from app.knowledge.constants import COLLECTION_NAME
+from app.knowledge.constants import COLLECTION_NAME, EXTERNAL_COLLECTION_NAME
 from app.knowledge.embedder import EmbeddingModelError, KnowledgeEmbedder, passage_text
+from app.knowledge.external_schemas import ExternalPassage, IndexExternalChunksInput
+from app.knowledge.external_store import ExternalKnowledgeStore
 from app.knowledge.schemas import IndexChunksInput, RetrievedPassage
 from app.knowledge.store import KnowledgeStore
 
@@ -52,9 +61,19 @@ class KnowledgeUnavailableError(RuntimeError):
 
 
 class KnowledgeService:
-    def __init__(self, settings: Settings, *, collection_name: str = COLLECTION_NAME) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        collection_name: str = COLLECTION_NAME,
+        external_collection_name: str = EXTERNAL_COLLECTION_NAME,
+    ) -> None:
         self._settings = settings
         self._collection_name = collection_name
+        self._external_collection_name = external_collection_name
+        self._external_store: ExternalKnowledgeStore | None = None
+        self._external_ready = False
+        self._external_lock = asyncio.Lock()
         self._client: AsyncQdrantClient | None = None
         self._store: KnowledgeStore | None = None
         self._embedder = KnowledgeEmbedder(cache_dir=settings.embedding_cache_dir, offline=settings.embedding_offline)
@@ -83,6 +102,7 @@ class KnowledgeService:
                 check_compatibility=False,
             )
         self._store = KnowledgeStore(self._client, self._collection_name)
+        self._external_store = ExternalKnowledgeStore(self._client, self._external_collection_name)
         self._model_task = asyncio.create_task(self._preload_model(), name="knowledge-model-load")
 
     async def _preload_model(self) -> None:
@@ -176,6 +196,77 @@ class KnowledgeService:
                 page=point.payload.get("page"),
                 score=point.score,
                 department_id=point.payload["department_id"],
+            )
+            for point in points
+        ]
+
+    # ---------------------------------------------------------------------------------------------
+    # External knowledge
+    # ---------------------------------------------------------------------------------------------
+
+    async def _ready_external_store(self) -> ExternalKnowledgeStore:
+        if self._external_store is None:
+            raise KnowledgeUnavailableError("QDRANT_URL is not configured")
+        if not self._external_ready:
+            async with self._external_lock:
+                if not self._external_ready:
+                    try:
+                        await self._external_store.ensure_collection()
+                    except INDEX_FAILURES as index_error:
+                        raise KnowledgeUnavailableError(type(index_error).__name__) from index_error
+                    self._external_ready = True
+        return self._external_store
+
+    async def _external(self, operation):
+        store = await self._ready_external_store()
+        try:
+            return await operation(store)
+        except INDEX_FAILURES as index_error:
+            raise KnowledgeUnavailableError(type(index_error).__name__) from index_error
+
+    async def index_external_chunks(self, chunk_input: IndexExternalChunksInput) -> int:
+        await self._ready_external_store()
+        try:
+            vectors = await self._embedder.embed_passages(
+                [passage_text(chunk.text, [chunk_input.title, *chunk.heading_path]) for chunk in chunk_input.chunks]
+            )
+        except EmbeddingModelError as model_error:
+            raise KnowledgeUnavailableError("embedding model unavailable") from model_error
+        return await self._external(lambda store: store.upsert_chunks(chunk_input, vectors))
+
+    async def remove_external_sources(self, source_ids: list[str]) -> int:
+        return await self._external(lambda store: store.remove_sources(source_ids))
+
+    async def set_external_approval(self, source_ids: list[str], approved: bool) -> int:
+        return await self._external(lambda store: store.set_approval(source_ids, approved))
+
+    async def remove_expired_external(self, before: datetime) -> int:
+        return await self._external(lambda store: store.remove_expired(before.timestamp()))
+
+    async def search_external_passages(
+        self, *, question: str, include_unapproved: bool, limit: int, now: datetime | None = None
+    ) -> list[ExternalPassage]:
+        """Up to `limit` fresh web page passages, most relevant first; approved pages only unless asked."""
+        await self._ready_external_store()
+        try:
+            vector = await self._embedder.embed_query(question)
+        except EmbeddingModelError as model_error:
+            raise KnowledgeUnavailableError("embedding model unavailable") from model_error
+        now_ts = (now or datetime.now(UTC)).timestamp()
+        points = await self._external(
+            lambda store: store.search(vector, now_ts=now_ts, include_unapproved=include_unapproved, limit=limit)
+        )
+        return [
+            ExternalPassage(
+                source_id=point.payload["source_id"],
+                source_url=point.payload["source_url"],
+                domain=point.payload["domain"],
+                title=point.payload["title"],
+                fetched_at=point.payload["fetched_at"],
+                chunk_index=point.payload["chunk_index"],
+                text=point.payload["text"],
+                heading_path=point.payload.get("heading_path") or [],
+                score=point.score,
             )
             for point in points
         ]

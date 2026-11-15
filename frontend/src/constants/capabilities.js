@@ -28,4 +28,5 @@ export const CAPABILITIES = Object.freeze({
   RUN_OFFBOARDING: 'run_offboarding',
   VIEW_FINAL_SETTLEMENT: 'view_final_settlement',
   VIEW_IT_OFFBOARDING: 'view_it_offboarding',
+  RUN_WEB_RESEARCH: 'run_web_research',
 });

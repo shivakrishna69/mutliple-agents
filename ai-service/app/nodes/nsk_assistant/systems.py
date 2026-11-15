@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from app.knowledge.external_schemas import ExternalPassage
 from app.knowledge.schemas import RetrievedPassage
 from app.services.backend_client import BackendInternalClient, BackendRejectedError, BackendUnavailableError
 
@@ -45,6 +46,10 @@ class DocumentSearch(Protocol):
     async def search_department_passages(
         self, *, department_ids: list[str], question: str, limit: int
     ) -> list[RetrievedPassage]: ...
+
+    async def search_external_passages(
+        self, *, question: str, include_unapproved: bool, limit: int
+    ) -> list[ExternalPassage]: ...
 
 
 class BackendNskSystems:

@@ -158,7 +158,19 @@ class ConversationSource(BaseModel):
     session_id: ObjectIdString
 
 
-Source = Annotated[ToolSource | DocumentSource | ConversationSource, Field(discriminator="kind")]
+class WebSource(BaseModel):
+    """A web page kept as external knowledge: the backend checks it is still cached and readable."""
+
+    number: int = Field(ge=1)
+    kind: Literal["web"] = "web"
+    source_id: ObjectIdString
+    url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=300)
+    fetched_at: str = Field(min_length=1, max_length=40)
+    excerpt: str
+
+
+Source = Annotated[ToolSource | DocumentSource | ConversationSource | WebSource, Field(discriminator="kind")]
 
 
 class Suggestion(BaseModel):

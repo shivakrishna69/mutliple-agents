@@ -8,7 +8,8 @@
  *                   the message
  *   citations       ASSISTANT only: what the reply's [n] marks point at, as they were when it was
  *                   written: a tool read (its name and what it read), a document passage (document,
- *                   headings, page, a quoted excerpt) or an earlier session. Never a whole document.
+ *                   headings, page, a quoted excerpt), an earlier session, or a web page (its URL and
+ *                   when it was fetched). Never a whole document.
  *   suggestions     ASSISTANT only: the likely next questions, offered as cards
  *   actions         ASSISTANT only: buttons for one resolved person (start their offboarding, view
  *                   their profile), as checked by the backend when the reply was stored
@@ -48,6 +49,10 @@ const citationSchema = new mongoose.Schema(
     page: { type: Number, default: null },
     // CONVERSATION
     sessionId: { type: ObjectId, ref: 'ChatSession', default: null },
+    // WEB: the cached page, its address and when it was fetched (shown with every web citation)
+    externalSourceId: { type: ObjectId, ref: 'ExternalSource', default: null },
+    sourceUrl: { type: String, default: null, maxlength: 2048 },
+    fetchedAt: { type: Date, default: null },
     excerpt: { type: String, default: null, maxlength: NSK_BOT_SETTINGS.CITATION_EXCERPT_MAX_LENGTH },
   },
   { _id: false },

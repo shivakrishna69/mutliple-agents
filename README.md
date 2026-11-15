@@ -98,6 +98,7 @@ Qdrant, backend, AI service, and the frontend served by nginx):
 # backend/.env and ai-service/.env as in step 2 above, and a key for Qdrant (32+ characters) in a
 # .env file next to docker-compose.yml (git-ignored) or in the shell:
 echo "QDRANT_API_KEY=$(openssl rand -hex 32)" >> .env
+echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> .env   # the web search for NSK (SearXNG)
 docker compose up --build -d     # open http://localhost:8080
 docker compose logs -f backend   # follow a service's log
 docker compose down              # stop (data is kept in the mongo-data volume)

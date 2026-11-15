@@ -61,11 +61,13 @@ export const NSK_OUTCOMES = Object.freeze({
  *   TOOL          a live read of the portal's data (the tool's name and what it read)
  *   DOCUMENT      a passage of a department knowledge base document
  *   CONVERSATION  one of the person's earlier NSK sessions
+ *   WEB           a web page kept as external knowledge (its URL and when it was fetched)
  */
 export const NSK_SOURCE_KINDS = Object.freeze({
   TOOL: 'TOOL',
   DOCUMENT: 'DOCUMENT',
   CONVERSATION: 'CONVERSATION',
+  WEB: 'WEB',
 });
 
 export const NSK_MESSAGE_ROLES = Object.freeze({ USER: 'USER', ASSISTANT: 'ASSISTANT' });
@@ -87,6 +89,8 @@ export const NSK_INTENT_CAPABILITIES = Object.freeze({
   [NSK_INTENTS.PROFILE_LOOKUP]: CAPABILITIES.RUN_PEOPLE_LOOKUP,
   [NSK_INTENTS.OFFBOARDING_WORKFLOW]: CAPABILITIES.RUN_OFFBOARDING,
   [NSK_INTENTS.ATTENDANCE_AUDIT]: CAPABILITIES.USE_NSK_ASSISTANT,
+  // Everyone may ask; live research needs RUN_WEB_RESEARCH, others get approved cached pages only.
+  [NSK_INTENTS.WEB_MARKET_RESEARCH]: CAPABILITIES.USE_NSK_ASSISTANT,
   [NSK_INTENTS.POLICY_QA]: CAPABILITIES.USE_NSK_ASSISTANT,
   [NSK_INTENTS.GENERAL_HELP]: CAPABILITIES.USE_NSK_ASSISTANT,
 });

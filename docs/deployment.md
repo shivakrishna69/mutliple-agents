@@ -155,6 +155,12 @@ by hand before it, or that deploy fails and the previous version keeps running:
 grep -q '^QDRANT_API_KEY=' /etc/nsk/stack.env || echo "QDRANT_API_KEY=$(openssl rand -hex 32)" | sudo tee -a /etc/nsk/stack.env >/dev/null
 ```
 
+**Web search for NSK** needs nothing to set up either: SearXNG runs in the stack, reachable only by the
+backend, with its secret `SEARXNG_SECRET` generated in `/etc/nsk/stack.env` by `deploy/stack-settings.sh`
+on the next deploy. For NSE/BSE stock quotes, add `ALPHA_VANTAGE_API_KEY` to `/etc/nsk/backend.env`
+(a free key from alphavantage.co) and run `nsk up -d`. Administrators choose which sites NSK may
+read under the web research settings.
+
 **Email** (signup confirmation, password reset, invitations, leave notices): set `SMTP_HOST`,
 `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM` in `/etc/nsk/backend.env` (the file has
 them, commented out), then `nsk up -d`. Without email, nobody can sign up or reset a password.

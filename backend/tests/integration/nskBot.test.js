@@ -30,6 +30,7 @@ const SELF_TOOLS = [
   'my_leave_balances',
   'my_leave_requests',
   'knowledge_scope',
+  'external_knowledge_scope',
 ];
 
 describe('NSK assistant', { skip: skipReason ?? false }, () => {
@@ -233,7 +234,12 @@ describe('NSK assistant', { skip: skipReason ?? false }, () => {
     assert.equal(turn.path, '/ai/nsk/turn');
     assert.equal(turn.body.message, 'How much leave do I have?');
     assert.deepEqual(turn.body.user, { name: 'Asha Rao', role_label: 'Employee' });
-    assert.deepEqual(turn.body.allowed_intents, ['ATTENDANCE_AUDIT', 'POLICY_QA', 'GENERAL_HELP']);
+    assert.deepEqual(turn.body.allowed_intents, [
+      'ATTENDANCE_AUDIT',
+      'POLICY_QA',
+      'WEB_MARKET_RESEARCH',
+      'GENERAL_HELP',
+    ]);
     assert.deepEqual(turn.body.allowed_tools, SELF_TOOLS);
     assert.deepEqual(turn.body.history, []);
     assert.match(turn.body.today, /^\d{4}-\d{2}-\d{2}$/);

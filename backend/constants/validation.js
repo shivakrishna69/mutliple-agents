@@ -684,6 +684,40 @@ export const NSK_BOT_SETTINGS = Object.freeze({
   ACTIONS_MAX: 4,
 });
 
+/** Web research through NSK (services/webResearch/). */
+export const WEB_RESEARCH_SETTINGS = Object.freeze({
+  // Fetching a page: the whole fetch, redirects included, must finish within FETCH_TIMEOUT_MS; a body
+  // over FETCH_MAX_BYTES is refused; only these ports and content types are read.
+  URL_MAX_LENGTH: 2048,
+  FETCH_TIMEOUT_MS: 10_000,
+  FETCH_MAX_BYTES: 2 * 1024 * 1024,
+  MAX_REDIRECTS: 5,
+  ALLOWED_PORTS: Object.freeze([80, 443]),
+  CONTENT_TYPES: Object.freeze(['text/html', 'application/xhtml+xml', 'text/plain']),
+  USER_AGENT: 'NSKResearchBot/1.0 (company HR portal; reads public pages on request)',
+  // What is kept of a page: its readable text (at most TEXT_MAX_CHARS, chunked into the index), and
+  // the first EXCERPT_CHARS handed to the assistant.
+  TEXT_MAX_CHARS: 200_000,
+  EXCERPT_CHARS: 4_000,
+  TITLE_MAX_LENGTH: 300,
+  // Pages are kept as external knowledge for EXTERNAL_KNOWLEDGE_TTL_DAYS (bounds below), then removed
+  // by the cleanup job, which runs this often.
+  CLEANUP_INTERVAL_MS: 60 * 60 * 1000,
+  // Web search (SearXNG) and quotes (Alpha Vantage).
+  SEARCH_QUERY_MAX_LENGTH: 200,
+  SEARCH_RESULTS_MAX: 8,
+  SNIPPET_MAX_LENGTH: 400,
+  PROVIDER_TIMEOUT_MS: 8_000,
+  SYMBOL_PATTERN: /^[A-Z0-9][A-Z0-9&_-]{0,19}$/,
+  EXCHANGES: Object.freeze(['NSE', 'BSE']),
+  // The admin's domain lists.
+  DOMAINS_MAX: 200,
+  DOMAIN_MAX_LENGTH: 253,
+  SOURCES_LISTED: 100,
+  // Daily usage counters are kept this long, then deleted.
+  USAGE_RETENTION_DAYS: 7,
+});
+
 /** Offboarding through NSK (services/nskBot/offboarding/). */
 export const OFFBOARDING_SETTINGS = Object.freeze({
   // How far ahead a last working day may be set.

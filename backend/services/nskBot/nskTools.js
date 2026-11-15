@@ -30,6 +30,8 @@
  *   find_offboarding_employee the person someone says is leaving (?query=), among everyone still
  *                         employed, with the action cards to offer (offboarding/offboardingTool.js)
  *                                                                               RUN_OFFBOARDING
+ *   web_search, fetch_web_page, get_stock_quote   live web research (webTools.js)  RUN_WEB_RESEARCH
+ *   external_knowledge_scope  which cached web pages the ai-service may search for the person
  *
  * The people tools and find_offboarding_employee answer with an `audit` too: whom or which department they read and the fields
  * shown, recorded by the controller for every call (category "nsk_bot").
@@ -42,7 +44,7 @@ import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
 import { nskHasCapability } from '../../constants/nskBot.js';
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import { NSK_BOT_MESSAGES } from '../../constants/messages.js';
-import { NSK_BOT_SETTINGS } from '../../constants/validation.js';
+import { NSK_BOT_SETTINGS, WEB_RESEARCH_SETTINGS } from '../../constants/validation.js';
 import ChatSession from '../../models/ChatSession.js';
 import EmployeeProfile from '../../models/EmployeeProfile.js';
 import { LEAVE_REQUEST_STATUSES } from '../../models/LeaveRequest.js';
@@ -59,6 +61,13 @@ import { verifyActorToken } from './actorToken.js';
 import { headedDepartmentIdsOf, peopleScopeOf } from './nskAccess.js';
 import { findOffboardingEmployee } from './offboarding/offboardingTool.js';
 import { departmentMetrics, lookupEmployeeProfile } from './peopleTools.js';
+import {
+  WEB_ARGUMENT_LIMITS,
+  externalKnowledgeScopeTool,
+  fetchWebPageTool,
+  stockQuoteTool,
+  webSearchTool,
+} from './webTools.js';
 
 export const NSK_TOOLS = Object.freeze({
   MY_ATTENDANCE_TODAY: 'my_attendance_today',
@@ -69,6 +78,10 @@ export const NSK_TOOLS = Object.freeze({
   LOOKUP_EMPLOYEE_PROFILE: 'lookup_employee_profile',
   GET_DEPARTMENT_METRICS: 'get_department_metrics',
   FIND_OFFBOARDING_EMPLOYEE: 'find_offboarding_employee',
+  WEB_SEARCH: 'web_search',
+  FETCH_WEB_PAGE: 'fetch_web_page',
+  GET_STOCK_QUOTE: 'get_stock_quote',
+  EXTERNAL_KNOWLEDGE_SCOPE: 'external_knowledge_scope',
 });
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -293,6 +306,50 @@ const TOOL_DEFINITIONS = Object.freeze({
       }),
     run: ({ input }) => findOffboardingEmployee({ query: input.query }),
   },
+
+  [NSK_TOOLS.WEB_SEARCH]: {
+    capability: CAPABILITIES.RUN_WEB_RESEARCH,
+    needsProfile: false,
+    validate: (args) =>
+      textArgument(args, 'query', {
+        minLength: WEB_ARGUMENT_LIMITS.QUERY_MIN_LENGTH,
+        maxLength: WEB_ARGUMENT_LIMITS.QUERY_MAX_LENGTH,
+      }),
+    run: webSearchTool,
+  },
+
+  [NSK_TOOLS.FETCH_WEB_PAGE]: {
+    capability: CAPABILITIES.RUN_WEB_RESEARCH,
+    needsProfile: false,
+    validate: (args) => textArgument(args, 'url', { minLength: 4, maxLength: WEB_ARGUMENT_LIMITS.URL_MAX_LENGTH }),
+    run: fetchWebPageTool,
+  },
+
+  [NSK_TOOLS.GET_STOCK_QUOTE]: {
+    capability: CAPABILITIES.RUN_WEB_RESEARCH,
+    needsProfile: false,
+    validate(args) {
+      const unknown = onlyKnownArguments(args, ['symbol', 'exchange']);
+      if (unknown) return unknown;
+      const symbol = typeof args.symbol === 'string' ? args.symbol.trim().toUpperCase() : '';
+      if (!WEB_RESEARCH_SETTINGS.SYMBOL_PATTERN.test(symbol)) {
+        return invalid('symbol', 'must be a stock symbol such as RELIANCE or TCS');
+      }
+      const exchange = typeof args.exchange === 'string' ? args.exchange.trim().toUpperCase() : 'NSE';
+      if (!WEB_RESEARCH_SETTINGS.EXCHANGES.includes(exchange)) {
+        return invalid('exchange', `must be one of ${WEB_RESEARCH_SETTINGS.EXCHANGES.join(', ')}`);
+      }
+      return valid({ symbol, exchange });
+    },
+    run: stockQuoteTool,
+  },
+
+  [NSK_TOOLS.EXTERNAL_KNOWLEDGE_SCOPE]: {
+    capability: CAPABILITIES.USE_NSK_ASSISTANT,
+    needsProfile: false,
+    validate: noArguments,
+    run: externalKnowledgeScopeTool,
+  },
 });
 
 /** The departments whose knowledge bases this person may read: { id, name }, by name. */
@@ -331,12 +388,13 @@ async function loadActor(key, token, now) {
 
 /**
  * Runs one tool call from the ai-service.
- * @param {{ key: Buffer, token: unknown, toolName: string, args: object, now?: Date }} call
+ * @param {{ key: Buffer, token: unknown, toolName: string, args: object, config: object, requestId: string,
+ *   now?: Date }} call  config and requestId for the tools that call other services (web research)
  * @returns {Promise<{ validationErrors: object[] } | { actor: object, result: object, source: string|null,
  *   audit: object|null }>}  audit: what a people tool read, for the audit log
  * @throws {ServiceError} 401 / 403 / 404 as listed above; the tool's own refusals
  */
-export async function runNskTool({ key, token, toolName, args, now = new Date() }) {
+export async function runNskTool({ key, token, toolName, args, config, requestId, now = new Date() }) {
   const actor = await loadActor(key, token, now);
   const definition = Object.hasOwn(TOOL_DEFINITIONS, toolName) ? TOOL_DEFINITIONS[toolName] : null;
   if (!definition) throw refusal(HTTP_STATUS.NOT_FOUND, 'TOOL_NOT_FOUND');
@@ -368,6 +426,8 @@ export async function runNskTool({ key, token, toolName, args, now = new Date() 
     actor,
     profile,
     input: validation.sanitizedInput,
+    config,
+    requestId,
     now,
   });
   return { actor, result, source, audit };

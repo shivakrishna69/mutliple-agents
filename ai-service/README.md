@@ -55,7 +55,12 @@ API for any change.
   match comes back with action cards (start the offboarding package, view the profile first), passed
   on as `actions` unless the reply is refused, and the backend checks them again; several matches
   become "Offboard {name} ({ID})" cards. NSK never says offboarding has started: HR does that from
-  the card. Tool results, passages and earlier sessions are numbered sources the
+  the card. For the outside world (`WEB_MARKET_RESEARCH`), everyone may search saved web pages
+  (`search_external_knowledge`, the `external_knowledge` collection: fresh pages only, and approved
+  ones only unless the backend says the person has live research); people with live research also
+  get `search_the_web`, `read_web_page` (a page read safely by the backend and cited as a web source
+  with its URL and fetch date) and `get_stock_quote` (end-of-day; search snippets flagged as
+  unverified when no quote can be had). An answer from saved pages must cite them, like documents. Tool results, passages and earlier sessions are numbered sources the
   reply cites as [n]. The reply is then checked: `CLARIFY:`/`NOT_FOUND:` markers set the outcome,
   marks pointing nowhere are removed, the output guard runs, and every number must appear in the
   evidence (grounding.py: digit-group commas and leading zeros ignored); sentences with other numbers
@@ -110,7 +115,8 @@ docker run --rm -v "$PWD/app:/src/app:ro" -v "$PWD/tests:/src/tests:ro" -v "$PWD
 | `test_support_graph.py` | Whole support turns with scripted models: tool use, two-topic messages, guard escalation, fallbacks |
 | `test_attendance_agent.py` | The evidence rule, date resolution, and full regularization conversations, including prompt injection |
 | `test_leave_assistant.py` | Tools scoped to the backend's employee, pricing and drafting without sending, refusals and mistakes returned to the model, bounded rounds, guarded replies, the endpoint's statuses |
-| `test_nsk_assistant.py` | The NSK assistant with scripted models: classification and tone rules, the number check, tool calls carrying the actor token, only allowed tools offered, a disallowed intent answered without tools, invented numbers and uncited policy refused, markers, earlier sessions as sources, refused tool calls, the urgent tone, fallbacks, suggestions, people tools (ambiguous names as cards, masked phone passed on, invented salary refused, not offered to self-service), offboarding (someone leaving found with the action cards, an ambiguous leaver offered as offboarding cards, no cards on a refused reply, the tool only when allowed), the endpoint and its action cards |
+| `test_nsk_assistant.py` | The NSK assistant with scripted models: classification and tone rules, the number check, tool calls carrying the actor token, only allowed tools offered, a disallowed intent answered without tools, invented numbers and uncited policy refused, markers, earlier sessions as sources, refused tool calls, the urgent tone, fallbacks, suggestions, people tools (ambiguous names as cards, masked phone passed on, invented salary refused, not offered to self-service), offboarding (someone leaving found with the action cards, an ambiguous leaver offered as offboarding cards, no cards on a refused reply, the tool only when allowed), web research (a read page cited as a web source, saved pages searched within the backend's scope, uncited web answers refused, tools only when allowed), the endpoint and its action cards |
+| `test_external_knowledge.py` | The external knowledge index on a real Qdrant: metadata and filter indexes, searches skipping expired and (unless asked) unapproved pages, approval changes, removing sources and expired chunks, request checks |
 | `test_api.py` | Internal API key, 422 shape, 503 without Groq, 504 on timeout |
 | `test_knowledge_api.py` | The knowledge endpoints: internal key, every malformed batch refused before embedding, 503 without Qdrant |
 | `test_knowledge_unit.py` | Stable point ids, headings in the embedded text, Qdrant and offline-model settings |

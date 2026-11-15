@@ -71,7 +71,7 @@ scripts/         operational scripts
 | `/api/employees`                                                                                 | current employees for pickers (invited people included); base office assignment; bulk CSV import                                                                                                                                                                                 | HR, admin                                                                                |
 | `/api/work-calendar`                                                                             | holidays and the day-by-day calendar                                                                                                                                                                                                                                             | HR, admin edit / employees read their office                                             |
 | `/api/leave`                                                                                     | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export                                                                                                                                                       | HR, admin manage / employees their own / reporting managers decide their team's requests |
-| `/api/nsk-bot`                                                                                   | the NSK assistant: sessions (list, open, delete, resume), turns with cited sources, suggestions and action cards; offboarding (settlement preview, start, cases, IT checklist, document downloads)                                                                                                                                                                            | everyone with `use_nsk_assistant` (every role); sessions: their owner                    |
+| `/api/nsk-bot`                                                                                   | the NSK assistant: sessions (list, open, delete, resume), turns with cited sources, suggestions and action cards; offboarding (settlement preview, start, cases, IT checklist, document downloads); web research through its tools                                                                                                                                                                            | everyone with `use_nsk_assistant` (every role); sessions: their owner                    |
 | `/api/internal`                                                                                  | calls from the AI service                                                                                                                                                                                                                                                        | internal API key                                                                         |
 
 ## Dashboard and service health
@@ -396,7 +396,7 @@ audited as denied). No tool takes a person as an argument. Every role has the se
 `my_attendance_today`, `my_attendance_month` (`month`, up to 12 months back), `my_leave_balances`,
 `my_leave_requests` (`status`), and `knowledge_scope` (the departments whose knowledge bases the
 person may read, by the department agents' audience rules; the ai-service searches only those).
-Offboarding and web research come with their own capabilities.
+Offboarding and web research have their own capabilities (below).
 
 **People tools.** `run_people_lookup` (admin, HR, finance, IT administrator) gives the whole company;
 a **department head** of any role gets the same tools for the departments they head
@@ -451,7 +451,9 @@ The settlement is a pure calculator, `utils/payroll/finalSettlement.js`, with th
   It is 0 when that month's payslip was already issued; HR may set the days.
 - **Leave encashment.** Basic ÷ 26 × encashable days.
 - **Gratuity.** 15 ÷ 26 × Basic × completed years, from 5 completed years (1 for fixed-term, which HR
-  marks), at most ₹20 lakh. Completed years are whole years; a part year is not rounded up.
+  marks), at most ₹20 lakh. A final part year of more than six months counts as a full year
+  (Payment of Gratuity Act, s.4(2)), so 4 years and 7 months qualifies as 5; fixed-term needs one
+  whole year first.
 - **Notice shortfall.** Gross ÷ 30 × the notice days not served, editable or waivable.
 - **Statutory deductions.** Provident fund and ESI are prorated to the salary days; professional tax
   is taken whole.
@@ -489,6 +491,58 @@ They are stored in the `OFFBOARDING_S3_*` bucket under `company-offboarding/<cas
 server-side encryption, SHA-256 recorded). The upload and download code is shared with payslips
 (`utils/s3ObjectStore.js`). Without that bucket or a PDF browser, previews still work and execute
 answers 503. Every change and download is audited (category `offboarding`) with ids, never figures.
+
+**Web research.** `run_web_research` (admin, HR, finance, IT administrator) gives NSK three live
+tools; everyone else gets `WEB_MARKET_RESEARCH` answers from approved cached pages only
+(`services/webResearch/`, `services/nskBot/webTools.js`):
+
+- `web_search` (`query`): results from the company's own SearXNG (`SEARXNG_URL`, self-hosted in the
+  compose stack, `deploy/searxng/settings.yml`). Blocked domains and non-http results are left out.
+- `fetch_web_page` (`url`): one page, read by the SSRF-safe fetcher and kept as external knowledge:
+  - **URL:** http or https only; no user name or password; ports 80 and 443 (`WEB_FETCH_ALLOWED_PORTS`).
+  - **Admin's lists:** the host is checked against them (below).
+  - **DNS first:** the name is resolved before connecting, and the page is refused if any address is
+    private, loopback, link-local (cloud metadata), carrier-grade NAT, reserved, multicast, or an IPv6
+    form carrying one of those (mapped, NAT64, 6to4, Teredo).
+  - **Pinned connection:** the request goes to the address that was checked (no DNS rebinding).
+  - **Redirects:** at most 5, each checked again.
+  - **Limits:** 10 seconds for the whole fetch, 2 MB, HTML or plain text only.
+  - **Extraction:** Mozilla Readability, then chunked like knowledge base documents and indexed in
+    the ai-service's `external_knowledge` collection with its URL, fetch date and expiry
+    (`EXTERNAL_KNOWLEDGE_TTL_DAYS`, default 7).
+  - **Cache:** a page read again before it expires is answered from the cache. If the index is down,
+    the page is still answered once.
+- `get_stock_quote` (`symbol`, `exchange` NSE or BSE): Alpha Vantage's end-of-day quote
+  (`ALPHA_VANTAGE_API_KEY`). Without a key, when its free daily limit is used up, or when it has no data
+  for the symbol, it falls back to web search snippets with a note that they are unverified. The
+  provider is an interface, so another market data source can be added.
+- `external_knowledge_scope`: tells the ai-service which cached pages it may search for this person.
+
+**The admin's lists** (`/api/web-research`, `manage_company_settings`: admin, IT administrator):
+
+| Route | What |
+| --- | --- |
+| `GET /settings` | The lists and the unlisted-domains switch. |
+| `PUT /settings` | `{ allowedDomains, blockedDomains, allowUnlistedDomains, version }` (409 when stale). |
+| `GET /sources` | The cached pages, newest first. |
+| `DELETE /sources/:id` | Removes a cached page, record and chunks. |
+
+- **Allowlist:** pages from these domains are approved, cached for everyone.
+- **Blocklist:** never read; saving removes the cached pages of a newly blocked domain.
+- **Other domains:** read only for people with live research, and cached for them only. Turning off
+  `allowUnlistedDomains` closes them.
+- **Matching:** an entry covers its subdomains; an IP address entry covers that address only.
+- **Approval** follows the allowlist when it changes, in the record and the index.
+
+**Access, limits and audits.** Each person has daily limits (`WEB_FETCH_DAILY_LIMIT` 40,
+`WEB_SEARCH_DAILY_LIMIT` 60, `STOCK_QUOTE_DAILY_LIMIT` 20; 429 over them). A web citation is kept only
+when the page is still cached and either approved or cited for someone with live research; it shows
+the page's URL and fetch date. Every live call is audited (`nsk_bot.nsk_web_research`) with the
+domain, the query length or the symbol, never a query's text or a page's content. An hourly job
+removes expired pages with their chunks.
+
+`WEB_FETCH_ALLOWED_PRIVATE_CIDRS` lets a deployment reach chosen private ranges (an intranet).
+Loopback, link-local, "this network" and multicast are refused in it in production.
 
 **Citations.** Each reply's sources are checked before they are stored: a document must belong to a
 knowledge base the person may read (named, with its page), an earlier session must be one of the

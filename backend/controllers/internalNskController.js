@@ -10,7 +10,9 @@
  * A refused tool call is audited (category "nsk_bot", action "nsk_tool_call", outcome denied) with
  * the person and the tool, since it means the model asked for more than the person may read. Every
  * people tool call is audited as allowed (action "nsk_people_lookup") with the person it acted for,
- * the employees or department it read, and the fields shown; never the values.
+ * the employees or department it read, and the fields shown; never the values. Every live web research
+ * call is audited as "nsk_web_research" with what was looked up (a page's domain, a query's length, a
+ * symbol), never a query's text or a page's content.
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
@@ -34,11 +36,24 @@ export async function postNskToolCall(req, res, next) {
       token: actorToken,
       toolName,
       args,
+      config: req.app.locals.config,
+      requestId: req.id,
     });
     if (outcome.validationErrors) {
       return sendError(req, res, HTTP_STATUS.BAD_REQUEST, NSK_BOT_MESSAGES.INPUT_INVALID, outcome.validationErrors);
     }
-    if (outcome.audit) {
+    if (outcome.audit?.action) {
+      recordAuditEvent(req, {
+        category: NSK_BOT_AUDIT_CATEGORY,
+        action: outcome.audit.action,
+        outcome: AUDIT_OUTCOMES.ALLOWED,
+        tool: toolName,
+        onBehalfOfUserId: outcome.actor.id,
+        onBehalfOfRole: outcome.actor.role,
+        sessionId: outcome.actor.sessionId,
+        ...outcome.audit.details,
+      });
+    } else if (outcome.audit) {
       recordAuditEvent(req, {
         category: NSK_BOT_AUDIT_CATEGORY,
         action: 'nsk_people_lookup',

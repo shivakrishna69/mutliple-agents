@@ -807,6 +807,9 @@ export const NSK_BOT_MESSAGES = Object.freeze({
     EMPLOYEE_PROFILE: (name, employeeCode) => `Profile: ${name} (${employeeCode})`,
     DEPARTMENTS: 'Departments you can look at',
     DEPARTMENT_METRICS: (name, date) => `${name} metrics on ${date}`,
+    WEB_SEARCH: (query, date) => `Web search: "${query}" (${date})`,
+    WEB_PAGE: (title, domain, date) => `${title} (${domain}), fetched ${date}`,
+    STOCK_QUOTE: (symbol, exchange, date) => `${symbol} on ${exchange}, Alpha Vantage, ${date}`,
   }),
   // Notes inside tool results, for the assistant to pass on.
   SALARY_HIDDEN: 'Salary is not shown to your role',
@@ -819,6 +822,53 @@ export const NSK_BOT_MESSAGES = Object.freeze({
     VIEW_PROFILE: (name, employeeCode) => `View profile first: ${name} (${employeeCode})`,
   }),
   OFFBOARDING_ALREADY_STARTED_NOTE: 'Offboarding has already started for this person; open their case instead',
+});
+
+/** Web research through NSK, and the admin's settings for it. */
+export const WEB_RESEARCH_MESSAGES = Object.freeze({
+  SETTINGS_RETRIEVED: 'Web research settings',
+  SETTINGS_UPDATED: 'Web research settings saved',
+  SOURCES_RETRIEVED: 'Cached web pages',
+  SOURCE_REMOVED: 'Cached web page removed',
+  SOURCE_NOT_FOUND: 'Cached web page not found',
+  INPUT_INVALID: 'Some details need fixing',
+  NOT_ALLOWED: 'Your role cannot change web research settings',
+  VERSION_CONFLICT: 'Someone changed these settings since you opened them; reload and try again',
+  DOMAIN_IN_BOTH_LISTS: (domain) => `${domain} cannot be both allowed and blocked`,
+  // Refusals of a page or search, passed on to the assistant.
+  FETCH_REFUSED: Object.freeze({
+    INVALID_URL: 'That is not a valid web address',
+    SCHEME_NOT_ALLOWED: 'Only http and https pages can be read',
+    PORT_NOT_ALLOWED: 'Only pages on the standard web ports (80 and 443) can be read',
+    CREDENTIALS_NOT_ALLOWED: 'Web addresses with a user name or password cannot be read',
+    DOMAIN_BLOCKED: 'This site is blocked by your administrator',
+    DOMAIN_NOT_ALLOWED: 'Only sites your administrator approved can be read',
+    PRIVATE_ADDRESS: 'This address points inside a private network, so it cannot be read',
+    DNS_FAILED: 'The site could not be found',
+    TOO_MANY_REDIRECTS: 'The page redirected too many times',
+    TIMEOUT: 'The site took too long to answer',
+    TOO_LARGE: 'The page is too large to read',
+    UNSUPPORTED_CONTENT: 'Only web pages and plain text can be read',
+    HTTP_ERROR: (status) => `The site answered with an error (HTTP ${status})`,
+    NETWORK_ERROR: 'The site could not be reached',
+    EMPTY_CONTENT: 'The page has no readable text',
+  }),
+  SEARCH_UNAVAILABLE: 'Web search is not set up on this server',
+  SEARCH_FAILED: 'Web search did not answer; try again shortly',
+  INDEX_UNAVAILABLE: 'The page was read but could not be saved for later; it is shown this once',
+  DAILY_LIMIT: (kind, limit) => `You have used today's ${limit} ${kind}; you can continue tomorrow (UTC)`,
+  USAGE_KINDS: Object.freeze({ fetch: 'page reads', search: 'web searches', quote: 'stock quotes' }),
+  // Stock quotes, and the fallback when the quote provider cannot answer.
+  QUOTE_NOTE: 'End-of-day quote from Alpha Vantage, not a live price',
+  QUOTE_FALLBACK_NOTE: (reason) =>
+    `No verified quote is available (${reason}); these are web search snippets, which may be out of date`,
+  QUOTE_FALLBACK_REASONS: Object.freeze({
+    not_configured: 'the quote provider is not set up',
+    rate_limited: "the quote provider's free daily limit is used up",
+    no_data: 'the quote provider has no data for this symbol',
+    unavailable: 'the quote provider did not answer',
+  }),
+  CACHED_ONLY_NOTE: 'Only pages your administrator approved and that are still fresh are searched',
 });
 
 /** Offboarding through NSK: settlement previews, starting the notice period, the documents. */

@@ -55,6 +55,7 @@ services:
       AI_SERVICE_URL: http://ai-service:8000
       CORS_ORIGINS: http://localhost:8080
       APP_PUBLIC_URL: http://localhost:8080
+      SEARXNG_URL: http://searxng:8080
       COOKIE_SECURE: "false"
       # nginx in the frontend container is the one proxy in front of the backend.
       TRUST_PROXY_HOPS: "1"
@@ -102,6 +103,20 @@ services:
     tmpfs:
       - /tmp
       - /qdrant/snapshots:uid=1000,gid=1000
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # The company's own web search for the NSK assistant (deploy/searxng/settings.yml). Not published:
+  # only the backend reaches it, through its JSON API.
+  searxng:
+    image: searxng/searxng:2026.10.29-c15647b5a
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET (at least 32 characters) in your shell or a .env file next to this one}
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    read_only: true
+    tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
