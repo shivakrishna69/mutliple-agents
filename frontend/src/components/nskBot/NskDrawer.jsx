@@ -8,8 +8,12 @@
  *              conversation, with its "Continue: …" chip and the questions it predicted next
  *   a turn     POST /api/nsk-bot/message; the person's words show at once and a typing indicator runs
  *              while NSK checks its tools and sources; the reply comes back checked, with its sources
- *   cards      suggestion chips send their text; Start offboarding package opens the offboarding form in
- *              the conversation (OffboardingPanel.jsx); View profile first asks for the profile
+ *   cards      suggestion chips send their text (a "Yes, start offboarding for …" chip does what its
+ *              card does); Start offboarding package opens the offboarding form in the conversation
+ *              (OffboardingPanel.jsx); View profile first asks for the profile
+ *   type-ahead as the person types, up to three sentence starters above the box (the backend's
+ *              promptHelpers for their intents, matched on the device: utils/nskBot.js
+ *              matchPromptHelpers); a click puts the starter in the box to finish or send
  *
  * Errors are the backend's messages. Escape closes the drawer.
  */
@@ -32,6 +36,7 @@ import {
 import { toDisplayError } from '../../hooks/useApiResource.js';
 import { ChatIcon, ChevronDownIcon, CloseIcon, PaperAirplaneIcon, PlusIcon, SparklesIcon } from '../Icons.jsx';
 import { Notice, Spinner, formatDateTime } from '../ui.jsx';
+import { matchPromptHelpers } from '../../utils/nskBot.js';
 import NskMessage, { SuggestionChips } from './NskMessage.jsx';
 import { useNskDrawer } from './nskDrawerState.js';
 import OffboardingPanel from './OffboardingPanel.jsx';
@@ -125,6 +130,28 @@ function SessionMenu({ sessions, activeSessionId, onOpen, onDelete, onNew, isBus
   );
 }
 
+function PromptHelpers({ helpers, onPick }) {
+  if (helpers.length === 0) return null;
+  return (
+    <ul className="mb-2 flex flex-wrap gap-1.5" aria-label={NSK_LABELS.PROMPT_HELPERS} data-testid="nsk-prompt-helpers">
+      {helpers.map((helper) => (
+        <li key={helper.label}>
+          <button
+            type="button"
+            // Keeps the focus in the message box while clicking.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onPick(helper)}
+            className="flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs text-slate-700 ring-1 ring-slate-200 transition hover:bg-brand-50 hover:text-brand-800 hover:ring-brand-200 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+          >
+            <SparklesIcon className="h-3 w-3 shrink-0 text-brand-500" />
+            {helper.label}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ResumeBanner({ resume, onContinue, onSuggestion, isBusy }) {
   return (
     <div className="rounded-xl bg-brand-50 p-3 ring-1 ring-brand-200" data-testid="nsk-resume">
@@ -146,6 +173,7 @@ export default function NskDrawer() {
   const { csrfToken } = useAuth();
   const [sessions, setSessions] = useState(null);
   const [resume, setResume] = useState(null);
+  const [promptHelpers, setPromptHelpers] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -164,6 +192,7 @@ export default function NskDrawer() {
       .then((data) => {
         setSessions(data.sessions);
         setResume(data.resume);
+        setPromptHelpers(data.promptHelpers ?? []);
       })
       .catch((loadError) => {
         if (loadError.name !== 'AbortError') {
@@ -277,7 +306,13 @@ export default function NskDrawer() {
     }
   }
 
+  function pickPromptHelper(helper) {
+    setDraft(helper.fill);
+    inputRef.current?.focus();
+  }
+
   if (!isOpen) return null;
+  const helperMatches = busy === null ? matchPromptHelpers(draft, promptHelpers) : [];
   const latestReplyId = [...messages].reverse().find((message) => message.role === NSK_MESSAGE_ROLES.ASSISTANT)?.id;
 
   return (
@@ -364,6 +399,7 @@ export default function NskDrawer() {
           send(draft);
         }}
       >
+        <PromptHelpers helpers={helperMatches} onPick={pickPromptHelper} />
         <div className="flex items-end gap-2">
           <label htmlFor="nsk-message" className="sr-only">
             {NSK_LABELS.PLACEHOLDER}

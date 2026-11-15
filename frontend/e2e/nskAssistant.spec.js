@@ -2,11 +2,13 @@
  * The NSK assistant in the browser, answered by the stand-in AI service (e2e/standInAiService.js),
  * which calls the backend's real NSK tools with each turn's actor token:
  *
- *   employee   self-service: the drawer from the top bar, a reply citing live portal data, a
+ *   employee   self-service: the type-ahead starters of their own intents only, the drawer from the
+ *              top bar, a reply citing live portal data, a
  *              suggestion chip, the escalation banner for an urgent message, no offboarding cards or
  *              page; after a reload, the resume banner and its "Continue" chip, then deleting the
  *              conversation
- *   HR         "<name> is leaving": the action cards, the offboarding form, the settlement preview with
+ *   HR         the offboarding starter as they type; "<name> is leaving": the action cards and the
+ *              one-tap "Yes, start offboarding" chip, the offboarding form, the settlement preview with
  *              the payment deadline banner, starting it, each document prepared (Socket.IO progress)
  *              and downloaded from S3
  *   finance    the settlement read-only, with only the statement downloadable
@@ -49,6 +51,18 @@ test('an employee asks NSK, picks up the conversation later, and deletes it', as
   await page.getByTestId('nsk-open-topbar').click();
   const drawer = drawerOf(page);
   await expect(drawer.getByText('How can I help?')).toBeVisible();
+
+  // Type-ahead: starters for what an employee may ask, never offboarding.
+  const box = drawer.getByLabel(PLACEHOLDER);
+  const starters = drawer.getByTestId('nsk-prompt-helpers');
+  await box.fill('debo');
+  await expect(starters).toHaveCount(0);
+  await box.fill('leav');
+  await starters.getByRole('button', { name: 'Check my leave balances' }).click();
+  await expect(box).toHaveValue('Check my leave balances');
+  await expect(box).toBeFocused();
+  await expect(starters).toHaveCount(0);
+  await box.fill('');
 
   await ask(drawer, 'How much leave do I have?');
   await expect(drawer.getByText(NSK_LEAVE_REPLY.split(' [')[0])).toBeVisible();
@@ -93,11 +107,19 @@ test('HR offboards someone from NSK: preview, start, and download the documents'
   await page.getByTestId('nsk-open-topbar').click();
   const drawer = drawerOf(page);
 
+  // Type-ahead offers HR the offboarding starter, to finish with the name.
+  const box = drawer.getByLabel(PLACEHOLDER);
+  await box.fill('debo');
+  await drawer.getByTestId('nsk-prompt-helpers').getByRole('button', { name: 'Start offboarding for [name]' }).click();
+  await expect(box).toHaveValue('Start offboarding for ');
+
   await ask(drawer, `${OFFBOARD_EMPLOYEE.name} is leaving`);
   await expect(drawer.getByRole('button', { name: /View profile first/ })).toBeVisible();
-  await drawer
-    .getByRole('button', { name: new RegExp(`Start offboarding package: ${OFFBOARD_EMPLOYEE.name}`) })
-    .click();
+  await expect(
+    drawer.getByRole('button', { name: new RegExp(`Start offboarding package: ${OFFBOARD_EMPLOYEE.name}`) }),
+  ).toBeVisible();
+  // The one-tap confirmation chip opens the same form as the card.
+  await drawer.getByRole('button', { name: `Yes, start offboarding for ${OFFBOARD_EMPLOYEE.name}` }).click();
 
   const panel = drawer.getByTestId('offboarding-panel');
   await panel.getByLabel('Last working day').fill(inDays(20));
