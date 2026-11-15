@@ -30,7 +30,10 @@ import { ApiError } from '../api/httpClient.js';
 import { requestKnowledgeBases } from '../api/knowledgeApi.js';
 import { requestMyBoards } from '../api/tasksApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { hasCapability } from '../auth/capabilities.js';
+import { hasAnyCapability, hasCapability } from '../auth/capabilities.js';
+import NskDrawer from './nskBot/NskDrawer.jsx';
+import { NskDrawerProvider } from './nskBot/NskDrawerProvider.jsx';
+import NskLaunchButton from './nskBot/NskLaunchButton.jsx';
 import BrandMark from './BrandMark.jsx';
 import NotificationCenter from './NotificationCenter.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
@@ -45,6 +48,7 @@ import {
   ChatIcon,
   CloseIcon,
   CurrencyIcon,
+  DocumentIcon,
   HomeIcon,
   InboxIcon,
   MapPinIcon,
@@ -162,6 +166,14 @@ const NAVIGATION_SECTIONS = Object.freeze([
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_WORKFORCE,
       },
+      {
+        label: 'Offboarding',
+        path: ROUTE_PATHS.OFFBOARDING,
+        Icon: DocumentIcon,
+        views: MANAGEMENT_ONLY,
+        capability: null,
+        anyCapabilities: [CAPABILITIES.VIEW_FINAL_SETTLEMENT, CAPABILITIES.VIEW_IT_OFFBOARDING],
+      },
     ],
   },
   {
@@ -205,9 +217,13 @@ const NAVIGATION_SECTIONS = Object.freeze([
 
 const ALL_NAVIGATION_ITEMS = NAVIGATION_SECTIONS.flatMap((section) => section.items);
 
-/** True when this person sees `item`: they have its capability, and it belongs to their view (if they switch). */
+/**
+ * True when this person sees `item`: they have its capability (or one of its `anyCapabilities`), and it
+ * belongs to their view (if they switch).
+ */
 const isItemVisible = (item, { user, view, context }) =>
   (item.capability === null || hasCapability(user, item.capability)) &&
+  (!item.anyCapabilities || hasAnyCapability(user, item.anyCapabilities)) &&
   (item.isVisibleTo?.(context) ?? true) &&
   (view === null || item.views.includes(view));
 
@@ -226,6 +242,7 @@ const pageLabelOf = (pathname) => itemOfPath(pathname)?.label ?? null;
 function SidebarNavigation({ visibility, onNavigate }) {
   return (
     <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-4 py-6 scroll-thin">
+      <NskLaunchButton variant="sidebar" onOpened={onNavigate} />
       {NAVIGATION_SECTIONS.map((navigationSection) => {
         const visibleItems = navigationSection.items.filter((navigationItem) =>
           isItemVisible(navigationItem, visibility),
@@ -359,6 +376,7 @@ function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
       <div className="flex shrink-0 items-center gap-3">
         {switcher}
         <SystemsPill health={health} />
+        <NskLaunchButton variant="topbar" />
         <NotificationCenter />
         <span
           className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"
@@ -438,8 +456,9 @@ export default function AppShell() {
   }
 
   const closeMobileNav = () => setIsMobileNavOpen(false);
+  const canUseNsk = hasCapability(currentUser, CAPABILITIES.USE_NSK_ASSISTANT);
 
-  return (
+  const shell = (
     <div className="h-dvh bg-[#f5f7fb]">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 lg:block">
@@ -508,7 +527,10 @@ export default function AppShell() {
             <MenuIcon className="h-6 w-6" />
           </button>
           <BrandMark />
-          <NotificationCenter />
+          <div className="flex items-center gap-1">
+            <NskLaunchButton variant="icon" />
+            <NotificationCenter />
+          </div>
         </header>
 
         {signOutError && (
@@ -526,6 +548,9 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+      {canUseNsk && <NskDrawer />}
     </div>
   );
+  // The NSK drawer, and the buttons that open it, exist only for people who may use the assistant.
+  return canUseNsk ? <NskDrawerProvider>{shell}</NskDrawerProvider> : shell;
 }
