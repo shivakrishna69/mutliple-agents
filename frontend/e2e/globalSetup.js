@@ -5,14 +5,18 @@
  * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave tests,
  * plus a second employee of that manager with Earned Leave that needs HR's approval too, and the
  * department's head, who manages its knowledge base.
- * A stand-in AI service answers the leave assistant (e2e/standInAiService.js). Returns the teardown,
- * which stops the backend and drops the database.
+ * A stand-in AI service answers the leave assistant and NSK (e2e/standInAiService.js). Offboarding
+ * documents are rendered with Playwright's own Chromium and stored in an S3 stand-in
+ * (backend/tests/integration/s3StandIn.js), so an offboarding can run to its downloads. Returns the
+ * teardown, which stops the backend and drops the database.
  *
  * Needs the backend's dependencies installed (cd backend && npm ci) and MongoDB reachable at
  * TEST_MONGO_URL (default mongodb://127.0.0.1:27017).
  */
 
+import { chromium } from '@playwright/test';
 import { onboardEmployee } from '../../backend/tests/integration/fixtures.js';
+import { startS3StandIn } from '../../backend/tests/integration/s3StandIn.js';
 import {
   endEmailCooldowns,
   insertConfirmedAccount,
@@ -32,6 +36,7 @@ import {
   LEAVE_EMPLOYEE,
   LEAVE_EMPLOYEE_CASUAL_DAYS,
   LEAVE_MANAGER,
+  OFFBOARD_EMPLOYEE,
   PASSWORD,
   RESET_ACCOUNT,
   TWO_STEP_EARNED_DAYS,
@@ -132,6 +137,7 @@ export default async function globalSetup() {
   // The stand-in starts first: the backend needs its address; it reads the backend's when asked.
   // The backend may call it while starting (its external knowledge cleanup), before testServer is set.
   let testServer;
+  const s3 = await startS3StandIn();
   const standIn = await startStandInAiService({
     backendUrl: () => testServer?.baseUrl,
     internalApiKey: () => testServer?.internalApiKey,
@@ -143,9 +149,19 @@ export default async function globalSetup() {
       aiServiceUrl: standIn.url,
       // Email goes to a test inbox the specs read over HTTP, like a person reading their mail.
       mailHttpPort: MAIL_INBOX_PORT,
+      environment: {
+        ...s3.environmentFor('OFFBOARDING'),
+        PDF_BROWSER_EXECUTABLE_PATH: chromium.executablePath(),
+        COMPANY_LEGAL_NAME: 'NSK Software Technologies Private Limited',
+        COMPANY_REGISTERED_ADDRESS: '1 Test Road, Bengaluru 560001',
+        // The Vite dev server is the one proxy in front of the backend, as nginx is when deployed: a
+        // spec may then send its own X-Forwarded-For to keep its sign-ins out of the shared per-IP budget.
+        TRUST_PROXY_HOPS: '1',
+      },
     });
   } catch (startupError) {
     await standIn.close();
+    await s3.close();
     throw startupError;
   }
   try {
@@ -171,6 +187,7 @@ export default async function globalSetup() {
       'the department',
     );
     await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...EMPLOYEE });
+    await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...OFFBOARD_EMPLOYEE });
     await seedLeaveScenario(testServer, adminClient, department.id);
     // The department's head, who manages its knowledge base from self-service.
     const head = await onboardEmployee({
@@ -191,10 +208,12 @@ export default async function globalSetup() {
   } catch (seedingError) {
     await testServer.stop();
     await standIn.close();
+    await s3.close();
     throw seedingError;
   }
   return async () => {
     await testServer.stop();
     await standIn.close();
+    await s3.close();
   };
 }

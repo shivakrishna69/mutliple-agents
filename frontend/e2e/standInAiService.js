@@ -8,10 +8,22 @@
  * an uploaded document reaches READY. Department agents' answers (POST /ai/knowledge/answer) are
  * streamed like the real service's: from the department's most recently indexed passage, cited as
  * [1], word by word; a question containing "not in the handbook" (or one to a department
- * with nothing indexed) is not found. Other ai-service endpoints are not served.
+ * with nothing indexed) is not found. NSK turns (POST /ai/nsk/turn) are answered through the backend's
+ * NSK tools with the turn's actor token, as the real assistant does: "<name> is leaving" finds the
+ * person (find_offboarding_employee) and passes on the action cards; anything else reads the person's
+ * leave balances and cites them, with two suggestions; a message containing "urgent" is classified
+ * URGENT, so the backend adds its escalation hint. The external knowledge cleanup
+ * (POST /ai/external-knowledge/*) gets counts of nothing. Other ai-service endpoints are not served.
  */
 
 import { createServer } from 'node:http';
+
+/** What the stand-in suggests after an NSK answer. */
+export const NSK_STAND_IN_SUGGESTIONS = Object.freeze([
+  { text: 'Show my leave requests', intent: 'ATTENDANCE_AUDIT' },
+  { text: 'What is the leave policy?', intent: 'POLICY_QA' },
+]);
+export const NSK_LEAVE_REPLY = 'Here are your leave balances for this leave year [1].';
 
 export const STAND_IN_TRIGGERS = Object.freeze({
   UNAVAILABLE: 'unavailable',
@@ -84,6 +96,55 @@ export async function startStandInAiService(backend) {
   }
   const KNOWLEDGE_PATHS = new Set(['/ai/knowledge/chunks', '/ai/knowledge/documents/remove']);
 
+  async function nskTool(name, args, actorToken) {
+    const response = await fetch(`${backend.backendUrl()}/api/internal/nsk/tools/${name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Api-Key': backend.internalApiKey() },
+      body: JSON.stringify({ actor_token: actorToken, arguments: args }),
+    });
+    if (!response.ok) throw new Error(`NSK tool ${name} answered ${response.status}`);
+    return (await response.json()).data;
+  }
+
+  /** One NSK turn, in the ai-service's response shape (backend services/nskBot/nskTurnClient.js). */
+  async function nskTurn(turn) {
+    const sentiment = /urgent/i.test(turn.message) ? 'URGENT' : 'NEUTRAL';
+    const leaving = /^(.+?) is leaving/i.exec(turn.message);
+    const base = { usage: { input_tokens: 120, output_tokens: 40 }, actions: [] };
+    if (leaving && turn.allowed_tools.includes('find_offboarding_employee')) {
+      const found = await nskTool('find_offboarding_employee', { query: leaving[1].trim() }, turn.actor_token);
+      const person = found.result.employee;
+      return {
+        ...base,
+        outcome: 'answered',
+        reply: person
+          ? `That is ${person.name} (${person.employee_code}), ${person.designation} [1]. Use the cards below to start the offboarding package or view the profile first.`
+          : 'I could not find that person.',
+        classification: {
+          intent: 'OFFBOARDING_WORKFLOW',
+          sentiment,
+          confidence: 0.9,
+          topic: 'Offboarding',
+          entities: [],
+        },
+        sources: person ? [{ number: 1, kind: 'tool', tool: 'find_offboarding_employee', label: found.source }] : [],
+        suggestions: [],
+        actions: found.result.actions ?? [],
+        tools_used: ['find_offboarding_employee'],
+      };
+    }
+    const balances = await nskTool('my_leave_balances', {}, turn.actor_token);
+    return {
+      ...base,
+      outcome: 'answered',
+      reply: NSK_LEAVE_REPLY,
+      classification: { intent: 'ATTENDANCE_AUDIT', sentiment, confidence: 0.9, topic: 'Leave', entities: [] },
+      sources: balances.source ? [{ number: 1, kind: 'tool', tool: 'my_leave_balances', label: balances.source }] : [],
+      suggestions: NSK_STAND_IN_SUGGESTIONS,
+      tools_used: ['my_leave_balances'],
+    };
+  }
+
   /** Streams an answer as NDJSON: the words as deltas, then the final result. */
   async function streamAnswer(response, body) {
     const passage = latestPassageByDepartment.get(body.department_id);
@@ -138,11 +199,26 @@ export async function startStandInAiService(backend) {
     request.on('end', async () => {
       const isLeaveQuestion = request.method === 'POST' && request.url === '/ai/leave/assistant';
       const isKnowledgeCall = request.method === 'POST' && KNOWLEDGE_PATHS.has(request.url);
+      const isNskTurn = request.method === 'POST' && request.url === '/ai/nsk/turn';
+      const isExternalKnowledge = request.method === 'POST' && request.url.startsWith('/ai/external-knowledge/');
       // Before the backend has started, no key is known and nothing matches.
       const expectedKey = backend.internalApiKey();
       const keyMatches = Boolean(expectedKey) && request.headers['x-internal-api-key'] === expectedKey;
       if (request.method === 'POST' && request.url === '/ai/knowledge/answer' && keyMatches) {
         await streamAnswer(response, JSON.parse(rawBody));
+        return;
+      }
+      if ((isNskTurn || isExternalKnowledge) && keyMatches) {
+        let answerBody;
+        try {
+          answerBody = isNskTurn ? await nskTurn(JSON.parse(rawBody)) : { removed: 0, updated: 0, indexed: 0 };
+        } catch (turnError) {
+          response.writeHead(503, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ error: turnError.message }));
+          return;
+        }
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(answerBody));
         return;
       }
       const { status, body } =

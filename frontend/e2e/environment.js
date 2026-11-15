@@ -35,6 +35,9 @@ export const RESET_ACCOUNT = Object.freeze({ name: 'Rohan Desai', email: 'rohan.
 
 export const DEPARTMENT_NAME = 'Engineering';
 
+/** The employee HR offboards through NSK in the NSK test; no other test uses them. */
+export const OFFBOARD_EMPLOYEE = Object.freeze({ name: 'Omkar Sethi', email: 'omkar.sethi@example.com' });
+
 /** An employee (with a profile, unlike the accounts above), onboarded by global setup the way HR does it. */
 export const EMPLOYEE = Object.freeze({ name: 'Esha Iyer', email: 'esha.iyer@example.com' });
 
