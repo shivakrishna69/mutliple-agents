@@ -34,6 +34,8 @@ export const ROUTE_PATHS = Object.freeze({
   ONBOARDING: '/people/onboarding',
   // Offices, holidays and employees' base offices (MANAGE_WORKFORCE).
   WORKPLACE: '/workplace',
+  // Offboarding settlements (VIEW_FINAL_SETTLEMENT) and the IT notice checklist (VIEW_IT_OFFBOARDING).
+  OFFBOARDING: '/people/offboarding',
   // Leave, with a tab per address. The backend's emails link to /leave and /leave/approvals
   // (backend/services/leaveRequestEmails.js LEAVE_APP_PATHS), so those two must not move.
   LEAVE: '/leave',
