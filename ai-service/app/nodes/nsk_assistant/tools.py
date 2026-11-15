@@ -30,7 +30,9 @@ a person: the actor token fixes whose data it is.
 
 When a lookup returns several candidates, they are kept on the turn (clarification_candidates, with
 the tool that found them), so the reply can offer each as a card to pick. Action cards a tool
-returns are kept too (proposed_actions); the backend checks them again before showing them.
+returns are kept too (proposed_actions); the backend checks them again before showing them. So is
+the backend's confirmation line for the person found ("Did you mean: Start offboarding for …?",
+confirm_prompt), which the reply opens with.
 
 Sources. Every tool result the backend labels, and every passage a search returns, becomes a
 numbered source; the result handed to the model carries its number ("source": 3), and the model
@@ -117,6 +119,8 @@ class NskTurnState:
     external_include_unapproved: bool | None = None
     # Action cards the tools proposed for one resolved person, at most ACTIONS_MAX.
     proposed_actions: list[Action] = field(default_factory=list)
+    # The backend's line asking to confirm the person found ("Did you mean: Start offboarding for …?").
+    confirm_prompt: str | None = None
 
     def propose_actions(self, raw_actions: list[Any]) -> None:
         for raw in raw_actions:
@@ -257,6 +261,8 @@ def build_nsk_tools(
             state.clarification_tool = backend_name
         if isinstance(result, dict) and isinstance(result.get("actions"), list):
             state.propose_actions(result["actions"])
+        if isinstance(result, dict) and isinstance(result.get("confirm_prompt"), str):
+            state.confirm_prompt = result["confirm_prompt"].strip() or None
         if not label:
             return _for_model({"data": result})
         evidence = json.dumps(result, ensure_ascii=False, default=str)

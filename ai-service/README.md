@@ -55,7 +55,15 @@ API for any change.
   match comes back with action cards (start the offboarding package, view the profile first), passed
   on as `actions` unless the reply is refused, and the backend checks them again; several matches
   become "Offboard {name} ({ID})" cards. NSK never says offboarding has started: HR does that from
-  the card. For the outside world (`WEB_MARKET_RESEARCH`), everyone may search saved web pages
+  the card. The classifier is told to decode typos and informal HR words ("i want to deboard
+  Rajeshwari", "F&F", "leaves left", "headcount") and to return names cleaned up. When a message is
+  confidently offboarding or a people lookup and names one person, that person is looked up before
+  the model's first round (one round less). A reply with a Start offboarding card opens with the
+  backend's "Did you mean: Start offboarding for …?" line. A result marked `approximate` (a guessed
+  spelling) is put to the person as "Did you mean …?". Tool rounds stop once the turn's budget
+  (`NSK_TURN_TIMEOUT_SECONDS` less one final answer's time) is used, and the model answers with what it
+  has. The three chips stay on the turn's subject: the prompt names its topic and the people and
+  departments it named, and the fixed fallbacks are built from those names first. For the outside world (`WEB_MARKET_RESEARCH`), everyone may search saved web pages
   (`search_external_knowledge`, the `external_knowledge` collection: fresh pages only, and approved
   ones only unless the backend says the person has live research); people with live research also
   get `search_the_web`, `read_web_page` (a page read safely by the backend and cited as a web source
@@ -115,7 +123,7 @@ docker run --rm -v "$PWD/app:/src/app:ro" -v "$PWD/tests:/src/tests:ro" -v "$PWD
 | `test_support_graph.py` | Whole support turns with scripted models: tool use, two-topic messages, guard escalation, fallbacks |
 | `test_attendance_agent.py` | The evidence rule, date resolution, and full regularization conversations, including prompt injection |
 | `test_leave_assistant.py` | Tools scoped to the backend's employee, pricing and drafting without sending, refusals and mistakes returned to the model, bounded rounds, guarded replies, the endpoint's statuses |
-| `test_nsk_assistant.py` | The NSK assistant with scripted models: classification and tone rules, the number check, tool calls carrying the actor token, only allowed tools offered, a disallowed intent answered without tools, invented numbers and uncited policy refused, markers, earlier sessions as sources, refused tool calls, the urgent tone, fallbacks, suggestions, people tools (ambiguous names as cards, masked phone passed on, invented salary refused, not offered to self-service), offboarding (someone leaving found with the action cards, an ambiguous leaver offered as offboarding cards, no cards on a refused reply, the tool only when allowed), web research (a read page cited as a web source, saved pages searched within the backend's scope, uncited web answers refused, tools only when allowed), the endpoint and its action cards |
+| `test_nsk_assistant.py` | The NSK assistant with scripted models: classification and tone rules, the number check, tool calls carrying the actor token, only allowed tools offered, a disallowed intent answered without tools, invented numbers and uncited policy refused, markers, earlier sessions as sources, refused tool calls, the urgent tone, fallbacks, suggestions, people tools (ambiguous names as cards, masked phone passed on, invented salary refused, not offered to self-service), offboarding (someone leaving found with the action cards, an ambiguous leaver offered as offboarding cards, no cards on a refused reply, the tool only when allowed), web research (a read page cited as a web source, saved pages searched within the backend's scope, uncited web answers refused, tools only when allowed), informal requests (the classifier told to decode HR synonyms and clean names, a named person looked up before the first round only when confident, the "Did you mean" line added once and never to a refused reply), the tool-round time budget, chips anchored to the named department or person, the endpoint and its action cards |
 | `test_external_knowledge.py` | The external knowledge index on a real Qdrant: metadata and filter indexes, searches skipping expired and (unless asked) unapproved pages, approval changes, removing sources and expired chunks, request checks |
 | `test_api.py` | Internal API key, 422 shape, 503 without Groq, 504 on timeout |
 | `test_knowledge_api.py` | The knowledge endpoints: internal key, every malformed batch refused before embedding, 503 without Qdrant |

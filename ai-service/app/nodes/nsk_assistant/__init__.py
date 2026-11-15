@@ -5,7 +5,7 @@ that every fact is traced to a source (grounding.py), and predicts the next ques
 (suggestions.py). See assistant.py for a turn and schemas.py for the contract with the backend.
 """
 
-from app.nodes.nsk_assistant.assistant import NskAssistant, NskTurnResult
+from app.nodes.nsk_assistant.assistant import NskAssistant, NskTurnResult, tool_rounds_budget
 from app.nodes.nsk_assistant.schemas import NskTurnInput, NskTurnResponse
 from app.nodes.nsk_assistant.systems import (
     BackendNskSystems,
@@ -27,4 +27,5 @@ __all__ = [
     "NskTurnResponse",
     "NskTurnResult",
     "SearchSettings",
+    "tool_rounds_budget",
 ]

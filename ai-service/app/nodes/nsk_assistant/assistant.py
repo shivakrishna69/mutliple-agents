@@ -14,6 +14,14 @@ Turn
                       MAX_TOOL_ROUNDS rounds, then once more without tools. The prompt numbers the
                       earlier sessions as sources; tool results and passages get numbers as they
                       arrive. The tone follows the sentiment (TONE_INSTRUCTIONS).
+                      The person named: when the message is classified (confidently) as offboarding
+                      or a people lookup and names someone, that person is looked up before the
+                      model's first round (RESOLVE_PERSON_TOOLS), as if the model had asked: one
+                      model round less, and the cards and the confirmation are ready whatever the
+                      model does next.
+                      Time: no new tool round starts once the turn has used its tool-round budget
+                      (tool_rounds_budget: the turn's deadline less room for one final answer); the
+                      model then answers with what it has, instead of the whole turn timing out.
   3. Check the reply
        markers     "CLARIFY: <question>" -> outcome clarify; "NOT_FOUND: <what is missing>" -> not_found
        citations   marks pointing at no source are removed (knowledge_agent/citations.py)
@@ -28,7 +36,9 @@ Turn
   4. Cards         people a tool could not tell apart replace the predicted suggestions, one card
                    each (CANDIDATE_SUGGESTIONS, by the tool that found them); action cards a tool
                    proposed for one person (start their offboarding, view their profile) go with a
-                   reply that was not refused. The backend checks both again.
+                   reply that was not refused. The backend checks both again. A reply with a Start
+                   offboarding card opens with the backend's confirmation line ("Did you mean: Start
+                   offboarding for Rajeshwari (NSK0123)?") when the model did not write it.
 """
 
 from __future__ import annotations
@@ -36,7 +46,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -54,7 +65,9 @@ from app.nodes.nsk_assistant.schemas import (
     SUGGESTION_MAX_LENGTH,
     SUGGESTIONS_MAX,
     Action,
+    ActionKind,
     Classification,
+    EntityKind,
     Intent,
     MemorySession,
     NskTurnInput,
@@ -72,6 +85,16 @@ logger = logging.getLogger("ai_service.nsk_assistant")
 
 MAX_TOOL_ROUNDS = 4
 NOT_ALLOWED_CONFIDENCE = 0.6
+# The person a message names is looked up before the model's first round, by this tool, when the
+# message is classified with at least RESOLVE_PERSON_CONFIDENCE.
+RESOLVE_PERSON_TOOLS = {
+    Intent.OFFBOARDING_WORKFLOW: "find_offboarding_employee",
+    Intent.PROFILE_LOOKUP: "lookup_employee_profile",
+}
+RESOLVE_PERSON_CONFIDENCE = 0.6
+RESOLVE_PERSON_CALL_ID = "nsk-resolve-person"
+# Room kept after the tool rounds for the final answer, beyond the answer model's own attempts.
+FINAL_ANSWER_MARGIN_SECONDS = 5.0
 CLARIFY_MARKER = "CLARIFY:"
 NOT_FOUND_MARKER = "NOT_FOUND:"
 MARKER_DECORATION = " \t\r\n*_`"
@@ -118,10 +141,13 @@ How to answer:
 - Phone numbers come masked: give them as they are and never try to complete them. Salary is shown only when the
   tool returns it; otherwise say it is not available to them.
 - If a people search returns several candidates, list them briefly and reply with "CLARIFY:" asking which one.
-- When {name} says a colleague is leaving (resigning, serving notice, being let go), find them with
-  find_offboarding_employee. Say in one or two sentences who it is (name, employee ID, role) and that the cards below
-  start their offboarding package or show their profile first. If offboarding has already started, say so. Never say
-  offboarding has started, a letter was sent or a status changed: HR does that from the cards.
+- When {name} says a colleague is leaving (resigning, serving notice, being let go, "deboard", "offboard", "exit",
+  "F&F"), find them with find_offboarding_employee. When it returns confirm_prompt, open your reply with that line
+  exactly, then say in one or two sentences who it is (name, employee ID, role) and that the cards below start their
+  offboarding package or show their profile first. If offboarding has already started, say so. Never say offboarding
+  has started, a letter was sent or a status changed: HR does that from the cards.
+- When a people result says approximate, nobody has exactly the name typed: ask "Did you mean ...?" with the closest
+  name(s) and employee IDs, and do not describe that person as the one asked about until {name} confirms.
 - For anything outside the company (markets, stock prices, interest rates, news, public facts), look in the saved
   web pages first (search_external_knowledge). If you have the live tools, search the web and read the page that
   answers it. Cite every web fact with its source number and say when the page was fetched. A stock quote is the
@@ -197,6 +223,20 @@ def split_marker(text: str) -> tuple[TurnOutcome, str]:
     return TurnOutcome.ANSWERED, text
 
 
+def tool_rounds_budget(turn_seconds: float, llm_request_seconds: float, llm_attempts: int) -> float:
+    """How long a turn may spend in tool rounds: its deadline less room for one final answer."""
+    return max(turn_seconds - llm_request_seconds * max(llm_attempts, 1) - FINAL_ANSWER_MARGIN_SECONDS, 0.0)
+
+
+def with_confirmation(reply: str, confirm_prompt: str | None, actions: Sequence[Action]) -> str:
+    """The reply opening with the confirmation line when it offers to start offboarding and lacks it."""
+    if not confirm_prompt or not any(action.kind is ActionKind.START_OFFBOARDING for action in actions):
+        return reply
+    if confirm_prompt.lower() in reply.lower():
+        return reply
+    return f"{confirm_prompt}\n\n{reply}"
+
+
 def candidate_suggestions(candidates: list[dict[str, Any]], tool: str | None = None) -> list[Suggestion]:
     """A card per person a tool could not tell apart, naming them by employee ID so the pick is exact."""
     template, intent = CANDIDATE_SUGGESTIONS.get(
@@ -240,12 +280,17 @@ class NskAssistant:
         systems: NskSystems,
         search: DocumentSearch | None,
         search_settings: SearchSettings,
+        tool_rounds_budget_seconds: float | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._answer_model = answer_model
         self._json_model = json_model
         self._systems = systems
         self._search = search
         self._search_settings = search_settings
+        # None: no budget (the turn's own deadline still applies).
+        self._tool_rounds_budget_seconds = tool_rounds_budget_seconds
+        self._clock = clock
 
     def attach_search(self, search: DocumentSearch) -> None:
         self._search = search
@@ -253,6 +298,7 @@ class NskAssistant:
     async def answer(self, turn_input: NskTurnInput) -> NskTurnResult:
         """One turn. Raises NskDataUnavailableError when the backend cannot provide the facts."""
         usage = UsageTotal()
+        started_at = self._clock()
         classification, classify_reply = await classify_message(
             self._json_model, turn_input.message, turn_input.history
         )
@@ -282,7 +328,7 @@ class NskAssistant:
                     actions=[],
                 )
             else:
-                replied = await self._reply(turn_input, classification, usage)
+                replied = await self._reply(turn_input, classification, usage, started_at)
             suggestions, suggestion_reply = await suggestions_task
             # People a lookup could not tell apart are the most likely next step: one card each.
             if replied.candidates:
@@ -338,16 +384,40 @@ class NskAssistant:
         except ValidationError as invalid_arguments:
             return json.dumps({"error": f"Invalid arguments: {invalid_arguments.errors()[0]['msg']}"})
 
-    async def _reply(self, turn_input: NskTurnInput, classification: Classification, usage: UsageTotal) -> ReplyResult:
+    def _out_of_time(self, started_at: float) -> bool:
+        budget = self._tool_rounds_budget_seconds
+        return budget is not None and self._clock() - started_at >= budget
+
+    async def _resolve_person(
+        self, classification: Classification, tools_by_name: dict[str, BaseTool], messages: list[BaseMessage]
+    ) -> None:
+        """Looks up the person the message names before the model's first round (RESOLVE_PERSON_TOOLS)."""
+        tool_name = RESOLVE_PERSON_TOOLS.get(classification.intent)
+        names = [entity.value for entity in classification.entities if entity.kind is EntityKind.EMPLOYEE_NAME]
+        if tool_name not in tools_by_name or len(names) != 1 or classification.confidence < RESOLVE_PERSON_CONFIDENCE:
+            return
+        tool_call = {"name": tool_name, "args": {"query": names[0]}, "id": RESOLVE_PERSON_CALL_ID, "type": "tool_call"}
+        content = await self._run_tool_call(tool_call, tools_by_name)
+        messages.append(AIMessage(content="", tool_calls=[tool_call]))
+        messages.append(ToolMessage(content=content, tool_call_id=RESOLVE_PERSON_CALL_ID))
+
+    async def _reply(
+        self, turn_input: NskTurnInput, classification: Classification, usage: UsageTotal, started_at: float
+    ) -> ReplyResult:
         state = NskTurnState(actor_token=turn_input.actor_token)
         numbered_memories = state.add_memories(turn_input.memory)
         tools = build_nsk_tools(self._systems, self._search, state, turn_input.allowed_tools, self._search_settings)
         tools_by_name = {tool.name: tool for tool in tools}
         messages = self._opening_messages(turn_input, classification, numbered_memories)
 
+        await self._resolve_person(classification, tools_by_name, messages)
+
         final_message: AIMessage | None = None
         model_with_tools = self._answer_model.bind_tools(tools) if tools else self._answer_model
-        for _round in range(MAX_TOOL_ROUNDS):
+        for round_number in range(MAX_TOOL_ROUNDS):
+            if self._out_of_time(started_at):
+                logger.warning("NSK tool rounds stopped: the turn's time budget is used", extra={"round": round_number})
+                break
             reply = await model_with_tools.ainvoke(messages)
             usage.add(reply)
             if not getattr(reply, "tool_calls", None):
@@ -373,14 +443,15 @@ class NskAssistant:
         ]
         outcome, reply_text, sources = self._checked(_text_of(final_message), state, evidence)
         refused = outcome is TurnOutcome.REFUSED
+        actions = [] if refused else list(state.proposed_actions)
         return ReplyResult(
             outcome=outcome,
-            reply=reply_text,
+            reply=reply_text if refused else with_confirmation(reply_text, state.confirm_prompt, actions),
             sources=sources,
             tools_used=state.tools_used,
             candidates=[] if refused else state.clarification_candidates,
             candidate_tool=state.clarification_tool,
-            actions=[] if refused else list(state.proposed_actions),
+            actions=actions,
         )
 
     @staticmethod
