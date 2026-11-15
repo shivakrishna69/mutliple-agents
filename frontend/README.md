@@ -49,7 +49,9 @@ real backend (port 5065), which `e2e/globalSetup.js` starts on a throwaway Mongo
 seeded admin, HR and customer accounts (plus one only the password-reset test uses), one onboarded employee without an office, and a leave
 scenario (an employee with an office, a manager and a Casual Leave balance). A stand-in AI service
 (`e2e/standInAiService.js`) answers the leave assistant, reading real data through the backend's
-internal API. Emails go to a test inbox the tests read over HTTP (port 5066), as a person reads
+internal API, and NSK turns, calling the backend's NSK tools with each turn's actor token. Offboarding
+documents are rendered with Playwright's own Chromium and stored in an S3 stand-in
+(`backend/tests/integration/s3StandIn.js`), so an offboarding runs to its downloads. Emails go to a test inbox the tests read over HTTP (port 5066), as a person reads
 their mail. Your `backend/.env` is never used.
 
 ```bash
@@ -68,6 +70,7 @@ npm run test:e2e                # MongoDB must be reachable at TEST_MONGO_URL (d
 | `e2e/pages.spec.js`                  | For each of the six roles: the exact sidebar, the role badge and dashboard sections, every page it may open loads with no uncaught errors or 5xx responses, and every guarded page it may not open redirects to the dashboard; public payslip check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `e2e/leaveApprovalSteps.spec.js`     | Leave that needs two approvals: the employee sees both steps waiting, the manager approves the first, a decision on a step someone else has just decided is refused and the queue reloads, the HR step charges the leave and the employee sees it approved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `e2e/leaveAssistant.spec.js`         | The leave assistant answers from the real balance, its draft opens the apply form filled in and the employee sends it, and an unavailable assistant gets a plain message                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `e2e/nskAssistant.spec.js`          | NSK in the drawer: an employee asks, sees the reply cite live portal data, uses a suggestion chip, gets the escalation banner for an urgent message and no offboarding cards; after a reload the resume banner continues the conversation, which is then deleted. HR says someone is leaving, opens the offboarding form from the card, previews the settlement with its payment deadline banner, starts it, watches the three documents get ready and downloads the statement from storage; finance reads it with only the statement downloadable; IT sees the person on the notice checklist without pay figures |
 | `e2e/leaveRequests.spec.js`          | An employee's badge reads Employee; a document upload with no file storage gets a plain explanation; the employee sees the price of a day's leave (full and half day) and sends it; the manager approves it; the employee asks to cancel it once started; the manager declines with a note; the calendar shows the leave                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `e2e/taskBoards.spec.js`             | A department board in two browsers, on one screen: the head opens it from the sidebar, plans a sprint from the header, creates tasks into it, starts it from its planning section and quick-adds a backlog task; the employee opens their task from the assignment notification, drags it to In progress and In review but cannot drop it on Done (nor drag a task they may not move), comments, filters by assignee and type, creates a task for themselves and drags it from the backlog into To do; the head drags the reviewed task to Done and completes the sprint from the header, sending unfinished work back to the backlog. Then task leads: the member sees no team overview and cannot choose leads; the head names the employee a task lead, who then reads the team overview (their workload, the completed sprint's burndown, the unassigned backlog, most urgent first, from which a task opens); the head takes the role back and the overview is gone, even by address |
 | `e2e/questionsInbox.spec.js`         | Department agents in two browsers: the head adds a document; an employee asks the agent, sees the answer appear as it is written with its source card and citation link, rates it; a question the documents do not cover goes to the department; the head is notified live, opens it from the bell, answers and saves it as an FAQ; the employee is notified live and reads the reply in their conversation; the FAQ becomes a Ready document                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -241,3 +244,44 @@ and **Preview letter** the watermarked letter. **Import CSV** turns a file of of
 lists every row to fix by line and column. Tick drafts and **Send selected** to send them one by one;
 each outcome is shown with the backend's reason. The form's choices and limits come from
 `GET /api/hr/onboarding/settings`.
+
+## NSK assistant
+
+The **Ask NSK** button (top bar, sidebar, and the mobile header) opens the assistant's drawer on every
+page for people with `use_nsk_assistant` (`components/nskBot/`). The drawer:
+
+- **Conversations:** the person's sessions (`GET /api/nsk-bot/sessions`), to open, start anew or
+  delete. On a fresh chat, the backend's "Pick up where you left off" banner offers the latest one
+  with its **Continue: …** chip and the questions it predicted next.
+- **A turn** (`POST /api/nsk-bot/message`): the person's words show at once, and a typing indicator
+  runs while NSK checks its tools and sources.
+- **Replies:** each `[n]` links to its source badge, which says what the source is:
+  - live portal data;
+  - a policy document, with its section and page;
+  - an earlier conversation;
+  - a web page, with its address and fetch date;
+  - a web search snippet, marked unverified.
+- **Banners and tags:** urgent, frustrated or sensitive messages get the backend's escalation banner.
+  A reply that needs a detail, found nothing or was refused gets a tag.
+- **Cards:** suggestion chips send their text. **Start offboarding package** opens the offboarding
+  form in the conversation (`OffboardingPanel.jsx`); **View profile first** asks for the profile.
+
+**The offboarding form** (`run_offboarding`) takes the separation, the resignation date, the last
+working day, the exit reason and HR's adjustments: salary, salary days, encashable leave, notice
+shortfall or waiver, fixed-term, TDS, and other earnings and deductions.
+
+- **Preview settlement** shows the breakdown with the 2-working-day payment deadline banner and the
+  backend's notes. Previewing again updates the same draft.
+- **Start offboarding** prepares the three documents. Each step arrives over Socket.IO
+  (`OFFBOARDING_PROGRESS`), and the case is also re-read every few seconds in case events were missed.
+  Each ready document gets a **Download** button (a 60-second signed link).
+
+**People → Offboarding** (`/people/offboarding`, `pages/OffboardingCenter.jsx`) is read-only:
+
+- **Settlements** (`view_final_settlement`): each case as HR previewed it. Finance may download the
+  statement only.
+- **IT checklist** (`view_it_offboarding`): everyone serving notice, with their last working day and
+  what to revoke then.
+
+Every reply, label of a source, banner, note and error is the backend's; only the screen's own labels
+live in `constants/nskBot.js`.
