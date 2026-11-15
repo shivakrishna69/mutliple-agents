@@ -110,9 +110,19 @@ function toApiError(httpResponse, responseBody) {
  *                                                      the Content-Type with its boundary.
  * @param {string} [requestDescription.csrfToken]       Sent as X-CSRF-Token when provided.
  * @param {AbortSignal} [requestDescription.callerSignal]
+ * @param {number} [requestDescription.timeoutMs]       A longer deadline for a request known to be slow
+ *                                                      (an NSK turn); REQUEST_TIMEOUT_MS otherwise.
  */
-export async function sendApiRequest({ method, endpointPath, requestPayload, formData, csrfToken, callerSignal }) {
-  const timeoutSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+export async function sendApiRequest({
+  method,
+  endpointPath,
+  requestPayload,
+  formData,
+  csrfToken,
+  callerSignal,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+}) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const requestSignal = callerSignal ? AbortSignal.any([callerSignal, timeoutSignal]) : timeoutSignal;
 
   const requestHeaders = { Accept: 'application/json' };

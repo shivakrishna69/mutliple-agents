@@ -17,6 +17,13 @@
 
 import { sendApiRequest } from './httpClient.js';
 
+/**
+ * How long the browser waits for one NSK turn. A web or stock question runs several tool rounds; the
+ * backend gives up first (NSK_TURN_TIMEOUT_MS, 90 s by default) and answers with its own message, and
+ * nginx waits 120 s (frontend/nginx.conf), so the browser waits between the two.
+ */
+export const NSK_TURN_TIMEOUT_MS = 110_000;
+
 const encode = encodeURIComponent;
 
 async function getData(endpointPath, callerSignal) {
@@ -47,6 +54,7 @@ export async function sendNskMessage({ message, sessionId }, csrfToken) {
     endpointPath: '/api/nsk-bot/message',
     requestPayload: { message, ...(sessionId ? { sessionId } : {}) },
     csrfToken,
+    timeoutMs: NSK_TURN_TIMEOUT_MS,
   });
   return responseData;
 }

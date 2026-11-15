@@ -80,3 +80,17 @@ def test_knowledge_answer_settings_out_of_range_are_refused(environment, variabl
     environment(**{variable_name: value})
     with pytest.raises(ConfigurationError, match=variable_name):
         Settings.from_environment()
+
+
+def test_nsk_turns_get_their_own_longer_deadline(environment):
+    settings = Settings.from_environment()
+    assert settings.nsk_turn_timeout_seconds == 85.0
+    assert settings.process_timeout_seconds == 18.0
+    environment(NSK_TURN_TIMEOUT_SECONDS="60")
+    assert Settings.from_environment().nsk_turn_timeout_seconds == 60.0
+    environment(NSK_TURN_TIMEOUT_SECONDS="5")
+    with pytest.raises(ConfigurationError, match="NSK_TURN_TIMEOUT_SECONDS"):
+        Settings.from_environment()
+    environment(NSK_TURN_TIMEOUT_SECONDS="12", LLM_REQUEST_TIMEOUT_SECONDS="20", AI_PROCESS_TIMEOUT_SECONDS="25")
+    with pytest.raises(ConfigurationError, match="NSK_TURN_TIMEOUT_SECONDS must be greater"):
+        Settings.from_environment()

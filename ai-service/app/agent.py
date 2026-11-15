@@ -629,8 +629,8 @@ class AgentRuntime:
 
     async def process_nsk_turn(self, turn_input: NskTurnInput) -> NskTurnResult:
         """
-        One NSK assistant turn, bounded by AI_PROCESS_TIMEOUT_SECONDS. It only reads, so a timeout or a
-        retry is always safe.
+        One NSK assistant turn, bounded by NSK_TURN_TIMEOUT_SECONDS (several tool rounds may run). It
+        only reads, so a timeout or a retry is always safe.
         """
         if not self.is_llm_configured:
             raise LLMNotConfiguredError("llm_not_configured", "GROQ_API_KEY is not set")
@@ -638,14 +638,14 @@ class AgentRuntime:
             raise NskAssistantUnavailableError("nsk_assistant_not_configured", "BACKEND_INTERNAL_URL is not set")
         try:
             async with telemetry_turn(self.telemetry_publisher, workflow=WORKFLOW_NSK_ASSISTANT) as turn_telemetry:
-                async with asyncio.timeout(self._settings.process_timeout_seconds):
+                async with asyncio.timeout(self._settings.nsk_turn_timeout_seconds):
                     result = await self.nsk_assistant.answer(turn_input)
                 if turn_telemetry is not None:
                     turn_telemetry.route_decision = result.classification.intent.value
                 return result
         except TimeoutError as timeout_error:
             raise AgentTimeoutError(
-                "turn_timeout", f"NSK turn exceeded {self._settings.process_timeout_seconds} s"
+                "turn_timeout", f"NSK turn exceeded {self._settings.nsk_turn_timeout_seconds} s"
             ) from timeout_error
         except NskDataUnavailableError as unavailable_error:
             raise NskAssistantUnavailableError("nsk_data_unavailable", str(unavailable_error)) from unavailable_error

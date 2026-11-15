@@ -68,9 +68,22 @@ class BackendInternalClient:
     async def aclose(self) -> None:
         await self._http_client.aclose()
 
-    async def post_json(self, path: str, payload: dict[str, Any], *, request_id: str | None = None) -> dict[str, Any]:
-        """POSTs JSON and returns the response's `data` object. Retries once on unavailability."""
-        return await self._request_data("POST", path, json_payload=payload, request_id=request_id)
+    async def post_json(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        request_id: str | None = None,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
+        """POSTs JSON and returns the response's `data` object. Retries once on unavailability.
+
+        `timeout_seconds` replaces REQUEST_TIMEOUT_SECONDS for a call known to be slow (an NSK tool
+        that reads the web).
+        """
+        return await self._request_data(
+            "POST", path, json_payload=payload, request_id=request_id, timeout_seconds=timeout_seconds
+        )
 
     async def get_json(
         self, path: str, params: dict[str, str] | None = None, *, request_id: str | None = None
@@ -86,13 +99,15 @@ class BackendInternalClient:
         json_payload: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
         request_id: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
         headers = {"X-Request-Id": request_id} if request_id else {}
+        timeout = httpx.Timeout(timeout_seconds) if timeout_seconds is not None else httpx.USE_CLIENT_DEFAULT
         last_failure: Exception | None = None
         for attempt_number in range(1, MAX_ATTEMPTS + 1):
             try:
                 response = await self._http_client.request(
-                    method, path, json=json_payload, params=params, headers=headers
+                    method, path, json=json_payload, params=params, headers=headers, timeout=timeout
                 )
             except httpx.HTTPError as transport_error:
                 last_failure = BackendUnavailableError(f"{type(transport_error).__name__}: {transport_error}")

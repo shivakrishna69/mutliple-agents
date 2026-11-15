@@ -824,3 +824,47 @@ async def test_web_tools_are_not_offered_without_them():
     await nsk.answer(turn_input("hi"))
     for name in ("search_the_web", "read_web_page", "get_stock_quote", "search_external_knowledge"):
         assert name not in answer_model.bound_tool_names
+
+
+async def test_nsk_tool_calls_wait_long_enough_for_the_web_tools():
+    from app.nodes.nsk_assistant.systems import NSK_TOOL_TIMEOUT_SECONDS, BackendNskSystems
+
+    class RecordingClient:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        async def post_json(self, path: str, payload: dict[str, Any], **options: Any) -> dict[str, Any]:
+            self.calls.append({"path": path, "payload": payload, **options})
+            return {"result": {}, "source": None}
+
+    client = RecordingClient()
+    await BackendNskSystems(client).call_tool("fetch_web_page", {"url": "https://example.com"}, ACTOR_TOKEN)
+    assert client.calls[0]["path"] == "/api/internal/nsk/tools/fetch_web_page"
+    assert client.calls[0]["timeout_seconds"] == NSK_TOOL_TIMEOUT_SECONDS
+    # Longer than the backend's slowest web tool: a quote that falls back to search (8 s + 8 s).
+    assert NSK_TOOL_TIMEOUT_SECONDS > 16
+
+
+async def test_the_backend_client_applies_a_per_call_timeout():
+    import httpx
+
+    from app.services.backend_client import REQUEST_TIMEOUT_SECONDS, BackendInternalClient
+
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.extensions["timeout"])
+        return httpx.Response(200, json={"data": {"ok": True}})
+
+    client = BackendInternalClient("http://backend.test", "k" * 32)
+    await client._http_client.aclose()
+    client._http_client = httpx.AsyncClient(
+        base_url="http://backend.test", transport=httpx.MockTransport(handler), timeout=REQUEST_TIMEOUT_SECONDS
+    )
+    try:
+        await client.post_json("/api/internal/nsk/tools/web_search", {}, timeout_seconds=30.0)
+        await client.post_json("/api/internal/leave/balances", {})
+    finally:
+        await client.aclose()
+    assert seen[0]["read"] == 30.0
+    assert seen[1]["read"] == REQUEST_TIMEOUT_SECONDS

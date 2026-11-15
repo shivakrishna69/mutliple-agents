@@ -231,19 +231,21 @@ export function requestAiProcessing(aiProcessRequest, { config, requestId }) {
  * duration added, classifying every failure as an AiServiceError (see the module comment).
  * @param {string} path
  * @param {object} requestBody
- * @param {{ config: object, requestId: string }} callContext
+ * @param {{ config: object, requestId: string, timeoutMs?: number }} callContext  timeoutMs: a longer
+ *   deadline for a call known to be slow (an NSK turn); config.aiServiceTimeoutMs otherwise
  * @param {(responseBody: unknown, startedAt: Date) => object} parseResponse  throws invalid_response
  */
-export async function postToAiService(path, requestBody, { config, requestId }, parseResponse) {
+export async function postToAiService(path, requestBody, { config, requestId, timeoutMs }, parseResponse) {
   const startedAtMs = Date.now();
+  const deadlineMs = timeoutMs ?? config.aiServiceTimeoutMs;
   // AbortSignal.timeout is a hard deadline for the whole exchange; axios's own `timeout` only
   // measures socket inactivity in Node, which a slowly trickling response would never trip.
-  const deadlineSignal = AbortSignal.timeout(config.aiServiceTimeoutMs);
+  const deadlineSignal = AbortSignal.timeout(deadlineMs);
 
   let aiServiceResponse;
   try {
     aiServiceResponse = await axios.post(`${config.aiServiceUrl}${path}`, requestBody, {
-      timeout: config.aiServiceTimeoutMs,
+      timeout: deadlineMs,
       signal: deadlineSignal,
       headers: {
         'Content-Type': 'application/json',
@@ -261,7 +263,7 @@ export async function postToAiService(path, requestBody, { config, requestId }, 
   } catch (requestError) {
     const durationMs = Date.now() - startedAtMs;
     if (deadlineSignal.aborted || requestError.code === 'ETIMEDOUT' || requestError.code === 'ECONNABORTED') {
-      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${config.aiServiceTimeoutMs} ms`, {
+      throw new AiServiceError(AI_FAILURE_KIND.TIMEOUT, `no response within ${deadlineMs} ms`, {
         durationMs,
       });
     }

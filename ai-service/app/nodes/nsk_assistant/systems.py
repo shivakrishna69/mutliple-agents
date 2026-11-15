@@ -52,6 +52,12 @@ class DocumentSearch(Protocol):
     ) -> list[ExternalPassage]: ...
 
 
+# How long one NSK tool call may take. Most answer at once; the web tools wait on outside services
+# (the backend gives SearXNG and Alpha Vantage 8 s each, a page 10 s, then indexes it), so the client's
+# usual 5 s would cut them off.
+NSK_TOOL_TIMEOUT_SECONDS = 30.0
+
+
 class BackendNskSystems:
     """NskSystems over the backend's /api/internal/nsk/tools endpoint."""
 
@@ -61,7 +67,9 @@ class BackendNskSystems:
     async def call_tool(self, name: str, arguments: dict[str, Any], actor_token: str) -> dict[str, Any]:
         try:
             return await self._client.post_json(
-                f"/api/internal/nsk/tools/{name}", {"actor_token": actor_token, "arguments": arguments}
+                f"/api/internal/nsk/tools/{name}",
+                {"actor_token": actor_token, "arguments": arguments},
+                timeout_seconds=NSK_TOOL_TIMEOUT_SECONDS,
             )
         except BackendUnavailableError as unavailable_error:
             raise NskDataUnavailableError(str(unavailable_error)) from unavailable_error
