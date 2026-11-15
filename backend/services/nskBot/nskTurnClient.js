@@ -207,5 +207,12 @@ export function parseNskTurnResponse(body) {
  * @throws {AiServiceError}
  */
 export function requestNskTurn(turnRequest, callContext) {
-  return postToAiService(AI_NSK_TURN_PATH, turnRequest, callContext, parseNskTurnResponse);
+  // A turn runs several tool rounds (web search, quotes, page reads): NSK_TURN_TIMEOUT_MS, not the
+  // shorter deadline of the other ai-service calls.
+  return postToAiService(
+    AI_NSK_TURN_PATH,
+    turnRequest,
+    { ...callContext, timeoutMs: callContext.config.nskTurnTimeoutMs },
+    parseNskTurnResponse,
+  );
 }

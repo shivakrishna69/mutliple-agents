@@ -32,6 +32,10 @@ const REMEMBERED_SESSION_DAYS_BOUNDS = Object.freeze({ MIN: 1, MAX: 90, DEFAULT:
 const AGENT_DAILY_QUESTION_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 50 });
 // Messages one person may send the NSK assistant per UTC day (each costs several model calls).
 const NSK_DAILY_MESSAGE_LIMIT_BOUNDS = Object.freeze({ MIN: 1, MAX: 1000, DEFAULT: 100 });
+// How long the backend waits for one NSK turn from the ai-service (several tool rounds). Below nginx's
+// 120 s for /api/nsk-bot/ (frontend/nginx.conf) and above the ai-service's NSK_TURN_TIMEOUT_SECONDS (85 s),
+// so each layer answers before the one in front of it gives up.
+const NSK_TURN_TIMEOUT_BOUNDS_MS = Object.freeze({ MIN: 10_000, MAX: 115_000, DEFAULT: 90_000 });
 // The NSK actor token key is derived from JWT_SECRET for this one purpose (HKDF), so it needs no
 // secret of its own and a token for one use can never be read as the other.
 const NSK_ACTOR_KEY_INFO = 'nsk-assistant-actor-token-v1';
@@ -490,6 +494,7 @@ export function loadConfig() {
   const rememberedSessionDays = readBoundedInteger('REMEMBERED_SESSION_DAYS', REMEMBERED_SESSION_DAYS_BOUNDS);
   const agentDailyQuestionLimit = readBoundedInteger('AGENT_DAILY_QUESTION_LIMIT', AGENT_DAILY_QUESTION_LIMIT_BOUNDS);
   const nskDailyMessageLimit = readBoundedInteger('NSK_DAILY_MESSAGE_LIMIT', NSK_DAILY_MESSAGE_LIMIT_BOUNDS);
+  const nskTurnTimeoutMs = readBoundedInteger('NSK_TURN_TIMEOUT_MS', NSK_TURN_TIMEOUT_BOUNDS_MS);
   const nskActorTokenKey = Buffer.from(
     hkdfSync('sha256', process.env.JWT_SECRET, Buffer.alloc(0), NSK_ACTOR_KEY_INFO, 32),
   );
@@ -531,6 +536,7 @@ export function loadConfig() {
     rememberedSessionDays,
     agentDailyQuestionLimit,
     nskDailyMessageLimit,
+    nskTurnTimeoutMs,
     nskActorTokenKey,
     corsOrigins,
     mail,

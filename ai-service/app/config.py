@@ -97,6 +97,11 @@ class Settings:
     # AI_SERVICE_TIMEOUT_MS so the backend receives a clean 504 instead of timing out itself.
     process_timeout_seconds: float
 
+    # Hard deadline for one NSK assistant turn, which may run several tool rounds (web search, stock
+    # quotes, page reads). Shorter than the backend's NSK_TURN_TIMEOUT_MS (90 s by default), so the
+    # backend gets a clean 504 rather than timing out itself.
+    nsk_turn_timeout_seconds: float
+
     # Worker tools backed by simulated data (app/nodes/worker_tools.py). Never allowed in production,
     # where customers would receive invented ledger and log data as fact.
     simulated_tools_enabled: bool
@@ -160,6 +165,9 @@ class Settings:
         process_timeout_seconds = _read_float("AI_PROCESS_TIMEOUT_SECONDS", 18.0, 2.0, 115.0)
         if process_timeout_seconds <= llm_request_timeout_seconds:
             raise ConfigurationError("AI_PROCESS_TIMEOUT_SECONDS must be greater than LLM_REQUEST_TIMEOUT_SECONDS")
+        nsk_turn_timeout_seconds = _read_float("NSK_TURN_TIMEOUT_SECONDS", 85.0, 10.0, 110.0)
+        if nsk_turn_timeout_seconds <= llm_request_timeout_seconds:
+            raise ConfigurationError("NSK_TURN_TIMEOUT_SECONDS must be greater than LLM_REQUEST_TIMEOUT_SECONDS")
 
         environment = os.getenv("APP_ENV", "development").strip()
         simulated_tools_setting = os.getenv("SIMULATED_TOOLS_ENABLED", "").strip().lower()
@@ -224,6 +232,7 @@ class Settings:
             llm_max_output_tokens=_read_int("LLM_MAX_OUTPUT_TOKENS", 2048, 64, 8192),
             llm_reasoning_effort=llm_reasoning_effort,
             process_timeout_seconds=process_timeout_seconds,
+            nsk_turn_timeout_seconds=nsk_turn_timeout_seconds,
             simulated_tools_enabled=simulated_tools_enabled,
             max_context_messages=_read_int("MAX_CONTEXT_MESSAGES", 30, 2, 100),
             thread_idle_ttl_seconds=_read_int("THREAD_IDLE_TTL_SECONDS", 7200, 60, 7 * 24 * 3600),

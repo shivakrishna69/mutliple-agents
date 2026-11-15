@@ -86,6 +86,18 @@ describe('loadConfig', () => {
     assert.equal(loadWith({ AI_SERVICE_URL: 'http://ai-service:8000/' }).aiServiceUrl, 'http://ai-service:8000');
   });
 
+  it('gives NSK turns 90 seconds by default, within 10 to 115 seconds', () => {
+    assert.equal(loadWith().nskTurnTimeoutMs, 90_000);
+    assert.equal(loadWith().aiServiceTimeoutMs, 20_000);
+    assert.equal(loadWith({ NSK_TURN_TIMEOUT_MS: '60000' }).nskTurnTimeoutMs, 60_000);
+    for (const value of ['9999', '115001', 'slow']) {
+      assert.throws(
+        () => loadWith({ NSK_TURN_TIMEOUT_MS: value }),
+        /NSK_TURN_TIMEOUT_MS must be a whole number from 10000 to 115000/,
+      );
+    }
+  });
+
   it('keeps remembered sign-ins 30 days by default, within 1 to 90 days', () => {
     assert.equal(loadWith().rememberedSessionDays, 30);
     assert.equal(loadWith({ REMEMBERED_SESSION_DAYS: '7' }).rememberedSessionDays, 7);
