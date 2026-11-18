@@ -5,6 +5,8 @@
  */
 @import '@fontsource-variable/plus-jakarta-sans';
 @import '@fontsource/michroma/latin-400.css';
+/* The signed-in app's frosted-glass light and dark themes. */
+@import './styles/glass-theme.css';
 
 /* Design tokens. The system stack is the fallback while the font loads. */
 @theme {

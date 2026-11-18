@@ -153,6 +153,22 @@ lead to the same page, with Settings and Documents tabs (`?tab=documents`).
 The brand colour is blue #1F5BFF everywhere (the `--color-brand-*` tokens in `src/index.css`); the NSK
 logo keeps its own colours.
 
+The signed-in app has a frosted-glass look in two themes: **Frosted Aurora Light** (the default) and
+**Obsidian Midnight Glass**. Users switch with the sun/moon button in the top bar (`ThemeToggle.jsx`,
+`hooks/useTheme.js`), and the choice is kept in the browser under `nsk.theme`. Everything is in
+`src/styles/glass-theme.css`:
+- the ambient canvas (a gradient mesh with fixed orbs);
+- glass utilities: `.glass-card`, `.glass-panel`, `.glass-sidebar`, `.glass-header`, `.glass-table`
+  and `.glass-interactive`;
+- the rules that make the pages' existing classes follow the theme inside `.theme-content` (the top
+  bar, the page and the NSK drawer). White rounded surfaces become glass, table headers turn
+  translucent and sticky, and in the dark theme text, surfaces, borders, rings, accent tints and chart
+  lines are re-inked.
+
+Pages therefore need no theme-specific classes. White pieces on a gradient panel stay solid. The
+sidebar is obsidian glass in both themes, and the sign-in screens keep their own look. Body text meets
+WCAG AA on glass in both themes: at least 4.6:1 in light and 6.2:1 in dark.
+
 ## Fonts and flags
 
 Served with the app, so no font or image request leaves the site:

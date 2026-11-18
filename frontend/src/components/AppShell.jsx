@@ -1,11 +1,16 @@
 /**
- * Layout for every signed-in page, in the dashboard design: a dark sidebar with the pages this
- * user's role can open (grouped, the current one a blue pill) and the signed-in user's card with
- * sign-out; a top bar with where you are (company › page), the services' state for administrators
- * (hooks/useSystemHealth.js) and the user's initials; and the page content.
+ * Layout for every signed-in page, in the frosted-glass design (styles/glass-theme.css): a floating
+ * obsidian-glass sidebar with the pages this user's role can open (grouped, the current one a glowing
+ * pill) and the signed-in user's card with sign-out; a frosted top bar with where you are (company ›
+ * page), the services' state for administrators (hooks/useSystemHealth.js), the theme switch and the
+ * user's initials; and the page content on the ambient canvas.
  *
- *   lg and up:  fixed dark sidebar (w-72) | top bar over a scrollable content column
+ *   lg and up:  floating sidebar (w-72, inset from the edges) | top bar over a scrollable content column
  *   below lg:   top bar with a menu button that opens the same sidebar as a drawer
+ *
+ * The theme ("Frosted Aurora Light" or "Obsidian Midnight Glass", hooks/useTheme.js) is set on the
+ * shell's root (data-theme); the top bar, the page and the NSK drawer (.theme-content) follow it,
+ * while the sidebar keeps its dark glass in both.
  *
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
  * pages (the chat and the console) can fill it with `h-full` while ordinary pages scroll inside it.
@@ -39,6 +44,7 @@ import NotificationCenter from './NotificationCenter.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import PortalSwitcher from './PortalSwitcher.jsx';
 import RoleBadge from './RoleBadge.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
 import {
   BookOpenIcon,
   CheckBadgeIcon,
@@ -71,6 +77,7 @@ import { useApiResource } from '../hooks/useApiResource.js';
 import { usePortalView } from '../hooks/usePortalView.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 import { useSystemHealth } from '../hooks/useSystemHealth.js';
+import { useTheme } from '../hooks/useTheme.js';
 import { initialsOf } from '../utils/dashboardFormat.js';
 
 const BOTH_VIEWS = Object.freeze(Object.values(PORTAL_VIEWS));
@@ -264,8 +271,8 @@ function SidebarNavigation({ visibility, onNavigate }) {
                         'group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[15px] font-medium transition',
                         'focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none',
                         isActive
-                          ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30'
-                          : 'text-slate-300 hover:bg-white/[0.06] hover:text-white',
+                          ? 'nav-pill-active text-white'
+                          : 'text-slate-300 hover:bg-white/[0.07] hover:text-white',
                       ].join(' ')
                     }
                   >
@@ -332,9 +339,10 @@ function SidebarContents({
   onNavigate,
   switcher = null,
   closeButton = null,
+  className = '',
 }) {
   return (
-    <div className="flex h-full flex-col bg-[#23272e]">
+    <div className={`glass-sidebar flex h-full flex-col overflow-hidden ${className}`}>
       <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/[0.06] px-6">
         <BrandMark tone="light" />
         {closeButton}
@@ -357,9 +365,9 @@ function SystemsPill({ health }) {
   );
 }
 
-function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
+function TopBar({ companyName, pageLabel, currentUser, health, switcher, themeToggle }) {
   return (
-    <header className="hidden h-16 shrink-0 items-center justify-between gap-4 border-b border-slate-200/70 bg-white/80 px-8 backdrop-blur lg:flex">
+    <header className="glass-header relative z-20 hidden h-16 shrink-0 items-center justify-between gap-4 px-8 lg:flex">
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3 text-sm">
         {companyName && <span className="truncate text-slate-500">{companyName}</span>}
         {companyName && pageLabel && (
@@ -376,10 +384,11 @@ function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
       <div className="flex shrink-0 items-center gap-3">
         {switcher}
         <SystemsPill health={health} />
+        {themeToggle}
         <NskLaunchButton variant="topbar" />
         <NotificationCenter />
         <span
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white shadow-sm ring-2 ring-white/60"
           title={currentUser.name}
           aria-hidden="true"
         >
@@ -401,6 +410,8 @@ export default function AppShell() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(null);
   const { canSwitch, view, setView } = usePortalView(currentUser);
+  const { theme, toggleTheme } = useTheme();
+  const themeToggle = <ThemeToggle theme={theme} onToggle={toggleTheme} />;
   // Whether this person heads or leads a department (for "My department's knowledge base"). A failed
   // load just leaves the entry out; the page itself is still reachable and reports its own errors.
   const knowledgeBases = useApiResource((signal) => requestKnowledgeBases(signal), [currentUser.id]);
@@ -459,10 +470,11 @@ export default function AppShell() {
   const canUseNsk = hasCapability(currentUser, CAPABILITIES.USE_NSK_ASSISTANT);
 
   const shell = (
-    <div className="h-dvh bg-[#f5f7fb]">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 lg:block">
+    <div className="app-canvas h-dvh" data-theme={theme}>
+      {/* Desktop sidebar: a floating glass rail */}
+      <aside className="fixed inset-y-3 left-3 z-30 hidden w-72 lg:block">
         <SidebarContents
+          className="rounded-2xl"
           currentUser={currentUser}
           companyName={companyName}
           visibility={visibility}
@@ -506,17 +518,18 @@ export default function AppShell() {
         </div>
       )}
 
-      <div className="flex h-dvh flex-col lg:pl-72">
+      <div className="theme-content flex h-dvh flex-col lg:pl-[19.5rem]">
         <TopBar
           companyName={companyName}
           pageLabel={pageLabelOf(pathname)}
           currentUser={currentUser}
           health={health.data}
           switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} />}
+          themeToggle={themeToggle}
         />
 
         {/* Mobile top bar */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:hidden">
+        <header className="glass-header relative z-20 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden">
           <button
             type="button"
             onClick={() => setIsMobileNavOpen(true)}
@@ -528,13 +541,14 @@ export default function AppShell() {
           </button>
           <BrandMark />
           <div className="flex items-center gap-1">
+            {themeToggle}
             <NskLaunchButton variant="icon" />
             <NotificationCenter />
           </div>
         </header>
 
         {signOutError && (
-          <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
+          <div className="glass-header shrink-0 px-4 py-3 sm:px-8">
             <ErrorBanner
               title={BANNER_TITLES.SIGN_OUT_FAILED}
               message={signOutError.message}
@@ -548,7 +562,11 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
-      {canUseNsk && <NskDrawer />}
+      {canUseNsk && (
+        <div className="theme-content">
+          <NskDrawer />
+        </div>
+      )}
     </div>
   );
   // The NSK drawer, and the buttons that open it, exist only for people who may use the assistant.

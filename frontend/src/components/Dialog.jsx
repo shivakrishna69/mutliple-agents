@@ -62,7 +62,7 @@ export default function Dialog({ title, onClose, size = 'md', children }) {
         type="button"
         tabIndex={-1}
         aria-hidden="true"
-        className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-slate-950/45 backdrop-blur-md"
         onClick={() => onCloseRef.current()}
       />
       {/* min-h-full: a dialog taller than the screen starts at the top and scrolls, instead of being
@@ -74,7 +74,7 @@ export default function Dialog({ title, onClose, size = 'md', children }) {
           aria-modal="true"
           aria-labelledby={titleId}
           tabIndex={-1}
-          className={`pointer-events-auto relative my-8 w-full ${SIZES[size]} rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200 focus:outline-none`}
+          className={`pointer-events-auto relative my-8 w-full ${SIZES[size]} glass-panel rounded-2xl focus:outline-none`}
         >
           <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
             <h2 id={titleId} className="text-base font-semibold text-slate-900">
