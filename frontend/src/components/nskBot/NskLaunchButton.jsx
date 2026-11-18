@@ -11,7 +11,7 @@ const VARIANT_CLASSES = Object.freeze({
   topbar:
     'flex items-center gap-2 rounded-full bg-gradient-to-r from-brand-600 via-indigo-600 to-violet-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/25 transition hover:shadow-indigo-500/45 hover:brightness-110',
   sidebar:
-    'flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-[15px] font-medium text-slate-300 transition hover:bg-white/[0.06] hover:text-white',
+    'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white/70 hover:text-slate-900',
   icon: 'rounded-lg p-1.5 text-brand-600 hover:bg-brand-50',
 });
 

@@ -1,8 +1,8 @@
 /**
  * Shared presentation primitives for the workforce screens (payroll, attendance, analytics, OKRs,
  * vault, telemetry). Pure presentation: no data fetching. The visual language follows AppShell and
- * styles/glass-theme.css: frosted glass cards on the ambient canvas, rounded-2xl surfaces with a
- * specular edge, tinted translucent icon badges and pill badges, in the light and the dark theme.
+ * styles/glass-theme.css: frosted glass cards with a white specular rim on the colour-mesh canvas,
+ * frosted tinted icon medallions, translucent controls and pill badges.
  */
 
 import { useId } from 'react';
@@ -12,8 +12,8 @@ const BUTTON_VARIANTS = Object.freeze({
   primary:
     'bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-sm shadow-brand-600/20 hover:from-brand-500 hover:to-brand-600 focus-visible:ring-brand-500',
   secondary:
-    'bg-white/70 text-slate-700 ring-1 ring-slate-200 ring-inset backdrop-blur hover:bg-white focus-visible:ring-brand-500',
-  ghost: 'text-slate-600 hover:bg-slate-100 focus-visible:ring-brand-500',
+    'bg-white/70 text-slate-700 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9)] ring-1 ring-slate-900/10 ring-inset backdrop-blur hover:bg-white/90 focus-visible:ring-brand-500',
+  ghost: 'text-slate-600 hover:bg-white/60 focus-visible:ring-brand-500',
   danger: 'bg-rose-600 text-white hover:bg-rose-500 focus-visible:ring-rose-500',
   success: 'bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500',
 });
@@ -65,7 +65,7 @@ export function Card({ title, subtitle, actions = null, className = '', bodyClas
   return (
     <section className={`glass-card ${className}`}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/60 px-5 py-4 sm:px-6">
+        <header className="flex flex-wrap items-start justify-between gap-3 hairline-b px-5 py-4 sm:px-6">
           <div>
             {title && <h2 className="text-base font-semibold text-slate-900">{title}</h2>}
             {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
@@ -78,46 +78,33 @@ export function Card({ title, subtitle, actions = null, className = '', bodyClas
   );
 }
 
-/** Translucent icon badges, one tint per accent. */
-const STAT_ICON_TINTS = Object.freeze({
-  brand: 'bg-brand-500/12 text-brand-600 ring-brand-500/20',
-  emerald: 'bg-emerald-500/12 text-emerald-600 ring-emerald-500/20',
-  amber: 'bg-amber-500/14 text-amber-600 ring-amber-500/25',
-  rose: 'bg-rose-500/12 text-rose-600 ring-rose-500/20',
-  sky: 'bg-sky-500/12 text-sky-600 ring-sky-500/20',
-  slate: 'bg-slate-500/12 text-slate-600 ring-slate-500/20',
-});
-
-const STAT_ACCENTS = Object.freeze({
-  brand: 'from-brand-500 to-brand-600',
-  emerald: 'from-emerald-500 to-teal-500',
-  amber: 'from-amber-500 to-orange-500',
-  rose: 'from-rose-500 to-pink-500',
-  sky: 'from-sky-500 to-cyan-500',
-  slate: 'from-slate-500 to-slate-600',
+/** Frosted icon medallions: a soft tint gradient with an inner ring and a white top highlight. */
+const STAT_MEDALLIONS = Object.freeze({
+  brand: 'from-brand-500/20 to-indigo-500/5 text-brand-700 ring-brand-500/20',
+  emerald: 'from-emerald-500/20 to-teal-500/5 text-emerald-700 ring-emerald-500/20',
+  amber: 'from-amber-500/25 to-orange-500/5 text-amber-700 ring-amber-500/25',
+  rose: 'from-rose-500/20 to-pink-500/5 text-rose-700 ring-rose-500/20',
+  sky: 'from-sky-500/20 to-cyan-500/5 text-sky-700 ring-sky-500/20',
+  slate: 'from-slate-500/20 to-slate-500/5 text-slate-700 ring-slate-500/20',
 });
 
 export function StatTile({ label, value, hint, accent = 'brand', Icon = null }) {
   return (
-    <div className="glass-card glass-interactive relative overflow-hidden p-5">
-      <div
-        className={`absolute inset-x-5 top-0 h-[3px] rounded-b-full bg-gradient-to-r opacity-80 ${STAT_ACCENTS[accent]}`}
-        aria-hidden="true"
-      />
+    <div className="glass-card glass-interactive p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
           <p className="mt-2 truncate text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
-          {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
         </div>
         {Icon && (
           <span
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 backdrop-blur ring-inset ${STAT_ICON_TINTS[accent]}`}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br shadow-[inset_0_1px_1px_rgb(255_255_255/0.85)] ring-1 backdrop-blur ring-inset ${STAT_MEDALLIONS[accent]}`}
           >
             <Icon className="h-5 w-5" />
           </span>
         )}
       </div>
+      {hint && <p className="hairline-t mt-4 pt-3 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }
@@ -157,11 +144,11 @@ export function Tabs({ tabs, activeTabId, onChange, label }) {
             onClick={() => onChange(id)}
             className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
               isActive
-                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white/90 text-slate-900 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9),0_2px_8px_-2px_rgb(15_23_42/0.12)] ring-1 ring-slate-900/[0.06]'
+                : 'text-slate-600 hover:bg-white/50 hover:text-slate-900'
             }`}
           >
-            {Icon && <Icon className={`h-4 w-4 ${isActive ? 'text-brand-600' : ''}`} />}
+            {Icon && <Icon className={`h-4 w-4 ${isActive ? 'text-brand-700' : ''}`} />}
             {tabLabel}
             {badge !== undefined && badge !== null && (
               <span className="rounded-full bg-brand-600 px-1.5 text-[0.65rem] text-white">{badge}</span>
@@ -175,9 +162,9 @@ export function Tabs({ tabs, activeTabId, onChange, label }) {
 
 export function EmptyState({ title, description, Icon = null, action = null }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/40 px-6 py-14 text-center backdrop-blur-sm">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-900/15 bg-white/40 px-6 py-14 text-center backdrop-blur-md">
       {Icon && (
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-brand-500 shadow-sm ring-1 ring-slate-200">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-white/90 to-white/60 text-brand-600 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9),0_4px_12px_-4px_rgb(15_23_42/0.12)] ring-1 ring-slate-900/[0.06]">
           <Icon className="h-6 w-6" />
         </span>
       )}
@@ -199,7 +186,7 @@ export function ProgressBar({ value, tone = 'brand', label }) {
   const clampedValue = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   return (
     <div
-      className="h-2 w-full overflow-hidden rounded-full bg-slate-100"
+      className="h-2 w-full overflow-hidden rounded-full bg-slate-900/[0.07]"
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
@@ -285,7 +272,7 @@ export function SelectInput({ label, hint, error, options, className, ...selectP
 
 export function Toggle({ label, description, checked, onChange }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-white/50 px-4 py-3 ring-1 ring-slate-900/[0.06] backdrop-blur">
       <span>
         <span className="block text-sm font-medium text-slate-800">{label}</span>
         {description && <span className="block text-xs text-slate-500">{description}</span>}
@@ -315,7 +302,7 @@ export function Notice({ tone = 'info', title, children, onDismiss }) {
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ring-1 backdrop-blur-sm ${toneClassName}`}
+      className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm shadow-[inset_0_1px_1px_rgb(255_255_255/0.7)] ring-1 backdrop-blur-md ${toneClassName}`}
     >
       <div className="flex-1">
         {title && <p className="font-semibold">{title}</p>}
