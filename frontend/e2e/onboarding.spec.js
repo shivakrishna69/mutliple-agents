@@ -175,6 +175,25 @@ test('HR invites a new joiner, imports more from a CSV, prepares offers, and rea
   await expect(sendResults.getByRole('listitem')).toHaveCount(2);
   await expect(sendResults.getByRole('listitem').first()).toContainText('Not sent');
 
+  // --- Offer settings: the signatory the letters lack, and a standard term -------------------------
+  const noSignatory = page.getByText('Offer letters have no signatory yet, so offers cannot be sent.');
+  await expect(noSignatory).toBeVisible();
+  await page.getByRole('button', { name: 'Set the signatory' }).first().click();
+  const offerSettings = page.getByRole('dialog', { name: 'Offer settings' });
+  await expect(offerSettings.getByLabel('Signatory name')).toBeFocused();
+  await offerSettings.getByLabel('Signatory name').fill('Hema HR');
+  await offerSettings.getByLabel('Signatory designation').fill('Manager - HR');
+  await offerSettings.getByLabel('Probation (months)').fill('3');
+  await offerSettings.getByLabel('Basic (% of CTC)').fill('45');
+  await offerSettings.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Onboarding settings saved')).toBeVisible();
+  await expect(noSignatory).toHaveCount(0);
+  await page.getByRole('button', { name: 'Offer settings' }).click();
+  await expect(offerSettings.getByLabel('Signatory name')).toHaveValue('Hema HR');
+  await expect(offerSettings.getByLabel('Probation (months)')).toHaveValue('3');
+  await expect(offerSettings.getByLabel('Basic (% of CTC)')).toHaveValue('45');
+  await offerSettings.getByRole('button', { name: 'Cancel' }).click();
+
   // --- Attendance charts ---------------------------------------------------------------------------
   await page.goto('/attendance');
   await page.getByRole('tab', { name: 'Team insights' }).click();

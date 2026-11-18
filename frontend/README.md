@@ -245,6 +245,19 @@ lists every row to fix by line and column. Tick drafts and **Send selected** to 
 each outcome is shown with the backend's reason. The form's choices and limits come from
 `GET /api/hr/onboarding/settings`.
 
+**Offer settings** (`OfferSettingsDialog.jsx`, `utils/offerSettings.js`) edits what every letter says:
+- the signatory's name and designation;
+- standard terms: probation, notice, offer validity, weekly hours, working days and times;
+- clauses and annexures: confidentiality, IP, non-solicitation, background verification, the stock
+  option note, further terms, and the joining documents (one per line);
+- the salary split policy: Basic %, HRA % in metro and other cities, PF on the whole Basic, and
+  gratuity in the CTC.
+
+Editing follows the backend: `manage_offers` for the terms and `manage_compensation` for the policy.
+Others see them read-only. Only changed fields are sent, with the version loaded. While no signatory is
+set, and whenever a send is refused for that (`SIGNATORY_MISSING`), **Set the signatory** opens the
+settings on that field.
+
 ## NSK assistant
 
 The **Ask NSK** button (top bar, sidebar, and the mobile header) opens the assistant's drawer on every

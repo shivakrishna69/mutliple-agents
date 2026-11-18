@@ -30,6 +30,10 @@ async function change(method, endpointPath, requestPayload, csrfToken) {
 
 export const requestOfferSettings = (callerSignal) => getData(`${BASE}/settings`, callerSignal);
 
+/** @param {{ version: number, offerTerms?: object, compensation?: object }} changes  utils/offerSettings.js settingsChangeRequest */
+export const requestOfferSettingsUpdate = (changes, csrfToken) =>
+  change('PATCH', `${BASE}/settings`, changes, csrfToken);
+
 /** @param {object} offer  the offer as the backend takes it; includePreview asks for the letter too */
 export const requestOfferCalculation = (offer, csrfToken) => change('POST', `${BASE}/calculate`, offer, csrfToken);
 
