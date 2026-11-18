@@ -1,21 +1,19 @@
 /*
- * The signed-in app's frosted-glass theme (AppShell.jsx). Two themes, chosen with the switch in the
- * top bar and kept per browser (hooks/useTheme.js): "Frosted Aurora Light" (default) and "Obsidian
- * Midnight Glass". The shell's root carries data-theme="light|dark"; the sign-in screens sit outside
- * it and keep their own look.
+ * The signed-in app's frosted-glass look (AppShell.jsx): one light theme. The sign-in screens sit
+ * outside the shell and keep their own look.
  *
- *   tokens      the canvas, glass surfaces, borders, highlights, shadows and ink of each theme
- *   canvas      .app-canvas: the gradient mesh with fixed ambient orbs the glass refracts
- *   surfaces    .glass-card, .glass-panel, .glass-sidebar, .glass-header, .glass-table and
- *               .glass-interactive (hover lift)
- *   content     inside .theme-content (the top bar, the page and the NSK drawer; never the sidebar):
- *               white rounded surfaces become glass, table headers turn translucent and sticky, rows
- *               highlight on hover
- *   dark        the same Tailwind classes the pages already use, re-inked for the dark theme (text,
- *               surfaces, borders, rings and the light accent tints), so no page needs its own dark
- *               styles; contrast is kept at WCAG AA for body text
+ *   tokens      the canvas, the glass surfaces, hairlines, highlights, shadows and ink
+ *   canvas      .app-canvas: a cool indigo and sapphire mesh with soft colour blobs behind the content,
+ *               so every glass surface has colour to refract
+ *   frame       .glass-frame: the sidebar and the top bar, one frosted surface with hairline borders
+ *   surfaces    .glass-card, .glass-panel (dialogs, the NSK drawer) and .glass-interactive (hover lift)
+ *   content     inside .glass-content (the top bar, the page and the NSK drawer; never the sidebar):
+ *               white rounded surfaces become glass cards, inputs and light tints turn translucent,
+ *               table headers stay in view, rows highlight on hover, and the muted inks are deepened
+ *               so text keeps WCAG AA contrast on the glass
  *
  * Utilities live in @layer utilities: a page's own class still wins where it is more specific.
+ * White pieces on a gradient panel (a white button on a coloured hero card) are left solid.
  */
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -23,45 +21,32 @@
 /* ---------------------------------------------------------------------------------------------- */
 
 .app-canvas {
-  --canvas-gradient: linear-gradient(135deg, #eef2ff 0%, #f8fafc 50%, #fff7ed 100%);
-  --orb-primary: rgb(99 102 241 / 0.1);
-  --orb-secondary: rgb(249 115 22 / 0.07);
-  --orb-tertiary: rgb(56 189 248 / 0.05);
-  --glass-bg: rgb(255 255 255 / 0.68);
-  --glass-bg-strong: rgb(255 255 255 / 0.86);
-  --glass-border: rgb(255 255 255 / 0.85);
-  --glass-edge: rgb(15 23 42 / 0.07);
-  --glass-highlight: inset 0 1px 0 0 rgb(255 255 255 / 0.5);
-  --glass-shadow: 0 10px 30px -14px rgb(30 41 59 / 0.18), 0 2px 6px -2px rgb(30 41 59 / 0.06);
-  --glass-shadow-raised: 0 18px 40px -16px rgb(30 41 59 / 0.26), 0 4px 10px -4px rgb(30 41 59 / 0.08);
-  --glass-blur: blur(16px) saturate(160%);
-  --table-head: rgb(248 250 252 / 0.78);
-  --row-hover: rgb(99 102 241 / 0.05);
-  --ink-faint: #64748b;
-  color-scheme: light;
-}
+  --canvas-gradient: linear-gradient(135deg, #dde6f5 0%, #e8eef9 50%, #dce4f2 100%);
+  --blob-indigo: rgb(79 70 229 / 0.18);
+  --blob-blue: rgb(14 165 233 / 0.14);
+  --blob-violet: rgb(139 92 246 / 0.12);
 
-.app-canvas[data-theme='dark'] {
-  --canvas-gradient: linear-gradient(160deg, #080c14 0%, #0a1020 55%, #080c14 100%);
-  --orb-primary: rgb(79 70 229 / 0.14);
-  --orb-secondary: rgb(245 158 11 / 0.06);
-  --orb-tertiary: rgb(34 211 238 / 0.07);
-  --glass-bg: rgb(17 24 39 / 0.62);
-  --glass-bg-strong: rgb(15 21 35 / 0.9);
-  --glass-border: rgb(255 255 255 / 0.09);
-  --glass-edge: rgb(255 255 255 / 0.06);
-  --glass-highlight: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
-  --glass-shadow: 0 12px 36px -14px rgb(0 0 0 / 0.65), 0 2px 6px -2px rgb(0 0 0 / 0.4);
-  --glass-shadow-raised: 0 20px 44px -16px rgb(0 0 0 / 0.75), 0 4px 10px -4px rgb(0 0 0 / 0.45);
-  --table-head: rgb(15 21 35 / 0.82);
-  --row-hover: rgb(129 140 248 / 0.07);
-  /* Ink on dark glass (composited over the canvas): strong 16.6:1, body 12.3:1, muted 8.4:1, faint 6.2:1. */
-  --ink-strong: #f1f5f9;
-  --ink-body: #cbd5e1;
-  --ink-muted: #a3b1c6;
-  --ink-faint: #8a98ae;
-  --ink-separator: #55657e;
-  color-scheme: dark;
+  --frame-bg: rgb(255 255 255 / 0.65);
+  --frame-blur: blur(24px) saturate(180%);
+  --hairline: rgb(15 23 42 / 0.08);
+
+  --glass-gradient: linear-gradient(135deg, rgb(255 255 255 / 0.72) 0%, rgb(255 255 255 / 0.5) 100%);
+  --glass-hover-bg: rgb(255 255 255 / 0.75);
+  --glass-blur: blur(20px) saturate(180%);
+  --glass-rim: rgb(255 255 255 / 0.85);
+  --glass-shadow: inset 0 1px 1px rgb(255 255 255 / 0.9), 0 10px 30px -10px rgb(15 23 42 / 0.1);
+  --glass-shadow-raised: inset 0 1px 1px rgb(255 255 255 / 0.95), 0 18px 40px -14px rgb(15 23 42 / 0.18);
+
+  --panel-bg: rgb(255 255 255 / 0.84);
+  --control-bg: rgb(255 255 255 / 0.7);
+  --control-bg-strong: rgb(255 255 255 / 0.9);
+  --inset-bg: rgb(255 255 255 / 0.45);
+  --table-head: rgb(255 255 255 / 0.6);
+  --row-hover: rgb(79 70 229 / 0.05);
+
+  /* Muted ink on glass: 4.9:1 or better even over the strongest blob (slate-500 falls to 3.7:1). */
+  --ink-muted: #566174;
+  color-scheme: light;
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -74,7 +59,7 @@
   background: var(--canvas-gradient);
   background-attachment: fixed;
 }
-/* Ambient orbs, fixed behind everything so the glass has depth to refract. */
+/* Colour blobs, fixed behind the KPI row and the content below it. */
 .app-canvas::before {
   content: '';
   position: fixed;
@@ -82,61 +67,68 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(38rem 32rem at 12% 8%, var(--orb-primary), transparent 70%),
-    radial-gradient(34rem 30rem at 92% 88%, var(--orb-secondary), transparent 70%),
-    radial-gradient(30rem 26rem at 70% 20%, var(--orb-tertiary), transparent 72%);
+    radial-gradient(36rem 28rem at 30% 22%, var(--blob-indigo), transparent 70%),
+    radial-gradient(32rem 26rem at 82% 30%, var(--blob-blue), transparent 70%),
+    radial-gradient(38rem 30rem at 60% 85%, var(--blob-violet), transparent 72%);
 }
 
 @layer utilities {
   /* -------------------------------------------------------------------------------------------- */
+  /* Frame: the sidebar and the top bar                                                            */
+  /* -------------------------------------------------------------------------------------------- */
+
+  .glass-frame {
+    background-color: var(--frame-bg);
+    -webkit-backdrop-filter: var(--frame-blur);
+    backdrop-filter: var(--frame-blur);
+    border-color: var(--hairline);
+  }
+  .hairline-r {
+    border-right: 1px solid var(--hairline);
+  }
+  .hairline-b {
+    border-bottom: 1px solid var(--hairline);
+  }
+  .hairline-t {
+    border-top: 1px solid var(--hairline);
+  }
+  .nav-pill-active {
+    background-image: linear-gradient(135deg, rgb(31 91 255 / 0.95), rgb(99 102 241 / 0.92));
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.22),
+      0 8px 20px -8px rgb(79 70 229 / 0.6);
+  }
+
+  /* -------------------------------------------------------------------------------------------- */
   /* Glass surfaces                                                                                */
   /* -------------------------------------------------------------------------------------------- */
 
-  .glass-card,
-  .glass-panel,
-  .glass-header,
-  .glass-table {
-    background-color: var(--glass-bg);
+  .glass-card {
+    background-image: var(--glass-gradient);
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    box-shadow:
-      var(--glass-highlight),
-      0 0 0 1px var(--glass-edge),
-      var(--glass-shadow);
-  }
-  .glass-card {
+    border: 1px solid var(--glass-rim);
     border-radius: 1rem;
+    box-shadow: var(--glass-shadow);
   }
   /* Dialogs and the drawer: a denser glass, so long forms stay easy to read. */
   .glass-panel {
-    background-color: var(--glass-bg-strong);
-    box-shadow:
-      var(--glass-highlight),
-      0 0 0 1px var(--glass-edge),
-      var(--glass-shadow-raised);
-  }
-  .glass-header {
-    border-width: 0 0 1px;
-    border-radius: 0;
-  }
-  .glass-table {
-    border-radius: 1rem;
-    overflow: hidden;
+    background-color: var(--panel-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-rim);
+    box-shadow: var(--glass-shadow-raised);
   }
   .glass-interactive {
     transition:
       transform 200ms ease,
       box-shadow 200ms ease,
-      border-color 200ms ease;
+      background-color 200ms ease;
   }
   .glass-interactive:hover {
     transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--glass-border) 60%, rgb(99 102 241 / 0.5));
-    box-shadow:
-      var(--glass-highlight),
-      0 0 0 1px var(--glass-edge),
-      var(--glass-shadow-raised);
+    background-color: var(--glass-hover-bg);
+    box-shadow: var(--glass-shadow-raised);
   }
   @media (prefers-reduced-motion: reduce) {
     .glass-interactive:hover {
@@ -144,314 +136,121 @@
     }
   }
 
-  /* The navigation rail: obsidian glass in both themes, so its light-on-dark ink always reads. */
-  .glass-sidebar {
-    background-color: rgb(15 20 33 / 0.84);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid rgb(255 255 255 / 0.08);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.06),
-      0 24px 48px -20px rgb(2 6 23 / 0.55);
-  }
-  .nav-pill-active {
-    background-image: linear-gradient(135deg, rgb(58 107 255 / 0.95), rgb(99 102 241 / 0.9));
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.18),
-      0 8px 22px -8px rgb(79 70 229 / 0.7);
-  }
-
   /* -------------------------------------------------------------------------------------------- */
-  /* Page content: white surfaces become glass                                                     */
+  /* Page content                                                                                  */
   /* -------------------------------------------------------------------------------------------- */
 
-  /* Cards and panels (large radius): translucent, blurred, with the specular edge. Elements that
-     change background on hover keep their own colours, and so do white pieces on a gradient panel
-     (a white button on a dark hero card stays solid). */
-  .theme-content :is(.rounded-2xl, .rounded-3xl).bg-white:not([class*='hover:bg-']):not([class*='bg-gradient'] *) {
-    background-color: var(--glass-bg);
+  /* Cards and panels (large radius) become glass cards. Elements that change background on hover
+     keep their own colours. */
+  .glass-content
+    :is(.rounded-2xl, .rounded-3xl, [class*='rounded-[']).bg-white:not([class*='hover:bg-']):not(
+      [class*='bg-gradient'] *
+    ) {
+    background-color: transparent;
+    background-image: var(--glass-gradient);
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
-    box-shadow:
-      var(--glass-highlight),
-      0 0 0 1px var(--glass-edge),
-      var(--glass-shadow);
+    border-color: var(--glass-rim);
+    box-shadow: var(--glass-shadow);
   }
-  /* Smaller white pieces (inputs, chips, tooltips): translucent, without the blur's cost. */
-  .theme-content
+  /* Smaller white pieces (inputs, dropdowns, chips, active tabs): frosted controls. */
+  .glass-content
     :is(.rounded-xl, .rounded-lg, .rounded-md, .rounded-full).bg-white:not([class*='hover:bg-']):not(
       [class*='bg-gradient'] *
     ) {
-    background-color: var(--glass-bg-strong);
+    background-color: var(--control-bg-strong);
+  }
+  .glass-content :is(input, select, textarea).bg-white:not([type='checkbox']):not([type='radio']) {
+    background-color: var(--control-bg);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .glass-content :is(input, select, textarea).bg-white:focus {
+    background-color: var(--control-bg-strong);
+  }
+  /* Light grey wells (segmented tab bars, inset panels): a translucent inset. */
+  .glass-content :is(.bg-slate-50, .bg-slate-100):not([class*='bg-gradient'] *):not(.h-2):not(.h-1\.5):not(.h-1) {
+    background-color: var(--inset-bg);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .glass-content [class*='border-slate-100'],
+  .glass-content [class*='border-slate-200'] {
+    border-color: var(--hairline);
+  }
+  .glass-content :is([class*='divide-slate-100'], [class*='divide-slate-200']) > :not(:last-child) {
+    border-color: var(--hairline);
+  }
+
+  /* Alert banners and pale tints: translucent, so the glass shows through. */
+  .glass-content .bg-brand-50 {
+    background-color: color-mix(in srgb, var(--color-brand-50) 78%, transparent);
+  }
+  .glass-content .bg-emerald-50 {
+    background-color: color-mix(in srgb, var(--color-emerald-50) 78%, transparent);
+  }
+  .glass-content .bg-amber-50 {
+    background-color: color-mix(in srgb, var(--color-amber-50) 80%, transparent);
+  }
+  .glass-content .bg-rose-50 {
+    background-color: color-mix(in srgb, var(--color-rose-50) 78%, transparent);
+  }
+  .glass-content .bg-red-50 {
+    background-color: color-mix(in srgb, var(--color-red-50) 78%, transparent);
+  }
+  .glass-content .bg-sky-50 {
+    background-color: color-mix(in srgb, var(--color-sky-50) 78%, transparent);
   }
 
   /* Cards that are links or buttons lift a little on hover. */
-  .theme-content :is(a, button).rounded-2xl:is(.bg-white, .glass-card) {
+  .glass-content :is(a, button).rounded-2xl:is(.bg-white, .glass-card) {
     transition:
       transform 200ms ease,
       box-shadow 200ms ease;
   }
-  .theme-content :is(a, button).rounded-2xl:is(.bg-white, .glass-card):hover {
+  .glass-content :is(a, button).rounded-2xl:is(.bg-white, .glass-card):hover {
     transform: translateY(-2px);
-    box-shadow:
-      var(--glass-highlight),
-      0 0 0 1px var(--glass-edge),
-      var(--glass-shadow-raised);
+    box-shadow: var(--glass-shadow-raised);
   }
   @media (prefers-reduced-motion: reduce) {
-    .theme-content :is(a, button).rounded-2xl:is(.bg-white, .glass-card):hover {
+    .glass-content :is(a, button).rounded-2xl:is(.bg-white, .glass-card):hover {
       transform: none;
     }
   }
 
-  /* Tables: a translucent header that stays in view while the page scrolls, rows that light up. */
-  .theme-content table > thead > tr > th {
+  /* Tables: a frosted header that stays in view while the page scrolls, rows that light up. */
+  .glass-content table > thead > tr > th {
     position: sticky;
     top: 0;
     z-index: 1;
     background-color: var(--table-head);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
-  .theme-content table > tbody > tr {
+  .glass-content table > tbody > tr {
     transition: background-color 150ms ease;
   }
-  .theme-content table > tbody > tr:hover {
+  .glass-content table > tbody > tr:hover {
     background-color: var(--row-hover);
   }
 
-  /* Hints and placeholders: slate-400 is below AA on white glass; a shade darker reads. */
-  .theme-content .text-slate-400:not([class*='bg-gradient'] *),
-  .theme-content .placeholder\:text-slate-400::placeholder {
-    color: var(--ink-faint);
+  /* Muted ink: slate-500 and slate-400 fall below AA where glass sits over a colour blob. */
+  .glass-content :is(.text-slate-500, .text-slate-400):not([class*='bg-gradient'] *),
+  .glass-content :is(.placeholder\:text-slate-400, .placeholder\:text-slate-500)::placeholder {
+    color: var(--ink-muted);
+  }
+  /* Accent links straight on glass: one shade deeper (brand-600 drops to 4.1:1 over a blob). */
+  .glass-content :is(.text-brand-600, .hover\:text-brand-600:hover):not([class*='bg-gradient'] *) {
+    color: var(--color-brand-700);
+  }
+
+  /* Charts (Recharts): soft gridlines on glass */
+  .glass-content .recharts-cartesian-grid line {
+    stroke: var(--hairline);
   }
 }
 
-/* -------------------------------------------------------------------------------------------------- */
-/* Obsidian Midnight Glass: the pages' classes re-inked                                                */
-/* -------------------------------------------------------------------------------------------------- */
-
-/* Text without its own colour, and placeholders without their own, follow the theme. */
-.app-canvas[data-theme='dark'] .theme-content {
-  color: var(--ink-strong);
-}
-.theme-content ::placeholder {
-  color: var(--ink-faint);
+.glass-content ::placeholder {
+  color: var(--ink-muted);
   opacity: 1;
-}
-
-@layer utilities {
-  /* Ink */
-  [data-theme='dark']
-    .theme-content
-    :is(.text-slate-900, .text-slate-800, .hover\:text-slate-900:hover, .hover\:text-slate-800:hover):not(
-      [class*='bg-gradient'] *
-    ) {
-    color: var(--ink-strong);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-slate-700, .text-slate-600, .hover\:text-slate-700:hover, .hover\:text-slate-600:hover):not(
-      [class*='bg-gradient'] *
-    ) {
-    color: var(--ink-body);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-slate-500, .disabled\:text-slate-500:disabled):not([class*='bg-gradient'] *) {
-    color: var(--ink-muted);
-  }
-  [data-theme='dark'] .theme-content .placeholder\:text-slate-500::placeholder {
-    color: var(--ink-muted);
-  }
-  [data-theme='dark'] .theme-content .text-slate-300:not([class*='bg-gradient'] *) {
-    color: var(--ink-separator);
-  }
-
-  /* Surfaces (white pieces on a gradient panel stay as they are) */
-  [data-theme='dark'] .theme-content :is(.bg-white, .hover\:bg-white:hover):not([class*='bg-gradient'] *) {
-    background-color: var(--glass-bg);
-  }
-  [data-theme='dark'] .theme-content .file\:bg-white::file-selector-button {
-    background-color: rgb(30 41 59 / 0.8);
-  }
-  [data-theme='dark'] .theme-content [class*='bg-white/']:not([class*='bg-gradient'] *) {
-    background-color: rgb(255 255 255 / 0.06);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.rounded-xl, .rounded-lg, .rounded-md, .rounded-full).bg-white:not([class*='bg-gradient'] *) {
-    background-color: rgb(30 41 59 / 0.7);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(
-      .bg-slate-50,
-      .disabled\:bg-slate-50:disabled,
-      .hover\:bg-slate-50:hover,
-      .focus-visible\:bg-slate-50:focus-visible,
-      [class*='bg-slate-50/']
-    ) {
-    background-color: rgb(255 255 255 / 0.04);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.bg-slate-100, .hover\:bg-slate-100:hover, .disabled\:bg-slate-100:disabled, [class*='bg-slate-100/']) {
-    background-color: rgb(255 255 255 / 0.07);
-  }
-  [data-theme='dark'] .theme-content .bg-slate-200 {
-    background-color: rgb(255 255 255 / 0.12);
-  }
-  [data-theme='dark'] .theme-content .bg-slate-300 {
-    background-color: rgb(255 255 255 / 0.2);
-  }
-
-  /* Borders and rings */
-  [data-theme='dark'] .theme-content :is([class*='border-slate-100'], [class*='border-slate-200']) {
-    border-color: rgb(255 255 255 / 0.09);
-  }
-  [data-theme='dark'] .theme-content :is([class*='border-slate-300'], [class*='border-slate-400']) {
-    border-color: rgb(255 255 255 / 0.18);
-  }
-  [data-theme='dark'] .theme-content :is([class*='divide-slate-100'], [class*='divide-slate-200']) > :not(:last-child) {
-    border-color: rgb(255 255 255 / 0.08);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is([class*='ring-slate-100'], [class*='ring-slate-200'], [class*='ring-slate-300'], [class*='ring-slate-500']) {
-    --tw-ring-color: rgb(255 255 255 / 0.1);
-  }
-
-  /* Light accent tints become translucent glows */
-  [data-theme='dark']
-    .theme-content
-    :is(.bg-brand-50, .hover\:bg-brand-50:hover, .focus-visible\:bg-brand-50:focus-visible) {
-    background-color: rgb(58 107 255 / 0.16);
-  }
-  [data-theme='dark'] .theme-content :is(.bg-brand-100, .hover\:bg-brand-100:hover) {
-    background-color: rgb(58 107 255 / 0.24);
-  }
-  [data-theme='dark'] .theme-content :is(.bg-brand-200, .hover\:bg-brand-200:hover) {
-    background-color: rgb(58 107 255 / 0.32);
-  }
-  [data-theme='dark'] .theme-content .bg-emerald-50 {
-    background-color: rgb(16 185 129 / 0.14);
-  }
-  [data-theme='dark'] .theme-content .bg-amber-50 {
-    background-color: rgb(245 158 11 / 0.14);
-  }
-  [data-theme='dark'] .theme-content :is(.bg-rose-50, .hover\:bg-rose-50:hover) {
-    background-color: rgb(244 63 94 / 0.14);
-  }
-  [data-theme='dark'] .theme-content :is(.bg-red-50, .hover\:bg-red-100:hover) {
-    background-color: rgb(239 68 68 / 0.14);
-  }
-  [data-theme='dark'] .theme-content .bg-sky-50 {
-    background-color: rgb(14 165 233 / 0.14);
-  }
-  [data-theme='dark'] .theme-content .bg-indigo-50 {
-    background-color: rgb(99 102 241 / 0.16);
-  }
-  [data-theme='dark'] .theme-content .bg-violet-50 {
-    background-color: rgb(139 92 246 / 0.16);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(
-      [class*='ring-brand-100'],
-      [class*='ring-brand-200'],
-      [class*='ring-brand-300'],
-      [class*='border-brand-100'],
-      [class*='border-brand-200']
-    ) {
-    --tw-ring-color: rgb(97 137 255 / 0.35);
-    border-color: rgb(97 137 255 / 0.35);
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(
-      [class*='ring-emerald-200'],
-      [class*='ring-emerald-300'],
-      [class*='ring-amber-200'],
-      [class*='ring-rose-200'],
-      [class*='ring-rose-300'],
-      [class*='border-emerald-200'],
-      [class*='border-red-200'],
-      [class*='border-red-300']
-    ) {
-    --tw-ring-color: rgb(255 255 255 / 0.14);
-    border-color: rgb(255 255 255 / 0.14);
-  }
-
-  /* Accent ink: deep shades on light tints become light shades on dark glass */
-  [data-theme='dark']
-    .theme-content
-    :is(
-      .text-brand-600,
-      .text-brand-700,
-      .text-brand-800,
-      .text-brand-900,
-      .hover\:text-brand-600:hover,
-      .hover\:text-brand-700:hover,
-      .hover\:text-brand-800:hover
-    ):not([class*='bg-gradient'] *) {
-    color: #a9c0ff;
-  }
-  [data-theme='dark'] .theme-content .file\:text-brand-700::file-selector-button {
-    color: #a9c0ff;
-  }
-  [data-theme='dark'] .theme-content :is(.text-brand-500, .hover\:text-brand-500:hover):not([class*='bg-gradient'] *) {
-    color: #8eabff;
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900, .text-emerald-950):not(
-      [class*='bg-gradient'] *
-    ) {
-    color: #6ee7b7;
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900):not([class*='bg-gradient'] *) {
-    color: #fcd34d;
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900, .hover\:text-rose-600:hover):not(
-      [class*='bg-gradient'] *
-    ) {
-    color: #fda4af;
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-red-500, .text-red-600, .text-red-700, .text-red-800, .hover\:text-red-700:hover):not(
-      [class*='bg-gradient'] *
-    ) {
-    color: #fca5a5;
-  }
-  [data-theme='dark']
-    .theme-content
-    :is(.text-sky-600, .text-sky-700, .hover\:text-sky-600:hover):not([class*='bg-gradient'] *) {
-    color: #7dd3fc;
-  }
-  [data-theme='dark'] .theme-content .text-indigo-700:not([class*='bg-gradient'] *) {
-    color: #c7d2fe;
-  }
-  [data-theme='dark'] .theme-content .text-violet-700:not([class*='bg-gradient'] *) {
-    color: #c4b5fd;
-  }
-
-  /* Charts (Recharts): gridlines, axis labels and the hover band */
-  [data-theme='dark'] .theme-content .recharts-cartesian-grid line {
-    stroke: rgb(255 255 255 / 0.08);
-  }
-  [data-theme='dark'] .theme-content :is(.recharts-cartesian-axis-tick-value, .recharts-label, .recharts-text) {
-    fill: var(--ink-muted);
-  }
-  [data-theme='dark'] .theme-content .recharts-cartesian-axis-line {
-    stroke: rgb(255 255 255 / 0.14);
-  }
-  [data-theme='dark'] .theme-content .recharts-tooltip-cursor {
-    fill: rgb(255 255 255 / 0.05);
-  }
 }

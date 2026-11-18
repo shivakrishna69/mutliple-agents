@@ -1,16 +1,15 @@
 /**
- * Layout for every signed-in page, in the frosted-glass design (styles/glass-theme.css): a floating
- * obsidian-glass sidebar with the pages this user's role can open (grouped, the current one a glowing
- * pill) and the signed-in user's card with sign-out; a frosted top bar with where you are (company ›
- * page), the services' state for administrators (hooks/useSystemHealth.js), the theme switch and the
- * user's initials; and the page content on the ambient canvas.
+ * Layout for every signed-in page, in the frosted-glass design (styles/glass-theme.css). The sidebar
+ * and the top bar are one frame of the same frosted glass: the sidebar (w-64) holds the logo in a
+ * 64px block level with the top bar, the pages this user's role can open (grouped, the current one a
+ * glowing pill) and the signed-in user's card with sign-out; the top bar holds where you are (company
+ * › page), the services' state for administrators (hooks/useSystemHealth.js) and the user's initials.
+ * Hairlines separate the frame from the page content on the colour-mesh canvas.
  *
- *   lg and up:  floating sidebar (w-72, inset from the edges) | top bar over a scrollable content column
+ *   lg and up:  fixed sidebar | top bar over a scrollable content column
  *   below lg:   top bar with a menu button that opens the same sidebar as a drawer
  *
- * The theme ("Frosted Aurora Light" or "Obsidian Midnight Glass", hooks/useTheme.js) is set on the
- * shell's root (data-theme); the top bar, the page and the NSK drawer (.theme-content) follow it,
- * while the sidebar keeps its dark glass in both.
+ * The top bar, the page and the NSK drawer (.glass-content) turn the pages' white surfaces into glass.
  *
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
  * pages (the chat and the console) can fill it with `h-full` while ordinary pages scroll inside it.
@@ -44,7 +43,6 @@ import NotificationCenter from './NotificationCenter.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import PortalSwitcher from './PortalSwitcher.jsx';
 import RoleBadge from './RoleBadge.jsx';
-import ThemeToggle from './ThemeToggle.jsx';
 import {
   BookOpenIcon,
   CheckBadgeIcon,
@@ -77,7 +75,6 @@ import { useApiResource } from '../hooks/useApiResource.js';
 import { usePortalView } from '../hooks/usePortalView.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 import { useSystemHealth } from '../hooks/useSystemHealth.js';
-import { useTheme } from '../hooks/useTheme.js';
 import { initialsOf } from '../utils/dashboardFormat.js';
 
 const BOTH_VIEWS = Object.freeze(Object.values(PORTAL_VIEWS));
@@ -248,7 +245,7 @@ const pageLabelOf = (pathname) => itemOfPath(pathname)?.label ?? null;
 
 function SidebarNavigation({ visibility, onNavigate }) {
   return (
-    <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-4 py-6 scroll-thin">
+    <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-5 scroll-thin">
       <NskLaunchButton variant="sidebar" onOpened={onNavigate} />
       {NAVIGATION_SECTIONS.map((navigationSection) => {
         const visibleItems = navigationSection.items.filter((navigationItem) =>
@@ -257,10 +254,10 @@ function SidebarNavigation({ visibility, onNavigate }) {
         if (visibleItems.length === 0) return null;
         return (
           <div key={navigationSection.sectionTitle}>
-            <p className="px-3 text-[0.7rem] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+            <p className="px-3 text-[0.68rem] font-semibold tracking-[0.12em] text-slate-500 uppercase">
               {navigationSection.sectionTitle}
             </p>
-            <ul className="mt-2.5 space-y-1">
+            <ul className="mt-2 space-y-0.5">
               {visibleItems.map(({ label, path, Icon }) => (
                 <li key={path}>
                   <NavLink
@@ -268,18 +265,18 @@ function SidebarNavigation({ visibility, onNavigate }) {
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [
-                        'group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[15px] font-medium transition',
+                        'group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
                         'focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none',
                         isActive
                           ? 'nav-pill-active text-white'
-                          : 'text-slate-300 hover:bg-white/[0.07] hover:text-white',
+                          : 'text-slate-600 hover:bg-white/70 hover:text-slate-900',
                       ].join(' ')
                     }
                   >
                     {({ isActive }) => (
                       <>
                         <Icon
-                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}
+                          className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-brand-600'}`}
                         />
                         {label}
                       </>
@@ -297,20 +294,20 @@ function SidebarNavigation({ visibility, onNavigate }) {
 
 function UserCard({ currentUser, companyName, isSigningOut, onSignOut }) {
   return (
-    <div className="p-4">
-      <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/[0.06]">
+    <div className="hairline-t p-3">
+      <div className="flex items-center gap-3 rounded-xl bg-white/60 p-2.5 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9)] ring-1 ring-slate-900/[0.06]">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white"
           aria-hidden="true"
         >
           {initialsOf(currentUser.name)}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-white">{currentUser.name}</p>
-            <RoleBadge role={currentUser.role} tone="dark" />
+            <p className="truncate text-sm font-semibold text-slate-900">{currentUser.name}</p>
+            <RoleBadge role={currentUser.role} />
           </div>
-          <p className="mt-0.5 truncate text-xs text-slate-400" title={currentUser.email}>
+          <p className="mt-0.5 truncate text-xs text-slate-600" title={currentUser.email}>
             {companyName ?? currentUser.email}
           </p>
         </div>
@@ -321,7 +318,7 @@ function UserCard({ currentUser, companyName, isSigningOut, onSignOut }) {
           aria-busy={isSigningOut}
           aria-label={isSigningOut ? 'Signing out' : 'Sign out'}
           title="Sign out"
-          className="rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50"
+          className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-900/[0.05] hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50"
         >
           <SignOutIcon className="h-5 w-5" />
         </button>
@@ -342,9 +339,9 @@ function SidebarContents({
   className = '',
 }) {
   return (
-    <div className={`glass-sidebar flex h-full flex-col overflow-hidden ${className}`}>
-      <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/[0.06] px-6">
-        <BrandMark tone="light" />
+    <div className={`glass-frame flex h-full flex-col overflow-hidden ${className}`}>
+      <div className="hairline-b flex h-16 shrink-0 items-center justify-between px-5">
+        <BrandMark />
         {closeButton}
       </div>
       {switcher && <div className="shrink-0 px-4 pt-4">{switcher}</div>}
@@ -358,18 +355,18 @@ function SidebarContents({
 function SystemsPill({ health }) {
   if (!health) return null;
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+    <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9)] ring-1 ring-slate-900/[0.06] backdrop-blur">
       <span className={`h-2 w-2 rounded-full ${SERVICE_STATE_TONES[health.overall].dotClassName}`} aria-hidden="true" />
       {health.overall === 'operational' ? 'Systems live' : `Systems: ${health.overallLabel}`}
     </span>
   );
 }
 
-function TopBar({ companyName, pageLabel, currentUser, health, switcher, themeToggle }) {
+function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
   return (
-    <header className="glass-header relative z-20 hidden h-16 shrink-0 items-center justify-between gap-4 px-8 lg:flex">
+    <header className="glass-frame hairline-b relative z-20 hidden h-16 shrink-0 items-center justify-between gap-4 px-8 lg:flex">
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3 text-sm">
-        {companyName && <span className="truncate text-slate-500">{companyName}</span>}
+        {companyName && <span className="truncate text-slate-600">{companyName}</span>}
         {companyName && pageLabel && (
           <span className="text-slate-300" aria-hidden="true">
             ›
@@ -384,11 +381,10 @@ function TopBar({ companyName, pageLabel, currentUser, health, switcher, themeTo
       <div className="flex shrink-0 items-center gap-3">
         {switcher}
         <SystemsPill health={health} />
-        {themeToggle}
         <NskLaunchButton variant="topbar" />
         <NotificationCenter />
         <span
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white shadow-sm ring-2 ring-white/60"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white shadow-sm ring-2 ring-white/80"
           title={currentUser.name}
           aria-hidden="true"
         >
@@ -410,8 +406,6 @@ export default function AppShell() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(null);
   const { canSwitch, view, setView } = usePortalView(currentUser);
-  const { theme, toggleTheme } = useTheme();
-  const themeToggle = <ThemeToggle theme={theme} onToggle={toggleTheme} />;
   // Whether this person heads or leads a department (for "My department's knowledge base"). A failed
   // load just leaves the entry out; the page itself is still reachable and reports its own errors.
   const knowledgeBases = useApiResource((signal) => requestKnowledgeBases(signal), [currentUser.id]);
@@ -470,11 +464,11 @@ export default function AppShell() {
   const canUseNsk = hasCapability(currentUser, CAPABILITIES.USE_NSK_ASSISTANT);
 
   const shell = (
-    <div className="app-canvas h-dvh" data-theme={theme}>
-      {/* Desktop sidebar: a floating glass rail */}
-      <aside className="fixed inset-y-3 left-3 z-30 hidden w-72 lg:block">
+    <div className="app-canvas h-dvh">
+      {/* Desktop sidebar: the frame's left rail, joined to the top bar by one hairline */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
         <SidebarContents
-          className="rounded-2xl"
+          className="hairline-r"
           currentUser={currentUser}
           companyName={companyName}
           visibility={visibility}
@@ -488,27 +482,26 @@ export default function AppShell() {
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
             aria-label="Close navigation"
             onClick={closeMobileNav}
           />
           <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
             <SidebarContents
+              className="bg-white/90"
               currentUser={currentUser}
               companyName={companyName}
               visibility={visibility}
               isSigningOut={isSigningOut}
               onSignOut={handleSignOut}
               onNavigate={closeMobileNav}
-              switcher={
-                canSwitch && <PortalSwitcher view={view} onChange={changeView} tone="dark" className="w-full" />
-              }
+              switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} className="w-full" />}
               closeButton={
                 <button
                   type="button"
                   onClick={closeMobileNav}
                   aria-label="Close navigation"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-900/[0.05] hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
                 >
                   <CloseIcon className="h-5 w-5" />
                 </button>
@@ -518,18 +511,17 @@ export default function AppShell() {
         </div>
       )}
 
-      <div className="theme-content flex h-dvh flex-col lg:pl-[19.5rem]">
+      <div className="glass-content flex h-dvh flex-col lg:pl-64">
         <TopBar
           companyName={companyName}
           pageLabel={pageLabelOf(pathname)}
           currentUser={currentUser}
           health={health.data}
           switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} />}
-          themeToggle={themeToggle}
         />
 
         {/* Mobile top bar */}
-        <header className="glass-header relative z-20 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden">
+        <header className="glass-frame hairline-b relative z-20 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden">
           <button
             type="button"
             onClick={() => setIsMobileNavOpen(true)}
@@ -541,14 +533,13 @@ export default function AppShell() {
           </button>
           <BrandMark />
           <div className="flex items-center gap-1">
-            {themeToggle}
             <NskLaunchButton variant="icon" />
             <NotificationCenter />
           </div>
         </header>
 
         {signOutError && (
-          <div className="glass-header shrink-0 px-4 py-3 sm:px-8">
+          <div className="glass-frame hairline-b shrink-0 px-4 py-3 sm:px-8">
             <ErrorBanner
               title={BANNER_TITLES.SIGN_OUT_FAILED}
               message={signOutError.message}
@@ -563,7 +554,7 @@ export default function AppShell() {
         </main>
       </div>
       {canUseNsk && (
-        <div className="theme-content">
+        <div className="glass-content">
           <NskDrawer />
         </div>
       )}
