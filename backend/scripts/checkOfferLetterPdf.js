@@ -4,7 +4,8 @@
  * (PDF_BROWSER_EXECUTABLE_PATH or PDF_BROWSER_CHANNEL), locks it with qpdf (QPDF_PATH) using a
  * sample date of birth, then confirms with qpdf that the letter is AES-256 encrypted, that the date
  * of birth opens it, that another password does not, and that it prints on SAMPLE_LETTER_PAGES pages
- * (one per section: the sample's content fits each section on its page).
+ * (the offer, Annexure A, Annexure B over two pages, Annexure C). It also shows that the letterhead
+ * logo (COMPANY_LOGO_FILE, or the bundled one) is in the image.
  *
  *   node scripts/checkOfferLetterPdf.js        (in the backend folder, or in the backend container)
  *
@@ -21,7 +22,12 @@ import { promisify } from 'node:util';
 import { loadOfferLetterConfig, loadPdfBrowserConfig } from '../config/environment.js';
 import { ONBOARDING_SETTINGS } from '../constants/validation.js';
 import { computeCtcStructure } from '../services/ctcStructure.js';
-import { initOfferLetters, offerLetterPassword, renderOfferLetter } from '../services/offerLetterGenerator.js';
+import {
+  initOfferLetters,
+  offerLetterPassword,
+  readLogoDataUri,
+  renderOfferLetter,
+} from '../services/offerLetterGenerator.js';
 import { closePdfRenderer, initPdfRenderer } from '../services/pdfGenerationService.js';
 
 const runFile = promisify(execFile);
@@ -37,6 +43,9 @@ async function main() {
   const offerLetters = loadOfferLetterConfig();
   initPdfRenderer(pdfBrowser);
   initOfferLetters(offerLetters);
+  if (!readLogoDataUri(offerLetters.logoFile))
+    throw new Error(`the letterhead logo ${offerLetters.logoFile} cannot be read`);
+  console.log(`letterhead logo: ${path.basename(offerLetters.logoFile)}`);
   const { stdout: qpdfVersion } = await runFile(offerLetters.qpdfPath, ['--version']);
   console.log(`using ${qpdfVersion.split('\n')[0]}`);
 

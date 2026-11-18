@@ -150,4 +150,22 @@ describe('loadConfig', () => {
       /SMTP_PASSWORD is required when SMTP_USER is set/,
     );
   });
+
+  it('reads the letterhead CIN, GSTIN and logo, and refuses malformed ones', () => {
+    const plain = loadWith().offerLetters;
+    assert.equal(plain.cin, null);
+    assert.equal(plain.gstin, null);
+    assert.match(plain.logoFile.replaceAll('\\', '/'), /backend\/assets\/brand\/company-logo\.png$/);
+    const set = loadWith({
+      COMPANY_CIN: ' u72200tg2020ptc123456 ',
+      COMPANY_GSTIN: '36aabcn1234f1z5',
+      COMPANY_LOGO_FILE: 'assets/brand/other.svg',
+    }).offerLetters;
+    assert.equal(set.cin, 'U72200TG2020PTC123456');
+    assert.equal(set.gstin, '36AABCN1234F1Z5');
+    assert.match(set.logoFile.replaceAll('\\', '/'), /assets\/brand\/other\.svg$/);
+    assert.throws(() => loadWith({ COMPANY_CIN: 'U72200TG2020PTC12345' }), /COMPANY_CIN must be a 21-character/);
+    assert.throws(() => loadWith({ COMPANY_GSTIN: '36AABCN1234F1Y5' }), /COMPANY_GSTIN must be a 15-character/);
+    assert.throws(() => loadWith({ COMPANY_LOGO_FILE: 'logo.gif' }), /COMPANY_LOGO_FILE must be a \.png/);
+  });
 });

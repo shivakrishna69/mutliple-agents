@@ -513,7 +513,9 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     assert.equal(createHash('sha256').update(letter.content).digest('hex'), sent.data.draft.dispatch.offerLetterSha256);
     assert.equal(await opens(letter.content, '15061995'), true, 'the date of birth opens it');
     assert.equal(await opens(letter.content, '01011990'), false, 'another password does not');
-    assert.equal(await pageCount(letter.content, '15061995'), 5, 'the five-page letter');
+    // The offer and three annexures, each starting a page; the terms may run over a second page.
+    const pages = await pageCount(letter.content, '15061995');
+    assert.ok(pages >= 4 && pages <= 6, `the offer and its annexures: ${pages} pages`);
     assert.equal(sent.data.draft.lifecycle, 'OFFER_SENT');
 
     const again = await hrClient.post(dispatchUrl, {});

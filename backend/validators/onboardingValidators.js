@@ -54,6 +54,7 @@ const SETTINGS_GROUPS = Object.freeze({
     'ipAssignmentClause',
     'nonSolicitationClause',
     'nonSolicitationMonths',
+    'backgroundVerificationClause',
     'esopNote',
     'joiningChecklist',
   ]),

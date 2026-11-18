@@ -501,6 +501,9 @@ export const ONBOARDING_SETTINGS = Object.freeze({
     nonSolicitationClause:
       'While you are employed, and for the period below after your employment ends, you will not persuade any employee of the company to leave it, or any customer you dealt with to stop doing business with it.',
     nonSolicitationMonths: 12,
+    // Annexure B: the company may check what the candidate told it before or after they join.
+    backgroundVerificationClause:
+      'This offer is made on the basis of the information you have given the company about your identity, education and previous employment. The company may verify it, itself or through an agency, before or after you join. If any of it is found to be false or incomplete, the company may withdraw this offer or end your employment without notice.',
     // Page 2, under the stock options: how they vest.
     esopNote:
       'Stock options are granted under the company’s employee stock option plan, subject to its vesting schedule and the terms of your grant letter.',
@@ -538,6 +541,29 @@ export const OFFER_LETTER_PROTECTION = Object.freeze({
   // The candidate opens the letter with their date of birth written DDMMYYYY.
   PASSWORD_FORMAT_LABEL: 'DDMMYYYY',
   QPDF_TIMEOUT_MS: 30_000,
+});
+
+/**
+ * The offer letter's letterhead (services/offerLetterGenerator.js): the logo is read once at
+ * startup and embedded in the letter (the letter loads nothing from outside), so it is kept small.
+ */
+export const OFFER_LETTER_LOGO = Object.freeze({
+  DEFAULT_FILE: 'assets/brand/company-logo.png',
+  MAX_BYTES: 512 * 1024,
+  MEDIA_TYPES: Object.freeze({
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+  }),
+});
+
+/** Indian company registration numbers printed in the letter footer, upper case. */
+export const COMPANY_REGISTRATION_PATTERNS = Object.freeze({
+  // L/U, 5-digit industry code, state, year, company type, 6-digit number.
+  CIN: /^[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$/,
+  // State code, PAN, entity number, Z, check character.
+  GSTIN: /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/,
 });
 
 /**
