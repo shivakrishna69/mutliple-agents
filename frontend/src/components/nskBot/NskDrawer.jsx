@@ -320,7 +320,7 @@ export default function NskDrawer() {
       role="dialog"
       aria-modal="false"
       aria-label={NSK_LABELS.TITLE}
-      className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-slate-200 bg-white shadow-2xl sm:w-[28rem]"
+      className="glass-panel fixed inset-y-0 right-0 z-40 flex w-full flex-col sm:inset-y-3 sm:right-3 sm:w-[28rem] sm:rounded-2xl"
     >
       <header className="space-y-2.5 border-b border-slate-200 px-4 py-3">
         <div className="flex items-start justify-between gap-2">

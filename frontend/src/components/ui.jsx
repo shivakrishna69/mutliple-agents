@@ -1,7 +1,8 @@
 /**
  * Shared presentation primitives for the workforce screens (payroll, attendance, analytics, OKRs,
- * vault, telemetry). Pure presentation: no data fetching. The visual language follows AppShell:
- * white cards on slate-50, NSK orange accents, rounded-2xl surfaces, soft rings for depth.
+ * vault, telemetry). Pure presentation: no data fetching. The visual language follows AppShell and
+ * styles/glass-theme.css: frosted glass cards on the ambient canvas, rounded-2xl surfaces with a
+ * specular edge, tinted translucent icon badges and pill badges, in the light and the dark theme.
  */
 
 import { useId } from 'react';
@@ -10,7 +11,8 @@ import { groupsOf } from '../utils/groupedOptions.js';
 const BUTTON_VARIANTS = Object.freeze({
   primary:
     'bg-gradient-to-r from-brand-600 to-brand-700 text-white shadow-sm shadow-brand-600/20 hover:from-brand-500 hover:to-brand-600 focus-visible:ring-brand-500',
-  secondary: 'bg-white text-slate-700 ring-1 ring-slate-200 ring-inset hover:bg-slate-50 focus-visible:ring-brand-500',
+  secondary:
+    'bg-white/70 text-slate-700 ring-1 ring-slate-200 ring-inset backdrop-blur hover:bg-white focus-visible:ring-brand-500',
   ghost: 'text-slate-600 hover:bg-slate-100 focus-visible:ring-brand-500',
   danger: 'bg-rose-600 text-white hover:bg-rose-500 focus-visible:ring-rose-500',
   success: 'bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500',
@@ -61,9 +63,9 @@ export function LoadingBlock({ label = 'Loading…' }) {
 
 export function Card({ title, subtitle, actions = null, className = '', bodyClassName = 'p-5 sm:p-6', children }) {
   return (
-    <section className={`rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 ${className}`}>
+    <section className={`glass-card ${className}`}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/60 px-5 py-4 sm:px-6">
           <div>
             {title && <h2 className="text-base font-semibold text-slate-900">{title}</h2>}
             {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
@@ -76,6 +78,16 @@ export function Card({ title, subtitle, actions = null, className = '', bodyClas
   );
 }
 
+/** Translucent icon badges, one tint per accent. */
+const STAT_ICON_TINTS = Object.freeze({
+  brand: 'bg-brand-500/12 text-brand-600 ring-brand-500/20',
+  emerald: 'bg-emerald-500/12 text-emerald-600 ring-emerald-500/20',
+  amber: 'bg-amber-500/14 text-amber-600 ring-amber-500/25',
+  rose: 'bg-rose-500/12 text-rose-600 ring-rose-500/20',
+  sky: 'bg-sky-500/12 text-sky-600 ring-sky-500/20',
+  slate: 'bg-slate-500/12 text-slate-600 ring-slate-500/20',
+});
+
 const STAT_ACCENTS = Object.freeze({
   brand: 'from-brand-500 to-brand-600',
   emerald: 'from-emerald-500 to-teal-500',
@@ -87,17 +99,20 @@ const STAT_ACCENTS = Object.freeze({
 
 export function StatTile({ label, value, hint, accent = 'brand', Icon = null }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
-      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${STAT_ACCENTS[accent]}`} aria-hidden="true" />
+    <div className="glass-card glass-interactive relative overflow-hidden p-5">
+      <div
+        className={`absolute inset-x-5 top-0 h-[3px] rounded-b-full bg-gradient-to-r opacity-80 ${STAT_ACCENTS[accent]}`}
+        aria-hidden="true"
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold tracking-tight text-slate-900">{value}</p>
+          <p className="mt-2 truncate text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
           {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
         </div>
         {Icon && (
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${STAT_ACCENTS[accent]}`}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 backdrop-blur ring-inset ${STAT_ICON_TINTS[accent]}`}
           >
             <Icon className="h-5 w-5" />
           </span>
@@ -130,11 +145,7 @@ export function Badge({ tone = 'slate', children, className = '' }) {
 /** Accessible tab bar. `tabs`: [{ id, label, Icon?, badge? }]. */
 export function Tabs({ tabs, activeTabId, onChange, label }) {
   return (
-    <div
-      role="tablist"
-      aria-label={label}
-      className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100/80 p-1 ring-1 ring-slate-200/60 scroll-thin"
-    >
+    <div role="tablist" aria-label={label} className="glass-card flex gap-1 overflow-x-auto p-1 scroll-thin">
       {tabs.map(({ id, label: tabLabel, Icon, badge }) => {
         const isActive = id === activeTabId;
         return (
@@ -146,7 +157,7 @@ export function Tabs({ tabs, activeTabId, onChange, label }) {
             onClick={() => onChange(id)}
             className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
               isActive
-                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -164,7 +175,7 @@ export function Tabs({ tabs, activeTabId, onChange, label }) {
 
 export function EmptyState({ title, description, Icon = null, action = null }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 px-6 py-14 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/40 px-6 py-14 text-center backdrop-blur-sm">
       {Icon && (
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-brand-500 shadow-sm ring-1 ring-slate-200">
           <Icon className="h-6 w-6" />
@@ -211,7 +222,7 @@ export function progressTone(progressValue) {
 }
 
 const INPUT_CLASS_NAME =
-  'block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm ring-1 ring-slate-300 ring-inset placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
+  'block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm ring-1 ring-slate-300 ring-inset transition placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
 
 /** Label + control + hint/error. `children` receives the generated control id. */
 export function Field({ label, hint, error, children, className = '' }) {
@@ -304,7 +315,7 @@ export function Notice({ tone = 'info', title, children, onDismiss }) {
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ring-1 ${toneClassName}`}
+      className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm ring-1 backdrop-blur-sm ${toneClassName}`}
     >
       <div className="flex-1">
         {title && <p className="font-semibold">{title}</p>}
