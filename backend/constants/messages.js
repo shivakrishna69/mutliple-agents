@@ -664,7 +664,7 @@ export const ONBOARDING_MESSAGES = Object.freeze({
   DISPATCH_IN_PROGRESS: 'This offer is already being sent',
   DISPATCH_NOT_ALLOWED: 'Only drafts waiting for review, or whose sending failed, can be sent',
   DISPATCH_EMAIL_FAILED: 'The employee record was created, but the offer email could not be sent. Try sending it again',
-  SIGNATORY_MISSING: 'Set the offer letter signatory in the onboarding settings before sending offers',
+  SIGNATORY_MISSING: 'Set the offer letter signatory in Offer settings before sending offers',
   PDF_UNAVAILABLE: 'Offer letters cannot be produced on this server right now. Contact your administrator',
   CTC_TOO_LOW:
     'This CTC is too low for the company salary policy: Basic, HRA and employer contributions already exceed it',

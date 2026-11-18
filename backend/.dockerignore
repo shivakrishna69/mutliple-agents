@@ -16,5 +16,6 @@
 !utils/
 !validators/
 !scripts/
+!assets/
 # Local demo data stays on developer machines (it is git-ignored too).
 scripts/seedDemoData.js

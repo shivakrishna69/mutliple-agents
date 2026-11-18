@@ -64,6 +64,8 @@ import { PdfProtectionError } from './pdfProtection.js';
 import { PdfRenderError } from './pdfGenerationService.js';
 import { ServiceError, assertCurrentVersion, saveVersioned } from './serviceError.js';
 
+// How many characters of the draft's id end its letter's reference number.
+const OFFER_REFERENCE_ID_CHARACTERS = 6;
 const PDF_MEDIA_TYPE = 'application/pdf';
 
 const conflict = (code) => new ServiceError(HTTP_STATUS.CONFLICT, code, ONBOARDING_MESSAGES[code]);
@@ -123,6 +125,7 @@ const plainOfferTerms = (settings) => {
     ipAssignmentClause: terms.ipAssignmentClause,
     nonSolicitationClause: terms.nonSolicitationClause,
     nonSolicitationMonths: terms.nonSolicitationMonths,
+    backgroundVerificationClause: terms.backgroundVerificationClause,
     esopNote: terms.esopNote ?? null,
     joiningChecklist: [...terms.joiningChecklist],
   };
@@ -207,8 +210,18 @@ export async function loadLeavePolicy() {
   return leaveTypes.map((leaveType) => ({ name: leaveType.name, annualDays: leaveType.accrual.annualQuotaDays }));
 }
 
-/** Everything compileOfferLetterHtml needs for this offer. */
-async function letterFor(offer, structure, settings, issuedOn) {
+/**
+ * The letter's reference number: the company's short code, the year it is issued and the end of the
+ * draft's id ("NSK/HR/OL/2026/A1B2C3"). A preview of an offer not yet saved has none.
+ */
+export function offerReferenceOf(shortCode, draftId, issuedOn) {
+  if (!draftId) return null;
+  const tail = draftId.toString().slice(-OFFER_REFERENCE_ID_CHARACTERS).toUpperCase();
+  return [shortCode, 'HR', 'OL', issuedOn.getUTCFullYear(), tail].filter(Boolean).join('/');
+}
+
+/** Everything compileOfferLetterHtml needs for this offer (draftId: the saved draft, for the reference number). */
+async function letterFor(offer, structure, settings, issuedOn, { draftId = null } = {}) {
   const [companySettings, names, leavePolicy] = await Promise.all([
     getCompanySettings(),
     loadPositionNames(offer.position),
@@ -224,9 +237,15 @@ async function letterFor(offer, structure, settings, issuedOn) {
       );
   return {
     company: letterheadCompany(companySettings),
-    candidate: { name: offer.candidate.name },
+    reference: offerReferenceOf(companySettings.shortCode, draftId, issuedOn),
+    candidate: {
+      name: offer.candidate.name,
+      personalEmail: offer.candidate.personalEmail ?? null,
+      gender: offer.candidate.gender ?? null,
+    },
     position: {
       designation: offer.position.designation,
+      workCity: offer.compensation?.workCity ?? null,
       departmentName: names.departmentName,
       managerName: names.managerName,
       dateOfJoining: offer.position.dateOfJoining,
@@ -555,7 +574,7 @@ export async function dispatchDraft({ draftId, actor, appContext, now = new Date
     const structure = structureFor(offerOf(before), plainCompensation(settings));
     // The figures must be the ones that were reviewed.
     if (!isDeepStrictEqual(structure, before.structure)) throw conflict('DRAFT_FIGURES_CHANGED');
-    letter = await letterFor(offerOf(before), structure, settings, now);
+    letter = await letterFor(offerOf(before), structure, settings, now, { draftId });
     rendered = await renderLetter(letter, { preview: false, dateOfBirth: before.candidate.dateOfBirth });
   } catch (preparationError) {
     await releaseClaim(draftId, previousStatus);

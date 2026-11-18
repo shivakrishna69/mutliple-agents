@@ -201,7 +201,7 @@ HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
 
 | Endpoint                                                                      | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET` / `PATCH /settings`                                                     | the compensation policy (Basic share, HRA rates by city, PF on full Basic, gratuity in CTC), the offer form's `choices` (professional tax states, tax regimes and genders with their labels, and the limits), and offer terms (probation, notice, weekly hours, shift timings, offer validity, signatory, extra clauses, the confidentiality, IP assignment and non-solicitation clauses with its months, the stock option note, the joining checklist); changes take `version` |
+| `GET` / `PATCH /settings`                                                     | the compensation policy (Basic share, HRA rates by city, PF on full Basic, gratuity in CTC), the offer form's `choices` (professional tax states, tax regimes and genders with their labels, and the limits), and offer terms (probation, notice, weekly hours, shift timings, offer validity, signatory, extra clauses, the confidentiality, IP assignment, non-solicitation (with its months) and background verification clauses, the stock option note, the joining checklist); changes take `version`. The policy needs `manage_compensation` (admin, HR, finance), the terms `manage_offers` (admin, HR) |
 | `POST /calculate`                                                             | the salary structure for an offer (`annualCtc`, optional `variablePayAnnual`, `esopUnits`, `components` `{ basicAnnual, hraAnnual, specialAllowanceAnnual }`, `terms` `{ probationMonths, noticePeriodDays, offerValidUntil }`); with `includePreview`, a watermarked, unlocked letter (base64). Saves nothing                                                                                                                                                                  |
 | `POST /create-draft`                                                          | saves the offer for review (`PENDING_REVIEW`) with the structure as calculated, and its terms: the settings' probation and notice unless HR set others, and its deadline (null: the settings' validity from the day it is sent)                                                                                                                                                                                                                                                 |
 | `GET /drafts?status=`, `GET` / `PATCH /drafts/:id`, `POST /drafts/:id/cancel` | list, read, change while waiting for review, cancel (`version` required); each with its `lifecycle` (below) and `acceptedAt`                                                                                                                                                                                                                                                                                                                                                    |
@@ -219,13 +219,28 @@ HR prepares an offer, reviews it, and only then sends it (`/api/hr/onboarding`,
   "25,00,000" or "₹ 25,00,000". A row is refused for anything a single offer is refused for (with the
   same words, such as a split that does not add up), and for the same email twice in the file, an
   email that already has an account or an offer not yet settled, or a role the importer may not give.
-- **The letter has five pages**, each section starting a page (a long one continues; the footer
-  counts the pages as printed): 1 the letter of appointment (role and pay at a glance, the deadline),
-  2 Annexure A (the structure, variable pay, stock options), 3 terms of employment (probation, hours
-  and shift, notice, the leave policy from the active leave types, further clauses), 4
-  confidentiality, IP assignment and non-solicitation, 5 the joining checklist and the signature
-  block. The clause and checklist texts are settings, with plain defaults
-  (`ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS`) a company should have its counsel review.
+- **The letter** follows the formal Indian offer-cum-appointment format, each section starting a page
+  (Annexure B usually runs over two):
+  - **Offer letter:** the letterhead (legal name, registered office, logo), the reference number
+    (`<short code>/HR/OL/<year>/<end of the draft id>`, none on a preview of an unsaved offer) and
+    date, and the addressee. Then the offer: designation, department and manager, the CTC in figures
+    and in words (`utils/rupeesInWords.js`), work location, date of joining, and how and by when to
+    accept. It ends with both signature blocks, the authorised signatory left and the candidate right.
+  - **Annexure A, details of compensation:** a ruled monthly and annual table grouped into earnings,
+    employer contributions, CTC and estimated deductions, with the net take-home, then the stock
+    options.
+  - **Annexure B, standard terms and conditions:** place of work, background verification,
+    probation, working hours, leave (from the active leave types), notice and separation,
+    confidentiality, IP, non-solicitation, further terms and company policies.
+  - **Annexure C:** the numbered documents to submit on joining, and the declaration and acceptance
+    with both signature blocks.
+
+  Every page footer carries the legal name, registered office, `COMPANY_CIN`, `COMPANY_GSTIN`, and
+  the website and support email from the company settings (whichever are set), plus "Page n of N".
+  The logo is `COMPANY_LOGO_FILE` (default: the bundled NSK logo, `assets/brand/company-logo.png`),
+  read once at startup and embedded, so the letter loads nothing from outside. Tables, terms and
+  signature blocks never split across pages. The clause and checklist texts are settings with plain
+  defaults (`ONBOARDING_SETTINGS.DEFAULT_OFFER_TERMS`) that a company should have its counsel review.
 - **Variable pay and a split HR sets:** `annualCtc` is the total; `variablePayAnnual` (at most
   `VARIABLE_PAY_MAX_BASIS_POINTS` of it) is set aside, and the rest, the fixed CTC, is split. HR may
   set Basic and HRA; Special allowance stays the balancing figure, so a split that cannot add up is

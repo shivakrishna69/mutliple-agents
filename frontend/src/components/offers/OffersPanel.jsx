@@ -8,6 +8,9 @@
  *                  previewed as its letter, sent, or cancelled
  *   Send selected  the ticked drafts waiting for review (or whose email failed), sent one by one
  *                  (POST /drafts/bulk-send); each draft's outcome is shown with the backend's reason
+ *   Offer settings the signatory, standard terms, clauses and annexures, and the salary split policy
+ *                  (OfferSettingsDialog). While no signatory is set, and when a send is refused for
+ *                  it (SIGNATORY_MISSING), "Set the signatory" opens the settings at that field.
  *
  * Nothing reaches a candidate until someone sends it. Every message is the backend's.
  */
@@ -36,8 +39,9 @@ const OFFER_LIFECYCLE_INVITED = 'INVITED';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { offerRequestFromDraft } from '../../utils/offers.js';
 import { Badge, Button, Card, EmptyState, LoadingBlock, Notice, formatDate, formatInr } from '../ui.jsx';
-import { DocumentIcon, PlusIcon, UploadIcon } from '../Icons.jsx';
+import { CogIcon, DocumentIcon, PlusIcon, UploadIcon } from '../Icons.jsx';
 import OfferFormDialog from './OfferFormDialog.jsx';
+import OfferSettingsDialog, { SIGNATORY_FIELD } from './OfferSettingsDialog.jsx';
 import OfferPreviewDialog from './OfferPreviewDialog.jsx';
 
 function ImportProblems({ problem, onDismiss }) {
@@ -69,7 +73,17 @@ function ImportProblems({ problem, onDismiss }) {
   );
 }
 
-function SendResults({ results, drafts, onDismiss }) {
+const SIGNATORY_MISSING = 'SIGNATORY_MISSING';
+
+function SetSignatoryButton({ onClick }) {
+  return (
+    <Button size="sm" variant="secondary" className="mt-2" onClick={onClick}>
+      Set the signatory
+    </Button>
+  );
+}
+
+function SendResults({ results, drafts, onDismiss, onSetSignatory }) {
   const nameOf = (draftId) => drafts.find((draft) => draft.id === draftId)?.candidate.name ?? draftId;
   return (
     <Notice tone="info" title="Send results" onDismiss={onDismiss}>
@@ -82,6 +96,7 @@ function SendResults({ results, drafts, onDismiss }) {
           </li>
         ))}
       </ul>
+      {results.some((result) => result.code === SIGNATORY_MISSING) && <SetSignatoryButton onClick={onSetSignatory} />}
     </Notice>
   );
 }
@@ -97,7 +112,14 @@ export default function OffersPanel({ options }) {
   const [sendResults, setSendResults] = useState(null);
   const [busy, setBusy] = useState(null);
   const [preview, setPreview] = useState(null);
+  // null, or the field the settings dialog opens at
+  const [settingsFocus, setSettingsFocus] = useState(null);
   const fileInput = useRef(null);
+  const openSettings = (focusField = '') => setSettingsFocus(focusField);
+  const openSignatory = () => {
+    setProblem(null);
+    openSettings(SIGNATORY_FIELD);
+  };
 
   const list = drafts.data?.drafts ?? [];
   const sendable = list.filter((draft) => SENDABLE_STATUSES.includes(draft.status));
@@ -165,11 +187,31 @@ export default function OffersPanel({ options }) {
   if (settings.error || drafts.error) return <Notice tone="error" title={(settings.error ?? drafts.error).message} />;
   if (!settings.data || !drafts.data) return <LoadingBlock label="Loading offers…" />;
 
+  const signatoryMissing = !settings.data.settings.offerTerms.signatoryName;
+
   return (
     <div className="space-y-4">
       {notice && <Notice tone="success" title={notice} onDismiss={() => setNotice(null)} />}
-      {problem && <ImportProblems problem={problem} onDismiss={() => setProblem(null)} />}
-      {sendResults && <SendResults results={sendResults} drafts={list} onDismiss={() => setSendResults(null)} />}
+      {problem?.code === SIGNATORY_MISSING ? (
+        <Notice tone="error" title={problem.message} onDismiss={() => setProblem(null)}>
+          <SetSignatoryButton onClick={openSignatory} />
+        </Notice>
+      ) : (
+        problem && <ImportProblems problem={problem} onDismiss={() => setProblem(null)} />
+      )}
+      {signatoryMissing && problem?.code !== SIGNATORY_MISSING && (
+        <Notice tone="warning" title="Offer letters have no signatory yet, so offers cannot be sent.">
+          <SetSignatoryButton onClick={openSignatory} />
+        </Notice>
+      )}
+      {sendResults && (
+        <SendResults
+          results={sendResults}
+          drafts={list}
+          onDismiss={() => setSendResults(null)}
+          onSetSignatory={openSignatory}
+        />
+      )}
 
       <Card
         title="Offers"
@@ -188,6 +230,10 @@ export default function OffersPanel({ options }) {
                 if (file) importFile(file);
               }}
             />
+            <Button variant="secondary" onClick={() => openSettings()}>
+              <CogIcon className="h-4 w-4" />
+              Offer settings
+            </Button>
             <Button variant="secondary" onClick={() => fileInput.current.click()} isBusy={busy === 'import'}>
               <UploadIcon className="h-4 w-4" />
               Import CSV
@@ -339,6 +385,19 @@ export default function OffersPanel({ options }) {
             setIsComposing(false);
             setNotice(message);
             drafts.reload();
+          }}
+        />
+      )}
+      {settingsFocus !== null && (
+        <OfferSettingsDialog
+          settings={settings.data.settings}
+          choices={settings.data.choices}
+          focusField={settingsFocus || null}
+          onClose={() => setSettingsFocus(null)}
+          onSaved={(savedSettings, message) => {
+            setSettingsFocus(null);
+            setNotice(message);
+            settings.reload();
           }}
         />
       )}

@@ -6,8 +6,19 @@
 
 import { hkdfSync } from 'node:crypto';
 import { BlockList, isIP } from 'node:net';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { EMAIL_PATTERN, HEX_COLOR_PATTERN, WEB_RESEARCH_SETTINGS } from '../constants/validation.js';
+import {
+  COMPANY_REGISTRATION_PATTERNS,
+  EMAIL_PATTERN,
+  HEX_COLOR_PATTERN,
+  OFFER_LETTER_LOGO,
+  WEB_RESEARCH_SETTINGS,
+} from '../constants/validation.js';
+
+// The backend folder: relative file settings (COMPANY_LOGO_FILE) are read from here.
+const BACKEND_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -266,13 +277,35 @@ export function loadPdfBrowserConfig() {
  *                                (default "qpdf", found on the PATH)
  *   COMPANY_LEGAL_NAME,          printed in the letter head when set (the company's name from its
  *   COMPANY_REGISTERED_ADDRESS   settings otherwise; the address is then left out)
+ *   COMPANY_CIN                  the Corporate Identity Number (21 characters, e.g. U72200TG2020PTC123456),
+ *                                printed in the letter's footer when set
+ *   COMPANY_GSTIN                the GST number (15 characters, e.g. 36AABCN1234F1Z5), printed in the
+ *                                letter's footer when set
+ *   COMPANY_LOGO_FILE            a PNG, JPEG or SVG logo for the letterhead, at most
+ *                                OFFER_LETTER_LOGO.MAX_BYTES (default: the bundled
+ *                                assets/brand/company-logo.png)
  */
 export function loadOfferLetterConfig() {
   const qpdfPath = (process.env.QPDF_PATH ?? '').trim() || 'qpdf';
+  const cin = (process.env.COMPANY_CIN ?? '').trim().toUpperCase() || null;
+  if (cin && !COMPANY_REGISTRATION_PATTERNS.CIN.test(cin)) {
+    throw new Error('COMPANY_CIN must be a 21-character Corporate Identity Number, e.g. U72200TG2020PTC123456');
+  }
+  const gstin = (process.env.COMPANY_GSTIN ?? '').trim().toUpperCase() || null;
+  if (gstin && !COMPANY_REGISTRATION_PATTERNS.GSTIN.test(gstin)) {
+    throw new Error('COMPANY_GSTIN must be a 15-character GST number, e.g. 36AABCN1234F1Z5');
+  }
+  const logoFile = (process.env.COMPANY_LOGO_FILE ?? '').trim() || OFFER_LETTER_LOGO.DEFAULT_FILE;
+  if (!OFFER_LETTER_LOGO.MEDIA_TYPES[path.extname(logoFile).toLowerCase()]) {
+    throw new Error('COMPANY_LOGO_FILE must be a .png, .jpg, .jpeg or .svg file');
+  }
   return {
     qpdfPath,
     legalName: (process.env.COMPANY_LEGAL_NAME ?? '').trim() || null,
     registeredAddress: (process.env.COMPANY_REGISTERED_ADDRESS ?? '').trim() || null,
+    cin,
+    gstin,
+    logoFile: path.resolve(BACKEND_ROOT, logoFile),
   };
 }
 

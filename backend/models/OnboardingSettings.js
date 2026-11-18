@@ -10,8 +10,8 @@
  *   offerTerms     the offer letter's terms: probation, notice period, weekly hours and shift
  *                  timings, how long the offer stays open, the signatory (required before an offer
  *                  can be sent), up to OFFER_TERM_LIMITS.CLAUSES_MAX further clauses, the
- *                  confidentiality, IP assignment and non-solicitation clauses (with its months), the
- *                  stock option note and the joining checklist
+ *                  confidentiality, IP assignment, non-solicitation (with its months) and background
+ *                  verification clauses, the stock option note and the joining checklist
  */
 
 import mongoose from 'mongoose';
@@ -111,6 +111,10 @@ const onboardingSettingsSchema = new mongoose.Schema(
       confidentialityClause: requiredClause('The confidentiality clause', TERMS.confidentialityClause),
       ipAssignmentClause: requiredClause('The IP assignment clause', TERMS.ipAssignmentClause),
       nonSolicitationClause: requiredClause('The non-solicitation clause', TERMS.nonSolicitationClause),
+      backgroundVerificationClause: requiredClause(
+        'The background verification clause',
+        TERMS.backgroundVerificationClause,
+      ),
       nonSolicitationMonths: wholeNumber('Non-solicitation', 'months', TERMS.nonSolicitationMonths, [
         0,
         TERM_LIMITS.NON_SOLICITATION_MONTHS_MAX,

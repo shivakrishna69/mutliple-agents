@@ -10,6 +10,7 @@ import { ApiError } from '../../api/httpClient.js';
 import {
   requestOfferBulkSend,
   requestOfferCalculation,
+  requestOfferDispatch,
   requestOfferDraftCreation,
   requestOfferDrafts,
   requestOfferImport,
@@ -26,9 +27,14 @@ vi.mock('../../api/offersApi.js', () => ({
   requestOfferDrafts: vi.fn(),
   requestOfferImport: vi.fn(),
   requestOfferSettings: vi.fn(),
+  requestOfferSettingsUpdate: vi.fn(),
 }));
 vi.mock('../../auth/AuthContext.jsx', () => {
-  const session = { csrfToken: 'csrf', markSessionEnded: () => {} };
+  const session = {
+    csrfToken: 'csrf',
+    markSessionEnded: () => {},
+    currentUser: { capabilities: ['read_offers', 'manage_offers', 'manage_compensation'] },
+  };
   return { useAuth: () => session };
 });
 
@@ -41,7 +47,33 @@ const OPTIONS = {
   employmentStatuses: ['Probation', 'Active'],
 };
 const SETTINGS = {
-  settings: { offerTerms: { probationMonths: 6, noticePeriodDays: 60, offerValidityDays: 7 } },
+  settings: {
+    version: 0,
+    offerTerms: {
+      probationMonths: 6,
+      noticePeriodDays: 60,
+      offerValidityDays: 7,
+      weeklyWorkingHours: 40,
+      signatoryName: null,
+      signatoryTitle: null,
+      additionalClauses: [],
+      shiftTimings: null,
+      confidentialityClause: 'Keep it confidential.',
+      ipAssignmentClause: 'Work belongs to the company.',
+      nonSolicitationClause: 'Do not poach.',
+      nonSolicitationMonths: 12,
+      backgroundVerificationClause: 'We may verify.',
+      esopNote: null,
+      joiningChecklist: ['PAN card'],
+    },
+    compensation: {
+      basicShareBasisPoints: 5000,
+      hraFiftyPercentCityBasisPoints: 5000,
+      hraOtherCityBasisPoints: 4000,
+      pfOnFullBasic: false,
+      includeGratuityInCtc: false,
+    },
+  },
   choices: {
     professionalTaxStates: [{ value: 'KA', label: 'Karnataka' }],
     taxRegimes: [{ value: 'new', label: 'New regime' }],
@@ -150,6 +182,8 @@ describe('offers panel', () => {
         .map((item) => item.textContent),
     ).toEqual(['SentAsha Rao', 'Not sentBilal KhanSet the offer letter signatory first']);
     expect(screen.getByText('1 sent, 0 created but not emailed, 1 not sent')).toBeTruthy();
+    // One link in the no-signatory warning, one with the send results.
+    expect(screen.getAllByRole('button', { name: 'Set the signatory' })).toHaveLength(2);
   });
 
   it("lists a CSV's problems by line and column", async () => {
@@ -177,6 +211,49 @@ describe('offers panel', () => {
       '3special_allowanceThe components do not add up to the fixed CTC',
       '4department_codeno active department has this code',
     ]);
+  });
+
+  it('warns while there is no signatory, and opens the offer settings at it', async () => {
+    render(<OffersPanel options={OPTIONS} />);
+    await screen.findByRole('row', { name: 'Asha Rao' });
+    expect(screen.getByText('Offer letters have no signatory yet, so offers cannot be sent.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Set the signatory' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Offer settings' });
+    expect(within(dialog).getByLabelText('Signatory name')).toBeTruthy();
+  });
+
+  it('turns a send refused for the missing signatory into a link to set it', async () => {
+    requestOfferDispatch.mockImplementation(async () => {
+      throw new ApiError({
+        status: 409,
+        code: 'SIGNATORY_MISSING',
+        message: 'Set the offer letter signatory in Offer settings before sending offers',
+      });
+    });
+    render(<OffersPanel options={OPTIONS} />);
+    fireEvent.click(within(await screen.findByRole('row', { name: 'Asha Rao' })).getByRole('button', { name: 'Send' }));
+    expect(
+      await screen.findByText('Set the offer letter signatory in Offer settings before sending offers'),
+    ).toBeTruthy();
+    // The warning is replaced by the refusal, which carries the one link.
+    expect(screen.queryByText('Offer letters have no signatory yet, so offers cannot be sent.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Set the signatory' }));
+    expect(await screen.findByRole('dialog', { name: 'Offer settings' })).toBeTruthy();
+  });
+
+  it('shows no warning once a signatory is set, and opens the settings from their button', async () => {
+    requestOfferSettings.mockResolvedValue({
+      ...SETTINGS,
+      settings: {
+        ...SETTINGS.settings,
+        offerTerms: { ...SETTINGS.settings.offerTerms, signatoryName: 'Example Signatory' },
+      },
+    });
+    render(<OffersPanel options={OPTIONS} />);
+    await screen.findByRole('row', { name: 'Asha Rao' });
+    expect(screen.queryByRole('button', { name: 'Set the signatory' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Offer settings' }));
+    expect(await screen.findByRole('dialog', { name: 'Offer settings' })).toBeTruthy();
   });
 
   it("previews a draft's letter", async () => {
