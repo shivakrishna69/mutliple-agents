@@ -5,7 +5,8 @@
  *   Departments  codes, web address names, heads, active or not (DepartmentsPanel.jsx)
  *   Offices      location, time zone, shift and weekly offs (components/workplace/OfficesPanel.jsx)
  *   Holidays     company-wide and per-office holidays by year (HolidaysPanel.jsx)
- *   Employees    each employee's base office (EmployeeOfficesPanel.jsx)
+ *   Employees    each employee's base office, and their annual CTC with MANAGE_COMPENSATION
+ *                (EmployeeOfficesPanel.jsx)
  *
  * Attendance and leave both read these, so set them up before employees apply for leave.
  */

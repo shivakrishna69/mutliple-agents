@@ -23,6 +23,8 @@ export const ROLES = Object.freeze({
   IT_ADMIN: 'it_admin',
   AGENT: 'agent',
   EMPLOYEE: 'employee',
+  // A chartered accountant: the Form 16 portal only (services/tax/form16Service.js).
+  CA: 'ca',
 });
 
 export const ROLE_CATEGORIES = Object.freeze({
@@ -63,6 +65,12 @@ export const ROLE_DEFINITIONS = Object.freeze([
     label: 'Support Agent',
     category: ROLE_CATEGORIES.SUPPORT,
     description: 'The support console',
+  },
+  {
+    value: ROLES.CA,
+    label: 'Chartered Accountant',
+    category: ROLE_CATEGORIES.OPERATIONS,
+    description: 'The Form 16 portal only: eligible employees, their tax figures and Form 16 uploads',
   },
   {
     value: ROLES.EMPLOYEE,
@@ -122,6 +130,15 @@ export const CAPABILITIES = Object.freeze({
   // knowledge when its domain is approved), and NSE/BSE stock quotes. Without it, NSK answers from
   // approved cached pages only.
   RUN_WEB_RESEARCH: 'run_web_research',
+  // The Form 16 portal: employees whose annual CTC is above the Form 16 threshold, their tax figures,
+  // and uploading their Form 16 (services/tax/form16Service.js).
+  MANAGE_FORM16: 'manage_form16',
+  // See and download one's own Form 16 (shown only when one's annual CTC is above the threshold).
+  VIEW_OWN_FORM16: 'view_own_form16',
+  // One's own workspace as an employee: attendance, presence, leave, payslips and the tax planner,
+  // analytics, OKRs, the document vault and the work calendar. Everyone but a chartered accountant,
+  // who works in the Form 16 portal only.
+  USE_EMPLOYEE_WORKSPACE: 'use_employee_workspace',
 });
 
 const C = CAPABILITIES;
@@ -129,12 +146,16 @@ const C = CAPABILITIES;
 /** Capabilities for people asking for help, never for the administrators who answer them. */
 const REQUESTER_CAPABILITIES = Object.freeze([C.USE_SUPPORT_CHAT]);
 
+/** What every member of staff has, whatever their role: their own workspace and their own Form 16. */
+const WORKSPACE_CAPABILITIES = Object.freeze([C.USE_EMPLOYEE_WORKSPACE, C.VIEW_OWN_FORM16]);
+
 /** What each role may do. A role not listed here may do nothing beyond its own workspace. */
 export const ROLE_CAPABILITIES = Object.freeze({
   [ROLES.ADMIN]: Object.freeze(
     Object.values(CAPABILITIES).filter((capability) => !REQUESTER_CAPABILITIES.includes(capability)),
   ),
   [ROLES.HR]: Object.freeze([
+    ...WORKSPACE_CAPABILITIES,
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
@@ -152,6 +173,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.READ_COMPANY_SETTINGS,
   ]),
   [ROLES.FINANCE]: Object.freeze([
+    ...WORKSPACE_CAPABILITIES,
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
@@ -164,6 +186,7 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.READ_OFFERS,
   ]),
   [ROLES.IT_ADMIN]: Object.freeze([
+    ...WORKSPACE_CAPABILITIES,
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
@@ -177,8 +200,16 @@ export const ROLE_CAPABILITIES = Object.freeze({
     C.VIEW_SYSTEM_HEALTH,
     C.VIEW_AGENT_TELEMETRY,
   ]),
-  [ROLES.AGENT]: Object.freeze([C.ASK_DEPARTMENT_AGENTS, C.USE_TASK_BOARDS, C.USE_NSK_ASSISTANT, C.STAFF_SUPPORT]),
+  [ROLES.AGENT]: Object.freeze([
+    ...WORKSPACE_CAPABILITIES,
+    C.ASK_DEPARTMENT_AGENTS,
+    C.USE_TASK_BOARDS,
+    C.USE_NSK_ASSISTANT,
+    C.STAFF_SUPPORT,
+  ]),
+  [ROLES.CA]: Object.freeze([C.MANAGE_FORM16]),
   [ROLES.EMPLOYEE]: Object.freeze([
+    ...WORKSPACE_CAPABILITIES,
     C.ASK_DEPARTMENT_AGENTS,
     C.USE_TASK_BOARDS,
     C.USE_NSK_ASSISTANT,
@@ -197,16 +228,25 @@ export function capabilitiesOf(role) {
 }
 
 /**
+ * Roles only an admin (ASSIGN_ADMIN_ROLE) may give, or take away: admin itself, and chartered
+ * accountant (salary and tax data of the company's highest earners).
+ */
+export const ADMIN_ASSIGNED_ROLES = Object.freeze([ROLES.ADMIN, ROLES.CA]);
+
+/**
  * The roles `assignerRole` may give someone in Users & roles (with their labels and groups): every
- * role for an admin; every role except admin for anyone else who manages users.
+ * role for an admin; every role except ADMIN_ASSIGNED_ROLES for anyone else who manages users.
  */
 export function assignableRoleDefinitionsFor(assignerRole) {
   if (!hasCapability(assignerRole, CAPABILITIES.MANAGE_USERS)) return [];
   const mayAssignAdmin = hasCapability(assignerRole, CAPABILITIES.ASSIGN_ADMIN_ROLE);
-  return ROLE_DEFINITIONS.filter((definition) => mayAssignAdmin || definition.value !== ROLES.ADMIN);
+  return ROLE_DEFINITIONS.filter((definition) => mayAssignAdmin || !ADMIN_ASSIGNED_ROLES.includes(definition.value));
 }
 
-/** Roles that can be given by invitation. Nobody becomes an admin by invitation. */
+/**
+ * Roles that can be given by invitation (which creates an employee record). Nobody becomes an admin by
+ * invitation, and a chartered accountant is not an employee: an admin gives that role in Users & roles.
+ */
 export const INVITABLE_ROLES = Object.freeze([ROLES.EMPLOYEE, ROLES.AGENT, ROLES.HR, ROLES.FINANCE, ROLES.IT_ADMIN]);
 
 /** Which roles each inviter may grant: HR invites employees and support agents; admins all invitable roles. */

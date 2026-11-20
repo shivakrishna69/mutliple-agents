@@ -83,7 +83,10 @@ describe('what each role may use', () => {
   const LOOKUP_TOOLS = toolsWith({ people: true });
 
   it('gives each role the tools of its capabilities: people, offboarding, live research, self-service', () => {
-    for (const role of Object.values(ROLES)) {
+    // A chartered accountant has no NSK assistant at all (the Form 16 portal only).
+    assert.deepEqual(allowedIntentsFor(ROLES.CA), []);
+    assert.deepEqual(toolsAvailableTo(ROLES.CA), []);
+    for (const role of Object.values(ROLES).filter((value) => value !== ROLES.CA)) {
       const looksUp = PEOPLE_ROLES.includes(role);
       const offboards = OFFBOARDING_ROLES.includes(role);
       let intents = SELF_INTENTS;

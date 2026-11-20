@@ -64,6 +64,7 @@ import {
   postRequest,
 } from '../controllers/leaveRequestController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 import { postAssistantMessage } from '../controllers/leaveAssistantController.js';
 import {
   leaveAdminWriteRateLimitByUser,
@@ -73,7 +74,7 @@ import {
 
 const leaveRouter = Router();
 
-leaveRouter.use(protect, (req, res, next) => {
+leaveRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });

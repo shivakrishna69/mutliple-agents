@@ -488,6 +488,17 @@ describe('onboarding offers: dispatch', { skip: pdfReason ?? false }, () => {
     const users = await testServer.database.collection('users').find({ email: 'asha.rao@example.com' }).toArray();
     assert.equal(users.length, 1);
     assert.equal(users[0].status, 'invited');
+    // The employee it created carries the offer's annual CTC (services/employeeCompensation.js).
+    const storedDraft = await testServer.database
+      .collection('onboardingdrafts')
+      .findOne({ _id: new testServer.database.base.Types.ObjectId(draft.id) });
+    const createdProfile = await testServer.database.collection('employeeprofiles').findOne({ userId: users[0]._id });
+    assert.equal(createdProfile.compensation.annualCtc, storedDraft.compensation.annualCtc);
+    assert.equal(createdProfile.compensation.source, 'offer');
+    assert.equal(
+      createdProfile.compensation.effectiveFrom.toISOString(),
+      storedDraft.position.dateOfJoining.toISOString(),
+    );
     const invitations = await testServer.database
       .collection('employeeinvitations')
       .find({ email: 'asha.rao@example.com' })

@@ -808,3 +808,37 @@ export const NOTIFICATION_SETTINGS = Object.freeze({
   LISTED: 50,
   RETENTION_DAYS: 90,
 });
+
+/**
+ * An employee's current annual CTC (EmployeeProfile.compensation, services/employeeCompensation.js):
+ * the same range an offer may state (ONBOARDING_SETTINGS.CTC_LIMITS).
+ */
+export const EMPLOYEE_COMPENSATION_LIMITS = Object.freeze({
+  ANNUAL_CTC_MIN: ONBOARDING_SETTINGS.CTC_LIMITS.MIN,
+  ANNUAL_CTC_MAX: ONBOARDING_SETTINGS.CTC_LIMITS.MAX,
+});
+
+/**
+ * The Form 16 portal (services/tax/form16Service.js, models/Form16Record.js).
+ *
+ *   CTC_THRESHOLD        the portal handles employees whose annual CTC is strictly above this, in
+ *                        rupees; everyone else is invisible to it (a company rule for this portal:
+ *                        the law asks for a Form 16 wherever tax was deducted at source)
+ *   FINANCIAL_YEARS_OFFERED  the current financial year and the ones before it, newest first
+ *   MAX_FILE_BYTES       the largest Form 16 PDF accepted
+ *   AMOUNT_MAX           the largest rupee figure a computation summary may state
+ *   REMARKS_MAX_LENGTH   the CA's remarks
+ *   SEARCH_MAX_LENGTH    the name, employee ID or email search in the CA's list
+ *   LIST_LIMIT           the most employees one list response returns
+ *   MULTIPART_FIELD_MAX_BYTES  the computation summary travels as one JSON text field of the upload
+ */
+export const FORM16_SETTINGS = Object.freeze({
+  CTC_THRESHOLD: 12_00_000,
+  FINANCIAL_YEARS_OFFERED: 2,
+  MAX_FILE_BYTES: 10 * 1024 * 1024,
+  AMOUNT_MAX: 1_00_00_00_000,
+  REMARKS_MAX_LENGTH: 1000,
+  SEARCH_MAX_LENGTH: 100,
+  LIST_LIMIT: 200,
+  MULTIPART_FIELD_MAX_BYTES: 4 * 1024,
+});

@@ -24,6 +24,7 @@ test('an admin assigns any role from a grouped menu and changes the company sett
     'HR',
     'Finance & Payroll',
     'IT Administrator',
+    'Chartered Accountant',
   ]);
   await expect(hrRoleMenu).toHaveValue('hr');
   // Badges name each role in the table.
@@ -56,10 +57,11 @@ test('an IT administrator manages accounts but never administration, and opens c
   await expect(adminRow.getByRole('combobox')).toHaveCount(0);
   await expect(adminRow.getByText('Admin', { exact: true })).toBeVisible();
 
-  // Other rows offer every role but Admin, grouped.
+  // Other rows offer every role but Admin and Chartered Accountant (an admin gives those), grouped.
   const agentRoleMenu = page.getByLabel(`Role for ${ACCOUNTS.agent.name}`);
   expect(await groupLabelsOf(agentRoleMenu)).toEqual(['Operations', 'Support', 'General']);
   await expect(agentRoleMenu.locator('option', { hasText: /^Admin$/ })).toHaveCount(0);
+  await expect(agentRoleMenu.locator('option', { hasText: 'Chartered Accountant' })).toHaveCount(0);
 
   await mainNavigation(page).getByRole('link', { name: 'Company' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Company' })).toBeVisible();

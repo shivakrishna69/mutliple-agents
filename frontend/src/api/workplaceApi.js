@@ -49,3 +49,9 @@ export const requestHolidayDeletion = (holidayId, csrfToken) =>
   sendData('DELETE', `/api/work-calendar/holidays/${encode(holidayId)}`, undefined, csrfToken);
 export const requestCalendarDays = ({ from, to, officeLocationId }, callerSignal) =>
   getData(`/api/work-calendar/days${toQueryString({ from, to, officeLocationId })}`, callerSignal);
+
+// --- Annual CTC (MANAGE_COMPENSATION) -------------------------------------------------------------
+export const requestEmployeeCompensation = (callerSignal) => getData('/api/employees/compensation', callerSignal);
+/** `effectiveFrom` is a YYYY-MM-DD date or null. */
+export const requestEmployeeCompensationChange = (employeeId, { annualCtc, effectiveFrom }, csrfToken) =>
+  sendData('PUT', `/api/employees/${encode(employeeId)}/compensation`, { annualCtc, effectiveFrom }, csrfToken);

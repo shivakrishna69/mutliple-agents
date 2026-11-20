@@ -19,11 +19,12 @@ import {
   removeHoliday,
 } from '../controllers/workCalendarController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 import { workplaceSetupWriteRateLimitByUser } from '../middleware/rateLimiter.js';
 
 const workCalendarRouter = Router();
 
-workCalendarRouter.use(protect, (req, res, next) => {
+workCalendarRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });

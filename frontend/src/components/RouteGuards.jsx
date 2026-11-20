@@ -8,7 +8,7 @@
 
 import { Navigate, Outlet } from 'react-router';
 import { AUTH_STATUS, useAuth } from '../auth/AuthContext.jsx';
-import { hasAnyCapability, hasCapability } from '../auth/capabilities.js';
+import { hasAnyCapability, hasCapability, homePathOf } from '../auth/capabilities.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { SESSION_MESSAGES } from '../constants/messages.js';
 
@@ -35,7 +35,8 @@ export function ProtectedRoute() {
 /**
  * Renders the child route only for a signed-in person with `capability` (constants/capabilities.js), or
  * with any of `anyOf` when given;
- * anyone else is sent to the dashboard, and signed-out users to login. The backend enforces the same
+ * anyone else is sent to their home page (auth/capabilities.js homePathOf: the dashboard, or the Form
+ * 16 portal for a chartered accountant), and signed-out users to login. The backend enforces the same
  * capability on every request the page makes.
  */
 export function CapabilityRoute({ capability, anyOf = null }) {
@@ -43,7 +44,7 @@ export function CapabilityRoute({ capability, anyOf = null }) {
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
   const allowed = anyOf ? hasAnyCapability(currentUser, anyOf) : hasCapability(currentUser, capability);
-  if (!allowed) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
+  if (!allowed) return <Navigate to={homePathOf(currentUser)} replace />;
   return <Outlet />;
 }
 

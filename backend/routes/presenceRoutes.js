@@ -19,10 +19,11 @@ import {
   postNoticeAcknowledgement,
 } from '../controllers/presenceController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 
 const presenceRouter = Router();
 
-presenceRouter.use(protect, (req, res, next) => {
+presenceRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   // Responses describe people's activity; never cache them.
   res.set('Cache-Control', 'no-store');
   next();

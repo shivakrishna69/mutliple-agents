@@ -44,6 +44,7 @@ import { ONBOARDING_MESSAGES } from '../constants/messages.js';
 import { ONBOARDING_SETTINGS } from '../constants/validation.js';
 import Department from '../models/Department.js';
 import EmployeeProfile from '../models/EmployeeProfile.js';
+import { recordOfferCompensation } from './employeeCompensation.js';
 import EmployeeInvitation, { INVITATION_STATUSES } from '../models/EmployeeInvitation.js';
 import LeaveType from '../models/LeaveType.js';
 import OnboardingDraft, { DISPATCHABLE_STATUSES, DRAFT_STATUSES } from '../models/OnboardingDraft.js';
@@ -630,7 +631,30 @@ export async function dispatchDraft({ draftId, actor, appContext, now = new Date
     },
     { new: true },
   );
+  await recordOfferCompensationQuietly({
+    employeeUserId: sent.invitation.invitedUserId,
+    offer: before,
+    actor,
+    draftId,
+  });
   return { draft: await summaryOf(draft), wasSent };
+}
+
+/**
+ * The employee the offer created gets its annual CTC (services/employeeCompensation.js). The offer has
+ * gone out by now, so a failure here is logged rather than reported as a failed send; HR can set the
+ * CTC on the Workplace page.
+ */
+async function recordOfferCompensationQuietly({ employeeUserId, offer, actor, draftId }) {
+  try {
+    const found = await recordOfferCompensation({ employeeUserId, offer, actorUserId: actor.id });
+    if (!found) logger.warn('Offer sent, but no employee record took its CTC', { draftId });
+  } catch (compensationError) {
+    logger.error('Offer sent, but its CTC could not be saved on the employee', {
+      draftId,
+      reason: compensationError.message,
+    });
+  }
 }
 
 export const BULK_SEND_OUTCOMES = Object.freeze({ SENT: 'sent', EMAIL_FAILED: 'email_failed', REFUSED: 'refused' });

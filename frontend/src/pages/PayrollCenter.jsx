@@ -7,6 +7,7 @@
  *                 60-second signed download link per PDF.
  *   Issue payslip HR/admin only: POST /api/payroll/payslips, which renders the PDF, stores it
  *                 encrypted and returns the verification ID printed on it.
+ *   Form 16       VIEW_OWN_FORM16: one's own Form 16 for a financial year (components/tax/MyForm16Panel.jsx).
  *
  * Salary inputs are annual rupee amounts. The compensation form is shared by the planner and the
  * issue form, so both send exactly the structure utils/payrollCalculator.js validates.
@@ -46,6 +47,7 @@ import {
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { toDisplayError, useApiResource } from '../hooks/useApiResource.js';
 import { hasCapability } from '../auth/capabilities.js';
+import MyForm16Panel from '../components/tax/MyForm16Panel.jsx';
 import { CAPABILITIES } from '../constants/capabilities.js';
 
 const INITIAL_COMPENSATION = Object.freeze({
@@ -698,6 +700,7 @@ function IssuePayslip({ rules, employeeOptions }) {
 export default function PayrollCenter() {
   const { currentUser } = useAuth();
   const isPayrollAdmin = hasCapability(currentUser, CAPABILITIES.MANAGE_PAYSLIPS);
+  const canViewOwnForm16 = hasCapability(currentUser, CAPABILITIES.VIEW_OWN_FORM16);
   const [activeTabId, setActiveTabId] = useState('planner');
   const rulesResource = useApiResource((signal) => requestPayrollRules(signal), []);
   // Whoever issues payslips (HR, Finance, admins) picks employees from the employee directory.
@@ -718,6 +721,7 @@ export default function PayrollCenter() {
   const tabs = [
     { id: 'planner', label: 'Tax planner', Icon: CurrencyIcon },
     { id: 'payslips', label: 'Payslips', Icon: DocumentIcon },
+    ...(canViewOwnForm16 ? [{ id: 'form16', label: 'Form 16', Icon: DocumentIcon }] : []),
     ...(isPayrollAdmin ? [{ id: 'issue', label: 'Issue payslip', Icon: CheckBadgeIcon }] : []),
   ];
 
@@ -764,6 +768,7 @@ export default function PayrollCenter() {
       {activeTabId === 'payslips' && (
         <PayslipLibrary isPayrollAdmin={isPayrollAdmin} employeeOptions={employeeOptions} />
       )}
+      {activeTabId === 'form16' && canViewOwnForm16 && <MyForm16Panel />}
       {rulesResource.data &&
         activeTabId === 'issue' &&
         isPayrollAdmin &&

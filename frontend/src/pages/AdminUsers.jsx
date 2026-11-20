@@ -38,6 +38,7 @@ const DISPLAYED_ROLES = Object.freeze([
   USER_ROLES.FINANCE,
   USER_ROLES.IT_ADMIN,
   USER_ROLES.AGENT,
+  USER_ROLES.CA,
   USER_ROLES.EMPLOYEE,
 ]);
 const ROLE_FILTER_TABS = Object.freeze([
@@ -89,7 +90,9 @@ function RoleEditor({ userSummary, isCurrentUser, roleOptions, canChangeAdmins, 
     ? 'Your own role can’t be changed here'
     : userSummary.role === USER_ROLES.ADMIN && !canChangeAdmins
       ? 'Only an admin can change an admin’s role'
-      : null;
+      : userSummary.role === USER_ROLES.CA && !canChangeAdmins
+        ? 'Only an admin can change a chartered accountant’s role'
+        : null;
   if (readOnlyReason) {
     return (
       <div className="flex items-center gap-2">

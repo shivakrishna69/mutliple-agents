@@ -4,7 +4,8 @@
  * (HR invites, the employee accepts): one without an office for the workplace test, and a leave
  * scenario (an employee with an office, a manager and a Casual Leave balance) for the leave tests,
  * plus a second employee of that manager with Earned Leave that needs HR's approval too, and the
- * department's head, who manages its knowledge base.
+ * department's head, who manages its knowledge base; and for the Form 16 test a chartered accountant
+ * and two employees, one above the annual CTC threshold and one exactly at it.
  * A stand-in AI service answers the leave assistant and NSK (e2e/standInAiService.js). Offboarding
  * documents are rendered with Playwright's own Chromium and stored in an S3 stand-in
  * (backend/tests/integration/s3StandIn.js), so an offboarding can run to its downloads. Returns the
@@ -29,6 +30,9 @@ import {
   BACKEND_PORT,
   DEPARTMENT_NAME,
   EMPLOYEE,
+  FORM16_ABOVE,
+  FORM16_AT,
+  FORM16_CA,
   FRONTEND_ORIGIN,
   KNOWLEDGE_ADMIN,
   KNOWLEDGE_HEAD,
@@ -151,6 +155,7 @@ export default async function globalSetup() {
       mailHttpPort: MAIL_INBOX_PORT,
       environment: {
         ...s3.environmentFor('OFFBOARDING'),
+        ...s3.environmentFor('TAX_DOCS'),
         PDF_BROWSER_EXECUTABLE_PATH: chromium.executablePath(),
         COMPANY_LEGAL_NAME: 'NSK Software Technologies Private Limited',
         COMPANY_REGISTERED_ADDRESS: '1 Test Road, Bengaluru 560001',
@@ -169,7 +174,7 @@ export default async function globalSetup() {
     // would set it): signing up always creates an employee, and sign-ups are limited per network,
     // which the sign-up tests need for themselves.
     const roleAccounts = Object.values(ACCOUNTS).filter((listed) => listed.role);
-    for (const account of roleAccounts) await insertConfirmedAccount(testServer, account);
+    for (const account of [...roleAccounts, FORM16_CA]) await insertConfirmedAccount(testServer, account);
     for (const account of [
       ...Object.values(ACCOUNTS).filter((listed) => !roleAccounts.includes(listed)),
       RESET_ACCOUNT,
@@ -189,6 +194,19 @@ export default async function globalSetup() {
     await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...EMPLOYEE });
     await onboardEmployee({ testServer, hrClient: adminClient, departmentId: department.id, ...OFFBOARD_EMPLOYEE });
     await seedLeaveScenario(testServer, adminClient, department.id);
+    // The Form 16 test's employees, either side of the threshold.
+    for (const { annualCtc, ...person } of [FORM16_ABOVE, FORM16_AT]) {
+      const { profileId } = await onboardEmployee({
+        testServer,
+        hrClient: adminClient,
+        departmentId: department.id,
+        ...person,
+      });
+      await expectCreated(
+        adminClient.put(`/api/employees/${profileId}/compensation`, { annualCtc, effectiveFrom: null }),
+        `the annual CTC of ${person.name}`,
+      );
+    }
     // The department's head, who manages its knowledge base from self-service.
     const head = await onboardEmployee({
       testServer,

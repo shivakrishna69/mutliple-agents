@@ -90,7 +90,13 @@ const NAVIGATION_SECTIONS = Object.freeze([
   {
     sectionTitle: 'Workspace',
     items: [
-      { label: 'Overview', path: ROUTE_PATHS.DASHBOARD, Icon: HomeIcon, views: BOTH_VIEWS, capability: null },
+      {
+        label: 'Overview',
+        path: ROUTE_PATHS.DASHBOARD,
+        Icon: HomeIcon,
+        views: BOTH_VIEWS,
+        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
+      },
       {
         label: 'Support chat',
         path: ROUTE_PATHS.SUPPORT,
@@ -138,16 +144,28 @@ const NAVIGATION_SECTIONS = Object.freeze([
         path: ROUTE_PATHS.ATTENDANCE,
         Icon: MapPinIcon,
         views: BOTH_VIEWS,
-        capability: null,
+        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
       },
-      { label: 'Leave', path: ROUTE_PATHS.LEAVE, Icon: CalendarIcon, views: BOTH_VIEWS, capability: null },
-      { label: 'Payroll', path: ROUTE_PATHS.PAYROLL, Icon: CurrencyIcon, views: BOTH_VIEWS, capability: null },
+      {
+        label: 'Leave',
+        path: ROUTE_PATHS.LEAVE,
+        Icon: CalendarIcon,
+        views: BOTH_VIEWS,
+        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
+      },
+      {
+        label: 'Payroll',
+        path: ROUTE_PATHS.PAYROLL,
+        Icon: CurrencyIcon,
+        views: BOTH_VIEWS,
+        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
+      },
       {
         label: 'Analytics hub',
         path: ROUTE_PATHS.ANALYTICS,
         Icon: ChartIcon,
         views: BOTH_VIEWS,
-        capability: null,
+        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
       },
       {
         label: 'Organisation',
@@ -210,6 +228,18 @@ const NAVIGATION_SECTIONS = Object.freeze([
         Icon: TerminalIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.VIEW_AGENT_TELEMETRY,
+      },
+    ],
+  },
+  {
+    sectionTitle: 'Tax',
+    items: [
+      {
+        label: 'Form 16 / CA Portal',
+        path: ROUTE_PATHS.CA_PORTAL,
+        Icon: DocumentIcon,
+        views: MANAGEMENT_ONLY,
+        capability: CAPABILITIES.MANAGE_FORM16,
       },
     ],
   },

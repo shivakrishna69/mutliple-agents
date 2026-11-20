@@ -38,6 +38,10 @@ export const RATE_LIMITS = Object.freeze({
   TAX_ESTIMATES_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
   // Payslip generation renders a PDF in a browser; a month's run for a team stays within this.
   PAYSLIP_GENERATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
+  // Form 16 uploads (each up to 10 MB, streamed to S3): a CA's year-end batch stays within this.
+  FORM16_UPLOADS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
+  // Form 16 download links (each is audited): more than anyone opens by hand.
+  FORM16_DOWNLOADS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 60 }),
   // Offer calculations (each preview renders a PDF) and dispatches (each sends an email).
   OFFER_CALCULATIONS_PER_USER: Object.freeze({ windowMs: 60 * 1000, maxRequests: 30 }),
   OFFER_DISPATCHES_PER_USER: Object.freeze({ windowMs: 15 * 60 * 1000, maxRequests: 30 }),

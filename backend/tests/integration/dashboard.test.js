@@ -96,7 +96,7 @@ describe('dashboard sections by role', { skip: skipReason ?? false }, () => {
       updatedAt: new Date(Date.now() - 30 * DAY),
     });
     const { accounts } = await overviewOf(clients.admin);
-    assert.deepEqual(accounts.perRole, { admin: 1, hr: 1, finance: 0, it_admin: 0, agent: 1, employee: 2 });
+    assert.deepEqual(accounts.perRole, { admin: 1, hr: 1, finance: 0, it_admin: 0, agent: 1, employee: 2, ca: 0 });
     assert.equal(accounts.total, 5);
     assert.equal(accounts.newThisWeek, 4);
   });

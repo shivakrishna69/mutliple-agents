@@ -58,6 +58,10 @@
  *   a response; endpoints that are allowed to return them must map the fields explicitly.
  *   Never send these fields to the AI service.
  *
+ *   `compensation` (the current annual CTC) is salary data: every leaf is `select: false` and
+ *   `toJSON` strips it too. It is read only by services/employeeCompensation.js (MANAGE_COMPENSATION)
+ *   and the Form 16 portal (services/tax/form16Service.js), which map the fields they may show.
+ *
  * Write rules
  * -----------
  *   userId, departmentId, reportingManagerId and officeLocationId are validated in document middleware, which
@@ -67,7 +71,11 @@
 
 import mongoose from 'mongoose';
 import { DEFAULT_EMPLOYMENT_TYPE, DEFAULT_JOB_LEVEL, EMPLOYMENT_TYPES, JOB_LEVELS } from '../constants/accessRoles.js';
-import { MAC_ADDRESS_PATTERN, ORGANIZATION_FIELD_LIMITS } from '../constants/validation.js';
+import {
+  EMPLOYEE_COMPENSATION_LIMITS,
+  MAC_ADDRESS_PATTERN,
+  ORGANIZATION_FIELD_LIMITS,
+} from '../constants/validation.js';
 import { invalidateOrgHierarchyCache } from '../services/orgHierarchyCache.js';
 import Department from './Department.js';
 import OfficeLocation from './OfficeLocation.js';
@@ -102,6 +110,14 @@ export const EMPLOYMENT_STATUSES = Object.freeze({
   NOTICE: 'Notice',
   TERMINATED: 'Terminated',
 });
+
+/**
+ * Where an employee's current annual CTC came from.
+ *   offer   the offer they were sent (services/onboardingService.js dispatchDraft, and the startup
+ *           migration migrations/addEmployeeCompensation.js for offers sent before the field existed)
+ *   manual  set by HR, Finance & Payroll or an administrator (services/employeeCompensation.js)
+ */
+export const COMPENSATION_SOURCES = Object.freeze({ OFFER: 'offer', MANUAL: 'manual' });
 
 /**
  * MAC value that iOS (since 7) and Android (since 6) return to apps instead of the real hardware
@@ -254,6 +270,40 @@ const employeeProfileSchema = new mongoose.Schema(
     },
 
     /**
+     * The current annual cost to company, in whole rupees. null: not known (nobody has set it and the
+     * person was not hired through an offer); such employees count as below every salary threshold.
+     */
+    compensation: {
+      annualCtc: {
+        type: Number,
+        default: null,
+        select: false,
+        min: [
+          EMPLOYEE_COMPENSATION_LIMITS.ANNUAL_CTC_MIN,
+          `Annual CTC must be at least ${EMPLOYEE_COMPENSATION_LIMITS.ANNUAL_CTC_MIN}`,
+        ],
+        max: [
+          EMPLOYEE_COMPENSATION_LIMITS.ANNUAL_CTC_MAX,
+          `Annual CTC cannot exceed ${EMPLOYEE_COMPENSATION_LIMITS.ANNUAL_CTC_MAX}`,
+        ],
+        validate: {
+          validator: (annualCtc) => annualCtc === null || Number.isInteger(annualCtc),
+          message: 'Annual CTC must be whole rupees',
+        },
+      },
+      // The day the figure applies from (the joining date for an offer).
+      effectiveFrom: { type: Date, default: null, select: false },
+      source: {
+        type: String,
+        enum: { values: [...Object.values(COMPENSATION_SOURCES), null], message: 'CTC source "{VALUE}" is not valid' },
+        default: null,
+        select: false,
+      },
+      // ──► User._id: who last set it (the person who sent the offer, or who edited it).
+      updatedByUserId: { type: ObjectId, ref: 'User', default: null, select: false },
+    },
+
+    /**
      * Model-derived scores, 0 (lowest) to 100 (highest risk), written by an analytics job, never
      * by the employee. Decision support for HR only: they must not drive automated decisions
      * about an individual.
@@ -274,6 +324,7 @@ const employeeProfileSchema = new mongoose.Schema(
       transform(doc, ret) {
         delete ret.biometricMetadata;
         delete ret.advancedMetrics;
+        delete ret.compensation;
         delete ret.__v;
         return ret;
       },
@@ -306,6 +357,9 @@ employeeProfileSchema.index({
   'organizationData.reportingManagerId': 1,
   'organizationData.employmentStatus': 1,
 });
+
+// Employees above a salary threshold (the Form 16 portal: compensation.annualCtc > threshold).
+employeeProfileSchema.index({ 'compensation.annualCtc': 1 });
 
 // ---------------------------------------------------------------------------
 // Referential integrity

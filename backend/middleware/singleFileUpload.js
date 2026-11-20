@@ -1,13 +1,14 @@
 /**
- * Multipart intake for endpoints that take one file (multer, memory storage): the vault's documents
- * and the employee import's CSV.
+ * Multipart intake for endpoints that take one file (multer, memory storage): the vault's documents,
+ * the employee import's CSV and Form 16 PDFs.
  *
  * The file is buffered in memory (never written to the server's disk, where it would outlive the
  * request unencrypted) and handed to the controller.
  *
  * Abuse limits, enforced while the request is being read:
  *   - exactly one file, in the field "file", at most `maxFileBytes`
- *   - at most 5 text fields, each at most 1 KB, field names at most 50 bytes
+ *   - at most 5 text fields, each at most `maxFieldBytes` (1 KB unless the endpoint needs more),
+ *     field names at most 50 bytes
  *   - a declared Content-Length far above the limit is refused before any byte is read
  * Route order matters: `protect` (session + CSRF) and the per-user rate limit run before this, so
  * an unauthenticated client cannot make the server buffer anything.
@@ -24,13 +25,14 @@ import { logger } from '../utils/logger.js';
 const FILE_FIELD_NAME = 'file';
 // Room for the multipart boundaries and the small text fields around the file.
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
+const DEFAULT_MAX_FIELD_BYTES = 1024;
 
 /**
- * @param {{ maxFileBytes: number, logLabel: string,
+ * @param {{ maxFileBytes: number, maxFieldBytes?: number, logLabel: string,
  *   messages: { fileTooLarge: string, fileRequired: string, malformedUpload: string, multipartRequired: string } }} options
  * @returns {import('express').RequestHandler}
  */
-export function createSingleFileUpload({ maxFileBytes, logLabel, messages }) {
+export function createSingleFileUpload({ maxFileBytes, maxFieldBytes = DEFAULT_MAX_FIELD_BYTES, logLabel, messages }) {
   const receiveSingleFile = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -38,7 +40,7 @@ export function createSingleFileUpload({ maxFileBytes, logLabel, messages }) {
       files: 1,
       fields: 5,
       fieldNameSize: 50,
-      fieldSize: 1024,
+      fieldSize: maxFieldBytes,
       parts: 6,
       headerPairs: 20,
     },
