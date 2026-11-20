@@ -276,6 +276,26 @@ Others see them read-only. Only changed fields are sent, with the version loaded
 set, and whenever a send is refused for that (`SIGNATORY_MISSING`), **Set the signatory** opens the
 settings on that field.
 
+## Form 16
+
+**Form 16 / CA Portal** (`/tax/ca-portal`, `pages/CaPortal.jsx`, for `MANAGE_FORM16`: chartered
+accountants and admins). A financial year selector, KPI cards (eligible above ₹12L, uploaded,
+pending), a search and status filter, and the employees the backend returns, which are only those
+whose annual CTC is above ₹12,00,000. **Upload** or **Review** opens `components/tax/Form16UploadDialog.jsx`:
+
+- the CTC and its split (from the sent offer), and the year's payslip TDS by month;
+- the PDF upload, the part, and an optional computation summary (`utils/form16.js`);
+- the version history, with a download per version.
+
+A chartered accountant has no employee workspace (`USE_EMPLOYEE_WORKSPACE`): they start at the CA
+portal (`auth/capabilities.js homePathOf`), the sidebar shows it and Account only, and the workspace
+pages send them back there.
+
+**Payroll → Form 16** (`components/tax/MyForm16Panel.jsx`, `VIEW_OWN_FORM16`) shows the employee's own
+Form 16 for a year: the CA's summary and **Download Form 16 PDF**, or the backend's notice (pending
+upload, or Form 16 here applies above ₹12,00,000). **Workplace → Employees** shows and edits each
+person's annual CTC for `MANAGE_COMPENSATION` (`components/workplace/AnnualCtcEditor.jsx`).
+
 ## NSK assistant
 
 The **Ask NSK** button (top bar, sidebar, and the mobile header) opens the assistant's drawer on every

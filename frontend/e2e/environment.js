@@ -67,3 +67,15 @@ export const KNOWLEDGE_HEAD = Object.freeze({ name: 'Kavya Menon', email: 'kavya
  * admin's (5 sign-ins per account per 15 minutes, which the other specs already use).
  */
 export const KNOWLEDGE_ADMIN = Object.freeze({ name: 'Kiran Rao', email: 'kiran.rao@example.com' });
+
+/**
+ * The Form 16 test: a chartered accountant (role "ca", written by global setup), an employee above
+ * the ₹12,00,000 threshold and one exactly at it (annual CTC set by global setup through the API).
+ */
+export const FORM16_CA = Object.freeze({ name: 'Chitra Kapoor', email: 'chitra.ca@example.com', role: 'ca' });
+export const FORM16_ABOVE = Object.freeze({
+  name: 'Ravi Varma',
+  email: 'ravi.varma@example.com',
+  annualCtc: 1_800_000,
+});
+export const FORM16_AT = Object.freeze({ name: 'Anil Kumar', email: 'anil.kumar@example.com', annualCtc: 1_200_000 });

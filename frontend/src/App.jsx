@@ -7,14 +7,15 @@
  *
  *   Signed in, inside AppShell (sidebar layout), with the capability each page needs
  *   (constants/capabilities.js; the server tells the browser which ones a person has):
- *   /dashboard    -> Dashboard        everyone
+ *   /dashboard    -> Dashboard        USE_EMPLOYEE_WORKSPACE (everyone but a chartered accountant)
  *   /account      -> Account          everyone
  *   /support      -> CustomerSupport  USE_SUPPORT_CHAT
  *   /console      -> AgentConsole     STAFF_SUPPORT
  *   /admin/users  -> AdminUsers       MANAGE_USERS
- *   /attendance   -> AttendanceCenter everyone (punch-in, regularization, manager reviews)
- *   /payroll      -> PayrollCenter    everyone (tax planner, payslips; issuing with MANAGE_PAYSLIPS)
- *   /analytics    -> AdvancedAnalyticsHub everyone (risk tab with MANAGE_WORKFORCE, OKRs, vault)
+ *   /attendance   -> AttendanceCenter USE_EMPLOYEE_WORKSPACE (punch-in, regularization, manager reviews)
+ *   /payroll      -> PayrollCenter    USE_EMPLOYEE_WORKSPACE (tax planner, payslips, own Form 16 with
+ *                                     VIEW_OWN_FORM16; issuing payslips with MANAGE_PAYSLIPS)
+ *   /analytics    -> AdvancedAnalyticsHub USE_EMPLOYEE_WORKSPACE (risk tab with MANAGE_WORKFORCE, OKRs, vault)
  *   /organisation -> OrgDirectory     STAFF_SUPPORT
  *   /admin/telemetry -> AgentTelemetry VIEW_AGENT_TELEMETRY
  *   /admin/company -> CompanySettings MANAGE_COMPANY_SETTINGS (name, employee ID format, email domain)
@@ -22,8 +23,9 @@
  *   /workplace    -> WorkplaceSetup   MANAGE_WORKFORCE (departments, offices, holidays, base offices)
  *   /people/offboarding -> OffboardingCenter   VIEW_FINAL_SETTLEMENT or VIEW_IT_OFFBOARDING (settlements
  *                    read-only, and who is serving notice for IT)
- *   /leave        -> LeaveCenter      everyone: My leave (index), /leave/calendar, /leave/approvals,
+ *   /leave        -> LeaveCenter      USE_EMPLOYEE_WORKSPACE: My leave (index), /leave/calendar, /leave/approvals,
  *                                     and /leave/admin with MANAGE_WORKFORCE (policies, balances, payroll)
+ *   /tax/ca-portal -> CaPortal        MANAGE_FORM16 (a chartered accountant's home page; admins too)
  *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  MANAGE_KNOWLEDGE_BASES
  *   /agents       -> AgentDirectory   ASK_DEPARTMENT_AGENTS (the department agents this person may ask)
  *   /boards       -> TaskBoards       USE_TASK_BOARDS (the department boards this person can open)
@@ -64,6 +66,7 @@ const AgentTelemetry = lazy(() => import('./pages/AgentTelemetry.jsx'));
 const AttendanceCenter = lazy(() => import('./pages/AttendanceCenter.jsx'));
 const CompanySettings = lazy(() => import('./pages/CompanySettings.jsx'));
 const OrgDirectory = lazy(() => import('./pages/OrgDirectory.jsx'));
+const CaPortal = lazy(() => import('./pages/CaPortal.jsx'));
 const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
 const PeopleOnboarding = lazy(() => import('./pages/PeopleOnboarding.jsx'));
@@ -114,28 +117,35 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
-            <Route path={ROUTE_PATHS.DASHBOARD} element={<Dashboard />} />
             <Route path={ROUTE_PATHS.ACCOUNT} element={<Account />} />
-            <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
-            <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />
-            <Route path={ROUTE_PATHS.ANALYTICS} element={<AdvancedAnalyticsHub />} />
-            <Route
-              path={ROUTE_PATHS.MY_KNOWLEDGE}
-              element={<KnowledgeBases scope="mine" detailPathOf={myDepartmentPath} />}
-            />
-            <Route
-              path={ROUTE_PATHS.MY_KNOWLEDGE_DEPARTMENT}
-              element={
-                <KnowledgeBaseDetail listPath={ROUTE_PATHS.MY_KNOWLEDGE} listLabel="My department's knowledge base" />
-              }
-            />
-            <Route path={ROUTE_PATHS.LEAVE} element={<LeaveCenter />}>
-              <Route index element={<MyLeavePanel />} />
-              <Route path={ROUTE_PATHS.LEAVE_CALENDAR} element={<LeaveCalendarPanel />} />
-              <Route path={ROUTE_PATHS.LEAVE_APPROVALS} element={<ApprovalsPanel />} />
-              <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_WORKFORCE} />}>
-                <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministrationPanel />} />
+            {/* One's own workspace: everyone but a chartered accountant (who starts at the CA portal). */}
+            <Route element={<CapabilityRoute capability={CAPABILITIES.USE_EMPLOYEE_WORKSPACE} />}>
+              <Route path={ROUTE_PATHS.DASHBOARD} element={<Dashboard />} />
+              <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
+              <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />
+              <Route path={ROUTE_PATHS.ANALYTICS} element={<AdvancedAnalyticsHub />} />
+              <Route
+                path={ROUTE_PATHS.MY_KNOWLEDGE}
+                element={<KnowledgeBases scope="mine" detailPathOf={myDepartmentPath} />}
+              />
+              <Route
+                path={ROUTE_PATHS.MY_KNOWLEDGE_DEPARTMENT}
+                element={
+                  <KnowledgeBaseDetail listPath={ROUTE_PATHS.MY_KNOWLEDGE} listLabel="My department's knowledge base" />
+                }
+              />
+              <Route path={ROUTE_PATHS.LEAVE} element={<LeaveCenter />}>
+                <Route index element={<MyLeavePanel />} />
+                <Route path={ROUTE_PATHS.LEAVE_CALENDAR} element={<LeaveCalendarPanel />} />
+                <Route path={ROUTE_PATHS.LEAVE_APPROVALS} element={<ApprovalsPanel />} />
+                <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_WORKFORCE} />}>
+                  <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministrationPanel />} />
+                </Route>
               </Route>
+            </Route>
+
+            <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_FORM16} />}>
+              <Route path={ROUTE_PATHS.CA_PORTAL} element={<CaPortal />} />
             </Route>
 
             <Route element={<CapabilityRoute capability={CAPABILITIES.ASK_DEPARTMENT_AGENTS} />}>

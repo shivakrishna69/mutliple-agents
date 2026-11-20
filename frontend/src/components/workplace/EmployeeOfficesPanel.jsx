@@ -1,20 +1,30 @@
 /**
  * Employees' base offices (HR and admins). An employee's office gives their working days, holidays
- * and time zone; without one, attendance cannot check them in and leave cannot be priced.
+ * and time zone; without one, attendance cannot check them in and leave cannot be priced. With
+ * MANAGE_COMPENSATION each row also shows and edits the annual CTC (AnnualCtcEditor.jsx).
  *
  *   GET /api/employees · GET /api/offices · PUT /api/employees/:id/office ({ officeLocationId })
+ *   GET /api/employees/compensation · PUT /api/employees/:id/compensation
  */
 
 import { useState } from 'react';
-import { requestEmployeeOfficeAssignment, requestEmployees, requestOffices } from '../../api/workplaceApi.js';
+import {
+  requestEmployeeCompensation,
+  requestEmployeeOfficeAssignment,
+  requestEmployees,
+  requestOffices,
+} from '../../api/workplaceApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { hasCapability } from '../../auth/capabilities.js';
+import { CAPABILITIES } from '../../constants/capabilities.js';
+import AnnualCtcEditor from './AnnualCtcEditor.jsx';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import { SearchIcon, UsersIcon } from '../Icons.jsx';
 import { Badge, Card, EmptyState, LoadingBlock, Notice, Spinner } from '../ui.jsx';
 
 const NO_OFFICE = '';
 
-function EmployeeOfficeRow({ employee, offices, onAssigned }) {
+function EmployeeOfficeRow({ employee, offices, onAssigned, compensation, onCompensationSaved }) {
   const { csrfToken } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [rowError, setRowError] = useState(null);
@@ -47,6 +57,9 @@ function EmployeeOfficeRow({ employee, offices, onAssigned }) {
           </p>
         </div>
         {employee.accountStatus === 'invited' && <Badge tone="sky">Invited</Badge>}
+        {onCompensationSaved && (
+          <AnnualCtcEditor employee={employee} compensation={compensation} onSaved={onCompensationSaved} />
+        )}
         {!employee.officeLocationId && <Badge tone="amber">No office</Badge>}
         <div className="flex items-center gap-2">
           {isSaving && <Spinner className="h-4 w-4 text-brand-500" />}
@@ -76,6 +89,20 @@ function EmployeeOfficeRow({ employee, offices, onAssigned }) {
 }
 
 export default function EmployeeOfficesPanel() {
+  const { currentUser } = useAuth();
+  const canEditCompensation = hasCapability(currentUser, CAPABILITIES.MANAGE_COMPENSATION);
+  const compensationResource = useApiResource((signal) => requestEmployeeCompensation(signal), [], {
+    enabled: canEditCompensation,
+  });
+  const compensationByEmployeeId = new Map(
+    (compensationResource.data?.compensation ?? []).map((entry) => [entry.employeeId, entry]),
+  );
+  function handleCompensationSaved(saved) {
+    compensationResource.setData((data) => ({
+      ...data,
+      compensation: [...(data?.compensation ?? []).filter((entry) => entry.employeeId !== saved.employeeId), saved],
+    }));
+  }
   const employeesResource = useApiResource((signal) => requestEmployees(signal), []);
   const officesResource = useApiResource((signal) => requestOffices(signal), []);
   const [searchText, setSearchText] = useState('');
@@ -100,7 +127,7 @@ export default function EmployeeOfficesPanel() {
     }));
   }
 
-  const loadError = employeesResource.error ?? officesResource.error;
+  const loadError = employeesResource.error ?? officesResource.error ?? compensationResource.error;
   return (
     <Card
       title="Employees' base offices"
@@ -149,6 +176,8 @@ export default function EmployeeOfficesPanel() {
               employee={employee}
               offices={offices}
               onAssigned={handleAssigned}
+              compensation={compensationByEmployeeId.get(employee.employeeId)}
+              onCompensationSaved={canEditCompensation ? handleCompensationSaved : null}
             />
           ))}
         </ul>

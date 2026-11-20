@@ -27,6 +27,7 @@ const GUARDED_PAGES = Object.freeze([
   '/admin/company',
   '/admin/knowledge',
   '/people/offboarding',
+  '/tax/ca-portal',
 ]);
 
 const EVERYONE_PAGES = Object.freeze([
@@ -65,6 +66,7 @@ const ROLE_ACCESS = {
       'Company',
       'Users & roles',
       'Agent telemetry',
+      'Form 16 / CA Portal',
       'Account',
     ],
     guardedPages: GUARDED_PAGES.filter((pagePath) => pagePath !== '/support'),

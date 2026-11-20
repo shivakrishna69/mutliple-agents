@@ -43,6 +43,8 @@ export const ROUTE_PATHS = Object.freeze({
   LEAVE_APPROVALS: '/leave/approvals',
   // Leave administration: policies, balances, payroll export (MANAGE_WORKFORCE).
   LEAVE_ADMIN: '/leave/admin',
+  // The Form 16 portal (MANAGE_FORM16): a chartered accountant's home page.
+  CA_PORTAL: '/tax/ca-portal',
   // Department knowledge bases: every department's with MANAGE_KNOWLEDGE_BASES, and the ones a person
   // heads or leads (self-service). The same pages; the backend decides what each person sees.
   KNOWLEDGE_HUB: '/admin/knowledge',
@@ -72,6 +74,7 @@ export const USER_ROLES = Object.freeze({
   IT_ADMIN: 'it_admin',
   AGENT: 'agent',
   EMPLOYEE: 'employee',
+  CA: 'ca',
 });
 
 /**
@@ -116,6 +119,13 @@ export const ROLE_DISPLAY = Object.freeze({
     assignmentPhrase: 'an IT administrator',
     description: 'User accounts, company settings and system health; no HR or salary data',
     badgeClassName: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+  },
+  ca: {
+    label: 'Chartered Accountant',
+    pluralLabel: 'Chartered Accountants',
+    assignmentPhrase: 'a chartered accountant',
+    description: 'The Form 16 portal only: eligible employees, their tax figures and Form 16 uploads',
+    badgeClassName: 'bg-teal-50 text-teal-700 ring-teal-600/20',
   },
   employee: {
     label: 'Employee',

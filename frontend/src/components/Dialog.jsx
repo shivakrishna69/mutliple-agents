@@ -12,7 +12,7 @@ import { useEffect, useId, useRef } from 'react';
 import { CloseIcon } from './Icons.jsx';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-const SIZES = Object.freeze({ md: 'max-w-lg', lg: 'max-w-3xl' });
+const SIZES = Object.freeze({ md: 'max-w-lg', lg: 'max-w-3xl', xl: 'max-w-5xl' });
 
 export default function Dialog({ title, onClose, size = 'md', children }) {
   const titleId = useId();

@@ -29,4 +29,7 @@ export const CAPABILITIES = Object.freeze({
   VIEW_FINAL_SETTLEMENT: 'view_final_settlement',
   VIEW_IT_OFFBOARDING: 'view_it_offboarding',
   RUN_WEB_RESEARCH: 'run_web_research',
+  MANAGE_FORM16: 'manage_form16',
+  VIEW_OWN_FORM16: 'view_own_form16',
+  USE_EMPLOYEE_WORKSPACE: 'use_employee_workspace',
 });
