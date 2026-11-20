@@ -179,7 +179,8 @@ const AWS_REGION_PATTERN = /^[a-z]{2}(?:-[a-z]+)+-\d+$/;
 
 /**
  * Reads one S3 storage area's settings from `<envPrefix>_S3_*` variables (VAULT_ for the document
- * vault, PAYSLIP_ for payslip PDFs, OFFBOARDING_ for offboarding letters, statements and audits). Returns null when `<envPrefix>_S3_BUCKET` is unset, which
+ * vault, PAYSLIP_ for payslip PDFs, OFFBOARDING_ for offboarding letters, statements and audits, TAX_DOCS_ for
+ * Form 16 PDFs). Returns null when `<envPrefix>_S3_BUCKET` is unset, which
  * disables that feature (its routes answer 503; the rest of the backend runs normally). When a
  * bucket is set, every related value is validated and a misconfiguration stops startup. AWS
  * credentials are deliberately not read here; the SDK's default provider chain supplies them
@@ -540,6 +541,9 @@ export function loadConfig() {
   // Optional. Offboarding documents (relieving letter, settlement statement, attendance audit); null
   // storage leaves offboarding previews working and refuses to start one (503).
   const offboarding = { storage: loadS3StorageConfig(env, 'OFFBOARDING') };
+  // Optional. Form 16 PDFs (the CA portal); null storage leaves the portal readable and refuses
+  // uploads and downloads (503).
+  const taxDocs = { storage: loadS3StorageConfig(env, 'TAX_DOCS') };
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')
@@ -557,6 +561,7 @@ export function loadConfig() {
     vaultStorage,
     payslips,
     offboarding,
+    taxDocs,
     webResearch: loadWebResearchConfig(env),
     pdfBrowser,
     offerLetters: loadOfferLetterConfig(),

@@ -22,11 +22,12 @@ import {
   listRegularizationReviews,
 } from '../controllers/regularizationReviewController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 import { attendancePunchRateLimitByUser, regularizationRateLimitByUser } from '../middleware/rateLimiter.js';
 
 const attendanceRouter = Router();
 
-attendanceRouter.use(protect, (req, res, next) => {
+attendanceRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   // Responses describe one person's location and attendance; never cache them.
   res.set('Cache-Control', 'no-store');
   next();

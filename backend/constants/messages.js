@@ -7,6 +7,7 @@
 import { ROLE_DEFINITIONS } from './accessRoles.js';
 import {
   ACCOUNT_EMAIL_SETTINGS,
+  FORM16_SETTINGS,
   GENDERS,
   KNOWLEDGE_BASE_SETTINGS,
   MESSAGE_FIELD_LIMITS,
@@ -54,6 +55,8 @@ export const RATE_LIMIT_MESSAGES = Object.freeze({
   TOO_MANY_REGULARIZATION_MESSAGES: 'Too many attendance correction messages. Please wait a minute and try again',
   TOO_MANY_TAX_ESTIMATES: 'Too many tax estimates. Please wait a minute and try again',
   TOO_MANY_PAYSLIP_GENERATIONS: 'Too many payslips generated in a short time. Please wait a minute and try again',
+  TOO_MANY_FORM16_UPLOADS: 'Too many Form 16 uploads in a short time. Please wait a minute and try again',
+  TOO_MANY_FORM16_DOWNLOADS: 'Too many Form 16 downloads in a short time. Please wait a minute and try again',
   TOO_MANY_OFFER_CALCULATIONS: 'Too many offer calculations in a short time. Please wait a minute and try again',
   TOO_MANY_OFFER_DISPATCHES: 'Too many offers sent in a short time. Please wait a few minutes and try again',
   TOO_MANY_OFFER_IMPORTS: 'Too many offer files uploaded in a short time. Please wait a few minutes and try again',
@@ -153,7 +156,8 @@ export const ACCOUNT_EMAIL_MESSAGES = Object.freeze({
 export const ADMIN_MESSAGES = Object.freeze({
   ADMINS_ONLY: 'Only administrators can do this',
   USER_MANAGERS_ONLY: 'Only administrators and IT administrators can manage users',
-  ADMIN_ROLE_RESTRICTED: "Only an administrator can make someone an administrator or change an administrator's role",
+  ADMIN_ROLE_RESTRICTED:
+    "Only an administrator can make someone an administrator or a chartered accountant, or change such a person's role",
   USERS_RETRIEVED: 'Users retrieved',
   ROLE_UPDATED: 'Role updated',
   ROLE_UNCHANGED: 'The user already has this role',
@@ -319,6 +323,8 @@ export const OKR_MESSAGES = Object.freeze({
 export const COMMON_MESSAGES = Object.freeze({
   STALE_VERSION: 'This was changed by someone else. Reload and try again',
   EMPLOYEE_NOT_FOUND: 'Employee not found',
+  // A chartered accountant asking for an employee's own workspace (attendance, leave, payslips...).
+  WORKSPACE_NOT_ALLOWED: 'This part of the portal is not available to your role',
 });
 
 export const COMPANY_MESSAGES = Object.freeze({
@@ -1089,4 +1095,37 @@ export const TASK_MESSAGES = Object.freeze({
     'Only the task leads plan sprints; you can bring a backlog task assigned to you into the active sprint',
   TASK_DONE_NEEDS_REVIEW: 'A task is marked done from In review. Move it to In review first',
   TASK_DONE_NOT_ALLOWED: 'Only the task leads or the person who reported a task can mark it done',
+});
+
+export const COMPENSATION_MESSAGES = Object.freeze({
+  COMPENSATION_RETRIEVED: 'Annual CTC of current employees',
+  COMPENSATION_UPDATED: 'Annual CTC saved',
+  INPUT_INVALID: 'The annual CTC needs fixing',
+  RESTRICTED: 'Only administrators, HR and Finance & Payroll can see or change annual CTC',
+});
+
+export const FORM16_MESSAGES = Object.freeze({
+  YEARS_RETRIEVED: 'Financial years',
+  EMPLOYEES_RETRIEVED: 'Employees with Form 16',
+  EMPLOYEE_RETRIEVED: 'Employee tax details',
+  UPLOADED: 'Form 16 uploaded',
+  MY_FORM16_RETRIEVED: 'Your Form 16',
+  // Shown on the employee's Form 16 tab (GET /api/tax/my-form16, as `notice`).
+  NOT_ELIGIBLE_NOTICE: `Form 16 through this portal is issued to employees whose annual CTC is above ₹${FORM16_SETTINGS.CTC_THRESHOLD.toLocaleString('en-IN')}`,
+  PENDING_NOTICE: (financialYear) =>
+    `Your Form 16 for financial year ${financialYear} has not been uploaded yet. It appears here once the chartered accountant uploads it`,
+  DOWNLOAD_ISSUED: 'Download link ready',
+  INPUT_INVALID: 'Some details need fixing',
+  NOT_ALLOWED: 'The Form 16 portal is open to chartered accountants and administrators only',
+  OWN_NOT_ALLOWED: 'Form 16 is not available to your role',
+  EMPLOYEE_NOT_FOUND: 'Employee not found',
+  DOCUMENT_NOT_FOUND: 'Form 16 not found',
+  STORAGE_NOT_CONFIGURED: 'Form 16 storage is not set up yet. Ask your administrator to configure it',
+  STORAGE_UNAVAILABLE: 'Form 16 storage is not reachable right now. Try again in a minute',
+  CONCURRENT_UPLOAD: 'Another Form 16 for this employee and year was uploaded at the same moment. Reload and try again',
+  FILE_REQUIRED: 'Choose the Form 16 PDF to upload',
+  FILE_TOO_LARGE: `The Form 16 PDF can be at most ${FORM16_SETTINGS.MAX_FILE_BYTES / (1024 * 1024)} MB`,
+  FILE_NOT_PDF: 'The file is not a PDF. Upload the Form 16 as a PDF',
+  MALFORMED_UPLOAD: 'The upload could not be read. Try again',
+  MULTIPART_REQUIRED: 'Send the Form 16 as a file upload',
 });

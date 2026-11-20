@@ -57,6 +57,7 @@ import taskBoardListRoutes from './routes/taskBoardListRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import nskBotRoutes from './routes/nskBotRoutes.js';
 import webResearchRoutes from './routes/webResearchRoutes.js';
+import taxRoutes from './routes/taxRoutes.js';
 import {
   startExternalKnowledgeCleanup,
   stopExternalKnowledgeCleanup,
@@ -71,6 +72,7 @@ import { closeEmployeeImportQueue, initEmployeeImportQueue } from './services/em
 import { closeKnowledgeIngestionQueue, initKnowledgeIngestionQueue } from './services/knowledge/ingestionQueue.js';
 import { closeOffboardingQueue, initOffboardingQueue } from './services/nskBot/offboarding/offboardingQueue.js';
 import { offboardingStore } from './services/nskBot/offboarding/offboardingStorage.js';
+import { form16Store } from './services/tax/form16Storage.js';
 import { closeCacheStore, initCacheStore } from './services/cacheStore.js';
 import { startLeaveScheduler, stopLeaveScheduler } from './services/leaveScheduler.js';
 import { startAttendanceScheduler, stopAttendanceScheduler } from './services/attendanceScheduler.js';
@@ -188,6 +190,7 @@ export function createApp(config) {
   // The NSK assistant: sessions and turns (its tools are internal routes the ai-service calls).
   app.use('/api/nsk-bot', nskBotRoutes);
   app.use('/api/web-research', webResearchRoutes);
+  app.use('/api/tax', taxRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));
@@ -241,6 +244,7 @@ async function start() {
     initOfferLetters(config.offerLetters);
     initPayslipServices(config.payslips);
     offboardingStore.init(config.offboarding.storage);
+    form16Store.init(config.taxDocs.storage);
     initMailService(config.mail);
     configureAccountCodeKey(config.jwtSecret);
   } catch (err) {
@@ -314,6 +318,7 @@ async function start() {
       await closeCacheStore();
       closeVaultStorage();
       offboardingStore.close();
+      form16Store.close();
       await closePayslipServices();
       closeMailService();
       await mongoose.connection.close();

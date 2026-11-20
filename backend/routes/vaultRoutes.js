@@ -21,12 +21,13 @@ import {
   verifyDocument,
 } from '../controllers/vaultController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 import { vaultDownloadRateLimitByUser, vaultUploadRateLimitByUser } from '../middleware/rateLimiter.js';
 import { receiveVaultUpload } from '../middleware/vaultUpload.js';
 
 const vaultRouter = Router();
 
-vaultRouter.use(protect, (req, res, next) => {
+vaultRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });

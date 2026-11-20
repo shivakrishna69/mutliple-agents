@@ -9,10 +9,11 @@
 import { Router } from 'express';
 import { getDashboardOverview } from '../controllers/dashboardController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 
 const dashboardRouter = Router();
 
-dashboardRouter.use(protect, (req, res, next) => {
+dashboardRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });

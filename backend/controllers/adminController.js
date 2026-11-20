@@ -7,8 +7,9 @@
  *   PATCH /api/admin/users/:userId/role      { role } (constants/accessRoles.js ROLES)
  *
  * Role changes:
- *   - Only an admin (ASSIGN_ADMIN_ROLE) makes someone an admin or changes an admin's role, so an IT
- *     administrator manages every other account but can never take or remove administration.
+ *   - Only an admin (ASSIGN_ADMIN_ROLE) gives or takes away ADMIN_ASSIGNED_ROLES (admin, chartered
+ *     accountant), so an IT administrator manages every other account but can never take or remove
+ *     administration, or open the Form 16 portal to anyone.
  *   - Nobody changes their own role; in particular an admin cannot, so the last admin can never demote themselves and
  *     lock everyone out of administration.
  *   - The change applies to HTTP requests immediately (every request reloads the user). The user's
@@ -17,7 +18,12 @@
  *   - Every change is logged with who made it, for audit.
  */
 
-import { CAPABILITIES, assignableRoleDefinitionsFor, hasCapability } from '../constants/accessRoles.js';
+import {
+  ADMIN_ASSIGNED_ROLES,
+  CAPABILITIES,
+  assignableRoleDefinitionsFor,
+  hasCapability,
+} from '../constants/accessRoles.js';
 import User, { ROLES } from '../models/User.js';
 import { ADMIN_MESSAGES } from '../constants/messages.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
@@ -103,7 +109,8 @@ export async function updateUserRole(req, res, next) {
     if (!userRecord) {
       return sendError(req, res, HTTP_STATUS.NOT_FOUND, ADMIN_MESSAGES.USER_NOT_FOUND);
     }
-    const touchesAdministration = requestedRole === ROLES.ADMIN || userRecord.role === ROLES.ADMIN;
+    const touchesAdministration =
+      ADMIN_ASSIGNED_ROLES.includes(requestedRole) || ADMIN_ASSIGNED_ROLES.includes(userRecord.role);
     if (touchesAdministration && !hasCapability(req.user.role, CAPABILITIES.ASSIGN_ADMIN_ROLE)) {
       logger.warn('Admin role change refused', { requestId: req.id, actorUserId: req.user.id, targetUserId: userId });
       return sendError(req, res, HTTP_STATUS.FORBIDDEN, ADMIN_MESSAGES.ADMIN_ROLE_RESTRICTED);

@@ -9,10 +9,11 @@
 import { Router } from 'express';
 import { getWorkforceRiskReport } from '../controllers/analyticsController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 
 const analyticsRouter = Router();
 
-analyticsRouter.use(protect, (req, res, next) => {
+analyticsRouter.use(protect, requireEmployeeWorkspace, (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });

@@ -25,6 +25,7 @@ import {
   verifyPayslipById,
 } from '../controllers/payrollController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { requireEmployeeWorkspace } from '../middleware/requireRole.js';
 import {
   payslipGenerationRateLimitByUser,
   payslipVerificationRateLimitByClientIp,
@@ -42,7 +43,7 @@ payrollRouter.use((req, res, next) => {
 payrollRouter.get('/payslips/verify/:verificationId', payslipVerificationRateLimitByClientIp, verifyPayslipById);
 
 // ---- Signed in -------------------------------------------------------------------------------
-payrollRouter.use(protect);
+payrollRouter.use(protect, requireEmployeeWorkspace);
 payrollRouter.get('/rules', getPayrollRules);
 payrollRouter.post('/tax-estimate', taxEstimateRateLimitByUser, createTaxEstimate);
 payrollRouter.post('/payslips', payslipGenerationRateLimitByUser, createPayslip);

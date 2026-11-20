@@ -307,3 +307,17 @@ export const invitationLookupRateLimitByClientIp = createRateLimiter({
   resolveClientKey: resolveClientIp,
   limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_INVITATION_ATTEMPTS,
 });
+
+export const form16UploadRateLimitByUser = createRateLimiter({
+  limiterName: 'form16_uploads_per_user',
+  ...RATE_LIMITS.FORM16_UPLOADS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_FORM16_UPLOADS,
+});
+
+export const form16DownloadRateLimitByUser = createRateLimiter({
+  limiterName: 'form16_downloads_per_user',
+  ...RATE_LIMITS.FORM16_DOWNLOADS_PER_USER,
+  resolveClientKey: (req) => `user:${req.user?.id ?? resolveClientIp(req)}`,
+  limitExceededMessage: RATE_LIMIT_MESSAGES.TOO_MANY_FORM16_DOWNLOADS,
+});

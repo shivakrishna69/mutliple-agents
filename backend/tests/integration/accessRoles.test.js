@@ -10,6 +10,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ADMIN_ASSIGNED_ROLES,
   CAPABILITIES,
   JOB_LEVEL_DEFINITIONS,
   ROLES,
@@ -76,18 +77,27 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
       assert.deepEqual(user.capabilities, capabilitiesOf(role));
     }
     assert.deepEqual(capabilitiesOf(ROLES.EMPLOYEE), [
+      CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
+      CAPABILITIES.VIEW_OWN_FORM16,
       CAPABILITIES.ASK_DEPARTMENT_AGENTS,
       CAPABILITIES.USE_TASK_BOARDS,
       CAPABILITIES.USE_NSK_ASSISTANT,
       CAPABILITIES.USE_SUPPORT_CHAT,
     ]);
+    // A chartered accountant works in the Form 16 portal only (tests/integration/form16.test.js).
+    const staffRoles = ALL_ROLES.filter((role) => role !== ROLES.CA);
+    assert.deepEqual(capabilitiesOf(ROLES.CA), [CAPABILITIES.MANAGE_FORM16]);
     assert.ok(
-      ALL_ROLES.every((role) => capabilitiesOf(role).includes(CAPABILITIES.ASK_DEPARTMENT_AGENTS)),
-      'every role may ask department agents (which ones is decided per agent)',
+      staffRoles.every((role) => capabilitiesOf(role).includes(CAPABILITIES.ASK_DEPARTMENT_AGENTS)),
+      'every staff role may ask department agents (which ones is decided per agent)',
     );
     assert.ok(
-      ALL_ROLES.every((role) => capabilitiesOf(role).includes(CAPABILITIES.USE_NSK_ASSISTANT)),
-      'every role may use the NSK assistant (what it reads follows their other capabilities)',
+      staffRoles.every((role) => capabilitiesOf(role).includes(CAPABILITIES.USE_NSK_ASSISTANT)),
+      'every staff role may use the NSK assistant (what it reads follows their other capabilities)',
+    );
+    assert.ok(
+      staffRoles.every((role) => capabilitiesOf(role).includes(CAPABILITIES.USE_EMPLOYEE_WORKSPACE)),
+      'every staff role has its own workspace',
     );
   });
 
@@ -191,8 +201,8 @@ describe('access roles', { skip: mongoReason ?? false }, () => {
     assert.equal(canChangeAdmins, false);
     assert.deepEqual(
       roleOptions.map((role) => role.value),
-      ROLE_DEFINITIONS.map((role) => role.value).filter((role) => role !== ROLES.ADMIN),
-      'an IT administrator is never offered the admin role',
+      ROLE_DEFINITIONS.map((role) => role.value).filter((role) => !ADMIN_ASSIGNED_ROLES.includes(role)),
+      'an IT administrator is never offered the admin or chartered accountant role',
     );
     const adminView = (await clients[ROLES.ADMIN].get('/api/admin/users')).body.data;
     assert.equal(adminView.canChangeAdmins, true);

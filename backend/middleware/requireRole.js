@@ -8,8 +8,8 @@
  */
 
 import { HTTP_STATUS } from '../constants/httpStatus.js';
-import { hasCapability } from '../constants/accessRoles.js';
-import { CONVERSATION_MESSAGES } from '../constants/messages.js';
+import { CAPABILITIES, hasCapability } from '../constants/accessRoles.js';
+import { COMMON_MESSAGES, CONVERSATION_MESSAGES } from '../constants/messages.js';
 import { isStaffRole } from '../services/conversationAccess.js';
 import { sendError } from '../utils/apiResponse.js';
 import { logger } from '../utils/logger.js';
@@ -47,3 +47,12 @@ export function requireStaff(req, res, next) {
   }
   return next();
 }
+
+/**
+ * One's own workspace as an employee (attendance, leave, payslips, analytics, OKRs, vault, work
+ * calendar, presence, dashboard): everyone but a chartered accountant (USE_EMPLOYEE_WORKSPACE).
+ */
+export const requireEmployeeWorkspace = requireCapability(
+  CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
+  COMMON_MESSAGES.WORKSPACE_NOT_ALLOWED,
+);
