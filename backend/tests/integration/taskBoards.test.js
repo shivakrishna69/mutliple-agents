@@ -9,11 +9,23 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { TASK_MESSAGES } from '../../constants/messages.js';
+import { DEFAULT_COMPANY_SETTINGS } from '../../models/CompanySettings.js';
+import { addDaysToCalendarDate } from '../../utils/calendarDates.js';
 import { insertDepartment, onboardEmployee } from './fixtures.js';
 import { createSignedInClient, mongoUnavailableReason, startTestServer } from './testServer.js';
 
 const mongoReason = await mongoUnavailableReason();
 const boardPath = (departmentId) => `/api/departments/${departmentId}`;
+// Sprint 1 runs from a week ago to a week ahead in the company's time zone, so "today" is always
+// inside it, whenever the tests run (fixed dates made the burndown fail once they had passed).
+const companyToday = new Intl.DateTimeFormat('en-CA', {
+  timeZone: DEFAULT_COMPANY_SETTINGS.timeZone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(new Date());
+const SPRINT_START = addDaysToCalendarDate(companyToday, -7);
+const SPRINT_END = addDaysToCalendarDate(companyToday, 7);
 
 describe('department task boards', { skip: mongoReason ?? false }, () => {
   let testServer;
@@ -130,13 +142,13 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
   });
 
   it('lets leads plan sprints, one active at a time', async () => {
-    const plan = { name: 'Sprint 1', goal: 'Ship login', startDate: '2026-11-09', endDate: '2026-11-20' };
+    const plan = { name: 'Sprint 1', goal: 'Ship login', startDate: SPRINT_START, endDate: SPRINT_END };
     const byMember = await dev1.client.post(`${boardPath(engineering)}/sprints`, plan);
     assert.equal(byMember.status, 403);
     assert.equal(byMember.body.error.code, 'LEADS_ONLY');
     const backwards = await engLead.client.post(`${boardPath(engineering)}/sprints`, {
       ...plan,
-      endDate: '2026-11-01',
+      endDate: addDaysToCalendarDate(SPRINT_START, -1),
     });
     assert.equal(backwards.status, 400);
     const missing = await engLead.client.post(`${boardPath(engineering)}/sprints`, { name: 'No dates' });
@@ -362,8 +374,8 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
       sprint.burndown.days.every((day) => day.remainingPoints === 5),
       'nothing done yet',
     );
-    assert.equal(sprint.burndown.days[0]?.date ?? '2026-11-09', '2026-11-09');
-    const lastDay = sprint.burndown.today < '2026-11-20' ? sprint.burndown.today : '2026-11-20';
+    assert.equal(sprint.burndown.days[0]?.date ?? SPRINT_START, SPRINT_START);
+    const lastDay = sprint.burndown.today < SPRINT_END ? sprint.burndown.today : SPRINT_END;
     assert.equal(sprint.burndown.days.at(-1)?.date ?? lastDay, lastDay, 'no days after today');
   });
 

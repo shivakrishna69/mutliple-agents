@@ -20,7 +20,7 @@
 import { expect, test } from '@playwright/test';
 
 import { ACCOUNTS, EMPLOYEE, OFFBOARD_EMPLOYEE } from './environment.js';
-import { localToday, mainNavigation, signIn, watchForPageProblems } from './helpers.js';
+import { mainNavigation, signIn, watchForPageProblems } from './helpers.js';
 import { NSK_LEAVE_REPLY } from './standInAiService.js';
 
 test.describe.configure({ mode: 'serial' });
@@ -40,7 +40,15 @@ async function ask(drawer, text) {
   await drawer.getByRole('button', { name: 'Send' }).click();
 }
 
-const inDays = (days) => localToday(new Date(Date.now() + days * 86_400_000));
+// The company's calendar (Asia/Kolkata), which the backend counts notice days in, rather than the test
+// runner's: on a UTC runner the two disagree between 18:30 and midnight UTC.
+const COMPANY_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const inDays = (days) => COMPANY_DATE.format(new Date(Date.now() + days * 86_400_000));
 
 test('an employee asks NSK, picks up the conversation later, and deletes it', async ({ page }) => {
   test.setTimeout(90_000);
