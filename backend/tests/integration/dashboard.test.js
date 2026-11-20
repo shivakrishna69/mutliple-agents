@@ -290,12 +290,15 @@ describe('dashboard support figures', { skip: skipReason ?? false }, () => {
   });
 
   it('puts a reply in the company’s local hour, not the server’s', async () => {
-    // One minute after the company's midnight: in UTC (the server's clock) it is still yesterday
-    // evening (18:31 for Kolkata), so a chart grouped in UTC would put it in the wrong hour and day.
+    // Just after the company's midnight: in UTC (the server's clock) it is still yesterday evening
+    // (18:31 for Kolkata), so a chart grouped in UTC would put it in the wrong hour and day. A minute
+    // after midnight, or a moment ago when the tests run in that first minute: the overview counts up
+    // to now, so a reply in the future would not be counted.
     const { range, support: before } = await overviewOf(adminClient);
     // Early in the company's day, the replies the fixtures just wrote are in this hour too.
     const repliesBefore = before.activity.points[0].ai;
-    const justAfterMidnight = new Date(new Date(range.start).getTime() + 60 * SECOND);
+    const midnight = new Date(range.start).getTime();
+    const justAfterMidnight = new Date(Math.max(midnight, Math.min(midnight + 60 * SECOND, Date.now() - SECOND)));
     await testServer.database.collection('messages').insertOne({
       conversationId: ids.aiOnly,
       senderType: 'ai_worker',
