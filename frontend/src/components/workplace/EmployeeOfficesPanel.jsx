@@ -57,10 +57,10 @@ function EmployeeOfficeRow({ employee, offices, onAssigned, compensation, onComp
           </p>
         </div>
         {employee.accountStatus === 'invited' && <Badge tone="sky">Invited</Badge>}
+        {!employee.officeLocationId && <Badge tone="amber">No office</Badge>}
         {onCompensationSaved && (
           <AnnualCtcEditor employee={employee} compensation={compensation} onSaved={onCompensationSaved} />
         )}
-        {!employee.officeLocationId && <Badge tone="amber">No office</Badge>}
         <div className="flex items-center gap-2">
           {isSaving && <Spinner className="h-4 w-4 text-brand-500" />}
           <select

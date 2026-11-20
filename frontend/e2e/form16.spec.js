@@ -16,6 +16,10 @@ import { mainNavigation, signIn, watchForPageProblems } from './helpers.js';
 
 const PDF = Buffer.from('%PDF-1.7\n% Form 16 for the browser test\n%%EOF\n', 'latin1');
 
+// Its own client address (through the dev server proxy), so these sign-ins stay out of the shared
+// per-address sign-in budget (30 per 15 minutes) the other specs use.
+const OWN_ADDRESS = Object.freeze({ 'X-Forwarded-For': '203.0.113.16' });
+test.use({ extraHTTPHeaders: OWN_ADDRESS });
 test.describe.configure({ mode: 'serial' });
 
 test('a CA uploads a Form 16 for an employee above ₹12,00,000 only', async ({ page }) => {
@@ -54,7 +58,7 @@ test('a CA uploads a Form 16 for an employee above ₹12,00,000 only', async ({ 
 });
 
 test('the employee downloads their Form 16; the one at ₹12,00,000 is told it does not apply', async ({ browser }) => {
-  const aboveContext = await browser.newContext();
+  const aboveContext = await browser.newContext({ extraHTTPHeaders: OWN_ADDRESS });
   const page = await aboveContext.newPage();
   await signIn(page, FORM16_ABOVE.email);
   await page.goto('/payroll');
@@ -69,7 +73,7 @@ test('the employee downloads their Form 16; the one at ₹12,00,000 is told it d
   expect((await fileRequest).url()).toMatch(/company-tax-docs\/form16\/\d{4}-\d{2}\/[0-9a-f]{24}\/[0-9a-f]{24}\.pdf/);
   await aboveContext.close();
 
-  const atContext = await browser.newContext();
+  const atContext = await browser.newContext({ extraHTTPHeaders: OWN_ADDRESS });
   const atPage = await atContext.newPage();
   await signIn(atPage, FORM16_AT.email);
   await atPage.goto('/payroll');
