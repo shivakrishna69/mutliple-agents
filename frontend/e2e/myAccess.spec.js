@@ -55,6 +55,31 @@ test('an administrator’s launcher has the management tools', async ({ page }) 
     await expect(tileLabels(page).filter({ hasText: label })).toHaveCount(1);
   }
   await expect(tileLabels(page).filter({ hasText: 'Support Chat' })).toHaveCount(0);
+
+  // Badges show the backend's own counts at this moment (other specs change them), and nothing at 0.
+  const apiData = async (path) => (await (await page.request.get(path)).json()).data;
+  const leavePending =
+    (await apiData('/api/leave/approvals?queue=requests')).requests.length +
+    (await apiData('/api/leave/approvals?queue=changes')).requests.length;
+  const form16Pending = (await apiData('/api/tax/ca/employees')).summary.pending;
+  for (const [label, count] of [
+    ['Leave', leavePending],
+    ['Form 16 / CA Portal', form16Pending],
+  ]) {
+    const badge = tileLabels(page).filter({ hasText: label }).getByTestId('my-access-badge');
+    if (count > 0) await expect(badge).toHaveText(count > 99 ? '99+' : String(count));
+    else await expect(badge).toHaveCount(0);
+  }
+
+  // The search filters as one types; × brings every tile back.
+  const allTiles = await tileLabels(page).count();
+  await page.getByLabel('Search modules').fill('payslip');
+  await expect(tileLabels(page)).toHaveText(['Payroll & Form 16']);
+  await page.getByLabel('Search modules').fill('no such module');
+  await expect(page.getByTestId('my-access-no-match')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(tileLabels(page)).toHaveCount(allTiles);
+
   await tileLabels(page).filter({ hasText: 'Users & Roles' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Users & roles' })).toBeVisible();
   await expect(mainNavigation(page)).toBeVisible();

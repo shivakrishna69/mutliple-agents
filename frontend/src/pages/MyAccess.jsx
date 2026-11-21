@@ -7,13 +7,23 @@
  *
  * The shell passes what decides visibility (role, portal view, board and knowledge base membership)
  * and the notifications through the outlet context, so nothing is fetched twice.
+ *
+ *   search   a box in the heading row filters the tiles as the person types (label, keywords or
+ *            address, any case); × clears it; a short note when nothing matches
+ *   badges   pending counts on the tiles that have one (Leave, Attendance, Support Console, Form 16 /
+ *            CA Portal), from endpoints the pages already use (utils/launcherBadges.js); a badge shows
+ *            only above 0, and not at all when its count cannot be read
+ *   hover    the tile lifts and its medallion zooms (transform only, so it stays smooth)
  */
 
 import { useState } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router';
 import { launcherTilesFor } from '../components/appNavigation.js';
 import { freshNavigationState } from '../components/NotificationCenter.jsx';
-import { BellIcon, CloseIcon } from '../components/Icons.jsx';
+import { BellIcon, CloseIcon, SearchIcon } from '../components/Icons.jsx';
+import { LAUNCHER_BADGE_LABEL, LAUNCHER_SEARCH } from '../constants/launcher.js';
+import { useApiResource } from '../hooks/useApiResource.js';
+import { BADGE_PATHS, badgeText, filterTiles, loadLauncherBadges } from '../utils/launcherBadges.js';
 
 const DISMISSED_KEY = 'nsk.myAccess.dismissedNotification';
 
@@ -77,7 +87,42 @@ function AnnouncementPill({ notificationState }) {
   );
 }
 
-function LauncherTile({ tile }) {
+/** The search box in the heading row: compact, so the grid still fits one screen. */
+function ModuleSearch({ value, onChange }) {
+  return (
+    <div className="relative w-full sm:w-64">
+      <label htmlFor="my-access-search" className="sr-only">
+        {LAUNCHER_SEARCH.LABEL}
+      </label>
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-3 z-10 h-4 w-4 -translate-y-1/2 text-slate-600" />
+      <input
+        id="my-access-search"
+        type="search"
+        value={value}
+        maxLength={LAUNCHER_SEARCH.MAX_LENGTH}
+        onChange={(changeEvent) => onChange(changeEvent.target.value)}
+        onKeyDown={(keyEvent) => {
+          if (keyEvent.key === 'Escape') onChange('');
+        }}
+        placeholder={LAUNCHER_SEARCH.PLACEHOLDER}
+        autoComplete="off"
+        className="h-9 w-full rounded-full border-0 bg-white/70 py-1.5 pr-9 pl-9 text-sm text-slate-900 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9)] ring-1 ring-slate-900/[0.08] backdrop-blur transition placeholder:text-slate-500 focus:bg-white/90 focus:ring-2 focus:ring-brand-500 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label={LAUNCHER_SEARCH.CLEAR}
+          className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-slate-500 hover:bg-slate-900/[0.06] hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+        >
+          <CloseIcon className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LauncherTile({ tile, badge }) {
   const { label, path, Icon, tint } = tile;
   return (
     <li>
@@ -86,14 +131,26 @@ function LauncherTile({ tile }) {
         className="group flex w-28 flex-col items-center gap-2 rounded-2xl text-center focus-visible:outline-none"
         data-testid="my-access-tile"
       >
-        <span className="glass-card glass-interactive flex h-24 w-24 items-center justify-center group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+        <span className="glass-card relative flex h-24 w-24 items-center justify-center transition-[transform,box-shadow,border-color] duration-200 ease-out will-change-transform group-hover:-translate-y-1 group-hover:border-white group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-brand-500 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
           <span
-            className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-[inset_0_1px_1px_rgb(255_255_255/0.45),0_8px_18px_-8px_rgb(15_23_42/0.45)] ring-[3px] ring-white/40 ${tint}`}
+            className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-[inset_0_1px_1px_rgb(255_255_255/0.45),0_8px_18px_-8px_rgb(15_23_42/0.45)] ring-[3px] ring-white/40 transition-transform duration-200 ease-out will-change-transform group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100 ${tint}`}
           >
             <Icon className="h-8 w-8" />
           </span>
+          {badge && (
+            <span
+              className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-semibold text-white shadow-sm ring-2 ring-white"
+              data-testid="my-access-badge"
+              aria-hidden="true"
+            >
+              {badge}
+            </span>
+          )}
         </span>
-        <span className="text-[13px] leading-tight font-medium text-slate-800 group-hover:text-slate-950">{label}</span>
+        <span className="text-[13px] leading-tight font-medium text-slate-800 group-hover:text-slate-950">
+          {label}
+          {badge && <span className="sr-only">{`, ${badge} ${LAUNCHER_BADGE_LABEL}`}</span>}
+        </span>
       </Link>
     </li>
   );
@@ -102,6 +159,13 @@ function LauncherTile({ tile }) {
 export default function MyAccess() {
   const { visibility, notificationState } = useOutletContext();
   const tiles = launcherTilesFor(visibility);
+  const [query, setQuery] = useState('');
+  // Only the tiles this person sees are asked for a count; a change of view asks again.
+  const badgePaths = tiles.map((tile) => tile.path).filter((path) => BADGE_PATHS.includes(path));
+  const badges = useApiResource((signal) => loadLauncherBadges(badgePaths, signal), [badgePaths.join(',')], {
+    enabled: badgePaths.length > 0,
+  });
+  const shownTiles = filterTiles(tiles, query);
   return (
     <div className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-10">
       <section className="glass-card px-5 py-5 sm:px-8 sm:py-6" aria-labelledby="my-access-heading">
@@ -109,13 +173,22 @@ export default function MyAccess() {
           <h1 id="my-access-heading" className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             My Access
           </h1>
-          <AnnouncementPill notificationState={notificationState} />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
+            <AnnouncementPill notificationState={notificationState} />
+            <ModuleSearch value={query} onChange={setQuery} />
+          </div>
         </div>
-        <ul className="mt-5 grid grid-cols-2 justify-items-center gap-x-6 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
-          {tiles.map((tile) => (
-            <LauncherTile key={tile.path} tile={tile} />
-          ))}
-        </ul>
+        {shownTiles.length === 0 ? (
+          <p className="mt-5 py-8 text-center text-sm text-slate-500" role="status" data-testid="my-access-no-match">
+            {LAUNCHER_SEARCH.NO_MATCH} “{query.trim()}”
+          </p>
+        ) : (
+          <ul className="mt-5 grid grid-cols-2 justify-items-center gap-x-6 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+            {shownTiles.map((tile) => (
+              <LauncherTile key={tile.path} tile={tile} badge={badgeText(badges.data?.[tile.path])} />
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

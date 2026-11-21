@@ -1,14 +1,25 @@
 /**
  * The My Access launcher (MyAccess.jsx, components/appNavigation.js): one tile per page the person may
  * open, following the same capabilities, portal view and membership rules as the sidebar; the newest
- * unread notification as a dismissible announcement; and nothing announced when all are read.
+ * unread notification as a dismissible announcement; and nothing announced when all are read; the
+ * pending-count badges; and the module search.
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { launcherTilesFor } from '../components/appNavigation.js';
+import { loadLauncherBadges } from '../utils/launcherBadges.js';
 import MyAccess from './MyAccess.jsx';
+
+vi.mock('../utils/launcherBadges.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  loadLauncherBadges: vi.fn(),
+}));
+vi.mock('../auth/AuthContext.jsx', () => {
+  const session = { currentUser: { id: 'me' }, markSessionEnded: () => {} };
+  return { useAuth: () => session };
+});
 
 const WORKSPACE = ['use_employee_workspace', 'view_own_form16', 'ask_department_agents', 'use_nsk_assistant'];
 const ADMIN = [
@@ -90,7 +101,11 @@ describe('launcher tiles', () => {
 });
 
 describe('My Access page', () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+    loadLauncherBadges.mockResolvedValue({});
+  });
 
   it('shows the heading and one link per tile', () => {
     renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
@@ -123,5 +138,38 @@ describe('My Access page', () => {
     // Dismissed for this browser: not back on the next visit.
     renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState });
     expect(screen.queryByTestId('my-access-announcement')).toBeNull();
+  });
+
+  it('shows a pending count only on the tiles that have one, and asks only for visible tiles', async () => {
+    loadLauncherBadges.mockResolvedValue({ '/leave': 3, '/attendance': 120 });
+    renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
+    const leave = screen.getByText('Leave').closest('a');
+    expect(await within(leave).findByTestId('my-access-badge')).toHaveProperty('textContent', '3');
+    expect(within(leave).getByText(', 3 pending')).toBeTruthy();
+    expect(within(screen.getByText('Attendance').closest('a')).getByTestId('my-access-badge').textContent).toBe('99+');
+    expect(screen.getAllByTestId('my-access-badge')).toHaveLength(2);
+    expect(loadLauncherBadges).toHaveBeenCalledWith(['/attendance', '/leave'], expect.anything());
+  });
+
+  it('shows no badge when the counts cannot be read', async () => {
+    loadLauncherBadges.mockRejectedValue(new Error('offline'));
+    renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
+    await screen.findByRole('heading', { name: 'My Access' });
+    expect(screen.queryByTestId('my-access-badge')).toBeNull();
+  });
+
+  it('filters the tiles as the person types, clears, and says when nothing matches', () => {
+    renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
+    const search = screen.getByLabelText('Search modules');
+    fireEvent.change(search, { target: { value: 'PAYSLIP' } });
+    expect(screen.getAllByTestId('my-access-tile').map((tile) => tile.textContent)).toEqual(['Payroll & Form 16']);
+
+    fireEvent.change(search, { target: { value: 'zebra' } });
+    expect(screen.queryAllByTestId('my-access-tile')).toHaveLength(0);
+    expect(screen.getByTestId('my-access-no-match').textContent).toContain('zebra');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(screen.getAllByTestId('my-access-tile')).toHaveLength(7);
+    expect(search.value).toBe('');
   });
 });
