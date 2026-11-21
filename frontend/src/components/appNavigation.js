@@ -9,7 +9,8 @@
  *   isVisibleTo      a further condition on the context ({ managesOwnKnowledgeBase, hasTaskBoard })
  *   views            the portal views it belongs to, for people who switch (PortalSwitcher.jsx)
  *   testId           a data-testid for its sidebar link, where tests rely on one
- *   tile             its My Access tile: { label?, tint } (the tint is the medallion's gradient), or
+ *   tile             its My Access tile: { label?, tint, keywords? } (the tint is the medallion's
+ *                    gradient; keywords are other words the launcher's search finds it by), or
  *                    absent when the page has no tile (My Access itself, Account)
  */
 
@@ -56,7 +57,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         views: BOTH_VIEWS,
         capability: CAPABILITIES.USE_NSK_ASSISTANT,
         testId: 'nsk-open-sidebar',
-        tile: { tint: 'from-brand-500 via-indigo-600 to-violet-600' },
+        tile: { tint: 'from-brand-500 via-indigo-600 to-violet-600', keywords: ['assistant', 'chat', 'ai', 'help'] },
       },
       {
         label: 'Overview',
@@ -64,7 +65,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: HomeIcon,
         views: BOTH_VIEWS,
         capability: WORKSPACE,
-        tile: { tint: 'from-brand-500 to-indigo-600' },
+        tile: { tint: 'from-brand-500 to-indigo-600', keywords: ['dashboard', 'home'] },
       },
       {
         label: 'Support chat',
@@ -72,7 +73,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: ChatIcon,
         views: BOTH_VIEWS,
         capability: CAPABILITIES.USE_SUPPORT_CHAT,
-        tile: { label: 'Support Chat', tint: 'from-blue-500 to-indigo-700' },
+        tile: { label: 'Support Chat', tint: 'from-blue-500 to-indigo-700', keywords: ['help', 'ticket'] },
       },
       {
         label: 'Support console',
@@ -80,7 +81,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: InboxIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.STAFF_SUPPORT,
-        tile: { label: 'Support Console', tint: 'from-cyan-500 to-sky-700' },
+        tile: { label: 'Support Console', tint: 'from-cyan-500 to-sky-700', keywords: ['tickets', 'queue', 'chats'] },
       },
       {
         label: "My department's knowledge base",
@@ -89,7 +90,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         views: SELF_SERVICE_ONLY,
         capability: null,
         isVisibleTo: (context) => context.managesOwnKnowledgeBase,
-        tile: { label: 'Knowledge Base', tint: 'from-lime-500 to-emerald-600' },
+        tile: { label: 'Knowledge Base', tint: 'from-lime-500 to-emerald-600', keywords: ['documents', 'knowledge'] },
       },
       {
         label: 'Department Board',
@@ -98,7 +99,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         views: BOTH_VIEWS,
         capability: CAPABILITIES.USE_TASK_BOARDS,
         isVisibleTo: (context) => context.hasTaskBoard,
-        tile: { tint: 'from-teal-400 to-teal-700' },
+        tile: { tint: 'from-teal-400 to-teal-700', keywords: ['tasks', 'sprint', 'kanban'] },
       },
       {
         label: 'Ask an agent',
@@ -106,7 +107,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: SparklesIcon,
         views: BOTH_VIEWS,
         capability: CAPABILITIES.ASK_DEPARTMENT_AGENTS,
-        tile: { label: 'Ask an Agent', tint: 'from-fuchsia-500 to-purple-700' },
+        tile: { label: 'Ask an Agent', tint: 'from-fuchsia-500 to-purple-700', keywords: ['agents', 'questions'] },
       },
     ],
   },
@@ -119,7 +120,10 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: MapPinIcon,
         views: BOTH_VIEWS,
         capability: WORKSPACE,
-        tile: { tint: 'from-orange-400 to-rose-500' },
+        tile: {
+          tint: 'from-orange-400 to-rose-500',
+          keywords: ['punch', 'check in', 'regularize', 'timesheet', 'corrections'],
+        },
       },
       {
         label: 'Leave',
@@ -127,7 +131,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: CalendarIcon,
         views: BOTH_VIEWS,
         capability: WORKSPACE,
-        tile: { tint: 'from-sky-400 to-blue-600' },
+        tile: { tint: 'from-sky-400 to-blue-600', keywords: ['time off', 'holiday', 'vacation', 'approvals'] },
       },
       {
         label: 'Payroll',
@@ -135,7 +139,11 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: CurrencyIcon,
         views: BOTH_VIEWS,
         capability: WORKSPACE,
-        tile: { label: 'Payroll & Form 16', tint: 'from-indigo-400 to-indigo-700' },
+        tile: {
+          label: 'Payroll & Form 16',
+          tint: 'from-indigo-400 to-indigo-700',
+          keywords: ['payslip', 'salary', 'tax'],
+        },
       },
       {
         label: 'Analytics hub',
@@ -143,7 +151,11 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: ChartIcon,
         views: BOTH_VIEWS,
         capability: WORKSPACE,
-        tile: { label: 'Analytics Hub', tint: 'from-violet-400 to-purple-700' },
+        tile: {
+          label: 'Analytics Hub',
+          tint: 'from-violet-400 to-purple-700',
+          keywords: ['reports', 'okr', 'vault', 'insights'],
+        },
       },
       {
         label: 'Organisation',
@@ -151,7 +163,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: SitemapIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.STAFF_SUPPORT,
-        tile: { tint: 'from-purple-600 to-indigo-900' },
+        tile: { tint: 'from-purple-600 to-indigo-900', keywords: ['org chart', 'directory', 'hierarchy'] },
       },
       {
         label: 'Onboarding',
@@ -159,7 +171,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: UserPlusIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_WORKFORCE,
-        tile: { tint: 'from-amber-400 to-orange-600' },
+        tile: { tint: 'from-amber-400 to-orange-600', keywords: ['offers', 'invite', 'new joiner', 'hiring'] },
       },
       {
         label: 'Workplace',
@@ -167,7 +179,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: BuildingIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_WORKFORCE,
-        tile: { tint: 'from-emerald-400 to-green-700' },
+        tile: { tint: 'from-emerald-400 to-green-700', keywords: ['offices', 'departments', 'holidays', 'ctc'] },
       },
       {
         label: 'Offboarding',
@@ -176,7 +188,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         views: MANAGEMENT_ONLY,
         capability: null,
         anyCapabilities: [CAPABILITIES.VIEW_FINAL_SETTLEMENT, CAPABILITIES.VIEW_IT_OFFBOARDING],
-        tile: { tint: 'from-red-500 to-rose-700' },
+        tile: { tint: 'from-red-500 to-rose-700', keywords: ['exit', 'resignation', 'settlement', 'relieving'] },
       },
     ],
   },
@@ -189,7 +201,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: BookOpenIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_KNOWLEDGE_BASES,
-        tile: { tint: 'from-green-500 to-teal-700' },
+        tile: { tint: 'from-green-500 to-teal-700', keywords: ['knowledge base', 'agents'] },
       },
       {
         label: 'Company',
@@ -197,7 +209,11 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: CogIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_COMPANY_SETTINGS,
-        tile: { label: 'Company Settings', tint: 'from-slate-400 to-slate-600' },
+        tile: {
+          label: 'Company Settings',
+          tint: 'from-slate-400 to-slate-600',
+          keywords: ['settings', 'branding', 'email domain'],
+        },
       },
       {
         label: 'Users & roles',
@@ -205,7 +221,11 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: UsersIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_USERS,
-        tile: { label: 'Users & Roles', tint: 'from-blue-500 to-blue-800' },
+        tile: {
+          label: 'Users & Roles',
+          tint: 'from-blue-500 to-blue-800',
+          keywords: ['permissions', 'accounts', 'access'],
+        },
       },
       {
         label: 'Agent telemetry',
@@ -213,7 +233,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: TerminalIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.VIEW_AGENT_TELEMETRY,
-        tile: { label: 'Agent Telemetry', tint: 'from-slate-600 to-slate-900' },
+        tile: { label: 'Agent Telemetry', tint: 'from-slate-600 to-slate-900', keywords: ['logs', 'monitoring'] },
       },
     ],
   },
@@ -226,7 +246,7 @@ export const NAVIGATION_SECTIONS = Object.freeze([
         Icon: DocumentIcon,
         views: MANAGEMENT_ONLY,
         capability: CAPABILITIES.MANAGE_FORM16,
-        tile: { tint: 'from-indigo-500 to-violet-700' },
+        tile: { tint: 'from-indigo-500 to-violet-700', keywords: ['tax', 'ca', 'chartered accountant'] },
       },
     ],
   },
@@ -258,11 +278,12 @@ export function itemOfPath(pathname) {
   );
 }
 
-/** The launcher tiles this person sees, in sidebar order: [{ label, path, Icon, tint }]. */
+/** The launcher tiles this person sees, in sidebar order: [{ label, path, Icon, tint, keywords }]. */
 export const launcherTilesFor = (visibility) =>
   ALL_NAVIGATION_ITEMS.filter((item) => item.tile && isItemVisible(item, visibility)).map((item) => ({
     label: item.tile.label ?? item.label,
     path: item.path,
     Icon: item.Icon,
     tint: item.tile.tint,
+    keywords: item.tile.keywords ?? [],
   }));

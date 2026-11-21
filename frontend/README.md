@@ -174,6 +174,14 @@ WCAG AA on glass in both themes: at least 4.6:1 in light and 6.2:1 in dark.
 
 Signing in lands everyone with an employee workspace on **My Access** (`/my-access`, `pages/MyAccess.jsx`); a chartered accountant still lands on the CA portal. The launcher is shown without the sidebar: a frosted panel with one tile per page the person may open, and their newest unread notification as a dismissible announcement. Tiles and sidebar come from one list, `components/appNavigation.js`, with the same capability, portal view and membership rules, so they always offer the same pages. Opening a tile brings the sidebar back; the nine-dot button in the top bar and **My Access** at the top of the sidebar return to the launcher. `/` and every sign-in path go to the person's home (`auth/capabilities.js homePathOf`).
 
+On the launcher, a search box in the heading row filters the tiles as you type (label, keywords such
+as "payslip" or "exit", or address; × or Escape clears it). Tiles with something waiting carry a
+count badge, read from endpoints the pages already use (`utils/launcherBadges.js`): Leave (leave
+requests and changes to decide), Attendance (corrections to review), Support Console (escalated chats
+nobody has claimed, among the latest 100) and Form 16 / CA Portal (eligible employees still without
+this year's Form 16). A badge shows only above 0, "99+" above 99, and not at all when its count cannot
+be read. Hovering a tile lifts it and zooms its icon.
+
 ## Fonts and flags
 
 Served with the app, so no font or image request leaves the site:
