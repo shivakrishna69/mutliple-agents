@@ -9,6 +9,10 @@ export const ROUTE_PATHS = Object.freeze({
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD_WITH_CODE: '/reset-password',
   RESET_PASSWORD: '/reset-password/:token',
+  // Signed in: each person's home (auth/capabilities.js homePathOf); signed out: the login page.
+  HOME: '/',
+  // Where everyone with an employee workspace starts: the app launcher (pages/MyAccess.jsx).
+  MY_ACCESS: '/my-access',
   DASHBOARD: '/dashboard',
   // Support console (STAFF_SUPPORT).
   CONSOLE: '/console',

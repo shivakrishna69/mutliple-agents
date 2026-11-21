@@ -55,7 +55,7 @@ export default function VerifyEmailLink() {
       if (!isCurrent) return;
       if (session) {
         establishSession(session);
-        navigate(ROUTE_PATHS.DASHBOARD, { replace: true });
+        navigate(ROUTE_PATHS.HOME, { replace: true });
       } else {
         setFailure(refusal);
       }

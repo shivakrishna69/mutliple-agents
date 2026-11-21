@@ -2,13 +2,29 @@ import { expect } from '@playwright/test';
 
 import { MAIL_INBOX_URL, PASSWORD } from './environment.js';
 
-/** Signs in through the login form and waits for the person's home page (the dashboard unless given). */
-export async function signIn(page, email, password = PASSWORD, { landsOn = /\/dashboard$/ } = {}) {
+/** Where everyone with an employee workspace lands after signing in. */
+export const LAUNCHER_URL = /\/my-access$/;
+
+/**
+ * Signs in through the login form and waits for the person's home page: the My Access launcher unless
+ * `landsOn` says otherwise. From the launcher it then opens the dashboard (where the sidebar is), as
+ * most tests start there; `stayOnLauncher` keeps it on the launcher.
+ */
+export async function signIn(
+  page,
+  email,
+  password = PASSWORD,
+  { landsOn = LAUNCHER_URL, stayOnLauncher = false } = {},
+) {
   await page.goto('/login');
   await page.getByLabel('Work Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page).toHaveURL(landsOn);
+  if (landsOn === LAUNCHER_URL && !stayOnLauncher) {
+    await page.goto('/dashboard');
+    await expect(page).toHaveURL(/\/dashboard$/);
+  }
 }
 
 /** Emails sent to `address` by the test backend, oldest first. */

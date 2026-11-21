@@ -13,11 +13,11 @@ export function hasCapability(user, capability) {
 }
 
 /**
- * Where `user` starts, and where a page they may not open sends them: the dashboard for everyone
- * with an employee workspace; the Form 16 portal for a chartered accountant; their account otherwise.
+ * Where `user` starts, and where a page they may not open sends them: the My Access launcher for
+ * everyone with an employee workspace; the Form 16 portal for a chartered accountant; their account otherwise.
  */
 export function homePathOf(user) {
-  if (hasCapability(user, CAPABILITIES.USE_EMPLOYEE_WORKSPACE)) return ROUTE_PATHS.DASHBOARD;
+  if (hasCapability(user, CAPABILITIES.USE_EMPLOYEE_WORKSPACE)) return ROUTE_PATHS.MY_ACCESS;
   if (hasCapability(user, CAPABILITIES.MANAGE_FORM16)) return ROUTE_PATHS.CA_PORTAL;
   return ROUTE_PATHS.ACCOUNT;
 }

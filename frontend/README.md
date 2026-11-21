@@ -170,6 +170,10 @@ Pages therefore need no theme-specific classes. White pieces on a gradient panel
 sidebar is obsidian glass in both themes, and the sign-in screens keep their own look. Body text meets
 WCAG AA on glass in both themes: at least 4.6:1 in light and 6.2:1 in dark.
 
+## My Access launcher
+
+Signing in lands everyone with an employee workspace on **My Access** (`/my-access`, `pages/MyAccess.jsx`); a chartered accountant still lands on the CA portal. The launcher is shown without the sidebar: a frosted panel with one tile per page the person may open, and their newest unread notification as a dismissible announcement. Tiles and sidebar come from one list, `components/appNavigation.js`, with the same capability, portal view and membership rules, so they always offer the same pages. Opening a tile brings the sidebar back; the nine-dot button in the top bar and **My Access** at the top of the sidebar return to the launcher. `/` and every sign-in path go to the person's home (`auth/capabilities.js homePathOf`).
+
 ## Fonts and flags
 
 Served with the app, so no font or image request leaves the site:
