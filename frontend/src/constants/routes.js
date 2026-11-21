@@ -14,6 +14,8 @@ export const ROUTE_PATHS = Object.freeze({
   // Where everyone with an employee workspace starts: the app launcher (pages/MyAccess.jsx).
   MY_ACCESS: '/my-access',
   DASHBOARD: '/dashboard',
+  // The NSK assistant, full page (USE_NSK_ASSISTANT).
+  ASK_NSK: '/ask-nsk',
   // Support console (STAFF_SUPPORT).
   CONSOLE: '/console',
   // Support chat (USE_SUPPORT_CHAT).

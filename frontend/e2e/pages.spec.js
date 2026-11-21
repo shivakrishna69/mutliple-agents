@@ -51,6 +51,7 @@ const ROLE_ACCESS = {
     badge: 'Admin',
     navigation: [
       'My Access',
+      'Ask NSK',
       'Overview',
       'Support console',
       'Department Board',
@@ -78,6 +79,7 @@ const ROLE_ACCESS = {
     badge: 'HR',
     navigation: [
       'My Access',
+      'Ask NSK',
       'Overview',
       'Ask an agent',
       'Attendance',
@@ -97,6 +99,7 @@ const ROLE_ACCESS = {
     badge: 'Finance & Payroll',
     navigation: [
       'My Access',
+      'Ask NSK',
       'Overview',
       'Ask an agent',
       'Attendance',
@@ -114,6 +117,7 @@ const ROLE_ACCESS = {
     badge: 'IT Administrator',
     navigation: [
       'My Access',
+      'Ask NSK',
       'Overview',
       'Ask an agent',
       'Attendance',
@@ -134,6 +138,7 @@ const ROLE_ACCESS = {
     badge: 'Support Agent',
     navigation: [
       'My Access',
+      'Ask NSK',
       'Overview',
       'Support console',
       'Ask an agent',
@@ -152,6 +157,7 @@ const ROLE_ACCESS = {
     badge: 'Employee',
     navigation: [
       'My Access',
+      'Ask NSK',
       'Overview',
       'Support chat',
       'Ask an agent',

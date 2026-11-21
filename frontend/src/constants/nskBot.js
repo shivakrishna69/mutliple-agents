@@ -69,13 +69,12 @@ export const CITATION_MARK_PATTERN = /\[(\d+)\]/g;
 
 export const NSK_LABELS = Object.freeze({
   OPEN: 'Ask NSK',
-  TITLE: 'NSK assistant',
-  SUBTITLE: 'Your HR assistant: attendance, leave, policies and more',
+  SUBTITLE: 'Your HR assistant: attendance, leave, policies, and more',
   NEW_CHAT: 'New chat',
+  NEW_CONVERSATION: 'New conversation',
   SESSIONS: 'Your conversations',
   NO_SESSIONS: 'No conversations yet',
   DELETE_SESSION: 'Delete conversation',
-  CLOSE: 'Close NSK',
   PLACEHOLDER: 'Ask NSK anything about your work, leave or company policies…',
   SEND: 'Send',
   THINKING: 'NSK is checking your records and sources…',
@@ -86,7 +85,11 @@ export const NSK_LABELS = Object.freeze({
   FETCHED: 'fetched',
   OPEN_SOURCE: 'Open the page',
   PROMPT_HELPERS: 'Suggested questions',
+  QUICK_START: 'Ways to start',
 });
+
+/** How many one-tap questions a fresh Ask NSK chat offers (utils/nskBot.js quickStartsFrom). */
+export const NSK_QUICK_START_LIMIT = 4;
 
 // =================================================================================================
 // Offboarding

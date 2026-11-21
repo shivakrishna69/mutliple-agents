@@ -83,17 +83,17 @@ function LauncherTile({ tile }) {
     <li>
       <Link
         to={path}
-        className="group flex flex-col items-center gap-3 rounded-2xl text-center focus-visible:outline-none"
+        className="group flex w-28 flex-col items-center gap-2 rounded-2xl text-center focus-visible:outline-none"
         data-testid="my-access-tile"
       >
-        <span className="glass-card glass-interactive flex h-28 w-28 items-center justify-center group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+        <span className="glass-card glass-interactive flex h-24 w-24 items-center justify-center group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
           <span
-            className={`flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-[inset_0_1px_1px_rgb(255_255_255/0.45),0_8px_18px_-8px_rgb(15_23_42/0.45)] ring-4 ring-white/40 ${tint}`}
+            className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-[inset_0_1px_1px_rgb(255_255_255/0.45),0_8px_18px_-8px_rgb(15_23_42/0.45)] ring-[3px] ring-white/40 ${tint}`}
           >
-            <Icon className="h-9 w-9" />
+            <Icon className="h-8 w-8" />
           </span>
         </span>
-        <span className="text-sm font-medium text-slate-800 group-hover:text-slate-950">{label}</span>
+        <span className="text-[13px] leading-tight font-medium text-slate-800 group-hover:text-slate-950">{label}</span>
       </Link>
     </li>
   );
@@ -103,15 +103,15 @@ export default function MyAccess() {
   const { visibility, notificationState } = useOutletContext();
   const tiles = launcherTilesFor(visibility);
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-12">
-      <section className="glass-card p-6 sm:p-8" aria-labelledby="my-access-heading">
+    <div className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-10">
+      <section className="glass-card px-5 py-5 sm:px-8 sm:py-6" aria-labelledby="my-access-heading">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 id="my-access-heading" className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             My Access
           </h1>
           <AnnouncementPill notificationState={notificationState} />
         </div>
-        <ul className="mt-8 grid grid-cols-2 justify-items-center gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <ul className="mt-5 grid grid-cols-2 justify-items-center gap-x-6 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
           {tiles.map((tile) => (
             <LauncherTile key={tile.path} tile={tile} />
           ))}

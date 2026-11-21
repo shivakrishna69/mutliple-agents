@@ -23,6 +23,7 @@ test('an employee starts at My Access, opens a module, and comes back', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'My Access' })).toBeVisible();
   await expect(mainNavigation(page)).toHaveCount(0);
   await expect(tileLabels(page)).toHaveText([
+    'Ask NSK',
     'Overview',
     'Support Chat',
     'Ask an Agent',

@@ -45,6 +45,7 @@ function renderLauncher({ visibility, notificationState }) {
 describe('launcher tiles', () => {
   it('gives an employee their own workspace only', () => {
     expect(labelsFor(visibilityOf(WORKSPACE))).toEqual([
+      'Ask NSK',
       'Overview',
       'Ask an Agent',
       'Attendance',
@@ -57,6 +58,7 @@ describe('launcher tiles', () => {
   it('gives an administrator the management tools in the management view, and not in self-service', () => {
     const management = labelsFor(visibilityOf(ADMIN, { view: 'management', context: { hasTaskBoard: true } }));
     expect(management).toEqual([
+      'Ask NSK',
       'Overview',
       'Support Console',
       'Department Board',
@@ -94,8 +96,8 @@ describe('My Access page', () => {
     renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
     expect(screen.getByRole('heading', { level: 1, name: 'My Access' })).toBeTruthy();
     const tiles = screen.getAllByTestId('my-access-tile');
-    expect(tiles).toHaveLength(6);
-    expect(within(tiles[2]).getByText('Attendance').closest('a').getAttribute('href')).toBe('/attendance');
+    expect(tiles).toHaveLength(7);
+    expect(within(tiles[3]).getByText('Attendance').closest('a').getAttribute('href')).toBe('/attendance');
     expect(screen.queryByTestId('my-access-announcement')).toBeNull();
   });
 
