@@ -15,7 +15,8 @@
  * navigation list is components/appNavigation.js; the launcher gets the visibility rules and the
  * notifications through the outlet context.
  *
- * The top bar, the page and the NSK drawer (.glass-content) turn the pages' white surfaces into glass.
+ * The top bar and the page (.glass-content) turn the pages' white surfaces into glass. Ask NSK is a
+ * page of its own (/ask-nsk), opened from the top bar, the sidebar and the launcher.
  *
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
  * pages (the chat and the console) can fill it with `h-full` while ordinary pages scroll inside it.
@@ -42,8 +43,6 @@ import { requestMyBoards } from '../api/tasksApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { hasCapability } from '../auth/capabilities.js';
 import { NAVIGATION_SECTIONS, isItemVisible, itemOfPath } from './appNavigation.js';
-import NskDrawer from './nskBot/NskDrawer.jsx';
-import { NskDrawerProvider } from './nskBot/NskDrawerProvider.jsx';
 import NskLaunchButton from './nskBot/NskLaunchButton.jsx';
 import BrandMark from './BrandMark.jsx';
 import NotificationCenter from './NotificationCenter.jsx';
@@ -69,7 +68,6 @@ const pageLabelOf = (pathname) => itemOfPath(pathname)?.label ?? null;
 function SidebarNavigation({ visibility, onNavigate }) {
   return (
     <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-5 scroll-thin">
-      <NskLaunchButton variant="sidebar" onOpened={onNavigate} />
       {NAVIGATION_SECTIONS.map((navigationSection) => {
         const visibleItems = navigationSection.items.filter((navigationItem) =>
           isItemVisible(navigationItem, visibility),
@@ -81,11 +79,12 @@ function SidebarNavigation({ visibility, onNavigate }) {
               {navigationSection.sectionTitle}
             </p>
             <ul className="mt-2 space-y-0.5">
-              {visibleItems.map(({ label, path, Icon }) => (
+              {visibleItems.map(({ label, path, Icon, testId }) => (
                 <li key={path}>
                   <NavLink
                     to={path}
                     onClick={onNavigate}
+                    data-testid={testId}
                     className={({ isActive }) =>
                       [
                         'group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
@@ -307,9 +306,8 @@ export default function AppShell() {
   }
 
   const closeMobileNav = () => setIsMobileNavOpen(false);
-  const canUseNsk = hasCapability(currentUser, CAPABILITIES.USE_NSK_ASSISTANT);
 
-  const shell = (
+  return (
     <div className="app-canvas h-dvh">
       {/* Desktop sidebar: the frame's left rail, joined to the top bar by one hairline (not on the launcher) */}
       {!isLauncher && (
@@ -409,13 +407,6 @@ export default function AppShell() {
           <Outlet context={{ visibility, notificationState }} />
         </main>
       </div>
-      {canUseNsk && (
-        <div className="glass-content">
-          <NskDrawer />
-        </div>
-      )}
     </div>
   );
-  // The NSK drawer, and the buttons that open it, exist only for people who may use the assistant.
-  return canUseNsk ? <NskDrawerProvider>{shell}</NskDrawerProvider> : shell;
 }

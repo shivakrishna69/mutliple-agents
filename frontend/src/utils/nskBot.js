@@ -177,3 +177,18 @@ export function matchPromptHelpers(draft, helpers) {
     .slice(0, PROMPT_HELPERS_SHOWN)
     .map((item) => item.helper);
 }
+
+/**
+ * The one-tap questions for a fresh chat, from the backend's promptHelpers for this person: only the
+ * complete ones (a starter that needs a name or a department added is left for the type-ahead), one
+ * per intent first so they cover what the person may ask, then the rest, up to `limit`.
+ * @param {{ intent: string, label: string, fill: string }[]} helpers
+ */
+export function quickStartsFrom(helpers, limit) {
+  const complete = helpers.filter((helper) => helper.fill.trim() === helper.label && !helper.fill.endsWith(' '));
+  const firstPerIntent = complete.filter(
+    (helper, index) => complete.findIndex((other) => other.intent === helper.intent) === index,
+  );
+  const rest = complete.filter((helper) => !firstPerIntent.includes(helper));
+  return [...firstPerIntent, ...rest].slice(0, limit);
+}

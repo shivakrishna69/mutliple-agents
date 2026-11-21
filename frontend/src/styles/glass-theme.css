@@ -6,8 +6,8 @@
  *   canvas      .app-canvas: a cool indigo and sapphire mesh with soft colour blobs behind the content,
  *               so every glass surface has colour to refract
  *   frame       .glass-frame: the sidebar and the top bar, one frosted surface with hairline borders
- *   surfaces    .glass-card, .glass-panel (dialogs, the NSK drawer) and .glass-interactive (hover lift)
- *   content     inside .glass-content (the top bar, the page and the NSK drawer; never the sidebar):
+ *   surfaces    .glass-card, .glass-panel (dialogs) and .glass-interactive (hover lift)
+ *   content     inside .glass-content (the top bar and the page; never the sidebar):
  *               white rounded surfaces become glass cards, inputs and light tints turn translucent,
  *               table headers stay in view, rows highlight on hover, and the muted inks are deepened
  *               so text keeps WCAG AA contrast on the glass

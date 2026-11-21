@@ -1,38 +1,38 @@
 /**
- * Opens the NSK drawer: in the top bar (labelled), in the sidebar (a navigation-style entry) and in the
- * mobile header (an icon). Renders nothing for people without use_nsk_assistant (no drawer provider).
+ * Opens Ask NSK (/ask-nsk, pages/AskNsk.jsx): labelled in the top bar, an icon in the mobile header.
+ * The sidebar entry and the My Access tile come from components/appNavigation.js. Renders nothing
+ * for people without use_nsk_assistant.
  */
 
+import { Link, useLocation } from 'react-router';
+import { useAuth } from '../../auth/AuthContext.jsx';
+import { hasCapability } from '../../auth/capabilities.js';
+import { CAPABILITIES } from '../../constants/capabilities.js';
 import { NSK_LABELS } from '../../constants/nskBot.js';
+import { ROUTE_PATHS } from '../../constants/routes.js';
 import { SparklesIcon } from '../Icons.jsx';
-import { useNskDrawer } from './nskDrawerState.js';
 
 const VARIANT_CLASSES = Object.freeze({
   topbar:
     'flex items-center gap-2 rounded-full bg-gradient-to-r from-brand-600 via-indigo-600 to-violet-600 px-4 py-1.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/25 transition hover:shadow-indigo-500/45 hover:brightness-110',
-  sidebar:
-    'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white/70 hover:text-slate-900',
   icon: 'rounded-lg p-1.5 text-brand-600 hover:bg-brand-50',
 });
 
-/** @param {{ variant: 'topbar'|'sidebar'|'icon', onOpened?: () => void }} props */
-export default function NskLaunchButton({ variant, onOpened }) {
-  const { isAvailable, isOpen, open } = useNskDrawer();
-  if (!isAvailable) return null;
+/** @param {{ variant: 'topbar'|'icon' }} props */
+export default function NskLaunchButton({ variant }) {
+  const { currentUser } = useAuth();
+  const { pathname } = useLocation();
+  if (!hasCapability(currentUser, CAPABILITIES.USE_NSK_ASSISTANT)) return null;
   return (
-    <button
-      type="button"
+    <Link
+      to={ROUTE_PATHS.ASK_NSK}
       aria-label={variant === 'icon' ? NSK_LABELS.OPEN : undefined}
-      aria-expanded={isOpen}
+      aria-current={pathname === ROUTE_PATHS.ASK_NSK ? 'page' : undefined}
       data-testid={`nsk-open-${variant}`}
-      onClick={() => {
-        open();
-        onOpened?.();
-      }}
       className={`${VARIANT_CLASSES[variant]} focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none`}
     >
       <SparklesIcon className={variant === 'icon' ? 'h-6 w-6' : 'h-5 w-5 shrink-0'} />
       {variant !== 'icon' && NSK_LABELS.OPEN}
-    </button>
+    </Link>
   );
 }

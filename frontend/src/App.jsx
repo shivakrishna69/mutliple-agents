@@ -27,6 +27,8 @@
  *                    read-only, and who is serving notice for IT)
  *   /leave        -> LeaveCenter      USE_EMPLOYEE_WORKSPACE: My leave (index), /leave/calendar, /leave/approvals,
  *                                     and /leave/admin with MANAGE_WORKFORCE (policies, balances, payroll)
+ *   /ask-nsk      -> AskNsk           USE_NSK_ASSISTANT: the NSK assistant, full page (conversations rail
+ *                                     and chat)
  *   /tax/ca-portal -> CaPortal        MANAGE_FORM16 (a chartered accountant's home page; admins too)
  *   /admin/knowledge(/:departmentId) -> KnowledgeBases / KnowledgeBaseDetail  MANAGE_KNOWLEDGE_BASES
  *   /agents       -> AgentDirectory   ASK_DEPARTMENT_AGENTS (the department agents this person may ask)
@@ -70,6 +72,7 @@ const AttendanceCenter = lazy(() => import('./pages/AttendanceCenter.jsx'));
 const CompanySettings = lazy(() => import('./pages/CompanySettings.jsx'));
 const OrgDirectory = lazy(() => import('./pages/OrgDirectory.jsx'));
 const CaPortal = lazy(() => import('./pages/CaPortal.jsx'));
+const AskNsk = lazy(() => import('./pages/AskNsk.jsx'));
 const PayrollCenter = lazy(() => import('./pages/PayrollCenter.jsx'));
 const PayslipVerification = lazy(() => import('./pages/PayslipVerification.jsx'));
 const PeopleOnboarding = lazy(() => import('./pages/PeopleOnboarding.jsx'));
@@ -146,6 +149,10 @@ export default function App() {
                   <Route path={ROUTE_PATHS.LEAVE_ADMIN} element={<LeaveAdministrationPanel />} />
                 </Route>
               </Route>
+            </Route>
+
+            <Route element={<CapabilityRoute capability={CAPABILITIES.USE_NSK_ASSISTANT} />}>
+              <Route path={ROUTE_PATHS.ASK_NSK} element={<AskNsk />} />
             </Route>
 
             <Route element={<CapabilityRoute capability={CAPABILITIES.MANAGE_FORM16} />}>

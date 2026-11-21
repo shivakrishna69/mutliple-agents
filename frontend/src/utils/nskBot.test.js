@@ -11,6 +11,7 @@ import {
   isGenerating,
   matchPromptHelpers,
   mergeProgress,
+  quickStartsFrom,
   sourceBadgeKind,
   splitCitations,
   toPreviewRequest,
@@ -218,5 +219,33 @@ describe('type-ahead sentence starters', () => {
     expect(labelsFor('Check my leave balances')).toEqual([]);
     expect(matchPromptHelpers('debo', [])).toEqual([]);
     expect(matchPromptHelpers('debo', undefined)).toEqual([]);
+  });
+});
+
+describe('quick starts for a fresh chat', () => {
+  const helper = (intent, label, fill = label) => ({ intent, label, fill, keywords: [] });
+  const HELPERS = [
+    helper('ATTENDANCE_AUDIT', 'Check my leave balances'),
+    helper('ATTENDANCE_AUDIT', 'Show my leave requests'),
+    helper('ATTENDANCE_AUDIT', 'Show my attendance this month'),
+    helper('OFFBOARDING_WORKFLOW', 'Start offboarding for [name]', 'Start offboarding for '),
+    helper('POLICY_QA', 'What is the notice period policy?'),
+    helper('POLICY_QA', 'What is the leave policy?'),
+    helper('WEB_MARKET_RESEARCH', 'What is the latest share price of [company]?', 'What is the latest share price of '),
+    helper('WEB_MARKET_RESEARCH', 'What are the latest IT hiring trends?'),
+  ];
+
+  it('offers only complete questions, one per intent first, up to the limit', () => {
+    expect(quickStartsFrom(HELPERS, 4).map((starter) => starter.label)).toEqual([
+      'Check my leave balances',
+      'What is the notice period policy?',
+      'What are the latest IT hiring trends?',
+      'Show my leave requests',
+    ]);
+  });
+
+  it('offers nothing when the person may ask nothing complete', () => {
+    expect(quickStartsFrom([HELPERS[3], HELPERS[6]], 4)).toEqual([]);
+    expect(quickStartsFrom([], 4)).toEqual([]);
   });
 });

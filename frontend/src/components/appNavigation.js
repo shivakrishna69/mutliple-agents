@@ -8,6 +8,7 @@
  *   anyCapabilities  alternatively, any one of these
  *   isVisibleTo      a further condition on the context ({ managesOwnKnowledgeBase, hasTaskBoard })
  *   views            the portal views it belongs to, for people who switch (PortalSwitcher.jsx)
+ *   testId           a data-testid for its sidebar link, where tests rely on one
  *   tile             its My Access tile: { label?, tint } (the tint is the medallion's gradient), or
  *                    absent when the page has no tile (My Access itself, Account)
  */
@@ -48,6 +49,15 @@ export const NAVIGATION_SECTIONS = Object.freeze([
     sectionTitle: 'Workspace',
     items: [
       { label: 'My Access', path: ROUTE_PATHS.MY_ACCESS, Icon: AppGridIcon, views: BOTH_VIEWS, capability: WORKSPACE },
+      {
+        label: 'Ask NSK',
+        path: ROUTE_PATHS.ASK_NSK,
+        Icon: SparklesIcon,
+        views: BOTH_VIEWS,
+        capability: CAPABILITIES.USE_NSK_ASSISTANT,
+        testId: 'nsk-open-sidebar',
+        tile: { tint: 'from-brand-500 via-indigo-600 to-violet-600' },
+      },
       {
         label: 'Overview',
         path: ROUTE_PATHS.DASHBOARD,

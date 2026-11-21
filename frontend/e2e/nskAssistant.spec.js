@@ -2,11 +2,11 @@
  * The NSK assistant in the browser, answered by the stand-in AI service (e2e/standInAiService.js),
  * which calls the backend's real NSK tools with each turn's actor token:
  *
- *   employee   self-service: the type-ahead starters of their own intents only, the drawer from the
- *              top bar, a reply citing live portal data, a
+ *   employee   self-service: the Ask NSK page from the top bar (quick starts on a fresh chat), the
+ *              type-ahead starters of their own intents only, a reply citing live portal data, a
  *              suggestion chip, the escalation banner for an urgent message, no offboarding cards or
- *              page; after a reload, the resume banner and its "Continue" chip, then deleting the
- *              conversation
+ *              page; back from another page through the sidebar, the resume banner and its
+ *              "Continue" chip, then deleting the conversation from the rail
  *   HR         the offboarding starter as they type; "<name> is leaving": the action cards and the
  *              one-tap "Yes, start offboarding" chip, the offboarding form, the settlement preview with
  *              the payment deadline banner, starting it, each document prepared (Socket.IO progress)
@@ -31,8 +31,9 @@ test.use({ timezoneId: 'Asia/Kolkata', extraHTTPHeaders: { 'X-Forwarded-For': '2
 const ESCALATION_HINT = 'Need a person? Contact HR directly, and they will help you';
 const PLACEHOLDER = 'Ask NSK anything about your work, leave or company policies…';
 
+/** The Ask NSK page (/ask-nsk): conversations rail and chat. */
 function drawerOf(page) {
-  return page.getByRole('dialog', { name: 'NSK assistant' });
+  return page.getByTestId('nsk-workspace');
 }
 
 async function ask(drawer, text) {
@@ -57,8 +58,11 @@ test('an employee asks NSK, picks up the conversation later, and deletes it', as
   await expect(mainNavigation(page).getByRole('link', { name: 'Offboarding' })).toHaveCount(0);
 
   await page.getByTestId('nsk-open-topbar').click();
+  await expect(page).toHaveURL(/\/ask-nsk$/);
   const drawer = drawerOf(page);
   await expect(drawer.getByText('How can I help?')).toBeVisible();
+  // A fresh chat offers one-tap questions for what an employee may ask.
+  await expect(drawer.getByTestId('nsk-quick-start').getByRole('button')).not.toHaveCount(0);
 
   // Type-ahead: starters for what an employee may ask, never offboarding.
   const box = drawer.getByLabel(PLACEHOLDER);
@@ -89,21 +93,20 @@ test('an employee asks NSK, picks up the conversation later, and deletes it', as
   await expect(drawer.getByRole('alert').filter({ hasText: ESCALATION_HINT })).toBeVisible();
 
   // Later: the resume banner offers to continue.
-  await page.keyboard.press('Escape');
+  await page.goto('/dashboard');
   await expect(drawer).toBeHidden();
-  await page.reload();
   await page.getByTestId('nsk-open-sidebar').click();
+  await expect(page).toHaveURL(/\/ask-nsk$/);
+  await expect(page.getByTestId('nsk-open-sidebar')).toHaveAttribute('aria-current', 'page');
   const resume = drawer.getByTestId('nsk-resume');
   await expect(resume).toContainText('Pick up where you left off');
   await resume.getByRole('button', { name: /^Continue: / }).click();
   await expect(drawer.locator('li[data-role="assistant"]')).toHaveCount(3);
 
-  // Deleting the conversation.
-  const sessionMenu = drawer.locator('button[aria-haspopup="true"]');
-  await sessionMenu.click();
-  await drawer.getByRole('button', { name: /^Delete conversation: / }).click();
-  // The menu stays open: the list is now empty, and the chat starts afresh.
-  await expect(drawer.getByText('No conversations yet')).toBeVisible();
+  // Deleting the conversation from the rail: the list is now empty, and the chat starts afresh.
+  const rail = drawer.getByTestId('nsk-conversations');
+  await rail.getByRole('button', { name: /^Delete conversation: / }).click();
+  await expect(rail.getByText('No conversations yet')).toBeVisible();
   await expect(drawer.getByText('How can I help?')).toBeVisible();
   expect(problems).toEqual([]);
 });
