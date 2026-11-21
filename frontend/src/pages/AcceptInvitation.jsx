@@ -100,7 +100,7 @@ export default function AcceptInvitation() {
     const session = await run(() => requestInvitationAcceptance(token, { password, confirmPassword, acceptTerms }));
     if (!session) return;
     establishSession(session);
-    navigate(ROUTE_PATHS.DASHBOARD, { replace: true });
+    navigate(ROUTE_PATHS.HOME, { replace: true });
   }
 
   const signInFooter = (

@@ -1,12 +1,14 @@
 /**
  * Route table.
  *
- *   /             -> redirects to /dashboard (which redirects to /login when signed out)
+ *   /             -> the person's home: /my-access, or /tax/ca-portal for a chartered accountant
+ *                    (/login when signed out); sign-in and account activation land here
  *   /login        -> Login       (signed-out users only)
  *   /signup       -> Signup      (signed-out users only)
  *
  *   Signed in, inside AppShell (sidebar layout), with the capability each page needs
  *   (constants/capabilities.js; the server tells the browser which ones a person has):
+ *   /my-access    -> MyAccess         USE_EMPLOYEE_WORKSPACE: the app launcher, without the sidebar
  *   /dashboard    -> Dashboard        USE_EMPLOYEE_WORKSPACE (everyone but a chartered accountant)
  *   /account      -> Account          everyone
  *   /support      -> CustomerSupport  USE_SUPPORT_CHAT
@@ -47,13 +49,14 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import AppShell from './components/AppShell.jsx';
-import { CapabilityRoute, ProtectedRoute, PublicOnlyRoute } from './components/RouteGuards.jsx';
+import { CapabilityRoute, HomeRedirect, ProtectedRoute, PublicOnlyRoute } from './components/RouteGuards.jsx';
 import Account from './pages/Account.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 
 import AgentConsole from './pages/AgentConsole.jsx';
 import CustomerSupport from './pages/CustomerSupport.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import MyAccess from './pages/MyAccess.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import { CAPABILITIES } from './constants/capabilities.js';
@@ -100,7 +103,7 @@ export default function App() {
   return (
     <Suspense fallback={<LoadingBlock />}>
       <Routes>
-        <Route path="/" element={<Navigate to={ROUTE_PATHS.DASHBOARD} replace />} />
+        <Route path={ROUTE_PATHS.HOME} element={<HomeRedirect />} />
         <Route path={ROUTE_PATHS.VERIFY_PAYSLIP} element={<PayslipVerification />} />
         <Route path={ROUTE_PATHS.ACCEPT_INVITATION} element={<AcceptInvitation />} />
         {/* Emailed links work whether or not someone is signed in on this browser. */}
@@ -120,6 +123,7 @@ export default function App() {
             <Route path={ROUTE_PATHS.ACCOUNT} element={<Account />} />
             {/* One's own workspace: everyone but a chartered accountant (who starts at the CA portal). */}
             <Route element={<CapabilityRoute capability={CAPABILITIES.USE_EMPLOYEE_WORKSPACE} />}>
+              <Route path={ROUTE_PATHS.MY_ACCESS} element={<MyAccess />} />
               <Route path={ROUTE_PATHS.DASHBOARD} element={<Dashboard />} />
               <Route path={ROUTE_PATHS.ATTENDANCE} element={<AttendanceCenter />} />
               <Route path={ROUTE_PATHS.PAYROLL} element={<PayrollCenter />} />

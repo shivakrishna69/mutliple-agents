@@ -29,8 +29,8 @@ describe('summaryRequestFrom', () => {
 });
 
 describe('homePathOf', () => {
-  it('starts staff at the dashboard and a chartered accountant at the CA portal', () => {
-    expect(homePathOf({ capabilities: ['use_employee_workspace', 'manage_form16'] })).toBe('/dashboard');
+  it('starts staff at My Access and a chartered accountant at the CA portal', () => {
+    expect(homePathOf({ capabilities: ['use_employee_workspace', 'manage_form16'] })).toBe('/my-access');
     expect(homePathOf({ capabilities: ['manage_form16'] })).toBe('/tax/ca-portal');
     expect(homePathOf({ capabilities: [] })).toBe('/account');
     expect(homePathOf(null)).toBe('/account');

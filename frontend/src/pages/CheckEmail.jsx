@@ -63,7 +63,7 @@ export default function CheckEmail() {
       return;
     }
     establishSession(confirmed);
-    navigate(ROUTE_PATHS.DASHBOARD, { replace: true });
+    navigate(ROUTE_PATHS.HOME, { replace: true });
   }
 
   async function handleResend() {

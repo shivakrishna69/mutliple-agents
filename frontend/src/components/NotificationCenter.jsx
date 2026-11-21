@@ -1,6 +1,7 @@
 /**
  * The bell in the top bar: the unread count as a badge, and a panel with the person's notifications
- * (hooks/useNotifications.js, kept current live). Opening one marks it read and goes where it points
+ * (hooks/useNotifications.js, kept current live; the app shell holds them, so every bell and the My
+ * Access announcement share one connection). Opening one marks it read and goes where it points
  * (an app path from the backend, such as a department's Questions Inbox or the person's conversation).
  *
  * Keyboard and screen readers: the button says how many are unread and whether the panel is open;
@@ -9,17 +10,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useNotifications } from '../hooks/useNotifications.js';
 import { BellIcon } from './Icons.jsx';
 import { formatDateTime } from './ui.jsx';
 
 const MAX_BADGE = 9;
 
 /** Navigation state that makes the target page load again even when it is the one already open. */
-const freshNavigationState = () => ({ refreshedAt: Date.now() });
+export const freshNavigationState = () => ({ refreshedAt: Date.now() });
 
-export default function NotificationCenter({ tone = 'light' }) {
-  const { notifications, unreadCount, isLoading, error, markRead, markAllRead } = useNotifications();
+/** @param {{ notificationState: ReturnType<typeof import('../hooks/useNotifications.js').useNotifications>, tone?: string }} props */
+export default function NotificationCenter({ notificationState, tone = 'light' }) {
+  const { notifications, unreadCount, isLoading, error, markRead, markAllRead } = notificationState;
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
   const navigate = useNavigate();

@@ -9,6 +9,12 @@
  *   lg and up:  fixed sidebar | top bar over a scrollable content column
  *   below lg:   top bar with a menu button that opens the same sidebar as a drawer
  *
+ * The My Access launcher (/my-access, pages/MyAccess.jsx) is shown without the sidebar: the top bar
+ * then carries the logo, and the launcher's tiles take the sidebar's place. On every other page the
+ * nine-dot button in the top bar (and "My Access" at the top of the sidebar) returns to it. The
+ * navigation list is components/appNavigation.js; the launcher gets the visibility rules and the
+ * notifications through the outlet context.
+ *
  * The top bar, the page and the NSK drawer (.glass-content) turn the pages' white surfaces into glass.
  *
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
@@ -29,12 +35,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api/httpClient.js';
 import { requestKnowledgeBases } from '../api/knowledgeApi.js';
 import { requestMyBoards } from '../api/tasksApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { hasAnyCapability, hasCapability } from '../auth/capabilities.js';
+import { hasCapability } from '../auth/capabilities.js';
+import { NAVIGATION_SECTIONS, isItemVisible, itemOfPath } from './appNavigation.js';
 import NskDrawer from './nskBot/NskDrawer.jsx';
 import { NskDrawerProvider } from './nskBot/NskDrawerProvider.jsx';
 import NskLaunchButton from './nskBot/NskLaunchButton.jsx';
@@ -43,232 +50,18 @@ import NotificationCenter from './NotificationCenter.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
 import PortalSwitcher from './PortalSwitcher.jsx';
 import RoleBadge from './RoleBadge.jsx';
-import {
-  BookOpenIcon,
-  CheckBadgeIcon,
-  BuildingIcon,
-  CalendarIcon,
-  ChartIcon,
-  ChatIcon,
-  CloseIcon,
-  CurrencyIcon,
-  DocumentIcon,
-  HomeIcon,
-  InboxIcon,
-  MapPinIcon,
-  MenuIcon,
-  SignOutIcon,
-  SitemapIcon,
-  SparklesIcon,
-  TerminalIcon,
-  UserPlusIcon,
-  UserCircleIcon,
-  UsersIcon,
-} from './Icons.jsx';
+import { AppGridIcon, CloseIcon, MenuIcon, SignOutIcon } from './Icons.jsx';
 import { CAPABILITIES } from '../constants/capabilities.js';
 import { SERVICE_STATE_TONES } from '../constants/dashboardDisplay.js';
 import { API_MESSAGES, BANNER_TITLES } from '../constants/messages.js';
 import { KNOWLEDGE_ACCESS_BASIS } from '../constants/knowledge.js';
-import { PORTAL_VIEWS } from '../constants/portal.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
 import { useApiResource } from '../hooks/useApiResource.js';
+import { useNotifications } from '../hooks/useNotifications.js';
 import { usePortalView } from '../hooks/usePortalView.js';
 import { usePublicAuthSettings } from '../hooks/usePublicAuthSettings.js';
 import { useSystemHealth } from '../hooks/useSystemHealth.js';
 import { initialsOf } from '../utils/dashboardFormat.js';
-
-const BOTH_VIEWS = Object.freeze(Object.values(PORTAL_VIEWS));
-const SELF_SERVICE_ONLY = Object.freeze([PORTAL_VIEWS.SELF_SERVICE]);
-const MANAGEMENT_ONLY = Object.freeze([PORTAL_VIEWS.MANAGEMENT]);
-
-/**
- * Sidebar entries, grouped into sections. `capability` is what a person needs to see one (null:
- * everyone); `isVisibleTo(context)`, when present, is a further condition (context:
- * { managesOwnKnowledgeBase, hasTaskBoard }); `views` the portal views it belongs to, for people who switch.
- */
-const NAVIGATION_SECTIONS = Object.freeze([
-  {
-    sectionTitle: 'Workspace',
-    items: [
-      {
-        label: 'Overview',
-        path: ROUTE_PATHS.DASHBOARD,
-        Icon: HomeIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
-      },
-      {
-        label: 'Support chat',
-        path: ROUTE_PATHS.SUPPORT,
-        Icon: ChatIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_SUPPORT_CHAT,
-      },
-      {
-        label: 'Support console',
-        path: ROUTE_PATHS.CONSOLE,
-        Icon: InboxIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.STAFF_SUPPORT,
-      },
-      {
-        label: "My department's knowledge base",
-        path: ROUTE_PATHS.MY_KNOWLEDGE,
-        Icon: BookOpenIcon,
-        views: SELF_SERVICE_ONLY,
-        capability: null,
-        isVisibleTo: (context) => context.managesOwnKnowledgeBase,
-      },
-      {
-        label: 'Department Board',
-        path: ROUTE_PATHS.BOARDS,
-        Icon: CheckBadgeIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_TASK_BOARDS,
-        isVisibleTo: (context) => context.hasTaskBoard,
-      },
-      {
-        label: 'Ask an agent',
-        path: ROUTE_PATHS.ASK_AGENTS,
-        Icon: SparklesIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.ASK_DEPARTMENT_AGENTS,
-      },
-    ],
-  },
-  {
-    sectionTitle: 'People',
-    items: [
-      {
-        label: 'Attendance',
-        path: ROUTE_PATHS.ATTENDANCE,
-        Icon: MapPinIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
-      },
-      {
-        label: 'Leave',
-        path: ROUTE_PATHS.LEAVE,
-        Icon: CalendarIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
-      },
-      {
-        label: 'Payroll',
-        path: ROUTE_PATHS.PAYROLL,
-        Icon: CurrencyIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
-      },
-      {
-        label: 'Analytics hub',
-        path: ROUTE_PATHS.ANALYTICS,
-        Icon: ChartIcon,
-        views: BOTH_VIEWS,
-        capability: CAPABILITIES.USE_EMPLOYEE_WORKSPACE,
-      },
-      {
-        label: 'Organisation',
-        path: ROUTE_PATHS.ORGANISATION,
-        Icon: SitemapIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.STAFF_SUPPORT,
-      },
-      {
-        label: 'Onboarding',
-        path: ROUTE_PATHS.ONBOARDING,
-        Icon: UserPlusIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.MANAGE_WORKFORCE,
-      },
-      {
-        label: 'Workplace',
-        path: ROUTE_PATHS.WORKPLACE,
-        Icon: BuildingIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.MANAGE_WORKFORCE,
-      },
-      {
-        label: 'Offboarding',
-        path: ROUTE_PATHS.OFFBOARDING,
-        Icon: DocumentIcon,
-        views: MANAGEMENT_ONLY,
-        capability: null,
-        anyCapabilities: [CAPABILITIES.VIEW_FINAL_SETTLEMENT, CAPABILITIES.VIEW_IT_OFFBOARDING],
-      },
-    ],
-  },
-  {
-    sectionTitle: 'Administration',
-    items: [
-      {
-        label: 'Departments & Agents',
-        path: ROUTE_PATHS.KNOWLEDGE_HUB,
-        Icon: BookOpenIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.MANAGE_KNOWLEDGE_BASES,
-      },
-      {
-        label: 'Company',
-        path: ROUTE_PATHS.COMPANY,
-        Icon: BuildingIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.MANAGE_COMPANY_SETTINGS,
-      },
-      {
-        label: 'Users & roles',
-        path: ROUTE_PATHS.ADMIN_USERS,
-        Icon: UsersIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.MANAGE_USERS,
-      },
-      {
-        label: 'Agent telemetry',
-        path: ROUTE_PATHS.AGENT_TELEMETRY,
-        Icon: TerminalIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.VIEW_AGENT_TELEMETRY,
-      },
-    ],
-  },
-  {
-    sectionTitle: 'Tax',
-    items: [
-      {
-        label: 'Form 16 / CA Portal',
-        path: ROUTE_PATHS.CA_PORTAL,
-        Icon: DocumentIcon,
-        views: MANAGEMENT_ONLY,
-        capability: CAPABILITIES.MANAGE_FORM16,
-      },
-    ],
-  },
-  {
-    sectionTitle: 'Settings',
-    items: [{ label: 'Account', path: ROUTE_PATHS.ACCOUNT, Icon: UserCircleIcon, views: BOTH_VIEWS, capability: null }],
-  },
-]);
-
-const ALL_NAVIGATION_ITEMS = NAVIGATION_SECTIONS.flatMap((section) => section.items);
-
-/**
- * True when this person sees `item`: they have its capability (or one of its `anyCapabilities`), and it
- * belongs to their view (if they switch).
- */
-const isItemVisible = (item, { user, view, context }) =>
-  (item.capability === null || hasCapability(user, item.capability)) &&
-  (!item.anyCapabilities || hasAnyCapability(user, item.anyCapabilities)) &&
-  (item.isVisibleTo?.(context) ?? true) &&
-  (view === null || item.views.includes(view));
-
-/** The item for the page at `pathname` (the longest matching path). */
-function itemOfPath(pathname) {
-  return (
-    ALL_NAVIGATION_ITEMS.filter((item) => pathname === item.path || pathname.startsWith(`${item.path}/`)).sort(
-      (first, second) => second.path.length - first.path.length,
-    )[0] ?? null
-  );
-}
 
 /** The sidebar label of the page at `pathname`, for the top bar. */
 const pageLabelOf = (pathname) => itemOfPath(pathname)?.label ?? null;
@@ -381,6 +174,21 @@ function SidebarContents({
   );
 }
 
+/** The nine-dot button back to the My Access launcher. */
+function LauncherButton({ testId, className = '' }) {
+  return (
+    <Link
+      to={ROUTE_PATHS.MY_ACCESS}
+      aria-label="App launcher"
+      title="My Access"
+      data-testid={testId}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 text-slate-600 shadow-[inset_0_1px_1px_rgb(255_255_255/0.9)] ring-1 ring-slate-900/[0.06] transition hover:bg-white hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${className}`}
+    >
+      <AppGridIcon className="h-[1.1rem] w-[1.1rem]" />
+    </Link>
+  );
+}
+
 /** "Systems live" while every configured service is operational, otherwise the overall state. */
 function SystemsPill({ health }) {
   if (!health) return null;
@@ -392,10 +200,13 @@ function SystemsPill({ health }) {
   );
 }
 
-function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
+function TopBar({ companyName, pageLabel, currentUser, health, switcher, notificationState, isLauncher, canLaunch }) {
   return (
     <header className="glass-frame hairline-b relative z-20 hidden h-16 shrink-0 items-center justify-between gap-4 px-8 lg:flex">
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-3 text-sm">
+        {/* On the launcher the sidebar (and its logo) is hidden, so the top bar carries the logo. */}
+        {isLauncher && <BrandMark />}
+        {canLaunch && <LauncherButton testId="app-launcher" />}
         {companyName && <span className="truncate text-slate-600">{companyName}</span>}
         {companyName && pageLabel && (
           <span className="text-slate-300" aria-hidden="true">
@@ -412,7 +223,7 @@ function TopBar({ companyName, pageLabel, currentUser, health, switcher }) {
         {switcher}
         <SystemsPill health={health} />
         <NskLaunchButton variant="topbar" />
-        <NotificationCenter />
+        <NotificationCenter notificationState={notificationState} />
         <span
           className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white shadow-sm ring-2 ring-white/80"
           title={currentUser.name}
@@ -436,6 +247,11 @@ export default function AppShell() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(null);
   const { canSwitch, view, setView } = usePortalView(currentUser);
+  // One connection for the bells and the My Access announcement (each call opens its own socket).
+  const notificationState = useNotifications();
+  // The My Access launcher is shown without the sidebar; every other page has it.
+  const isLauncher = pathname === ROUTE_PATHS.MY_ACCESS;
+  const canLaunch = hasCapability(currentUser, CAPABILITIES.USE_EMPLOYEE_WORKSPACE);
   // Whether this person heads or leads a department (for "My department's knowledge base"). A failed
   // load just leaves the entry out; the page itself is still reachable and reports its own errors.
   const knowledgeBases = useApiResource((signal) => requestKnowledgeBases(signal), [currentUser.id]);
@@ -495,20 +311,22 @@ export default function AppShell() {
 
   const shell = (
     <div className="app-canvas h-dvh">
-      {/* Desktop sidebar: the frame's left rail, joined to the top bar by one hairline */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
-        <SidebarContents
-          className="hairline-r"
-          currentUser={currentUser}
-          companyName={companyName}
-          visibility={visibility}
-          isSigningOut={isSigningOut}
-          onSignOut={handleSignOut}
-        />
-      </aside>
+      {/* Desktop sidebar: the frame's left rail, joined to the top bar by one hairline (not on the launcher) */}
+      {!isLauncher && (
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
+          <SidebarContents
+            className="hairline-r"
+            currentUser={currentUser}
+            companyName={companyName}
+            visibility={visibility}
+            isSigningOut={isSigningOut}
+            onSignOut={handleSignOut}
+          />
+        </aside>
+      )}
 
       {/* Mobile drawer */}
-      {isMobileNavOpen && (
+      {isMobileNavOpen && !isLauncher && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
           <button
             type="button"
@@ -541,30 +359,38 @@ export default function AppShell() {
         </div>
       )}
 
-      <div className="glass-content flex h-dvh flex-col lg:pl-64">
+      <div className={`glass-content flex h-dvh flex-col ${isLauncher ? '' : 'lg:pl-64'}`}>
         <TopBar
           companyName={companyName}
           pageLabel={pageLabelOf(pathname)}
           currentUser={currentUser}
           health={health.data}
           switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} />}
+          notificationState={notificationState}
+          isLauncher={isLauncher}
+          canLaunch={canLaunch}
         />
 
         {/* Mobile top bar */}
         <header className="glass-frame hairline-b relative z-20 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setIsMobileNavOpen(true)}
-            aria-label="Open navigation"
-            aria-expanded={isMobileNavOpen}
-            className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-          >
-            <MenuIcon className="h-6 w-6" />
-          </button>
+          {isLauncher ? (
+            <span className="w-9" aria-hidden="true" />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsMobileNavOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={isMobileNavOpen}
+              className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+            >
+              <MenuIcon className="h-6 w-6" />
+            </button>
+          )}
           <BrandMark />
           <div className="flex items-center gap-1">
+            {canLaunch && !isLauncher && <LauncherButton testId="app-launcher-mobile" className="mr-1" />}
             <NskLaunchButton variant="icon" />
-            <NotificationCenter />
+            <NotificationCenter notificationState={notificationState} />
           </div>
         </header>
 
@@ -580,7 +406,7 @@ export default function AppShell() {
         )}
 
         <main className="min-h-0 flex-1 overflow-y-auto scroll-thin">
-          <Outlet />
+          <Outlet context={{ visibility, notificationState }} />
         </main>
       </div>
       {canUseNsk && (

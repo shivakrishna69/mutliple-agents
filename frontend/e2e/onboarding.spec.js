@@ -103,7 +103,9 @@ test('HR invites a new joiner, imports more from a CSV, prepares offers, and rea
   await joinerPage.getByRole('checkbox', { name: /I accepted all terms/ }).check();
   await joinerPage.getByRole('button', { name: 'Activate my account' }).click();
 
-  await expect(joinerPage).toHaveURL(/\/dashboard$/);
+  // Signed in, they start at the My Access launcher; Overview opens their dashboard.
+  await expect(joinerPage).toHaveURL(/\/my-access$/);
+  await joinerPage.getByTestId('my-access-tile').filter({ hasText: 'Overview' }).click();
   await expect(joinerPage.getByRole('heading', { level: 1 })).toContainText('Nisha');
 
   // The link works once only.

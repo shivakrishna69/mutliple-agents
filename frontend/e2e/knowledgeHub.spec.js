@@ -85,7 +85,7 @@ test('an employee who leads nothing never sees the knowledge base, and cannot op
   await expect(mainNavigation(page).getByRole('link', { name: "My department's knowledge base" })).toHaveCount(0);
   await expect(page.getByRole('group', { name: 'Portal view' })).toHaveCount(0);
   await page.goto('/admin/knowledge');
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/my-access$/);
   await page.goto('/knowledge');
   await expect(page.getByText('No knowledge base to manage')).toBeVisible();
 });

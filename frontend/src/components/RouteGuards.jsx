@@ -6,7 +6,7 @@
  * so a signed-in user never sees the login page flash on reload.
  */
 
-import { Navigate, Outlet } from 'react-router';
+import { Navigate, Outlet, useOutletContext } from 'react-router';
 import { AUTH_STATUS, useAuth } from '../auth/AuthContext.jsx';
 import { hasAnyCapability, hasCapability, homePathOf } from '../auth/capabilities.js';
 import { ROUTE_PATHS } from '../constants/routes.js';
@@ -35,23 +35,37 @@ export function ProtectedRoute() {
 /**
  * Renders the child route only for a signed-in person with `capability` (constants/capabilities.js), or
  * with any of `anyOf` when given;
- * anyone else is sent to their home page (auth/capabilities.js homePathOf: the dashboard, or the Form
- * 16 portal for a chartered accountant), and signed-out users to login. The backend enforces the same
+ * anyone else is sent to their home page (auth/capabilities.js homePathOf: My Access, or the Form 16
+ * portal for a chartered accountant), and signed-out users to login. The backend enforces the same
  * capability on every request the page makes.
  */
 export function CapabilityRoute({ capability, anyOf = null }) {
   const { authStatus, currentUser } = useAuth();
+  // Passed on, so pages inside the guard still get the app shell's outlet context (pages/MyAccess.jsx).
+  const shellContext = useOutletContext();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
   if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
   const allowed = anyOf ? hasAnyCapability(currentUser, anyOf) : hasCapability(currentUser, capability);
   if (!allowed) return <Navigate to={homePathOf(currentUser)} replace />;
+  return <Outlet context={shellContext} />;
+}
+
+/** Renders the child route when signed out; a signed-in user is sent to their home page instead. */
+export function PublicOnlyRoute() {
+  const { authStatus, currentUser } = useAuth();
+  if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
+  if (authStatus === AUTH_STATUS.AUTHENTICATED) return <Navigate to={homePathOf(currentUser)} replace />;
   return <Outlet />;
 }
 
-/** Renders the child route when signed out; a signed-in user is sent to /dashboard instead. */
-export function PublicOnlyRoute() {
-  const { authStatus } = useAuth();
+/**
+ * The address "/" (and where sign-in, email confirmation and invitation acceptance go): the person's
+ * home page (auth/capabilities.js homePathOf: My Access, or the CA portal for a chartered accountant),
+ * or the login page when signed out.
+ */
+export function HomeRedirect() {
+  const { authStatus, currentUser } = useAuth();
   if (authStatus === AUTH_STATUS.CHECKING) return <SessionCheckSpinner />;
-  if (authStatus === AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.DASHBOARD} replace />;
-  return <Outlet />;
+  if (authStatus !== AUTH_STATUS.AUTHENTICATED) return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
+  return <Navigate to={homePathOf(currentUser)} replace />;
 }

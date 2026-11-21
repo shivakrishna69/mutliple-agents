@@ -53,7 +53,9 @@ test('a new customer signs up, confirms with the emailed code, sees their worksp
 
   await typeCode(page, code);
   await page.getByRole('button', { name: 'Verify & Continue' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  // Signed in, they start at the My Access launcher; Overview opens their dashboard.
+  await expect(page).toHaveURL(/\/my-access$/);
+  await page.getByTestId('my-access-tile').filter({ hasText: 'Overview' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Priya');
   await expect(mainNavigation(page).getByRole('link', { name: 'Support chat' })).toBeVisible();
   await expect(mainNavigation(page).getByRole('link', { name: 'Users & roles' })).toHaveCount(0);
@@ -89,7 +91,9 @@ test('signing in before confirming leads to "verify your email", and the emailed
 
   const confirmationLink = await emailedLink('rahul.verma@example.com', '/verify-email');
   await page.goto(confirmationLink);
-  await expect(page).toHaveURL(/\/dashboard$/);
+  // Signed in, they start at the My Access launcher; Overview opens their dashboard.
+  await expect(page).toHaveURL(/\/my-access$/);
+  await page.getByTestId('my-access-tile').filter({ hasText: 'Overview' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Rahul');
 
   // The link works once: opened again (signed out), it says so and offers the way forward.

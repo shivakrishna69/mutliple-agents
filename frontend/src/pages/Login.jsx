@@ -57,7 +57,7 @@ export default function Login() {
     });
     if (session) {
       establishSession(session);
-      navigate(ROUTE_PATHS.DASHBOARD, { replace: true });
+      navigate(ROUTE_PATHS.HOME, { replace: true });
       return;
     }
     if (refusal?.code === AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED) {

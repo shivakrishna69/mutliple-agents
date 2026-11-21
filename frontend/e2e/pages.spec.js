@@ -50,6 +50,7 @@ const ROLE_ACCESS = {
   admin: {
     badge: 'Admin',
     navigation: [
+      'My Access',
       'Overview',
       'Support console',
       'Department Board',
@@ -76,6 +77,7 @@ const ROLE_ACCESS = {
   hr: {
     badge: 'HR',
     navigation: [
+      'My Access',
       'Overview',
       'Ask an agent',
       'Attendance',
@@ -94,6 +96,7 @@ const ROLE_ACCESS = {
   finance: {
     badge: 'Finance & Payroll',
     navigation: [
+      'My Access',
       'Overview',
       'Ask an agent',
       'Attendance',
@@ -110,6 +113,7 @@ const ROLE_ACCESS = {
   it_admin: {
     badge: 'IT Administrator',
     navigation: [
+      'My Access',
       'Overview',
       'Ask an agent',
       'Attendance',
@@ -129,6 +133,7 @@ const ROLE_ACCESS = {
   agent: {
     badge: 'Support Agent',
     navigation: [
+      'My Access',
       'Overview',
       'Support console',
       'Ask an agent',
@@ -146,6 +151,7 @@ const ROLE_ACCESS = {
   employee: {
     badge: 'Employee',
     navigation: [
+      'My Access',
       'Overview',
       'Support chat',
       'Ask an agent',
@@ -196,7 +202,7 @@ for (const [role, access] of Object.entries(ROLE_ACCESS)) {
     }
     for (const pagePath of GUARDED_PAGES.filter((guarded) => !access.guardedPages.includes(guarded))) {
       await page.goto(pagePath);
-      await expect(page, `${role} should be sent back from ${pagePath}`).toHaveURL(/\/dashboard$/);
+      await expect(page, `${role} should be sent back from ${pagePath}`).toHaveURL(/\/my-access$/);
     }
     expect(problems, problems.join('\n')).toEqual([]);
   });

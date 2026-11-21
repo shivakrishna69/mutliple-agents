@@ -352,3 +352,12 @@ export function CogIcon(iconProps) {
     </OutlineIcon>
   );
 }
+
+/** The app launcher: nine dots (My Access). */
+export function AppGridIcon({ className = 'h-5 w-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      {[5, 12, 19].flatMap((cy) => [5, 12, 19].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2" />))}
+    </svg>
+  );
+}
