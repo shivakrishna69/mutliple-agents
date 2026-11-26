@@ -158,7 +158,11 @@ async function searchFilterOf(search) {
  * employees matching the search and status, each with their active Form 16 documents.
  * @param {{ financialYear: string, search: string|null, status: string|null }} query
  */
-export async function listCaEmployees({ financialYear, search, status }) {
+/**
+ * The year's counts over every eligible employee: { eligible, uploaded, pending }, and the ids of the
+ * employees with an active Form 16 (for the CA's status filter).
+ */
+async function form16YearCounts(financialYear) {
   const uploadedEmployeeIds = await Form16Record.distinct('employeeId', {
     financialYear,
     status: FORM16_STATUSES.ACTIVE,
@@ -167,6 +171,19 @@ export async function listCaEmployees({ financialYear, search, status }) {
     EmployeeProfile.countDocuments(eligibleProfileFilter()),
     EmployeeProfile.countDocuments({ ...eligibleProfileFilter(), _id: { $in: uploadedEmployeeIds } }),
   ]);
+  return {
+    uploadedEmployeeIds,
+    summary: { eligible: eligibleCount, uploaded: uploadedCount, pending: eligibleCount - uploadedCount },
+  };
+}
+
+/** Eligible employees still without an active Form 16 for the year (the daily briefing). */
+export async function countForm16Pending(financialYear) {
+  return (await form16YearCounts(financialYear)).summary.pending;
+}
+
+export async function listCaEmployees({ financialYear, search, status }) {
+  const { uploadedEmployeeIds, summary } = await form16YearCounts(financialYear);
 
   const statusFilter =
     status === FORM16_LIST_STATUSES.UPLOADED
@@ -219,7 +236,7 @@ export async function listCaEmployees({ financialYear, search, status }) {
   return {
     financialYear,
     assessmentYear: assessmentYearOf(financialYear),
-    summary: { eligible: eligibleCount, uploaded: uploadedCount, pending: eligibleCount - uploadedCount },
+    summary,
     employees,
     matchingCount,
     truncated: matchingCount > employees.length,

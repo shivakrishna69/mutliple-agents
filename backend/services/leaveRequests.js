@@ -65,6 +65,12 @@ import {
 import { leaveYearForDate, loadEmployeeLeaveContext } from './leaveSettings.js';
 import { leaveTypeNotFound, lowestAvailableCentidays } from './leaveTypes.js';
 import { ServiceError } from './serviceError.js';
+import {
+  invalidateInsights,
+  invalidateQuietly,
+  userIdsOfProfiles,
+  workforceAdminUserIds,
+} from './insights/insightsCache.js';
 import { isWorkforceAdmin } from './workforceAccess.js';
 
 const { PENDING, APPROVED, REJECTED, CANCELLED } = LEAVE_REQUEST_STATUSES;
@@ -333,7 +339,7 @@ async function claimDays({ employeeId, requestId, range }) {
  * @param {{ employeeId: string, actorUserId: string, input: object, now?: Date }} details
  * @returns {Promise<object>} the saved request's summary
  */
-export async function submitLeaveRequest({ employeeId, actorUserId, input, now }) {
+async function submitRequest({ employeeId, actorUserId, input, now }) {
   const requestId = new mongoose.Types.ObjectId();
   const evaluation = await evaluateRequest({ employeeId, requestId, input, now });
   const { employee, leaveType, range, pricing, today, currentLeaveYear } = evaluation;
@@ -564,7 +570,7 @@ const decisionBy = (actor, note, now) => ({ byUserId: actor.userId, note: note ?
  * next to it may add border charges), if the balance covers that price.
  */
 export function approveLeaveRequest({ requestId, ...decision }) {
-  return underEmployeeLease(requestId, (request) => approvePending(request, decision));
+  return refreshingInsights(underEmployeeLease(requestId, (request) => approvePending(request, decision)));
 }
 
 async function approvePending(request, { actor, note = null, step = null, now = new Date() }) {
@@ -618,7 +624,7 @@ async function approvePending(request, { actor, note = null, step = null, now = 
 }
 
 /** Rejects a pending request and frees its days and hold. */
-export async function rejectLeaveRequest({ requestId, actor, note, step = null, now = new Date() }) {
+async function rejectPending({ requestId, actor, note, step = null, now = new Date() }) {
   const request = await loadRequest(requestId);
   assertStepStillWaiting(request, step);
   assertCanDecideStep(actor, request);
@@ -647,7 +653,7 @@ export async function rejectLeaveRequest({ requestId, actor, note, step = null, 
  * @returns {Promise<{ request: object, wasWithdrawn: boolean }>}
  */
 export function cancelLeaveRequest({ requestId, ...cancellationDetails }) {
-  return underEmployeeLease(requestId, (request) => cancelOwnRequest(request, cancellationDetails));
+  return refreshingInsights(underEmployeeLease(requestId, (request) => cancelOwnRequest(request, cancellationDetails)));
 }
 
 async function cancelOwnRequest(request, { actor, now = new Date() }) {
@@ -689,7 +695,7 @@ async function cancelOwnRequest(request, { actor, now = new Date() }) {
  * @param {{ requestId: string, actor: LeaveActor, kind: string, newEndDate: string|null,
  *   newEndDayPortion: string|null, reason: string, now?: Date }} details
  */
-export async function requestLeaveChange({
+async function requestChange({
   requestId,
   actor,
   kind,
@@ -735,7 +741,7 @@ export async function requestLeaveChange({
  * shortening reprices it from its approved days and gives back the difference.
  */
 export function decideLeaveChange({ requestId, ...decision }) {
-  return underEmployeeLease(requestId, (request) => decideWaitingChange(request, decision));
+  return refreshingInsights(underEmployeeLease(requestId, (request) => decideWaitingChange(request, decision)));
 }
 
 async function decideWaitingChange(request, { actor, isApproved, note = null, now = new Date() }) {
@@ -811,4 +817,42 @@ async function decideWaitingChange(request, { actor, isApproved, note = null, no
       affectsNeighbours: true,
     },
   });
+}
+
+// =================================================================================================
+// Keeping the daily briefing current (services/insights/)
+// =================================================================================================
+
+/**
+ * After a change to a request succeeds, clears the daily briefings it appears in: the applicant's,
+ * their approver's, and HR's and administrators' (who see every request); their open sessions are
+ * told to fetch it again. Never fails the change itself.
+ * @param {Promise<object>} resultPromise  a request summary, or { request: summary, ... }
+ */
+async function refreshingInsights(resultPromise) {
+  const result = await resultPromise;
+  const summary = result?.request ?? result;
+  await invalidateQuietly(async () => {
+    const [people, workforceAdmins] = await Promise.all([
+      userIdsOfProfiles([summary?.employee?.id, summary?.approverEmployeeId]),
+      workforceAdminUserIds(),
+    ]);
+    await invalidateInsights([...people, ...workforceAdmins]);
+  });
+  return result;
+}
+
+/** Submits a request for the employee (see submitRequest). */
+export function submitLeaveRequest(submission) {
+  return refreshingInsights(submitRequest(submission));
+}
+
+/** Rejects a pending request and frees its days and hold (see rejectPending). */
+export function rejectLeaveRequest(rejection) {
+  return refreshingInsights(rejectPending(rejection));
+}
+
+/** Asks to cancel or shorten approved leave that has started (see requestChange). */
+export function requestLeaveChange(changeRequest) {
+  return refreshingInsights(requestChange(changeRequest));
 }

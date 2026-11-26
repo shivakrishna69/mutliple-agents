@@ -846,3 +846,21 @@ export const FORM16_SETTINGS = Object.freeze({
   LIST_LIMIT: 200,
   MULTIPART_FIELD_MAX_BYTES: 4 * 1024,
 });
+
+/**
+ * The daily briefing (services/insights/, GET /api/insights/daily-briefing).
+ *
+ *   CACHE_TTL_SECONDS          how long a person's briefing is kept; a leave or task change they are
+ *                              part of clears it at once (services/insights/insightsCache.js)
+ *   TASK_CARDS_PER_KIND        overdue, due today, up next, revisions and reviews each list at most this
+ *   LEAVE_CARDS_MAX            pending leave requests shown with their collision details
+ *   OVERLAPS_MAX               teammates' leave listed on one request (the rest are counted)
+ *   LEAVE_URGENT_AFTER_HOURS   a request waiting longer than this is urgent
+ */
+export const INSIGHT_SETTINGS = Object.freeze({
+  CACHE_TTL_SECONDS: 60,
+  TASK_CARDS_PER_KIND: 5,
+  LEAVE_CARDS_MAX: 10,
+  OVERLAPS_MAX: 5,
+  LEAVE_URGENT_AFTER_HOURS: 48,
+});

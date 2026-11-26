@@ -17,6 +17,9 @@ export const SOCKET_EVENTS = Object.freeze({
   NOTIFICATION_CREATED: 'NOTIFICATION_CREATED',
   // Server -> client: an offboarding case's documents moved on a step (to the person who started it)
   OFFBOARDING_PROGRESS: 'OFFBOARDING_PROGRESS',
+  // Server -> client: this user's daily briefing changed (a leave or task they are part of); fetch it
+  // again (GET /api/insights/daily-briefing). No payload beyond the time.
+  INSIGHTS_CHANGED: 'INSIGHTS_CHANGED',
   // Server -> client, agent telemetry channel (names are AGENT_TELEMETRY_EVENTS)
   AGENT_THINKING_EVENT: AGENT_TELEMETRY_EVENTS.AGENT_THINKING_EVENT,
   TOOL_EXECUTION_STARTED: AGENT_TELEMETRY_EVENTS.TOOL_EXECUTION_STARTED,

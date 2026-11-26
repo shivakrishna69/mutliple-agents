@@ -520,6 +520,25 @@ export function emitNotification(userId, notificationPayload) {
 }
 
 /**
+ * Tells every open session of a user that their daily briefing changed (services/insights/), so it is
+ * fetched again. Never throws; false when nothing could be sent (the next fetch is fresh anyway).
+ * @param {string} userId
+ */
+export function emitInsightsChanged(userId) {
+  if (!socketIoInstance) return false;
+  try {
+    socketIoInstance.to(ROOM_NAMES.user(userId)).emit(SOCKET_EVENTS.INSIGHTS_CHANGED, { at: new Date().toISOString() });
+    return true;
+  } catch (emitError) {
+    logger.error('Failed to emit INSIGHTS_CHANGED', {
+      userId,
+      error: { name: emitError.name, message: emitError.message },
+    });
+    return false;
+  }
+}
+
+/**
  * Pushes an offboarding case's progress (services/nskBot/offboarding/offboardingRunner.js) to every
  * open session of the person who started it. Never throws; returns false when nothing could be sent
  * (the case's state is in MongoDB either way, so GET /api/nsk-bot/offboarding/cases/:id shows it).
