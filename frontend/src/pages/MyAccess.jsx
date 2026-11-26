@@ -10,9 +10,11 @@
  *
  *   search   a box in the heading row filters the tiles as the person types (label, keywords or
  *            address, any case); × clears it; a short note when nothing matches
+ *   briefing the briefing bar above the tiles (components/insights/BriefingBar.jsx): the headline,
+ *            the most pressing item with its action, and Open briefing
  *   badges   pending counts on the tiles that have one (Leave, Attendance, Support Console, Form 16 /
- *            CA Portal), from endpoints the pages already use (utils/launcherBadges.js); a badge shows
- *            only above 0, and not at all when its count cannot be read
+ *            CA Portal), from the daily briefing's exact queues (utils/launcherBadges.js), so they
+ *            update live and cost no requests of their own; a badge shows only above 0
  *   hover    the tile lifts and its medallion zooms (transform only, so it stays smooth)
  */
 
@@ -21,9 +23,10 @@ import { Link, useNavigate, useOutletContext } from 'react-router';
 import { launcherTilesFor } from '../components/appNavigation.js';
 import { freshNavigationState } from '../components/NotificationCenter.jsx';
 import { BellIcon, CloseIcon, SearchIcon } from '../components/Icons.jsx';
+import BriefingBar from '../components/insights/BriefingBar.jsx';
+import { useInsights } from '../components/insights/InsightsContext.jsx';
 import { LAUNCHER_BADGE_LABEL, LAUNCHER_SEARCH } from '../constants/launcher.js';
-import { useApiResource } from '../hooks/useApiResource.js';
-import { BADGE_PATHS, badgeText, filterTiles, loadLauncherBadges } from '../utils/launcherBadges.js';
+import { badgeText, badgesFromQueues, filterTiles } from '../utils/launcherBadges.js';
 
 const DISMISSED_KEY = 'nsk.myAccess.dismissedNotification';
 
@@ -160,11 +163,7 @@ export default function MyAccess() {
   const { visibility, notificationState } = useOutletContext();
   const tiles = launcherTilesFor(visibility);
   const [query, setQuery] = useState('');
-  // Only the tiles this person sees are asked for a count; a change of view asks again.
-  const badgePaths = tiles.map((tile) => tile.path).filter((path) => BADGE_PATHS.includes(path));
-  const badges = useApiResource((signal) => loadLauncherBadges(badgePaths, signal), [badgePaths.join(',')], {
-    enabled: badgePaths.length > 0,
-  });
+  const badges = badgesFromQueues(useInsights()?.briefing?.queues);
   const shownTiles = filterTiles(tiles, query);
   return (
     <div className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-10">
@@ -178,6 +177,7 @@ export default function MyAccess() {
             <ModuleSearch value={query} onChange={setQuery} />
           </div>
         </div>
+        <BriefingBar className="mt-4" />
         {shownTiles.length === 0 ? (
           <p className="mt-5 py-8 text-center text-sm text-slate-500" role="status" data-testid="my-access-no-match">
             {LAUNCHER_SEARCH.NO_MATCH} “{query.trim()}”
@@ -185,7 +185,7 @@ export default function MyAccess() {
         ) : (
           <ul className="mt-5 grid grid-cols-2 justify-items-center gap-x-6 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
             {shownTiles.map((tile) => (
-              <LauncherTile key={tile.path} tile={tile} badge={badgeText(badges.data?.[tile.path])} />
+              <LauncherTile key={tile.path} tile={tile} badge={badgeText(badges[tile.path])} />
             ))}
           </ul>
         )}

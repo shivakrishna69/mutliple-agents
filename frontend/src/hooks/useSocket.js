@@ -12,6 +12,7 @@
  *     onConversationAccessRevoked: (revocationPayload) => { ... },
  *     onNotificationCreated: (notification) => { ... },          // the user's in-app notifications
  *     onOffboardingProgress: (progress) => { ... },              // a case this user started
+ *     onInsightsChanged: () => { ... },                         // this user's daily briefing changed
  *   });
  *
  * Lifecycle
@@ -99,6 +100,7 @@ export function useSocket({
   onConversationAccessRevoked,
   onNotificationCreated,
   onOffboardingProgress,
+  onInsightsChanged,
 } = {}) {
   const { authStatus, markSessionEnded } = useAuth();
   const isAuthenticated = authStatus === AUTH_STATUS.AUTHENTICATED;
@@ -120,6 +122,7 @@ export function useSocket({
       onConversationAccessRevoked,
       onNotificationCreated,
       onOffboardingProgress,
+      onInsightsChanged,
     };
   });
 
@@ -285,6 +288,10 @@ export function useSocket({
       invokeCallbackSafely('onNotificationCreated', consumerCallbacksRef.current.onNotificationCreated, notification);
     };
 
+    const handleInsightsChanged = () => {
+      invokeCallbackSafely('onInsightsChanged', consumerCallbacksRef.current.onInsightsChanged);
+    };
+
     const handleOffboardingProgress = (progress) => {
       if (!isPlainObject(progress)) return;
       invokeCallbackSafely('onOffboardingProgress', consumerCallbacksRef.current.onOffboardingProgress, progress);
@@ -299,6 +306,7 @@ export function useSocket({
     socket.on(SOCKET_EVENTS.CONVERSATION_ACCESS_REVOKED, handleConversationAccessRevoked);
     socket.on(SOCKET_EVENTS.NOTIFICATION_CREATED, handleNotificationCreated);
     socket.on(SOCKET_EVENTS.OFFBOARDING_PROGRESS, handleOffboardingProgress);
+    socket.on(SOCKET_EVENTS.INSIGHTS_CHANGED, handleInsightsChanged);
 
     setConnectionStatus(SOCKET_CONNECTION_STATUS.CONNECTING);
     socket.connect();

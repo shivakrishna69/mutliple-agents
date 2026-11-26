@@ -1,59 +1,30 @@
 /**
  * The My Access launcher's live counts and search (pages/MyAccess.jsx).
  *
- *   loadLauncherBadges   pending counts for the tiles that have one, read from endpoints the pages
- *                        already use; a count is left out when its request fails or the person may
- *                        not read it, so its badge simply does not show
+ *   badgesFromQueues   pending counts for the tiles that have one, from the daily briefing's exact
+ *                      queues (GET /api/insights/daily-briefing, loaded once by the app shell and kept
+ *                      current live), so the launcher makes no requests of its own; a queue missing
+ *                      from the briefing (its area could not be read) shows no badge
  *       Leave                leave requests and leave changes waiting for this person's decision
  *       Attendance           attendance corrections waiting for this person's review
- *       Support Console      escalated chats nobody has claimed yet (among the latest 100 the list
- *                            returns, so a busy queue shows "99+")
+ *       Support Console      escalated chats nobody has claimed yet
  *       Form 16 / CA Portal  eligible employees still waiting for this year's Form 16
- *   badgeText            what a badge shows: nothing at 0, "99+" above LAUNCHER_BADGE_MAX
- *   filterTiles          the tiles whose label, keywords or address contain the search text
+ *   badgeText          what a badge shows: nothing at 0, "99+" above LAUNCHER_BADGE_MAX
+ *   filterTiles        the tiles whose label, keywords or address contain the search text
  */
 
-import { requestRegularizationReviews } from '../api/workforceApi.js';
-import { requestApprovalQueue } from '../api/leaveApi.js';
-import { requestConversationList } from '../api/conversationsApi.js';
-import { requestCaEmployees } from '../api/taxApi.js';
-import { APPROVAL_QUEUES } from '../constants/leave.js';
-import { CONVERSATION_WAITING_STATUS, LAUNCHER_BADGE_MAX, REVIEW_PENDING_STATUS } from '../constants/launcher.js';
-import { ROUTE_PATHS } from '../constants/routes.js';
-
-/** Where each count comes from, by the tile it belongs to. */
-const BADGE_SOURCES = Object.freeze({
-  [ROUTE_PATHS.LEAVE]: async (signal) => {
-    const [requests, changes] = await Promise.all([
-      requestApprovalQueue(APPROVAL_QUEUES.REQUESTS, signal),
-      requestApprovalQueue(APPROVAL_QUEUES.CHANGES, signal),
-    ]);
-    return requests.requests.length + changes.requests.length;
-  },
-  [ROUTE_PATHS.ATTENDANCE]: async (signal) =>
-    (await requestRegularizationReviews(REVIEW_PENDING_STATUS, signal)).reviews.length,
-  [ROUTE_PATHS.CONSOLE]: async (signal) =>
-    (await requestConversationList({ signal })).filter(
-      (conversation) => conversation.status === CONVERSATION_WAITING_STATUS && !conversation.assignedAgentId,
-    ).length,
-  [ROUTE_PATHS.CA_PORTAL]: async (signal) => (await requestCaEmployees({}, signal)).summary.pending,
-});
-
-/** The tile addresses that can carry a badge. */
-export const BADGE_PATHS = Object.freeze(Object.keys(BADGE_SOURCES));
+import { QUEUE_BADGE_PATHS } from '../constants/insights.js';
+import { LAUNCHER_BADGE_MAX } from '../constants/launcher.js';
 
 /**
- * Pending counts for the given tile addresses: { [path]: count }. Only the tiles the person sees are
- * asked for; a failed or refused request leaves its tile out.
- * @param {string[]} paths
- * @param {AbortSignal} [signal]
+ * { [tile path]: count } for the tiles with a badge and a count above 0.
+ * @param {Record<string, number>|null|undefined} queues  the briefing's `queues`
  */
-export async function loadLauncherBadges(paths, signal) {
-  const wanted = paths.filter((path) => BADGE_SOURCES[path]);
-  const results = await Promise.allSettled(wanted.map((path) => BADGE_SOURCES[path](signal)));
+export function badgesFromQueues(queues) {
+  if (!queues) return {};
   return Object.fromEntries(
-    wanted
-      .map((path, index) => [path, results[index].status === 'fulfilled' ? results[index].value : null])
+    Object.entries(QUEUE_BADGE_PATHS)
+      .map(([path, queue]) => [path, queues[queue]])
       .filter(([, count]) => Number.isInteger(count) && count > 0),
   );
 }

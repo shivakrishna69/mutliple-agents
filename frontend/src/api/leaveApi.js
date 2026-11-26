@@ -88,16 +88,22 @@ export const requestLeaveChange = (requestId, changeInput, csrfToken) =>
 // --- Decisions ------------------------------------------------------------------------------------
 export const requestApprovalQueue = (queue, callerSignal) =>
   getData(`/api/leave/approvals${toQueryString({ queue })}`, callerSignal);
+/** A decision, with the backend's message about it as `notice` ("Leave request approved"). */
+async function sendDecision(endpointPath, requestPayload, csrfToken) {
+  const { responseData, responseMessage } = await sendApiRequest({
+    method: 'POST',
+    endpointPath,
+    requestPayload,
+    csrfToken,
+  });
+  return { ...responseData, notice: responseMessage };
+}
+
 // `step` names the approval step being decided, so a step someone has just decided is refused.
 export const requestLeaveApproval = (requestId, { note, step }, csrfToken) =>
-  sendData(
-    'POST',
-    requestPath(requestId, '/approve'),
-    { ...(note ? { note } : {}), ...(step ? { step } : {}) },
-    csrfToken,
-  );
+  sendDecision(requestPath(requestId, '/approve'), { ...(note ? { note } : {}), ...(step ? { step } : {}) }, csrfToken);
 export const requestLeaveRejection = (requestId, { note, step }, csrfToken) =>
-  sendData('POST', requestPath(requestId, '/reject'), { note, ...(step ? { step } : {}) }, csrfToken);
+  sendDecision(requestPath(requestId, '/reject'), { note, ...(step ? { step } : {}) }, csrfToken);
 export const requestLeaveChangeDecision = (requestId, { isApproved, note }, csrfToken) =>
   sendData(
     'POST',

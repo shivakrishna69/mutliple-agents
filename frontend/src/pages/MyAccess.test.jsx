@@ -2,20 +2,17 @@
  * The My Access launcher (MyAccess.jsx, components/appNavigation.js): one tile per page the person may
  * open, following the same capabilities, portal view and membership rules as the sidebar; the newest
  * unread notification as a dismissible announcement; and nothing announced when all are read; the
- * pending-count badges; and the module search.
+ * pending-count badges from the daily briefing's queues (no requests of their own); the briefing bar;
+ * and the module search.
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { launcherTilesFor } from '../components/appNavigation.js';
-import { loadLauncherBadges } from '../utils/launcherBadges.js';
+import { InsightsProvider } from '../components/insights/InsightsContext.jsx';
 import MyAccess from './MyAccess.jsx';
 
-vi.mock('../utils/launcherBadges.js', async (importOriginal) => ({
-  ...(await importOriginal()),
-  loadLauncherBadges: vi.fn(),
-}));
 vi.mock('../auth/AuthContext.jsx', () => {
   const session = { currentUser: { id: 'me' }, markSessionEnded: () => {} };
   return { useAuth: () => session };
@@ -41,15 +38,28 @@ const visibilityOf = (capabilities, { view = null, context = {} } = {}) => ({
 });
 const labelsFor = (visibility) => launcherTilesFor(visibility).map((tile) => tile.label);
 
-function renderLauncher({ visibility, notificationState }) {
+/** The shared briefing state as the app shell provides it, with this briefing loaded. */
+const insightsWith = (briefing) => ({
+  briefing,
+  isLoading: false,
+  error: null,
+  decisions: {},
+  openPanel: vi.fn(),
+  approve: vi.fn(),
+  undo: vi.fn(),
+});
+
+function renderLauncher({ visibility, notificationState }, insights = null) {
   return render(
-    <MemoryRouter initialEntries={['/my-access']}>
-      <Routes>
-        <Route element={<Outlet context={{ visibility, notificationState }} />}>
-          <Route path="/my-access" element={<MyAccess />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <InsightsProvider value={insights}>
+      <MemoryRouter initialEntries={['/my-access']}>
+        <Routes>
+          <Route element={<Outlet context={{ visibility, notificationState }} />}>
+            <Route path="/my-access" element={<MyAccess />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </InsightsProvider>,
   );
 }
 
@@ -104,7 +114,6 @@ describe('My Access page', () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.clearAllMocks();
-    loadLauncherBadges.mockResolvedValue({});
   });
 
   it('shows the heading and one link per tile', () => {
@@ -140,22 +149,28 @@ describe('My Access page', () => {
     expect(screen.queryByTestId('my-access-announcement')).toBeNull();
   });
 
-  it('shows a pending count only on the tiles that have one, and asks only for visible tiles', async () => {
-    loadLauncherBadges.mockResolvedValue({ '/leave': 3, '/attendance': 120 });
-    renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
+  it('shows the briefing queues as counts on the visible tiles, with the briefing bar above them', () => {
+    const insights = insightsWith({
+      headline: '2 leave requests to approve',
+      counts: { total: 2, urgent: 0, high: 2, byKind: {} },
+      queues: { LEAVE_DECISIONS: 3, ATTENDANCE_CORRECTIONS: 120, SUPPORT_WAITING: 4 },
+      cards: [],
+    });
+    renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } }, insights);
     const leave = screen.getByText('Leave').closest('a');
-    expect(await within(leave).findByTestId('my-access-badge')).toHaveProperty('textContent', '3');
+    expect(within(leave).getByTestId('my-access-badge').textContent).toBe('3');
     expect(within(leave).getByText(', 3 pending')).toBeTruthy();
     expect(within(screen.getByText('Attendance').closest('a')).getByTestId('my-access-badge').textContent).toBe('99+');
+    // Support Console is not one of this person's tiles, so its queue shows nowhere.
     expect(screen.getAllByTestId('my-access-badge')).toHaveLength(2);
-    expect(loadLauncherBadges).toHaveBeenCalledWith(['/attendance', '/leave'], expect.anything());
+    expect(screen.getByTestId('briefing-headline').textContent).toBe('2 leave requests to approve');
   });
 
-  it('shows no badge when the counts cannot be read', async () => {
-    loadLauncherBadges.mockRejectedValue(new Error('offline'));
+  it('shows no badge and no bar without a briefing', async () => {
     renderLauncher({ visibility: visibilityOf(WORKSPACE), notificationState: { notifications: [] } });
     await screen.findByRole('heading', { name: 'My Access' });
     expect(screen.queryByTestId('my-access-badge')).toBeNull();
+    expect(screen.queryByTestId('briefing-bar')).toBeNull();
   });
 
   it('filters the tiles as the person types, clears, and says when nothing matches', () => {

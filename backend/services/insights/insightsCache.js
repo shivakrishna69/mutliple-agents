@@ -1,7 +1,8 @@
 /**
  * The daily briefing's cache and its invalidation. A person's briefing is kept for
  * INSIGHT_SETTINGS.CACHE_TTL_SECONDS (Redis when configured, else this process's memory:
- * services/cacheStore.js). A change to a leave request or a task clears the briefings of everyone it
+ * services/cacheStore.js). A change to a leave request, a task or an attendance correction clears the
+ * briefings of everyone it
  * appears to and tells their open sessions (Socket.IO INSIGHTS_CHANGED), so banners refresh at once
  * rather than after the cache runs out.
  *
@@ -71,4 +72,19 @@ export async function invalidateQuietly(invalidate) {
   } catch (invalidationError) {
     logger.warn('Briefing invalidation failed', { error: invalidationError.message });
   }
+}
+
+/**
+ * An attendance correction filed or decided: its reviewers' briefings (the employee's reporting
+ * manager, HR and administrators) count it differently now. Never throws.
+ * @param {string|object|null} reportingManagerId  the employee record of the manager, if any
+ */
+export function refreshCorrectionInsights(reportingManagerId) {
+  return invalidateQuietly(async () => {
+    const [managerUserIds, adminUserIds] = await Promise.all([
+      userIdsOfProfiles([reportingManagerId]),
+      workforceAdminUserIds(),
+    ]);
+    await invalidateInsights([...managerUserIds, ...adminUserIds]);
+  });
 }

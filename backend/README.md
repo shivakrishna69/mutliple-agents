@@ -649,14 +649,18 @@ Each card has a label, title, body, facts and actions: `APPROVE_LEAVE` / `DECLIN
 request and the step it waits on; a decline needs a reason), `OPEN_TASK` / `REVIEW_TASK` (the task's
 `/boards/:departmentId?task=<id>`), `ASK_NSK` (a prompt to put in the box) and `OPEN_PAGE`. The response
 also has a `headline` ("1 revision needed · 2 overdue · 1 leave request to approve") and counts by
-severity and kind. Every text is in `constants/messages.js` (`INSIGHT_MESSAGES`); dates are the
-company's (`services/companyToday.js`).
+severity and kind, and `queues`: exact counts of what waits on the person, never capped like the cards
+(`LEAVE_DECISIONS`: leave requests and changes to decide, `ATTENDANCE_CORRECTIONS`, `SUPPORT_WAITING`,
+`OFFERS_PENDING`, `FORM16_PENDING`; 0 when not theirs, left out when its area failed). The web app's
+My Access badges read these, so the launcher makes no requests of its own. Every text is in
+`constants/messages.js` (`INSIGHT_MESSAGES`); dates are the company's (`services/companyToday.js`).
 
 A briefing is cached per person for 60 seconds (`INSIGHT_SETTINGS.CACHE_TTL_SECONDS`). A leave request
 changing (submitted, decided, cancelled, changed) clears the applicant's, their approver's and HR's
 and administrators' briefings; a task changing (created, edited, submitted, reviewed) clears its
 board leads', its assignee's before and after, its reporter's and the assignees of the tasks that
-follow it. Their open sessions get Socket.IO `INSIGHTS_CHANGED` and fetch again, so a banner never
+follow it; an attendance correction filed or decided clears its reviewers' (the employee's manager, HR
+and administrators). Their open sessions get Socket.IO `INSIGHTS_CHANGED` and fetch again, so a banner never
 waits for the cache to run out. A failing area (leave, tasks, operations) is logged and left out
 rather than failing the briefing.
 

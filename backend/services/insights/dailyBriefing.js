@@ -8,6 +8,8 @@
  *     today,          YYYY-MM-DD in the company's time zone
  *     headline,       "1 revision needed · 2 overdue · 1 leave request to approve", or ALL_CLEAR
  *     counts: { total, urgent, high, byKind: { [kind]: n } },
+ *     queues: { [INSIGHT_QUEUES]: n }  exact counts of what waits on the person, never capped (badges);
+ *                     a queue whose area failed to build is left out rather than shown as 0
  *     cards: [ ... ]  services/insights/insightFormat.js has the shape; urgent first
  *   }
  *
@@ -20,8 +22,8 @@ import { logger } from '../../utils/logger.js';
 import { companyToday } from '../companyToday.js';
 import { INSIGHT_KINDS, INSIGHT_SEVERITIES, sortCards } from './insightFormat.js';
 import { readCachedBriefing, storeCachedBriefing } from './insightsCache.js';
-import { buildLeaveCards } from './leaveInsights.js';
-import { buildOperationsCards } from './operationsInsights.js';
+import { buildLeaveInsights } from './leaveInsights.js';
+import { buildOperationsInsights } from './operationsInsights.js';
 import { buildTaskCards } from './taskInsights.js';
 
 /** Which kinds count towards each part of the headline. */
@@ -54,7 +56,7 @@ async function safely(area, viewer, build) {
     return await build();
   } catch (buildError) {
     logger.error('Briefing area could not be built', { area, userId: viewer.id, error: buildError.message });
-    return [];
+    return { cards: [], queues: {} };
   }
 }
 
@@ -66,11 +68,12 @@ async function safely(area, viewer, build) {
 export async function buildDailyBriefing(viewer, { now = new Date() } = {}) {
   const today = await companyToday(now);
   const groups = await Promise.all([
-    safely('leave', viewer, () => buildLeaveCards(viewer, { now })),
-    safely('tasks', viewer, () => buildTaskCards(viewer, { today })),
-    safely('operations', viewer, () => buildOperationsCards(viewer, { now })),
+    safely('leave', viewer, () => buildLeaveInsights(viewer, { now })),
+    safely('tasks', viewer, async () => ({ cards: await buildTaskCards(viewer, { today }), queues: {} })),
+    safely('operations', viewer, () => buildOperationsInsights(viewer, { now })),
   ]);
-  const cards = sortCards(groups.flat());
+  const cards = sortCards(groups.flatMap((group) => group.cards));
+  const queues = Object.assign({}, ...groups.map((group) => group.queues));
   const byKind = {};
   for (const card of cards) byKind[card.kind] = (byKind[card.kind] ?? 0) + 1;
   return {
@@ -83,6 +86,7 @@ export async function buildDailyBriefing(viewer, { now = new Date() } = {}) {
       high: cards.filter((card) => card.severity === INSIGHT_SEVERITIES.HIGH).length,
       byKind,
     },
+    queues,
     cards,
   };
 }

@@ -8,7 +8,7 @@
  *   offers             drafts waiting to be sent, or whose email failed       MANAGE_OFFERS
  *   Form 16            eligible employees without this year's Form 16         MANAGE_FORM16
  *
- * A count of 0 makes no card.
+ * A count of 0 makes no card. The same counts are the briefing's queues (INSIGHT_QUEUES).
  */
 
 import { CAPABILITIES, hasCapability } from '../../constants/accessRoles.js';
@@ -20,7 +20,7 @@ import { getCompanySettings } from '../companySettings.js';
 import { offeredFinancialYears } from '../tax/form16Eligibility.js';
 import { countForm16Pending } from '../tax/form16Service.js';
 import { findOwnEmployeeProfileId, isWorkforceAdmin } from '../workforceAccess.js';
-import { INSIGHT_ACTIONS, INSIGHT_KINDS, INSIGHT_SEVERITIES } from './insightFormat.js';
+import { INSIGHT_ACTIONS, INSIGHT_KINDS, INSIGHT_QUEUES, INSIGHT_SEVERITIES } from './insightFormat.js';
 
 /**
  * The web app's pages these cards open. Must match the frontend's routes
@@ -58,8 +58,9 @@ async function correctionsFilterFor(viewer) {
 /**
  * @param {{ id: string, role: string }} viewer
  * @param {{ now: Date }} options
+ * @returns {Promise<{ cards: object[], queues: object }>}
  */
-export async function buildOperationsCards(viewer, { now }) {
+export async function buildOperationsInsights(viewer, { now }) {
   const can = (capability) => hasCapability(viewer.role, capability);
   const correctionsFilter = await correctionsFilterFor(viewer);
   const financialYear = can(CAPABILITIES.MANAGE_FORM16)
@@ -114,5 +115,13 @@ export async function buildOperationsCards(viewer, { now }) {
       ),
     );
   }
-  return cards;
+  return {
+    cards,
+    queues: {
+      [INSIGHT_QUEUES.SUPPORT_WAITING]: supportWaiting,
+      [INSIGHT_QUEUES.ATTENDANCE_CORRECTIONS]: corrections,
+      [INSIGHT_QUEUES.OFFERS_PENDING]: offers,
+      [INSIGHT_QUEUES.FORM16_PENDING]: form16,
+    },
+  };
 }

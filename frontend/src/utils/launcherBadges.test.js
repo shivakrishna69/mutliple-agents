@@ -1,60 +1,29 @@
 /**
- * The launcher's counts and search (utils/launcherBadges.js): each count read from its existing
- * endpoint, a failed or empty one left out, "99+" above the maximum, and the search matching labels,
+ * The launcher's counts and search (utils/launcherBadges.js): each count read from the daily briefing's
+ * queues, a missing or empty one left out, "99+" above the maximum, and the search matching labels,
  * keywords and addresses in any case.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { requestConversationList } from '../api/conversationsApi.js';
-import { requestApprovalQueue } from '../api/leaveApi.js';
-import { requestCaEmployees } from '../api/taxApi.js';
-import { requestRegularizationReviews } from '../api/workforceApi.js';
-import { badgeText, filterTiles, loadLauncherBadges } from './launcherBadges.js';
+import { describe, expect, it } from 'vitest';
+import { badgeText, badgesFromQueues, filterTiles } from './launcherBadges.js';
 
-vi.mock('../api/leaveApi.js', () => ({ requestApprovalQueue: vi.fn() }));
-vi.mock('../api/workforceApi.js', () => ({ requestRegularizationReviews: vi.fn() }));
-vi.mock('../api/conversationsApi.js', () => ({ requestConversationList: vi.fn() }));
-vi.mock('../api/taxApi.js', () => ({ requestCaEmployees: vi.fn() }));
-
-const ALL_BADGE_PATHS = ['/leave', '/attendance', '/console', '/tax/ca-portal'];
-
-describe('loadLauncherBadges', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    requestApprovalQueue.mockImplementation(async (queue) => ({
-      requests: queue === 'requests' ? [{ id: 'r1' }, { id: 'r2' }] : [{ id: 'c1' }],
-    }));
-    requestRegularizationReviews.mockResolvedValue({ reviews: [{ id: 'v1' }] });
-    requestConversationList.mockResolvedValue([
-      { conversationId: 'a', status: 'escalated-to-human', assignedAgentId: null },
-      { conversationId: 'b', status: 'escalated-to-human', assignedAgentId: 'agent-1' },
-      { conversationId: 'c', status: 'processing-ai', assignedAgentId: null },
-    ]);
-    requestCaEmployees.mockResolvedValue({ summary: { eligible: 5, uploaded: 2, pending: 3 } });
+describe('badgesFromQueues', () => {
+  it('maps the briefing queues onto the Leave, Attendance, Support Console and CA Portal tiles', () => {
+    expect(
+      badgesFromQueues({
+        LEAVE_DECISIONS: 3,
+        ATTENDANCE_CORRECTIONS: 1,
+        SUPPORT_WAITING: 2,
+        FORM16_PENDING: 4,
+        OFFERS_PENDING: 5,
+      }),
+    ).toEqual({ '/leave': 3, '/attendance': 1, '/console': 2, '/tax/ca-portal': 4 });
   });
 
-  it('counts pending leave decisions, attendance corrections, unclaimed chats and missing Form 16s', async () => {
-    expect(await loadLauncherBadges([...ALL_BADGE_PATHS, '/payroll'])).toEqual({
-      '/leave': 3,
-      '/attendance': 1,
-      '/console': 1,
-      '/tax/ca-portal': 3,
-    });
-    expect(requestApprovalQueue).toHaveBeenCalledWith('requests', undefined);
-    expect(requestApprovalQueue).toHaveBeenCalledWith('changes', undefined);
-    expect(requestRegularizationReviews).toHaveBeenCalledWith('Pending', undefined);
-  });
-
-  it('asks only for the tiles the person sees', async () => {
-    expect(await loadLauncherBadges(['/leave'])).toEqual({ '/leave': 3 });
-    expect(requestConversationList).not.toHaveBeenCalled();
-    expect(requestCaEmployees).not.toHaveBeenCalled();
-  });
-
-  it('leaves out a count that is 0 or cannot be read', async () => {
-    requestRegularizationReviews.mockRejectedValue(new Error('403'));
-    requestCaEmployees.mockResolvedValue({ summary: { eligible: 2, uploaded: 2, pending: 0 } });
-    expect(await loadLauncherBadges(ALL_BADGE_PATHS)).toEqual({ '/leave': 3, '/console': 1 });
+  it('leaves out a queue that is 0 or missing (its area could not be read), and has nothing without a briefing', () => {
+    expect(badgesFromQueues({ LEAVE_DECISIONS: 0, SUPPORT_WAITING: 1 })).toEqual({ '/console': 1 });
+    expect(badgesFromQueues(null)).toEqual({});
+    expect(badgesFromQueues(undefined)).toEqual({});
   });
 });
 

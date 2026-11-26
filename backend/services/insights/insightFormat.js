@@ -37,6 +37,18 @@ export const INSIGHT_KINDS = Object.freeze({
  *   ASK_NSK                        { prompt }: /ask-nsk with the prompt in the box, not sent
  *   OPEN_PAGE                      { path }
  */
+/**
+ * Exact counts of what waits on the viewer, by queue (the briefing's `queues`), for badges such as My
+ * Access's tiles; a queue the viewer has no part in is 0. Unlike the cards, these are never capped.
+ */
+export const INSIGHT_QUEUES = Object.freeze({
+  LEAVE_DECISIONS: 'LEAVE_DECISIONS',
+  ATTENDANCE_CORRECTIONS: 'ATTENDANCE_CORRECTIONS',
+  SUPPORT_WAITING: 'SUPPORT_WAITING',
+  OFFERS_PENDING: 'OFFERS_PENDING',
+  FORM16_PENDING: 'FORM16_PENDING',
+});
+
 export const INSIGHT_ACTIONS = Object.freeze({
   APPROVE_LEAVE: 'APPROVE_LEAVE',
   DECLINE_LEAVE: 'DECLINE_LEAVE',
