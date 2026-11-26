@@ -57,6 +57,32 @@ export const ACTIVITY_FIELD_LABELS = Object.freeze({
   assigneeId: 'assignee',
   storyPoints: 'story points',
   sprintId: 'sprint',
+  startDate: 'start date',
+  dueDate: 'due date',
+  dependsOnTaskId: 'task it follows',
+});
+
+/** A task's review (backend TASK_REVIEW_STATES) and a lead's decision on it (TASK_REVIEW_DECISIONS). */
+export const TASK_REVIEW_STATES = Object.freeze({
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+});
+export const TASK_REVIEW_DECISIONS = Object.freeze({ APPROVE: 'APPROVE', REQUEST_CHANGES: 'REQUEST_CHANGES' });
+
+/** A review change in a task's activity, as people read it (null: taken back out of review). */
+export const REVIEW_ACTIVITY_PHRASES = Object.freeze({
+  SUBMITTED: 'submitted it for review',
+  APPROVED: 'approved it',
+  CHANGES_REQUESTED: 'requested changes',
+  WITHDRAWN: 'took it back out of review',
+});
+
+/** How close a task is to its due date, on its card (utils/taskBoard.js dueStateOf). */
+export const DUE_STATES = Object.freeze({ OVERDUE: 'OVERDUE', DUE_TODAY: 'DUE_TODAY' });
+export const DUE_STATE_DISPLAY = Object.freeze({
+  OVERDUE: { label: 'Overdue', tone: 'rose' },
+  DUE_TODAY: { label: 'Due today', tone: 'amber' },
 });
 
 /** Space between neighbouring tasks in a column (backend TASK_SETTINGS.ORDER_GAP). */
@@ -68,4 +94,5 @@ export const TASK_LIMITS = Object.freeze({
   COMMENT: 5_000,
   STORY_POINTS: 100,
   LEADS: 20,
+  REVIEW_NOTE: 1000,
 });

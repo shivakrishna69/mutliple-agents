@@ -1,12 +1,21 @@
 /**
- * A task on the board: title, type and priority, key, story points and assignee. Clicking (or Enter
- * on) the card opens the task; when the viewer may move it, it can be dragged. Dropping another task
- * on a card puts that task just above it, when the drop is allowed there.
+ * A task on the board: title, type and priority, key, story points and assignee, with an Overdue or
+ * Due today chip against the company's date (the board's `today`) and a Changes requested chip when a
+ * lead sent it back. Clicking (or Enter on) the card opens the task; when the viewer may move it, it
+ * can be dragged. Dropping another task on a card puts that task just above it, when the drop is
+ * allowed there.
  */
 
+import { DUE_STATE_DISPLAY } from '../../constants/tasks.js';
+import { dueStateOf, revisionOf } from '../../utils/taskBoard.js';
+import { Badge } from '../ui.jsx';
 import { PersonBadge, PriorityBadge, TaskTypeBadge } from './taskDisplay.jsx';
 
-export default function TaskCard({ task, canDrag, isDragging, onOpen, onDragStart, onDragEnd, dropHandlers }) {
+const REVISION_CHIP = Object.freeze({ label: 'Changes requested', tone: 'violet' });
+
+export default function TaskCard({ task, today, canDrag, isDragging, onOpen, onDragStart, onDragEnd, dropHandlers }) {
+  const dueState = dueStateOf(task, today);
+  const due = dueState ? DUE_STATE_DISPLAY[dueState] : null;
   return (
     <li
       draggable={canDrag}
@@ -25,6 +34,8 @@ export default function TaskCard({ task, canDrag, isDragging, onOpen, onDragStar
         <span className="mt-2 flex flex-wrap items-center gap-1.5">
           <TaskTypeBadge taskType={task.taskType} />
           <PriorityBadge priority={task.priority} />
+          {due && <Badge tone={due.tone}>{due.label}</Badge>}
+          {revisionOf(task) && <Badge tone={REVISION_CHIP.tone}>{REVISION_CHIP.label}</Badge>}
         </span>
         <span className="mt-2 flex items-center justify-between">
           <span className="font-mono text-xs text-slate-500">{task.key}</span>

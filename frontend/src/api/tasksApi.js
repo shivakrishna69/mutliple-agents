@@ -10,6 +10,7 @@
  *   GET   /sprints  POST /sprints  PATCH /sprints/:sprintId
  *   GET   /tasks?sprintId=&assignee=&status=   POST /tasks
  *   GET   /tasks/:taskId  PATCH /tasks/:taskId  POST /tasks/:taskId/comments
+ *   POST  /tasks/:taskId/review           leads, on a task in review: { decision, note, version }
  *   GET   /tasks/metrics?sprintId=        leads: each person's work, a sprint's burndown, the
  *                                         unassigned backlog
  */
@@ -65,3 +66,7 @@ export const requestTaskUpdate = (departmentId, taskId, changesWithVersion, csrf
 
 export const requestTaskComment = (departmentId, taskId, body, csrfToken) =>
   change('POST', `${boardPath(departmentId)}/tasks/${encode(taskId)}/comments`, { body }, csrfToken);
+
+/** @param {{ decision: 'APPROVE'|'REQUEST_CHANGES', note: string|null, version: number }} review */
+export const requestTaskReview = (departmentId, taskId, review, csrfToken) =>
+  change('POST', `${boardPath(departmentId)}/tasks/${encode(taskId)}/review`, review, csrfToken);

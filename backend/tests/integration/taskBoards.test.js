@@ -111,6 +111,7 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
     const memberView = (await dev1.client.get(`${boardPath(engineering)}/board`)).body.data.board;
     assert.equal(memberView.viewer.role, 'MEMBER');
     assert.equal(memberView.viewer.canPlanSprints, false);
+    assert.equal(memberView.today, companyToday, 'today in the company time zone, for due dates');
     assert.equal(memberView.head.name, 'Esha Head');
     assert.deepEqual(
       memberView.members.map((member) => member.name),

@@ -6,7 +6,8 @@
  *              type-ahead starters of their own intents only, a reply citing live portal data, a
  *              suggestion chip, the escalation banner for an urgent message, no offboarding cards or
  *              page; back from another page through the sidebar, the resume banner and its
- *              "Continue" chip, then deleting the conversation from the rail
+ *              "Continue" chip, then deleting the conversation from the rail; a question prepared by
+ *              the address (?q=) waits in the box, unsent
  *   HR         the offboarding starter as they type; "<name> is leaving": the action cards and the
  *              one-tap "Yes, start offboarding" chip, the offboarding form, the settlement preview with
  *              the payment deadline banner, starting it, each document prepared (Socket.IO progress)
@@ -108,6 +109,19 @@ test('an employee asks NSK, picks up the conversation later, and deletes it', as
   await rail.getByRole('button', { name: /^Delete conversation: / }).click();
   await expect(rail.getByText('No conversations yet')).toBeVisible();
   await expect(drawer.getByText('How can I help?')).toBeVisible();
+
+  // A prepared question (?q=, as the daily briefing links): in the box, focused, never sent by itself;
+  // the address drops it, so a reload starts empty.
+  const prepared = 'How many casual leave days do I have left this year?';
+  await page.goto(`/ask-nsk?q=${encodeURIComponent(prepared)}`);
+  await expect(drawer.getByLabel(PLACEHOLDER)).toHaveValue(prepared);
+  await expect(drawer.getByLabel(PLACEHOLDER)).toBeFocused();
+  await expect(page).toHaveURL(/\/ask-nsk$/);
+  await expect(drawer.getByText('How can I help?')).toBeVisible();
+  await expect(drawer.locator('li[data-role="assistant"]')).toHaveCount(0);
+  await expect(rail.getByText('No conversations yet')).toBeVisible();
+  await page.reload();
+  await expect(drawer.getByLabel(PLACEHOLDER)).toHaveValue('');
   expect(problems).toEqual([]);
 });
 

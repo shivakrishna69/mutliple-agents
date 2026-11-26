@@ -175,6 +175,7 @@ export default function UnifiedBoard({
     <TaskCard
       key={task.id}
       task={task}
+      today={board.today ?? null}
       canDrag={canDragTask(task, rightsOf(task), activeSprintId)}
       isDragging={dragged?.id === task.id}
       onOpen={onOpen}

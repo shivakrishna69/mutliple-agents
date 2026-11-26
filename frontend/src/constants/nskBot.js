@@ -64,6 +64,8 @@ export const PROMPT_HELPER_MAX_CHARS = 80;
 
 /** The longest message the backend takes (NSK_BOT_SETTINGS.MESSAGE_MAX_LENGTH). */
 export const NSK_MESSAGE_MAX_LENGTH = 2000;
+/** /ask-nsk?q=<text> puts a prepared question in the box without sending it (pages/AskNsk.jsx). */
+export const NSK_PREFILL_PARAMETER = 'q';
 /** Citation marks in a reply: [1], [2]. */
 export const CITATION_MARK_PATTERN = /\[(\d+)\]/g;
 

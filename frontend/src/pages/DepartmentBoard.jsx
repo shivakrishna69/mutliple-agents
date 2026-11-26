@@ -13,7 +13,8 @@
  * Tabs and buttons follow the viewer's rights from the backend, which decides again on every request.
  *
  * "Create task" opens the create dialog; any task opens its detail (?task=<id>, which is where
- * the backend's assignment notifications link). A move is shown at once and sent; when the backend
+ * the backend's assignment notifications link, and the daily briefing's task cards); a task's
+ * dialog takes its dates, the task it follows, and a lead's review (components/tasks/TaskDialogs.jsx). A move is shown at once and sent; when the backend
  * refuses it, the task goes back and the backend's reason is shown.
  */
 
@@ -295,6 +296,7 @@ export default function DepartmentBoard() {
           departmentId={departmentId}
           board={board}
           plannableSprints={plannableSprints}
+          tasks={allTasks}
           defaultSprintId={null}
           onClose={() => setDialog(null)}
           onCreated={(task, message) => {
@@ -322,11 +324,13 @@ export default function DepartmentBoard() {
           taskId={openTaskId}
           board={board}
           sprints={sprints}
+          tasks={allTasks}
           currentUserId={currentUser.id}
           onChanged={(task) => {
             replaceTask(task);
             sprintsResource.reload();
           }}
+          onOpenTask={(taskId) => setParameter('task', taskId)}
           onClose={() => setParameter('task', null)}
         />
       )}
