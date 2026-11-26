@@ -2,7 +2,8 @@
  * A department's board as a whole: who is on it, who leads it, and what the viewer may do.
  *
  *   getBoardSummary(scope)              the department, the viewer's role and rights, the task leads,
- *                                       the people tasks can be assigned to, and the active sprint
+ *                                       the people tasks can be assigned to, the active sprint, and
+ *                                       today in the company's time zone (for due and overdue tasks)
  *   setTaskLeads(scope, ...)            the department's head (or an administrator) names its task
  *                                       leads: people in the department
  */
@@ -10,6 +11,7 @@
 import { HTTP_STATUS } from '../../constants/httpStatus.js';
 import Sprint, { SPRINT_STATUSES } from '../../models/Sprint.js';
 import User from '../../models/User.js';
+import { companyToday } from '../companyToday.js';
 import { assertCurrentVersion, saveVersioned } from '../serviceError.js';
 import { BOARD_ROLES, boardRefusal } from './boardAccess.js';
 import { toSprintSummary } from './sprintService.js';
@@ -29,7 +31,10 @@ export async function getBoardSummary(scope) {
   const { department, board, role, isHead, isAdmin, memberUserIds, headUserId } = scope;
   const leadIds = board.leadUserIds.map(String).filter((leadId) => memberUserIds.has(leadId));
   const people = await peopleByIds([...memberUserIds]);
-  const activeSprint = await Sprint.findOne({ departmentId: department._id, status: SPRINT_STATUSES.ACTIVE }).lean();
+  const [activeSprint, today] = await Promise.all([
+    Sprint.findOne({ departmentId: department._id, status: SPRINT_STATUSES.ACTIVE }).lean(),
+    companyToday(),
+  ]);
   const isLead = role === BOARD_ROLES.LEAD;
   return {
     department: { id: department._id.toString(), name: department.name, code: department.code },
@@ -45,6 +50,7 @@ export async function getBoardSummary(scope) {
     leads: leadIds.map((leadId) => people.get(leadId)).filter(Boolean),
     members: [...people.values()].sort((first, second) => first.name.localeCompare(second.name)),
     activeSprint: activeSprint ? toSprintSummary(activeSprint) : null,
+    today,
     version: board.__v,
   };
 }

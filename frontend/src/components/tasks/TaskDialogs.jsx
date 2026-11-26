@@ -2,12 +2,18 @@
  * The task board's dialogs:
  *
  *   CreateTaskDialog   title, description, type, priority, assignee (people in the department),
- *                      story points; leads also choose the sprint (members' tasks go to the backlog)
- *   TaskDetailDialog   a task with its fields, status and sprint (each editable when the viewer may,
- *                      the same rules as the backend), its activity log and its comments
+ *                      story points, start and due dates, the task it follows; leads also choose the
+ *                      sprint (members' tasks go to the backlog)
+ *   TaskDetailDialog   a task with its fields, status, sprint, dates and the task it follows (each
+ *                      editable when the viewer may, the same rules as the backend), what it follows
+ *                      and what follows it, its activity log and its comments. On a task in review a
+ *                      lead approves it or asks for changes with a note; a task sent back shows the
+ *                      lead's note as a Revision requested banner
  *   SprintDialog       a new sprint: name, goal, start and end dates (leads)
  *
- * Every error is the backend's, shown in the dialog; an edit based on an old version reloads the task.
+ * "Follows" lists only this board's tasks, never the task itself or one that already follows it (that
+ * would be a loop; utils/taskBoard.js followableTasks); the backend checks again. Every error is the
+ * backend's, shown in the dialog; an edit based on an old version reloads the task.
  */
 
 import { useState } from 'react';
@@ -16,6 +22,7 @@ import {
   requestTask,
   requestTaskComment,
   requestTaskCreation,
+  requestTaskReview,
   requestTaskUpdate,
 } from '../../api/tasksApi.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
@@ -26,24 +33,71 @@ import {
   DEFAULT_PRIORITY,
   DEFAULT_TASK_TYPE,
   PRIORITY_OPTIONS,
+  REVIEW_ACTIVITY_PHRASES,
   SPRINT_STATUSES,
   STATUS_LABELS,
   TASK_LIMITS,
+  TASK_REVIEW_DECISIONS,
   TASK_STATUSES,
   TASK_TYPE_OPTIONS,
 } from '../../constants/tasks.js';
 import { toDisplayError, useApiResource } from '../../hooks/useApiResource.js';
 import Dialog from '../Dialog.jsx';
-import { Button, Field, LoadingBlock, Notice, SelectInput, TextInput, formatDateTime } from '../ui.jsx';
-import { allowedStatusesOf, taskRightsOf } from '../../utils/taskBoard.js';
+import { Button, Field, LoadingBlock, Notice, SelectInput, TextInput, formatDate, formatDateTime } from '../ui.jsx';
+import { allowedStatusesOf, canReviewTask, followableTasks, revisionOf, taskRightsOf } from '../../utils/taskBoard.js';
 
 const UNASSIGNED = '';
+const NOT_FOLLOWING = '';
 const STALE_VERSION = 'STALE_VERSION';
 
 const assigneeOptions = (members) => [
   { value: UNASSIGNED, label: 'Unassigned' },
   ...members.map((member) => ({ value: member.id, label: member.name })),
 ];
+/** The tasks this one may follow (taskId null: a new task). */
+const followOptions = (tasks, taskId) => [
+  { value: NOT_FOLLOWING, label: 'None' },
+  ...followableTasks(tasks, taskId).map((task) => ({ value: task.id, label: `${task.key} · ${task.title}` })),
+];
+const DATE_HINT = 'Optional';
+const FOLLOWS_HINT = 'Optional: a task on this board to do first';
+
+/** Start date, due date (not before the start) and the task it follows, as form fields. */
+function ScheduleFields({ form, onField, fieldErrors, options, disabled = false }) {
+  return (
+    <>
+      <TextInput
+        label="Start date"
+        type="date"
+        value={form.startDate}
+        onChange={onField('startDate')}
+        max={form.dueDate || undefined}
+        error={fieldErrors.startDate}
+        hint={disabled ? undefined : DATE_HINT}
+        disabled={disabled}
+      />
+      <TextInput
+        label="Due date"
+        type="date"
+        value={form.dueDate}
+        onChange={onField('dueDate')}
+        min={form.startDate || undefined}
+        error={fieldErrors.dueDate}
+        hint={disabled ? undefined : DATE_HINT}
+        disabled={disabled}
+      />
+      <SelectInput
+        label="Follows task"
+        value={form.dependsOnTaskId}
+        onChange={onField('dependsOnTaskId')}
+        error={fieldErrors.dependsOnTaskId}
+        options={options}
+        hint={disabled ? undefined : FOLLOWS_HINT}
+        disabled={disabled}
+      />
+    </>
+  );
+}
 const sprintOptions = (sprints) => [
   { value: BACKLOG, label: 'Backlog' },
   ...sprints.map((sprint) => ({ value: sprint.id, label: `${sprint.name} (${sprint.status.toLowerCase()})` })),
@@ -70,10 +124,18 @@ function TextArea({ label, value, onChange, error, maxLength, rows = 4, hint, au
 }
 
 /**
- * @param {{ departmentId: string, board: object, plannableSprints: object[], defaultSprintId: string|null,
- *   onCreated: (task, notice) => void, onClose: () => void }} props
+ * @param {{ departmentId: string, board: object, plannableSprints: object[], tasks: object[],
+ *   defaultSprintId: string|null, onCreated: (task, notice) => void, onClose: () => void }} props
  */
-export function CreateTaskDialog({ departmentId, board, plannableSprints, defaultSprintId, onCreated, onClose }) {
+export function CreateTaskDialog({
+  departmentId,
+  board,
+  plannableSprints,
+  tasks,
+  defaultSprintId,
+  onCreated,
+  onClose,
+}) {
   const { csrfToken } = useAuth();
   const canPlan = board.viewer.canPlanSprints;
   const [form, setForm] = useState({
@@ -84,6 +146,9 @@ export function CreateTaskDialog({ departmentId, board, plannableSprints, defaul
     assigneeId: UNASSIGNED,
     storyPoints: '',
     sprintId: canPlan && defaultSprintId ? defaultSprintId : BACKLOG,
+    startDate: '',
+    dueDate: '',
+    dependsOnTaskId: NOT_FOLLOWING,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -105,6 +170,9 @@ export function CreateTaskDialog({ departmentId, board, plannableSprints, defaul
           assigneeId: form.assigneeId || null,
           storyPoints: pointsOf(form.storyPoints),
           ...(canPlan && form.sprintId !== BACKLOG ? { sprintId: form.sprintId } : {}),
+          ...(form.startDate ? { startDate: form.startDate } : {}),
+          ...(form.dueDate ? { dueDate: form.dueDate } : {}),
+          ...(form.dependsOnTaskId ? { dependsOnTaskId: form.dependsOnTaskId } : {}),
         },
         csrfToken,
       );
@@ -170,6 +238,12 @@ export function CreateTaskDialog({ departmentId, board, plannableSprints, defaul
               options={sprintOptions(plannableSprints)}
             />
           )}
+          <ScheduleFields
+            form={form}
+            onField={update}
+            fieldErrors={fieldErrors}
+            options={followOptions(tasks ?? [], null)}
+          />
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
@@ -184,13 +258,16 @@ export function CreateTaskDialog({ departmentId, board, plannableSprints, defaul
   );
 }
 
-function describeChange(change, peopleById, sprintsById) {
+function describeChange(change, { peopleById, sprintsById, tasksById }) {
+  if (change.field === 'review') return REVIEW_ACTIVITY_PHRASES[change.to ?? 'WITHDRAWN'] ?? change.to;
   const field = ACTIVITY_FIELD_LABELS[change.field] ?? change.field;
   const show = (value) => {
     if (value === null || value === undefined) return change.field === 'sprintId' ? 'Backlog' : 'none';
     if (change.field === 'status') return STATUS_LABELS[value] ?? value;
     if (change.field === 'assigneeId') return peopleById.get(value)?.name ?? 'someone';
     if (change.field === 'sprintId') return sprintsById.get(value)?.name ?? 'a sprint';
+    if (change.field === 'startDate' || change.field === 'dueDate') return formatDate(value);
+    if (change.field === 'dependsOnTaskId') return tasksById.get(value)?.key ?? 'another task';
     return String(value);
   };
   if (change.from === null && change.to === null && (change.field === 'title' || change.field === 'description')) {
@@ -199,7 +276,7 @@ function describeChange(change, peopleById, sprintsById) {
   return `changed the ${field} from ${show(change.from)} to ${show(change.to)}`;
 }
 
-function ActivityLog({ activity, peopleById, sprintsById }) {
+function ActivityLog({ activity, names }) {
   return (
     <ol className="space-y-3" aria-label="Activity">
       {activity.map((entry) => (
@@ -208,12 +285,12 @@ function ActivityLog({ activity, peopleById, sprintsById }) {
             <span className="font-semibold text-slate-700">{entry.actor?.name ?? 'Someone'}</span>{' '}
             {entry.type === 'CREATED' && 'created the task'}
             {entry.type === 'COMMENTED' && 'commented'}
-            {entry.type === 'UPDATED' &&
-              entry.changes.map((change) => describeChange(change, peopleById, sprintsById)).join(', ')}
+            {entry.type === 'UPDATED' && entry.changes.map((change) => describeChange(change, names)).join(', ')}
             {' · '}
             <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
           </p>
-          {entry.type === 'COMMENTED' && (
+          {/* A comment, or the note a lead left with a review decision. */}
+          {(entry.type === 'COMMENTED' || (entry.type === 'UPDATED' && entry.body)) && (
             <p className="mt-1 rounded-xl bg-slate-50 px-3 py-2 whitespace-pre-wrap text-slate-800 ring-1 ring-slate-200/70">
               {entry.body}
             </p>
@@ -234,6 +311,9 @@ function formOf(task) {
     assigneeId: task.assignee?.id ?? UNASSIGNED,
     storyPoints: task.storyPoints === null ? '' : String(task.storyPoints),
     sprintId: task.sprintId ?? BACKLOG,
+    startDate: task.startDate ?? '',
+    dueDate: task.dueDate ?? '',
+    dependsOnTaskId: task.dependsOnTaskId ?? NOT_FOLLOWING,
   };
 }
 
@@ -247,6 +327,9 @@ function changesOf(form, task) {
   if (form.assigneeId !== saved.assigneeId) changes.assigneeId = form.assigneeId || null;
   if (form.storyPoints !== saved.storyPoints) changes.storyPoints = pointsOf(form.storyPoints);
   if (form.sprintId !== saved.sprintId) changes.sprintId = form.sprintId === BACKLOG ? null : form.sprintId;
+  for (const field of ['startDate', 'dueDate', 'dependsOnTaskId']) {
+    if (form[field] !== saved[field]) changes[field] = form[field] || null;
+  }
   return changes;
 }
 
@@ -261,7 +344,7 @@ function statusHint(task, rights) {
   return undefined;
 }
 
-function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved, onReload }) {
+function TaskEditor({ departmentId, board, sprints, tasks, task, currentUserId, onSaved, onReload }) {
   const { csrfToken } = useAuth();
   const activeSprintId = sprints.find((sprint) => sprint.status === SPRINT_STATUSES.ACTIVE)?.id ?? null;
   const rights = taskRightsOf(task, board.viewer, currentUserId, activeSprintId);
@@ -367,6 +450,13 @@ function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved
           error={fieldErrors.storyPoints}
           disabled={!rights.canEdit}
         />
+        <ScheduleFields
+          form={form}
+          onField={update}
+          fieldErrors={fieldErrors}
+          options={followOptions(tasks, task.id)}
+          disabled={!rights.canEdit}
+        />
       </div>
       <p className="text-xs text-slate-500">
         Reported by {task.reporter?.name ?? 'someone'} · created {formatDateTime(task.createdAt)}
@@ -382,6 +472,149 @@ function TaskEditor({ departmentId, board, sprints, task, currentUserId, onSaved
         </div>
       )}
     </form>
+  );
+}
+
+/** A lead's decision on a task in review: approve it (Done), or send it back with a required note. */
+function ReviewPanel({ departmentId, task, onSaved, onReload }) {
+  const { csrfToken } = useAuth();
+  const [isAskingForChanges, setIsAskingForChanges] = useState(false);
+  const [note, setNote] = useState('');
+  const [busyDecision, setBusyDecision] = useState(null);
+  const [reviewError, setReviewError] = useState(null);
+
+  async function decide(decision) {
+    setBusyDecision(decision);
+    setReviewError(null);
+    try {
+      const result = await requestTaskReview(
+        departmentId,
+        task.id,
+        {
+          decision,
+          note: decision === TASK_REVIEW_DECISIONS.REQUEST_CHANGES ? note.trim() : null,
+          version: task.version,
+        },
+        csrfToken,
+      );
+      onSaved(result.task, result.notice);
+    } catch (decisionError) {
+      setReviewError(toDisplayError(decisionError));
+      if (decisionError?.code === STALE_VERSION) onReload();
+    } finally {
+      setBusyDecision(null);
+    }
+  }
+
+  const submittedBy = task.review?.submittedBy?.name;
+  return (
+    <section aria-label="Review" className="space-y-3 rounded-xl bg-brand-50/60 p-4 ring-1 ring-brand-200">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-700">
+          {submittedBy ? `${submittedBy} submitted this task for review` : 'This task is waiting for review'}
+          {task.review?.submittedAt && <> · {formatDateTime(task.review.submittedAt)}</>}
+        </p>
+        {!isAskingForChanges && (
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setIsAskingForChanges(true)} disabled={busyDecision !== null}>
+              Request changes
+            </Button>
+            <Button
+              onClick={() => decide(TASK_REVIEW_DECISIONS.APPROVE)}
+              isBusy={busyDecision === TASK_REVIEW_DECISIONS.APPROVE}
+              disabled={busyDecision !== null}
+            >
+              Approve
+            </Button>
+          </div>
+        )}
+      </div>
+      {reviewError && <Notice tone="error" title={reviewError.message} />}
+      {isAskingForChanges && (
+        <div className="space-y-2">
+          <TextArea
+            label="What needs to change"
+            value={note}
+            onChange={setNote}
+            error={reviewError?.fieldErrors?.note}
+            maxLength={TASK_LIMITS.REVIEW_NOTE}
+            rows={3}
+            hint="Required: the assignee sees this note"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsAskingForChanges(false);
+                setNote('');
+              }}
+              disabled={busyDecision !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => decide(TASK_REVIEW_DECISIONS.REQUEST_CHANGES)}
+              isBusy={busyDecision === TASK_REVIEW_DECISIONS.REQUEST_CHANGES}
+              disabled={!note.trim() || busyDecision !== null}
+            >
+              Send back for changes
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The lead's note on a task sent back to In progress. */
+function RevisionBanner({ review }) {
+  return (
+    <Notice tone="warning" title={`Revision requested by ${review.decidedBy?.name ?? 'a task lead'}`}>
+      <p className="mt-1 whitespace-pre-wrap">{review.note}</p>
+      {review.decidedAt && <p className="mt-1 text-xs opacity-80">{formatDateTime(review.decidedAt)}</p>}
+    </Notice>
+  );
+}
+
+/** A linked task, which opens in this dialog. */
+function LinkedTask({ linked, onOpenTask }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenTask?.(linked.id)}
+      className="text-left text-brand-700 underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+    >
+      <span className="font-mono">{linked.key}</span> {linked.title}
+      <span className="text-slate-500"> · {STATUS_LABELS[linked.status] ?? linked.status}</span>
+    </button>
+  );
+}
+
+/** What this task follows, and the tasks that follow it. */
+function LinkedTasks({ dependsOn, followedBy, onOpenTask }) {
+  if (!dependsOn && followedBy.length === 0) return null;
+  return (
+    <dl className="space-y-1 text-sm" aria-label="Linked tasks">
+      {dependsOn && (
+        <div className="flex flex-wrap gap-x-2">
+          <dt className="font-medium text-slate-600">Follows</dt>
+          <dd>
+            <LinkedTask linked={dependsOn} onOpenTask={onOpenTask} />
+          </dd>
+        </div>
+      )}
+      {followedBy.length > 0 && (
+        <div className="flex flex-wrap gap-x-2">
+          <dt className="font-medium text-slate-600">Followed by</dt>
+          {followedBy.map((linked) => (
+            <dd key={linked.id}>
+              <LinkedTask linked={linked} onOpenTask={onOpenTask} />
+            </dd>
+          ))}
+        </div>
+      )}
+    </dl>
   );
 }
 
@@ -418,10 +651,20 @@ function CommentBox({ departmentId, taskId, onCommented }) {
 }
 
 /**
- * @param {{ departmentId: string, taskId: string, board: object, sprints: object[], currentUserId: string,
- *   onChanged: (task) => void, onClose: () => void }} props
+ * @param {{ departmentId: string, taskId: string, board: object, sprints: object[], tasks: object[],
+ *   currentUserId: string, onChanged: (task) => void, onOpenTask?: (taskId) => void, onClose: () => void }} props
  */
-export function TaskDetailDialog({ departmentId, taskId, board, sprints, currentUserId, onChanged, onClose }) {
+export function TaskDetailDialog({
+  departmentId,
+  taskId,
+  board,
+  sprints,
+  tasks = [],
+  currentUserId,
+  onChanged,
+  onOpenTask,
+  onClose,
+}) {
   const taskResource = useApiResource((signal) => requestTask(departmentId, taskId, signal), [departmentId, taskId]);
   const [notice, setNotice] = useState(null);
   const data = taskResource.data;
@@ -429,7 +672,17 @@ export function TaskDetailDialog({ departmentId, taskId, board, sprints, current
     ...board.members.map((member) => [member.id, member]),
     ...(data ? [data.task.assignee, data.task.reporter].filter(Boolean).map((person) => [person.id, person]) : []),
   ]);
-  const sprintsById = new Map(sprints.map((sprint) => [sprint.id, sprint]));
+  const names = {
+    peopleById,
+    sprintsById: new Map(sprints.map((sprint) => [sprint.id, sprint])),
+    tasksById: new Map(
+      [...tasks, ...(data ? [data.dependsOn, ...(data.followedBy ?? [])].filter(Boolean) : [])].map((task) => [
+        task.id,
+        task,
+      ]),
+    ),
+  };
+  const revision = data ? revisionOf(data.task) : null;
 
   function saved(task, message) {
     setNotice(message ?? null);
@@ -444,19 +697,31 @@ export function TaskDetailDialog({ departmentId, taskId, board, sprints, current
       {data && (
         <div className="space-y-6">
           {notice && <Notice tone="success" title={notice} onDismiss={() => setNotice(null)} />}
+          {revision && <RevisionBanner review={revision} />}
+          {canReviewTask(data.task, board.viewer) && (
+            <ReviewPanel
+              key={`review:${data.task.version}`}
+              departmentId={departmentId}
+              task={data.task}
+              onSaved={saved}
+              onReload={taskResource.reload}
+            />
+          )}
           <TaskEditor
             key={`${data.task.id}:${data.task.version}`}
             departmentId={departmentId}
             board={board}
             sprints={sprints}
+            tasks={tasks}
             task={data.task}
             currentUserId={currentUserId}
             onSaved={saved}
             onReload={taskResource.reload}
           />
+          <LinkedTasks dependsOn={data.dependsOn} followedBy={data.followedBy ?? []} onOpenTask={onOpenTask} />
           <section className="space-y-4 border-t border-slate-100 pt-4">
             <h3 className="text-sm font-semibold text-slate-900">Activity</h3>
-            <ActivityLog activity={data.activity} peopleById={peopleById} sprintsById={sprintsById} />
+            <ActivityLog activity={data.activity} names={names} />
             <CommentBox departmentId={departmentId} taskId={data.task.id} onCommented={taskResource.reload} />
           </section>
         </div>

@@ -1,7 +1,7 @@
 /**
  * Ask NSK as a full page (AskNsk.jsx): the conversations rail (new conversation, history with the
- * open one marked, delete), the title and quick starts on a fresh chat, and a quick start sending its
- * question.
+ * open one marked, delete), the title and quick starts on a fresh chat, a quick start sending its
+ * question, and a question prepared by the address (?q=) waiting in the box, never sent by itself.
  */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -24,13 +24,23 @@ vi.mock('../auth/AuthContext.jsx', () => {
 
 const SESSION = { id: 's1', title: 'Leave balance', lastMessageAt: '2026-11-20T10:00:00.000Z' };
 const HELPERS = [
-  { intent: 'ATTENDANCE_AUDIT', label: 'Show my attendance this month', fill: 'Show my attendance this month' },
-  { intent: 'POLICY_QA', label: 'What is the leave policy?', fill: 'What is the leave policy?' },
+  {
+    intent: 'ATTENDANCE_AUDIT',
+    label: 'Show my attendance this month',
+    fill: 'Show my attendance this month',
+    keywords: ['attendance'],
+  },
+  {
+    intent: 'POLICY_QA',
+    label: 'What is the leave policy?',
+    fill: 'What is the leave policy?',
+    keywords: ['leave', 'policy'],
+  },
 ];
 
-const renderPage = () =>
+const renderPage = (address = '/ask-nsk') =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[address]}>
       <AskNsk />
     </MemoryRouter>,
   );
@@ -94,5 +104,16 @@ describe('Ask NSK page', () => {
     fireEvent.click(within(rail).getByRole('button', { name: 'Delete conversation: Leave balance' }));
     await waitFor(() => expect(requestNskSessionDeletion).toHaveBeenCalledWith('s1', 'csrf'));
     expect(await within(rail).findByText('No conversations yet')).toBeTruthy();
+  });
+
+  it('puts a question from ?q= in the box, focused, and does not send it', async () => {
+    const question = "Should I approve Naren's leave from 25 Dec to 30 Dec?";
+    renderPage(`/ask-nsk?q=${encodeURIComponent(question)}`);
+    const box = screen.getByRole('textbox', { name: 'Ask NSK anything about your work, leave or company policies…' });
+    expect(box.value).toBe(question);
+    await waitFor(() => expect(document.activeElement).toBe(box));
+    expect(await within(screen.getByTestId('nsk-conversations')).findByText('Leave balance')).toBeTruthy();
+    expect(sendNskMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Send' }).disabled).toBe(false);
   });
 });

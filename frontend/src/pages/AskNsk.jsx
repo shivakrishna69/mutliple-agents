@@ -15,6 +15,9 @@
  *   cards      suggestion chips send their text (a "Yes, start offboarding for …" chip does what its
  *              card does); Start offboarding package opens the offboarding form in the conversation
  *              (OffboardingPanel.jsx); View profile first asks for the profile
+ *   prefill    /ask-nsk?q=<text> (the daily briefing's Ask NSK) puts the text in the box, focused and
+ *              never sent: the person reads it and presses Send, so no daily question is spent unasked.
+ *              The parameter is then dropped from the address, so a reload starts empty
  *   type-ahead as the person types, up to three sentence starters above the box (the backend's
  *              promptHelpers for their intents, matched on the device: utils/nskBot.js
  *              matchPromptHelpers); a click puts the starter in the box to finish or send
@@ -23,6 +26,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { requestNskSession, requestNskSessionDeletion, requestNskSessions, sendNskMessage } from '../api/nskBotApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import NskMessage, { SuggestionChips } from '../components/nskBot/NskMessage.jsx';
@@ -40,6 +44,7 @@ import {
   NSK_ACTION_KINDS,
   NSK_LABELS,
   NSK_MESSAGE_MAX_LENGTH,
+  NSK_PREFILL_PARAMETER,
   NSK_MESSAGE_ROLES,
   NSK_QUICK_START_LIMIT,
   viewProfileMessage,
@@ -254,7 +259,11 @@ export default function AskNsk() {
   const [promptHelpers, setPromptHelpers] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState('');
+  const [searchParameters, setSearchParameters] = useSearchParams();
+  // Read once, on the first render: a prepared question waits in the box until the person sends it.
+  const [draft, setDraft] = useState(() =>
+    (searchParameters.get(NSK_PREFILL_PARAMETER) ?? '').slice(0, NSK_MESSAGE_MAX_LENGTH),
+  );
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [offboardingTarget, setOffboardingTarget] = useState(null);
@@ -276,9 +285,24 @@ export default function AskNsk() {
           setError(toDisplayError(loadError).message);
         }
       });
-    inputRef.current?.focus();
+    const input = inputRef.current;
+    input?.focus();
+    input?.setSelectionRange?.(input.value.length, input.value.length);
     return () => controller.abort();
   }, []);
+
+  // Drop ?q= from the address once it is in the box (a reload or a shared link starts empty).
+  useEffect(() => {
+    if (!searchParameters.has(NSK_PREFILL_PARAMETER)) return;
+    setSearchParameters(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete(NSK_PREFILL_PARAMETER);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParameters, setSearchParameters]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView?.({ block: 'end' });

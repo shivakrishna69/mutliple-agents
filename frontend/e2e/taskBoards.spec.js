@@ -5,8 +5,10 @@
  * task from the assignment notification, drags it to In progress and on to In review, but cannot drop
  * it on Done (a lead or its reporter marks work done); comments, filters, creates a task for themselves
  * (members do not plan sprints) and, as its assignee, drags it from the backlog into To do. The head
- * drags the reviewed task to Done and completes the sprint from the header, which sends unfinished work
- * back to the backlog.
+ * gives the lead-only task a past due date (an Overdue chip) and makes it follow the employee's task
+ * (which then cannot follow it back), asks for changes on the task in review with a required note; the
+ * employee reads it as a Revision requested banner and submits again; the head approves it (Done) and
+ * completes the sprint from the header, which sends unfinished work back to the backlog.
  * Then delegation: the employee, a member, has no team overview and cannot choose leads; the head
  * names them a task lead, and they read the team overview (their workload, the completed sprint's
  * burndown, the unassigned backlog, from which a task opens); the head takes the role back and the
@@ -26,6 +28,7 @@ const LEAD_ONLY_TASK = 'Plan the team offsite';
 const MEMBER_TASK = 'Write the release notes';
 const QUICK_TASK = 'Order the team badges';
 const COMMENT = 'Reproduced it, working on a fix.';
+const REVIEW_NOTE = 'Please add a test for Safari 17 too.';
 
 /** A calendar date `days` after today, as the date inputs take it. */
 function daysFromToday(days) {
@@ -197,11 +200,66 @@ test('a department plans a sprint, works its tasks on the board, completes it, a
   await expect(employeePage.getByRole('button', { name: 'Complete sprint' })).toHaveCount(0);
   await expect(employeePage.getByRole('button', { name: 'Plan sprint' })).toHaveCount(0);
 
-  // --- The head finishes the task and completes the sprint -----------------------------------------
+  // --- Dates and the task it follows: the head schedules the lead-only task ------------------------
   await headPage.reload();
+  await card(headPage, LEAD_ONLY_TASK).getByRole('button').click();
+  const scheduled = headPage.getByRole('dialog', { name: new RegExp(LEAD_ONLY_TASK) });
+  await scheduled.getByLabel('Due date').fill(daysFromToday(-3));
+  const followsChoice = scheduled.getByLabel('Follows task');
+  await followsChoice.selectOption(
+    await followsChoice.locator('option', { hasText: TASK_TITLE }).getAttribute('value'),
+  );
+  await scheduled.getByRole('button', { name: 'Save task' }).click();
+  await expect(scheduled.getByText('Task saved')).toBeVisible();
+  const scheduledActivity = scheduled.getByRole('list', { name: 'Activity' });
+  await expect(scheduledActivity.getByText(/changed the due date from none to/)).toBeVisible();
+  await expect(scheduledActivity.getByText(/changed the task it follows from none to [A-Z]+-\d+/)).toBeVisible();
+  await scheduled.getByRole('button', { name: 'Close' }).click();
+  await expect(card(headPage, LEAD_ONLY_TASK).getByText('Overdue')).toBeVisible();
+
+  // --- The head reviews: asks for changes (a note is required) -------------------------------------
   await expect(card(column(headPage, 'In review'), TASK_TITLE)).toBeVisible();
   await expect(card(column(headPage, 'To do'), MEMBER_TASK)).toBeVisible();
-  await dragCard(headPage, card(column(headPage, 'In review'), TASK_TITLE), column(headPage, 'Done'));
+  await card(headPage, TASK_TITLE).getByRole('button').click();
+  const reviewing = headPage.getByRole('dialog', { name: new RegExp(TASK_TITLE) });
+  // The lead-only task follows this one, so this one may not follow it (a loop).
+  await expect(reviewing.getByLabel('Follows task').locator('option', { hasText: LEAD_ONLY_TASK })).toHaveCount(0);
+  await expect(reviewing.getByText('Followed by')).toBeVisible();
+  const review = reviewing.getByRole('region', { name: 'Review' });
+  await expect(review.getByText(`${EMPLOYEE.name} submitted this task for review`, { exact: false })).toBeVisible();
+  await review.getByRole('button', { name: 'Request changes' }).click();
+  await expect(review.getByRole('button', { name: 'Send back for changes' })).toBeDisabled();
+  await review.getByLabel(/What needs to change/).fill(REVIEW_NOTE);
+  await review.getByRole('button', { name: 'Send back for changes' }).click();
+  await expect(reviewing.getByText('Changes requested; the task is back in progress')).toBeVisible();
+  await expect(reviewing.getByRole('region', { name: 'Review' })).toHaveCount(0);
+  await expect(reviewing.getByRole('list', { name: 'Activity' }).getByText(/requested changes/)).toBeVisible();
+  await reviewing.getByRole('button', { name: 'Close' }).click();
+  await expect(card(column(headPage, 'In progress'), TASK_TITLE).getByText('Changes requested')).toBeVisible();
+
+  // --- The employee reads the note and submits it again ---------------------------------------------
+  await employeePage.reload();
+  await card(employeePage, TASK_TITLE).getByRole('button').click();
+  const revising = employeePage.getByRole('dialog', { name: new RegExp(TASK_TITLE) });
+  await expect(revising.getByText(`Revision requested by ${KNOWLEDGE_HEAD.name}`)).toBeVisible();
+  await expect(revising.getByText(REVIEW_NOTE).first()).toBeVisible();
+  await expect(revising.getByRole('region', { name: 'Review' })).toHaveCount(0);
+  await employeePage.keyboard.press('Escape');
+  await dragCard(
+    employeePage,
+    card(column(employeePage, 'In progress'), TASK_TITLE),
+    column(employeePage, 'In review'),
+  );
+  await expect(card(column(employeePage, 'In review'), TASK_TITLE)).toBeVisible();
+
+  // --- The head approves it, and completes the sprint ------------------------------------------------
+  await headPage.reload();
+  await card(column(headPage, 'In review'), TASK_TITLE).getByRole('button').click();
+  const approving = headPage.getByRole('dialog', { name: new RegExp(TASK_TITLE) });
+  await approving.getByRole('region', { name: 'Review' }).getByRole('button', { name: 'Approve' }).click();
+  await expect(approving.getByText('Task approved and marked done')).toBeVisible();
+  await expect(approving.getByRole('list', { name: 'Activity' }).getByText(/approved it/)).toBeVisible();
+  await approving.getByRole('button', { name: 'Close' }).click();
   await expect(card(column(headPage, 'Done'), TASK_TITLE)).toBeVisible();
   headPage.once('dialog', (dialog) => dialog.accept());
   await headPage.getByRole('button', { name: 'Complete sprint' }).click();
