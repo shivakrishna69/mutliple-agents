@@ -1139,3 +1139,72 @@ export const FORM16_MESSAGES = Object.freeze({
   MALFORMED_UPLOAD: 'The upload could not be read. Try again',
   MULTIPART_REQUIRED: 'Send the Form 16 as a file upload',
 });
+
+/** The daily briefing (services/insights/): every line and button it shows. */
+export const INSIGHT_MESSAGES = Object.freeze({
+  BRIEFING_RETRIEVED: 'Your daily briefing',
+  // The one-line summary: its parts in this order, joined by " · " (only those above 0).
+  HEADLINE_PARTS: Object.freeze({
+    revisions: (count) => `${count} ${count === 1 ? 'revision' : 'revisions'} needed`,
+    overdue: (count) => `${count} overdue`,
+    leaveApprovals: (count) => `${count} leave ${count === 1 ? 'request' : 'requests'} to approve`,
+    reviews: (count) => `${count} ${count === 1 ? 'task' : 'tasks'} to review`,
+    upNext: (count) => `${count} ready to start`,
+    dueToday: (count) => `${count} due today`,
+    operations: (count) => `${count} team ${count === 1 ? 'queue' : 'queues'} waiting`,
+  }),
+  HEADLINE_SEPARATOR: ' · ',
+  ALL_CLEAR: 'Nothing needs you right now',
+  LABELS: Object.freeze({
+    URGENT: 'Urgent',
+    REVISION: 'Revision',
+    LEAVE_APPROVAL: 'Leave approval',
+    REVIEW: 'Review',
+    UP_NEXT: 'Up next',
+    OVERDUE: 'Overdue',
+    DUE_TODAY: 'Today',
+    OPERATIONS: 'Operations',
+  }),
+  ACTIONS: Object.freeze({
+    APPROVE: 'Approve',
+    DECLINE: 'Decline',
+    VIEW_TASK: 'View in Department Board',
+    REVIEW_TASK: 'Review task',
+    ASK_NSK: 'Ask NSK',
+    OPEN: 'Open',
+  }),
+  // Leave approval cards
+  leaveTitle: (employeeName) => `Leave request: ${employeeName}`,
+  leaveWhat: (dateRange, days, typeName) => `${dateRange} (${days} ${days === 1 ? 'day' : 'days'}) · ${typeName}`,
+  leaveBalance: (available, taken) =>
+    `Balance: ${available} ${available === 1 ? 'day' : 'days'} left · ${taken} taken this year`,
+  LEAVE_NO_BALANCE: 'This leave type keeps no balance',
+  leaveOverlaps: (overlaps) => `Team overlap: ${overlaps}`,
+  leaveMoreOverlaps: (count) => `and ${count} more`,
+  LEAVE_NO_OVERLAP: 'No one else on the team is off then',
+  overlapEntry: (name, dateRange, isPending) => `${name}: ${dateRange}${isPending ? ' (pending)' : ''}`,
+  leaveWaiting: (hours) => `Waiting ${hours >= 48 ? `${Math.floor(hours / 24)} days` : `${hours} hours`}`,
+  leaveAskNsk: (employeeName, typeName, dateRange) =>
+    `Should I approve ${employeeName}'s ${typeName} from ${dateRange}? Check their balance, their leave this year and who else on the team is off then.`,
+  // Task cards
+  revisionTitle: (taskKey, taskTitle) => `Revision requested: ${taskKey} ${taskTitle}`,
+  revisionBy: (leadName) => `Requested by ${leadName}`,
+  upNextTitle: (taskTitle) => `Up next: ${taskTitle}`,
+  upNextBody: (previousKey, previousTitle) =>
+    `${previousKey} "${previousTitle}" is with the reviewers. Start this while it is reviewed`,
+  reviewTitle: (submitterName, taskTitle) => `${submitterName} submitted "${taskTitle}" for review`,
+  reviewMovedOn: (nextTitle) => `and moved on to "${nextTitle}"`,
+  overdueTitle: (taskKey, taskTitle) => `Overdue: ${taskKey} ${taskTitle}`,
+  dueTodayTitle: (taskKey, taskTitle) => `${taskKey} ${taskTitle}`,
+  taskDue: (date) => `Due ${date}`,
+  taskStarts: (date) => `Starts ${date}`,
+  taskPriority: (priority) => `${priority.charAt(0)}${priority.slice(1).toLowerCase()} priority`,
+  taskBoard: (departmentName) => `${departmentName} board`,
+  // Operations cards (counts)
+  supportWaiting: (count) => `${count} support ${count === 1 ? 'chat is' : 'chats are'} waiting for an agent`,
+  correctionsPending: (count) =>
+    `${count} attendance ${count === 1 ? 'correction is' : 'corrections are'} waiting for review`,
+  offersPending: (count) => `${count} ${count === 1 ? 'offer is' : 'offers are'} waiting to be sent`,
+  form16Pending: (count, financialYear) =>
+    `${count} ${count === 1 ? 'employee is' : 'employees are'} waiting for their Form 16 for FY ${financialYear}`,
+});

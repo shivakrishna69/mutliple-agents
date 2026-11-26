@@ -28,6 +28,8 @@
  *   reviewTask(scope, ...)           leads, on a task in review: APPROVE marks it Done quietly;
  *                                    REQUEST_CHANGES (with a note) sends it back to In progress and
  *                                    tells the assignee
+ *                                    every change also refreshes the daily briefings it appears in
+ *                                    (services/insights/insightsCache.js)
  *   addComment(scope, ...)           anyone on the board
  *   getTeamWork(scope, filters)      leads: each person's tasks by status and story points; for a
  *                                    sprint, its burndown; and the unassigned backlog
@@ -41,6 +43,7 @@ import { NOTIFICATION_TYPES } from '../../models/Notification.js';
 import Sprint, { SPRINT_STATUSES } from '../../models/Sprint.js';
 import Task, { TASK_REVIEW_STATES, TASK_STATUSES } from '../../models/Task.js';
 import TaskActivity, { TASK_ACTIVITY_TYPES } from '../../models/TaskActivity.js';
+import { invalidateInsights, invalidateQuietly } from '../insights/insightsCache.js';
 import { notifyUsers } from '../notifications.js';
 import { assertCurrentVersion, saveVersioned } from '../serviceError.js';
 import { boardRefusal, isLead, requireLead } from './boardAccess.js';
@@ -249,6 +252,27 @@ function leadUserIdsOf(scope) {
   return [...new Set([scope.headUserId, ...named].filter(Boolean))];
 }
 
+/**
+ * After a task changes, clears the daily briefings it appears in (services/insights/): the board's
+ * leads (reviews), the people on it before and after (assignee, reporter, who submitted it), and the
+ * assignees of the tasks that follow it (whose "up next" depends on it). Never fails the change.
+ * @param {object} scope
+ * @param {object[]} versions  the task as it was and as it is (plain objects or documents)
+ */
+async function refreshTaskInsights(scope, versions) {
+  await invalidateQuietly(async () => {
+    const ids = versions.flatMap((version) => [
+      version.assigneeId,
+      version.reporterId,
+      version.review?.submittedByUserId,
+    ]);
+    const followers = await Task.find({ departmentId: scope.department._id, dependsOnTaskId: versions[0]._id })
+      .select('assigneeId')
+      .lean();
+    await invalidateInsights([...leadUserIdsOf(scope), ...ids, ...followers.map((follower) => follower.assigneeId)]);
+  });
+}
+
 async function notifyReviewRequested(scope, task, actor) {
   const recipients = leadUserIdsOf(scope).filter((userId) => userId !== actor.id);
   if (recipients.length === 0) return;
@@ -366,6 +390,7 @@ export async function createTask(scope, input, actor) {
     type: TASK_ACTIVITY_TYPES.CREATED,
   });
   await notifyAssignee({ department, task, assigneeId: idOrNull(task.assigneeId), actor });
+  await refreshTaskInsights(scope, [task]);
   return (await getTask(scope, task._id)).task;
 }
 
@@ -474,6 +499,7 @@ export async function updateTask(scope, taskId, { changes, version }, actor) {
   const newAssignee = recorded.find((change) => change.field === 'assigneeId')?.to ?? null;
   if (newAssignee) await notifyAssignee({ department, task, assigneeId: newAssignee, actor });
   if (submits) await notifyReviewRequested(scope, task, actor);
+  await refreshTaskInsights(scope, [before, task]);
   return (await getTask(scope, task._id)).task;
 }
 
@@ -524,6 +550,7 @@ export async function reviewTask(scope, taskId, { decision, note, version }, act
     ...(note ? { body: note } : {}),
   });
   if (!approves) await notifyChangesRequested(scope, task, note, actor);
+  await refreshTaskInsights(scope, [before, task]);
   return (await getTask(scope, task._id)).task;
 }
 

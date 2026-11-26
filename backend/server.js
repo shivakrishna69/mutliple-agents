@@ -58,6 +58,7 @@ import presenceRoutes from './routes/presenceRoutes.js';
 import nskBotRoutes from './routes/nskBotRoutes.js';
 import webResearchRoutes from './routes/webResearchRoutes.js';
 import taxRoutes from './routes/taxRoutes.js';
+import insightsRoutes from './routes/insightsRoutes.js';
 import {
   startExternalKnowledgeCleanup,
   stopExternalKnowledgeCleanup,
@@ -191,6 +192,7 @@ export function createApp(config) {
   app.use('/api/nsk-bot', nskBotRoutes);
   app.use('/api/web-research', webResearchRoutes);
   app.use('/api/tax', taxRoutes);
+  app.use('/api/insights', insightsRoutes);
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(config));

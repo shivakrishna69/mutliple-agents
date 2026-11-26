@@ -43,8 +43,7 @@ import {
 } from '../../../utils/calendarDates.js';
 import { computeFinalSettlement, settlementDueDate } from '../../../utils/payroll/finalSettlement.js';
 import { DAY_KINDS } from '../../../constants/calendarDays.js';
-import { readOfficeLocalClock } from '../../attendancePolicy.js';
-import { getCompanySettings } from '../../companySettings.js';
+import { companyToday } from '../../companyToday.js';
 import { isPdfRendererConfigured } from '../../pdfGenerationService.js';
 import { ServiceError } from '../../serviceError.js';
 import { loadOfficeCalendar } from '../../workCalendar.js';
@@ -71,11 +70,6 @@ const refusal = (httpStatus, code, message = M[code]) => new ServiceError(httpSt
 const DEADLINE_SEARCH_DAYS = 31;
 
 export const isOffboardingAvailable = () => offboardingStore.isConfigured() && isPdfRendererConfigured();
-
-async function companyToday(now) {
-  const { timeZone } = await getCompanySettings();
-  return readOfficeLocalClock(now, timeZone).calendarDate;
-}
 
 // =================================================================================================
 // The settlement of a case

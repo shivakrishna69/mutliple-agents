@@ -14,6 +14,14 @@ npm run dev              # http://localhost:5000, restarts on file changes
 Requires MongoDB (`MONGO_URI`). Startup validates the configuration and refuses to start with
 missing or weak secrets (e.g. `JWT_SECRET`, `AI_SERVICE_API_KEY` shorter than 32 characters).
 
+Redis runs locally in Docker, not on a hosted plan: `docker compose up -d redis` from the repository
+root starts `redis:7-alpine` (in memory, `noeviction` for the queues) on `127.0.0.1:6379`, and
+`REDIS_URL=redis://localhost:6379` points the backend at it (`REDIS_HOST_PORT` picks another host
+port). Inside the compose stack the backend uses `redis://redis:6379`; production adds a password. The
+log says `Cache store ready` with `backend: redis` once connected; with `REDIS_URL` set and Redis down,
+startup stops rather than run without the shared cache. With `REDIS_URL` empty everything runs in the
+process (tests do this).
+
 | Script                                                                        | Purpose                                                                                                                                |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run dev`                                                                 | development server with auto-restart                                                                                                   |
@@ -73,6 +81,7 @@ scripts/         operational scripts
 | `/api/leave`                                                                                     | leave settings and types, balances, ledger, adjustments, encashments, leave job; leave requests, approvals, payroll export                                                                                                                                                       | HR, admin manage / employees their own / reporting managers decide their team's requests |
 | `/api/nsk-bot`                                                                                   | the NSK assistant: sessions (list, open, delete, resume), turns with cited sources, suggestions and action cards; offboarding (settlement preview, start, cases, IT checklist, document downloads); web research through its tools                                               | everyone with `use_nsk_assistant` (every role); sessions: their owner                    |
 | `/api/tax`                                                                                       | the Form 16 portal: eligible employees (annual CTC above ₹12,00,000), their CTC split and TDS, Form 16 uploads with versions; one's own Form 16 and its download                                                                                                                 | `manage_form16` (chartered accountant, admin) / `view_own_form16` (own)                  |
+| `/api/insights`                                                                                  | the daily briefing: leave to approve with balances and team overlaps, task revisions, up next, reviews, overdue and due-today work, team queues                                                                                                                                  | signed in (cards follow the person's capabilities and teams)                             |
 | `/api/internal`                                                                                  | calls from the AI service                                                                                                                                                                                                                                                        | internal API key                                                                         |
 
 ## Dashboard and service health
@@ -620,6 +629,36 @@ two uploads at the same moment cannot both win (409), and the loser's PDF is rem
 the `TAX_DOCS_S3_*` bucket under `company-tax-docs/form16/<FY>/<employeeId>/<recordId>.pdf` with
 server-side encryption and their SHA-256. Uploads and downloads are audited (category `form16`,
 actions `FORM16_UPLOADED`, `FORM16_DOWNLOADED`) with ids only.
+
+## Daily briefing
+
+`GET /api/insights/daily-briefing` (any signed-in person; `services/insights/`) returns what needs them
+today as cards, from deterministic queries only (no model writes any figure), urgent first:
+
+| Card                                   | For                                         | What it says                                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TASK_REVISION` (urgent)               | the assignee                                | a lead asked for changes, with the note                                                                                                                                       |
+| `LEAVE_APPROVAL` (high; urgent > 48 h) | whoever may decide it (manager, HR, admins) | dates, days, type; the balance left in that type and days taken this year; teammates (same manager, else same department) off over the same dates as `Naren: 25 Dec – 30 Dec` |
+| `TASK_REVIEW` (high)                   | the board's leads                           | who submitted which task, and the next task they moved on to                                                                                                                  |
+| `TASK_UP_NEXT` (high)                  | the assignee                                | a To do task whose predecessor is in review or done: start it now                                                                                                             |
+| `TASK_OVERDUE` (high)                  | the assignee                                | due before today (tasks without a due date never are)                                                                                                                         |
+| `TASK_DUE_TODAY`                       | the assignee                                | due today, or High/Urgent and not yet past due                                                                                                                                |
+| operations counts                      | by capability                               | support chats waiting for an agent, attendance corrections to review, offers to send, Form 16s missing this year                                                              |
+
+Each card has a label, title, body, facts and actions: `APPROVE_LEAVE` / `DECLINE_LEAVE` (with the
+request and the step it waits on; a decline needs a reason), `OPEN_TASK` / `REVIEW_TASK` (the task's
+`/boards/:departmentId?task=<id>`), `ASK_NSK` (a prompt to put in the box) and `OPEN_PAGE`. The response
+also has a `headline` ("1 revision needed · 2 overdue · 1 leave request to approve") and counts by
+severity and kind. Every text is in `constants/messages.js` (`INSIGHT_MESSAGES`); dates are the
+company's (`services/companyToday.js`).
+
+A briefing is cached per person for 60 seconds (`INSIGHT_SETTINGS.CACHE_TTL_SECONDS`). A leave request
+changing (submitted, decided, cancelled, changed) clears the applicant's, their approver's and HR's
+and administrators' briefings; a task changing (created, edited, submitted, reviewed) clears its
+board leads', its assignee's before and after, its reporter's and the assignees of the tasks that
+follow it. Their open sessions get Socket.IO `INSIGHTS_CHANGED` and fetch again, so a banner never
+waits for the cache to run out. A failing area (leave, tasks, operations) is logged and left out
+rather than failing the briefing.
 
 ## Department task boards
 
