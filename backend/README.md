@@ -654,6 +654,19 @@ more tasks. A task reaches Done only from In review (`TASK_DONE_NEEDS_REVIEW` ot
 a lead or its reporter (`TASK_DONE_NOT_ALLOWED`): nobody approves work they were only assigned. Tasks, sprints and the board are versioned: an edit based on an old version is refused
 with `STALE_VERSION`.
 
+**Dates, the next task, and reviews.** A task may have a `startDate` and `dueDate` (calendar dates in the
+company's time zone; the due date is not before the start) and `dependsOnTaskId`, the task it follows
+on the same board (`TASK_DEPENDENCY_NOT_FOUND` otherwise, `TASK_DEPENDENCY_LOOP` for itself or a loop). A
+task's detail names what it follows (`dependsOn`) and what follows it (`followedBy`). Tasks from before
+these fields keep them null, so they are never reported overdue. Moving a task to In review submits it
+(`review.state` `SUBMITTED`) and notifies the board's leads (`TASK_REVIEW_REQUESTED`); the assignee is
+free to start what follows at once. A lead decides with `POST /tasks/:taskId/review` `{ decision, note?,
+version }`: `APPROVE` marks it Done without telling anyone (`APPROVED`); `REQUEST_CHANGES` needs a note,
+sends it back to In progress (`CHANGES_REQUESTED`, no new column) and notifies the assignee
+(`TASK_CHANGES_REQUESTED`). A lead moving it from In review to Done also approves it; taking it back out
+of review without a decision clears the waiting review. `TASK_NOT_IN_REVIEW` refuses a review of a task
+that is not in review.
+
 | Endpoint                                                    | What it does                                                                                                                                                                                                                                                |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/task-boards`                                      | the boards the person can open: their department's and those they head, every active department's for an admin                                                                                                                                              |

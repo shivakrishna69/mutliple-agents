@@ -19,6 +19,15 @@
  *                                    they were only assigned)
  *                                    every change is recorded in the activity, and a new assignee is
  *                                    notified in the app
+ *                                    dates (startDate, dueDate) and the task it follows
+ *                                    (dependsOnTaskId: on this board, never in a loop) are edited
+ *                                    like the other fields
+ *                                    moving a task to In review submits it: review SUBMITTED, and the
+ *                                    leads are notified (the assignee is free to start what follows);
+ *                                    a lead moving it on to Done approves it
+ *   reviewTask(scope, ...)           leads, on a task in review: APPROVE marks it Done quietly;
+ *                                    REQUEST_CHANGES (with a note) sends it back to In progress and
+ *                                    tells the assignee
  *   addComment(scope, ...)           anyone on the board
  *   getTeamWork(scope, filters)      leads: each person's tasks by status and story points; for a
  *                                    sprint, its burndown; and the unassigned backlog
@@ -30,7 +39,7 @@ import { TASK_SETTINGS } from '../../constants/validation.js';
 import DepartmentBoard from '../../models/DepartmentBoard.js';
 import { NOTIFICATION_TYPES } from '../../models/Notification.js';
 import Sprint, { SPRINT_STATUSES } from '../../models/Sprint.js';
-import Task, { TASK_STATUSES } from '../../models/Task.js';
+import Task, { TASK_REVIEW_STATES, TASK_STATUSES } from '../../models/Task.js';
 import TaskActivity, { TASK_ACTIVITY_TYPES } from '../../models/TaskActivity.js';
 import { notifyUsers } from '../notifications.js';
 import { assertCurrentVersion, saveVersioned } from '../serviceError.js';
@@ -48,6 +57,8 @@ export const TASK_APP_PATHS = Object.freeze({
 });
 
 export const BACKLOG = 'backlog';
+/** A lead's decision on a task in review (POST /tasks/:taskId/review). */
+export const TASK_REVIEW_DECISIONS = Object.freeze({ APPROVE: 'APPROVE', REQUEST_CHANGES: 'REQUEST_CHANGES' });
 export const ASSIGNEE_FILTERS = Object.freeze({ ME: 'me', UNASSIGNED: 'unassigned' });
 
 // Fields recorded in the activity without their before and after (they can be long).
@@ -61,6 +72,9 @@ const MEMBER_EDITABLE_FIELDS = new Set([
   'storyPoints',
   'assigneeId',
   'orderIndex',
+  'startDate',
+  'dueDate',
+  'dependsOnTaskId',
 ]);
 
 const idOrNull = (id) => id?.toString() ?? null;
@@ -82,14 +96,35 @@ function toTaskSummary(task, people, { withDescription = false } = {}) {
     storyPoints: task.storyPoints ?? null,
     orderIndex: task.orderIndex,
     doneAt: task.doneAt ?? null,
+    startDate: task.startDate ?? null,
+    dueDate: task.dueDate ?? null,
+    dependsOnTaskId: idOrNull(task.dependsOnTaskId),
+    review: task.review
+      ? {
+          state: task.review.state,
+          submittedBy: person(task.review.submittedByUserId),
+          submittedAt: task.review.submittedAt,
+          decidedBy: person(task.review.decidedByUserId),
+          decidedAt: task.review.decidedAt ?? null,
+          note: task.review.note ?? null,
+        }
+      : null,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     version: task.__v,
   };
 }
 
+/** The people a task names: assignee, reporter, and whoever submitted and decided its review. */
+const peopleOf = (task) => [
+  task.assigneeId,
+  task.reporterId,
+  task.review?.submittedByUserId,
+  task.review?.decidedByUserId,
+];
+
 async function summarize(tasks, options) {
-  const people = await peopleByIds(tasks.flatMap((task) => [task.assigneeId, task.reporterId]));
+  const people = await peopleByIds(tasks.flatMap(peopleOf).filter(Boolean));
   return tasks.map((task) => toTaskSummary(task, people, options));
 }
 
@@ -136,9 +171,21 @@ export async function getTask({ department }, taskId) {
     .sort({ createdAt: 1, _id: 1 })
     .limit(TASK_SETTINGS.ACTIVITY_LISTED)
     .lean();
+  const [dependsOn, followedBy] = await Promise.all([
+    task.dependsOnTaskId
+      ? Task.findOne({ _id: task.dependsOnTaskId, departmentId: department._id })
+          .select('key title status assigneeId dueDate')
+          .lean()
+      : null,
+    Task.find({ departmentId: department._id, dependsOnTaskId: task._id })
+      .select('key title status assigneeId dueDate')
+      .sort({ number: 1 })
+      .limit(TASK_SETTINGS.DEPENDENCY_CHAIN_MAX)
+      .lean(),
+  ]);
   const people = await peopleByIds([
-    task.assigneeId,
-    task.reporterId,
+    ...peopleOf(task).filter(Boolean),
+    ...[dependsOn, ...followedBy].filter(Boolean).map((linked) => linked.assigneeId),
     ...activity.map((entry) => entry.actorId),
     ...activity.flatMap((entry) =>
       (entry.changes ?? [])
@@ -146,8 +193,18 @@ export async function getTask({ department }, taskId) {
         .flatMap((change) => [change.from, change.to]),
     ),
   ]);
+  const linkedSummary = (linked) => ({
+    id: linked._id.toString(),
+    key: linked.key,
+    title: linked.title,
+    status: linked.status,
+    dueDate: linked.dueDate ?? null,
+    assignee: linked.assigneeId ? (people.get(linked.assigneeId.toString()) ?? null) : null,
+  });
   return {
     task: toTaskSummary(task, people, { withDescription: true }),
+    dependsOn: dependsOn ? linkedSummary(dependsOn) : null,
+    followedBy: followedBy.map(linkedSummary),
     activity: activity.map((entry) => toActivitySummary(entry, people)),
   };
 }
@@ -162,6 +219,83 @@ async function requirePlannableSprint(department, sprintId) {
   if (sprintId === null) return;
   const sprint = await findSprint(department, sprintId, { lean: true });
   if (sprint.status === SPRINT_STATUSES.COMPLETED) throw boardRefusal(HTTP_STATUS.CONFLICT, 'SPRINT_COMPLETED');
+}
+
+/**
+ * Refuses a "follows" link to a task that is not on this board, or one that would make a loop (the
+ * chain of tasks it follows reaching back to this task). `taskId` is null for a new task.
+ */
+async function requireDependency(department, dependsOnTaskId, taskId) {
+  if (dependsOnTaskId === null || dependsOnTaskId === undefined) return;
+  if (taskId && dependsOnTaskId === taskId) throw boardRefusal(HTTP_STATUS.CONFLICT, 'TASK_DEPENDENCY_LOOP');
+  const findLink = (id) => Task.findOne({ _id: id, departmentId: department._id }).select('dependsOnTaskId').lean();
+  let current = await findLink(dependsOnTaskId);
+  if (!current) throw boardRefusal(HTTP_STATUS.UNPROCESSABLE_CONTENT, 'TASK_DEPENDENCY_NOT_FOUND');
+  for (let step = 0; step < TASK_SETTINGS.DEPENDENCY_CHAIN_MAX; step += 1) {
+    if (!current.dependsOnTaskId) return;
+    if (taskId && current.dependsOnTaskId.toString() === taskId) {
+      throw boardRefusal(HTTP_STATUS.CONFLICT, 'TASK_DEPENDENCY_LOOP');
+    }
+    current = await findLink(current.dependsOnTaskId);
+    if (!current) return;
+  }
+  // A chain this long is far more likely a loop through old data than real planning.
+  throw boardRefusal(HTTP_STATUS.CONFLICT, 'TASK_DEPENDENCY_LOOP');
+}
+
+/** The board's leads who are still in the department: its head and the task leads the head named. */
+function leadUserIdsOf(scope) {
+  const named = scope.board.leadUserIds.map((userId) => userId.toString()).filter((id) => scope.memberUserIds.has(id));
+  return [...new Set([scope.headUserId, ...named].filter(Boolean))];
+}
+
+async function notifyReviewRequested(scope, task, actor) {
+  const recipients = leadUserIdsOf(scope).filter((userId) => userId !== actor.id);
+  if (recipients.length === 0) return;
+  const departmentId = scope.department._id.toString();
+  await notifyUsers(recipients, () => ({
+    type: NOTIFICATION_TYPES.TASK_REVIEW_REQUESTED,
+    title: NOTIFICATION_MESSAGES.TASK_REVIEW_REQUESTED_TITLE(task.key),
+    body: NOTIFICATION_MESSAGES.TASK_REVIEW_REQUESTED_BODY(actor.name, task.title),
+    link: TASK_APP_PATHS.task(departmentId, task._id.toString()),
+    data: { departmentId, taskId: task._id.toString(), taskKey: task.key },
+  }));
+}
+
+async function notifyChangesRequested(scope, task, note, actor) {
+  const assigneeId = idOrNull(task.assigneeId);
+  if (!assigneeId || assigneeId === actor.id) return;
+  const departmentId = scope.department._id.toString();
+  await notifyUsers([assigneeId], () => ({
+    type: NOTIFICATION_TYPES.TASK_CHANGES_REQUESTED,
+    title: NOTIFICATION_MESSAGES.TASK_CHANGES_REQUESTED_TITLE(task.key),
+    body: NOTIFICATION_MESSAGES.TASK_CHANGES_REQUESTED_BODY(actor.name, task.title, note),
+    link: TASK_APP_PATHS.task(departmentId, task._id.toString()),
+    data: { departmentId, taskId: task._id.toString(), taskKey: task.key },
+  }));
+}
+
+/** A fresh submission: waiting for a lead. */
+const submittedReview = (actorId, now) => ({
+  state: TASK_REVIEW_STATES.SUBMITTED,
+  submittedByUserId: actorId,
+  submittedAt: now,
+  decidedByUserId: null,
+  decidedAt: null,
+  note: null,
+});
+
+/** The review after a lead's decision (a task in review from before reviews existed gets one). */
+function decidedReview(task, { state, actorId, note, now }) {
+  const current = task.review?.toObject?.() ?? task.review ?? null;
+  return {
+    state,
+    submittedByUserId: current?.submittedByUserId ?? task.assigneeId ?? actorId,
+    submittedAt: current?.submittedAt ?? now,
+    decidedByUserId: actorId,
+    decidedAt: now,
+    note: note ?? null,
+  };
 }
 
 /** The order that puts a task at the bottom of its column (a sprint's, or the backlog's, status). */
@@ -186,7 +320,8 @@ async function notifyAssignee({ department, task, assigneeId, actor }) {
 
 /**
  * @param {{ title: string, description: string, taskType?: string, priority?: string, assigneeId: string|null,
- *   storyPoints: number|null, sprintId: string|null }} input
+ *   storyPoints: number|null, sprintId: string|null, startDate?: string|null, dueDate?: string|null,
+ *   dependsOnTaskId?: string|null }} input
  * @param {{ id: string, name: string }} actor
  */
 export async function createTask(scope, input, actor) {
@@ -195,6 +330,7 @@ export async function createTask(scope, input, actor) {
   if (sprintId !== null && !isLead(scope)) throw boardRefusal(HTTP_STATUS.FORBIDDEN, 'TASK_SPRINT_NOT_ALLOWED');
   await requirePlannableSprint(department, sprintId);
   requireMember(scope, input.assigneeId ?? null);
+  await requireDependency(department, input.dependsOnTaskId ?? null, null);
 
   const task = new Task({
     departmentId: department._id,
@@ -209,6 +345,9 @@ export async function createTask(scope, input, actor) {
     assigneeId: input.assigneeId ?? null,
     reporterId: actor.id,
     storyPoints: input.storyPoints ?? null,
+    startDate: input.startDate ?? null,
+    dueDate: input.dueDate ?? null,
+    dependsOnTaskId: input.dependsOnTaskId ?? null,
     orderIndex: await bottomOrder(department._id, sprintId, TASK_STATUSES.TODO),
   });
   await task.validate();
@@ -282,16 +421,32 @@ export async function updateTask(scope, taskId, { changes, version }, actor) {
   await checkChangeRights(scope, task, changes, actor.id);
   if (changes.assigneeId !== undefined) requireMember(scope, changes.assigneeId);
   if (changes.sprintId !== undefined) await requirePlannableSprint(department, changes.sprintId);
+  if (changes.dependsOnTaskId !== undefined) {
+    await requireDependency(department, changes.dependsOnTaskId, task._id.toString());
+  }
 
   const before = task.toObject();
   for (const [field, value] of Object.entries(changes)) task.set(field, value);
+  // Submitting for review, and approving by moving the task on to Done (see reviewTask too).
+  const now = new Date();
+  const submits = task.status === TASK_STATUSES.IN_REVIEW && before.status !== TASK_STATUSES.IN_REVIEW;
+  if (submits) task.review = submittedReview(actor.id, now);
+  if (task.status === TASK_STATUSES.DONE && before.status === TASK_STATUSES.IN_REVIEW) {
+    task.review = decidedReview(task, { state: TASK_REVIEW_STATES.APPROVED, actorId: actor.id, now });
+  }
+  // Taken back out of review without a decision: no longer waiting for one (the activity keeps it).
+  const withdrawn =
+    before.status === TASK_STATUSES.IN_REVIEW &&
+    (task.status === TASK_STATUSES.TODO || task.status === TASK_STATUSES.IN_PROGRESS) &&
+    before.review?.state === TASK_REVIEW_STATES.SUBMITTED;
+  if (withdrawn) task.review = null;
   const movedColumn =
     (changes.status !== undefined && changes.status !== before.status) ||
     (changes.sprintId !== undefined && comparable(changes.sprintId) !== comparable(before.sprintId));
   if (movedColumn && changes.orderIndex === undefined) {
     task.orderIndex = await bottomOrder(department._id, task.sprintId, task.status);
   }
-  if (task.status === TASK_STATUSES.DONE && before.status !== TASK_STATUSES.DONE) task.doneAt = new Date();
+  if (task.status === TASK_STATUSES.DONE && before.status !== TASK_STATUSES.DONE) task.doneAt = now;
   if (task.status !== TASK_STATUSES.DONE) task.doneAt = null;
 
   const recorded = Object.keys(changes)
@@ -301,6 +456,8 @@ export async function updateTask(scope, taskId, { changes, version }, actor) {
         ? { field, from: null, to: null }
         : { field, from: comparable(before[field]), to: comparable(task.get(field)) },
     );
+  const reviewChange = reviewChangeOf(before, task);
+  if (reviewChange) recorded.push(reviewChange);
   if (recorded.length === 0 && task.orderIndex === before.orderIndex) {
     return (await getTask(scope, task._id)).task;
   }
@@ -316,6 +473,57 @@ export async function updateTask(scope, taskId, { changes, version }, actor) {
   }
   const newAssignee = recorded.find((change) => change.field === 'assigneeId')?.to ?? null;
   if (newAssignee) await notifyAssignee({ department, task, assigneeId: newAssignee, actor });
+  if (submits) await notifyReviewRequested(scope, task, actor);
+  return (await getTask(scope, task._id)).task;
+}
+
+/** The review state change for the activity, or null when it did not change. */
+function reviewChangeOf(before, task) {
+  const from = before.review?.state ?? null;
+  const to = task.review?.state ?? null;
+  const resubmitted = from === to && to === TASK_REVIEW_STATES.SUBMITTED && before.status !== task.status;
+  return from !== to || resubmitted ? { field: 'review', from, to } : null;
+}
+
+/**
+ * A lead's decision on a task in review. APPROVE marks it Done without interrupting anyone;
+ * REQUEST_CHANGES (a note is required, see validators/taskValidators.js) sends it back to In progress
+ * and notifies the assignee.
+ * @param {{ decision: string, note: string|null, version: number }} input
+ * @param {{ id: string, name: string }} actor
+ */
+export async function reviewTask(scope, taskId, { decision, note, version }, actor) {
+  requireLead(scope);
+  const { department } = scope;
+  const task = await findTask(department, taskId);
+  assertCurrentVersion(task, version);
+  if (task.status !== TASK_STATUSES.IN_REVIEW) throw boardRefusal(HTTP_STATUS.CONFLICT, 'TASK_NOT_IN_REVIEW');
+
+  const before = task.toObject();
+  const now = new Date();
+  const approves = decision === TASK_REVIEW_DECISIONS.APPROVE;
+  task.status = approves ? TASK_STATUSES.DONE : TASK_STATUSES.IN_PROGRESS;
+  task.doneAt = approves ? now : null;
+  task.orderIndex = await bottomOrder(department._id, task.sprintId, task.status);
+  task.review = decidedReview(task, {
+    state: approves ? TASK_REVIEW_STATES.APPROVED : TASK_REVIEW_STATES.CHANGES_REQUESTED,
+    actorId: actor.id,
+    note,
+    now,
+  });
+  await saveVersioned(task);
+  await TaskActivity.create({
+    taskId: task._id,
+    departmentId: department._id,
+    actorId: actor.id,
+    type: TASK_ACTIVITY_TYPES.UPDATED,
+    changes: [
+      { field: 'status', from: before.status, to: task.status },
+      { field: 'review', from: before.review?.state ?? null, to: task.review.state },
+    ],
+    ...(note ? { body: note } : {}),
+  });
+  if (!approves) await notifyChangesRequested(scope, task, note, actor);
   return (await getTask(scope, task._id)).task;
 }
 

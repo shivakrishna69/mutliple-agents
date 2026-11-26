@@ -781,6 +781,10 @@ export const TASK_SETTINGS = Object.freeze({
   SPRINT_NAME_MAX_LENGTH: 120,
   SPRINT_GOAL_MAX_LENGTH: 1_000,
   STORY_POINTS_MAX: 100,
+  // A lead's note when reviewing a task (required when asking for changes).
+  REVIEW_NOTE_MAX_LENGTH: 1_000,
+  // How far back a chain of "follows" links is walked to refuse a loop.
+  DEPENDENCY_CHAIN_MAX: 50,
   // A sprint may last at most this many days.
   SPRINT_MAX_DAYS: 90,
   // People a department head may name as task leads.

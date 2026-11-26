@@ -22,6 +22,10 @@ export const NOTIFICATION_TYPES = Object.freeze({
   AGENT_QUESTION_ANSWERED: 'AGENT_QUESTION_ANSWERED',
   // To the person a task was assigned to (not when they assigned it to themselves).
   TASK_ASSIGNED: 'TASK_ASSIGNED',
+  // To the board's leads: someone submitted a task for review (not to the lead who submitted it).
+  TASK_REVIEW_REQUESTED: 'TASK_REVIEW_REQUESTED',
+  // To the person assigned a task: a lead asked for changes to it.
+  TASK_CHANGES_REQUESTED: 'TASK_CHANGES_REQUESTED',
 });
 
 const notificationSchema = new mongoose.Schema(

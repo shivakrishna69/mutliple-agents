@@ -12,11 +12,14 @@
  *   PATCH /sprints/:sprintId             { ...changes, status?, version }              leads
  *   GET   /tasks?sprintId=&assignee=&status=
  *   POST  /tasks                         { title, description?, taskType?, priority?, assigneeId?,
- *                                          storyPoints?, sprintId? (leads) }
+ *                                          storyPoints?, sprintId? (leads), startDate?, dueDate?,
+ *                                          dependsOnTaskId? }
  *   GET   /tasks/metrics?sprintId=       each person's work, sprint burndown, unassigned leads
  *                                        backlog
  *   GET   /tasks/:taskId                 with its activity and comments
- *   PATCH /tasks/:taskId                 { ...changes, version }: status, order, assignee, fields
+ *   PATCH /tasks/:taskId                 { ...changes, version }: status, order, assignee, fields,
+ *                                        startDate, dueDate, dependsOnTaskId (moving to In review submits it)
+ *   POST  /tasks/:taskId/review          { decision: APPROVE | REQUEST_CHANGES, note?, version }    leads
  *   POST  /tasks/:taskId/comments        { body }
  *
  * Every change is audited (category "tasks") with ids and the fields changed, never their text.
@@ -29,7 +32,16 @@ import { TASK_AUDIT_CATEGORY } from '../middleware/departmentBoardScope.js';
 import { listMyBoards } from '../services/tasks/boardAccess.js';
 import { getBoardSummary, setTaskLeads } from '../services/tasks/boardService.js';
 import { createSprint, listSprints, updateSprint } from '../services/tasks/sprintService.js';
-import { addComment, createTask, getTask, getTeamWork, listTasks, updateTask } from '../services/tasks/taskService.js';
+import {
+  TASK_REVIEW_DECISIONS,
+  addComment,
+  createTask,
+  getTask,
+  getTeamWork,
+  listTasks,
+  reviewTask,
+  updateTask,
+} from '../services/tasks/taskService.js';
 import {
   validateComment,
   validateSprintChanges,
@@ -38,6 +50,7 @@ import {
   validateTaskCreation,
   validateTaskLeads,
   validateTaskQuery,
+  validateTaskReview,
 } from '../validators/taskValidators.js';
 import { createWorkforceHandlerFactory, idParamErrors } from './workforceHandler.js';
 
@@ -162,6 +175,21 @@ export const patchTask = boardHandler('update_task', SCOPED_WRITE, async (req) =
     message: TASK_MESSAGES.TASK_UPDATED,
     data: { task },
     auditDetails: { ...auditScope(req), taskId: task.id, fields: Object.keys(validation.sanitizedInput.changes) },
+  };
+});
+
+/** POST /tasks/:taskId/review */
+export const postTaskReview = boardHandler('review_task', SCOPED_WRITE, async (req) => {
+  const invalid = idParamErrors(req.params, 'taskId');
+  if (invalid) return { validationErrors: invalid };
+  const validation = validateTaskReview(req.body);
+  if (!validation.isValid) return { validationErrors: validation.validationErrors };
+  const task = await reviewTask(req.boardScope, req.params.taskId, validation.sanitizedInput, actorOf(req));
+  const approved = validation.sanitizedInput.decision === TASK_REVIEW_DECISIONS.APPROVE;
+  return {
+    message: approved ? TASK_MESSAGES.TASK_REVIEWED_APPROVED : TASK_MESSAGES.TASK_REVIEWED_CHANGES,
+    data: { task },
+    auditDetails: { ...auditScope(req), taskId: task.id, decision: validation.sanitizedInput.decision },
   };
 });
 
