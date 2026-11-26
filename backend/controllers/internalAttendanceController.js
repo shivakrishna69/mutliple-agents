@@ -34,6 +34,7 @@ import {
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
 import { validateAgentRegularization, validateAgentReviewSubmission } from '../validators/regularizationValidators.js';
+import { refreshCorrectionInsights } from '../services/insights/insightsCache.js';
 import { isDuplicateKeyError } from '../utils/mongoErrors.js';
 
 function auditAgentAction(req, action, outcome, details) {
@@ -175,6 +176,7 @@ export async function fileAgentReview(req, res, next) {
       });
     }
 
+    await refreshCorrectionInsights(storedReview.reportingManagerId);
     auditAgentAction(req, 'file_review', AUDIT_OUTCOMES.ALLOWED, {
       reviewId: storedReview._id.toString(),
       employeeId: reviewInput.employeeId,

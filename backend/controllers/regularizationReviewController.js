@@ -37,6 +37,7 @@ import {
 } from '../services/attendanceRegularization.js';
 import { sendCodedError, sendError, sendSuccess } from '../utils/apiResponse.js';
 import { AUDIT_OUTCOMES, recordAuditEvent } from '../utils/auditLogger.js';
+import { refreshCorrectionInsights } from '../services/insights/insightsCache.js';
 import { findOwnEmployeeProfileId, isWorkforceAdmin } from '../services/workforceAccess.js';
 import { isValidObjectIdString } from '../validators/conversationValidators.js';
 import { REVIEW_DECISIONS, validateReviewDecision } from '../validators/regularizationValidators.js';
@@ -222,6 +223,7 @@ export async function decideRegularizationReview(req, res, next) {
       throw saveError;
     }
 
+    await refreshCorrectionInsights(reviewRecord.reportingManagerId);
     auditReview(req, 'decide_review', AUDIT_OUTCOMES.ALLOWED, {
       ...auditContext,
       attendanceId: writeResult ? writeResult.attendance._id.toString() : null,

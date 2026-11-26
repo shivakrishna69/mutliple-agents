@@ -57,6 +57,13 @@ export const TWO_STEP_EMPLOYEE = Object.freeze({ name: 'Tara Pillai', email: 'ta
 export const TWO_STEP_EARNED_DAYS = 3;
 
 /**
+ * A third employee of the same manager and office, for the daily briefing test (insights.spec.js), so
+ * its leave never touches the other leave tests' balances: 5 days of Casual Leave.
+ */
+export const BRIEFING_EMPLOYEE = Object.freeze({ name: 'Bhavna Rao', email: 'bhavna.rao@example.com' });
+export const BRIEFING_EMPLOYEE_CASUAL_DAYS = 5;
+
+/**
  * The head of the department (set by global setup): manages its knowledge base from self-service
  * ("My department's knowledge base"). An employee account, so no portal switcher.
  */

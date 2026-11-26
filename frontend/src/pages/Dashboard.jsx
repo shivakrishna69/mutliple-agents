@@ -10,6 +10,9 @@
  *   employee  (anyone with an employee profile) their own day: punch-in, leave, requests, payslip
  *   customer  (no profile, no staff role) support chat and their latest conversation
  *
+ * Below the greeting, the briefing bar (components/insights/BriefingBar.jsx) says what needs the
+ * person today, with the most pressing item's action and the full briefing a click away.
+ *
  * The range picker (today, 7 or 30 days, in the company's time zone) reloads the figures. Every
  * figure is the server's; "—" means there is nothing to measure yet.
  */
@@ -19,6 +22,7 @@ import { requestConversationList } from '../api/conversationsApi.js';
 import { requestDashboardOverview } from '../api/dashboardApi.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ErrorBanner from '../components/ErrorBanner.jsx';
+import BriefingBar from '../components/insights/BriefingBar.jsx';
 import { CalendarIcon, ChevronDownIcon } from '../components/Icons.jsx';
 import RoleBadge from '../components/RoleBadge.jsx';
 import CustomerOverview from '../components/dashboard/CustomerOverview.jsx';
@@ -155,6 +159,8 @@ export default function Dashboard() {
           </div>
         )}
       </header>
+
+      <BriefingBar />
 
       {overview.error && (
         <ErrorBanner

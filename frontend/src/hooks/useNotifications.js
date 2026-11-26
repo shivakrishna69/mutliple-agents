@@ -1,7 +1,10 @@
 /**
  * The signed-in person's in-app notifications, kept current live:
  *
- *   const { notifications, unreadCount, isLoading, error, markRead, markAllRead } = useNotifications();
+ *   const { notifications, unreadCount, isLoading, error, markRead, markAllRead } = useNotifications({
+ *     onInsightsChanged,   // optional: the same connection tells the daily briefing to reload
+ *     onReconnected,       // optional: called after a reconnect (events sent meanwhile were missed)
+ *   });
  *
  *   - Loaded from GET /api/notifications on mount (hooks/useApiResource.js).
  *   - New ones arrive on the socket (NOTIFICATION_CREATED) and go to the top at once.
@@ -22,7 +25,7 @@ import { useSocket } from './useSocket.js';
 
 const EMPTY = Object.freeze({ notifications: [], unreadCount: 0 });
 
-export function useNotifications() {
+export function useNotifications({ onInsightsChanged, onReconnected } = {}) {
   const { csrfToken } = useAuth();
   const resource = useApiResource((signal) => requestNotifications(signal), []);
   const { setData, reload } = resource;
@@ -37,13 +40,21 @@ export function useNotifications() {
           unreadCount: notification.readAt ? count : count + 1,
         };
       }),
+    onInsightsChanged,
   });
 
   // A reconnect may have missed notifications: load them again (not on the first connection).
   const hasConnected = useRef(false);
+  const reconnectedRef = useRef(onReconnected);
+  useEffect(() => {
+    reconnectedRef.current = onReconnected;
+  });
   useEffect(() => {
     if (connectionStatus !== SOCKET_CONNECTION_STATUS.CONNECTED) return;
-    if (hasConnected.current) reload();
+    if (hasConnected.current) {
+      reload();
+      reconnectedRef.current?.();
+    }
     hasConnected.current = true;
   }, [connectionStatus, reload]);
 

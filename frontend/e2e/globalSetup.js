@@ -45,6 +45,8 @@ import {
   RESET_ACCOUNT,
   TWO_STEP_EARNED_DAYS,
   TWO_STEP_EMPLOYEE,
+  BRIEFING_EMPLOYEE,
+  BRIEFING_EMPLOYEE_CASUAL_DAYS,
 } from './environment.js';
 
 /** Signs up and confirms the email from the emailed link, through the API. */
@@ -61,7 +63,8 @@ async function expectCreated(responsePromise, what) {
 
 /**
  * The employees and manager for the leave tests, with an office open every day: a CL balance for
- * one, and Earned Leave needing the manager's then HR's approval for the other.
+ * one, Earned Leave needing the manager's then HR's approval for another, and a CL balance for the
+ * daily briefing test's employee.
  */
 async function seedLeaveScenario(testServer, adminClient, departmentId) {
   const employee = await onboardEmployee({ testServer, hrClient: adminClient, departmentId, ...LEAVE_EMPLOYEE });
@@ -70,6 +73,12 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
     hrClient: adminClient,
     departmentId,
     ...TWO_STEP_EMPLOYEE,
+  });
+  const briefingEmployee = await onboardEmployee({
+    testServer,
+    hrClient: adminClient,
+    departmentId,
+    ...BRIEFING_EMPLOYEE,
   });
   const manager = await onboardEmployee({ testServer, hrClient: adminClient, departmentId, ...LEAVE_MANAGER });
   const { office } = await expectCreated(
@@ -84,7 +93,7 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
     'the leave office',
   );
   const objectId = (id) => new testServer.database.base.Types.ObjectId(id);
-  for (const { profileId } of [employee, twoStepEmployee]) {
+  for (const { profileId } of [employee, twoStepEmployee, briefingEmployee]) {
     await expectCreated(
       adminClient.request('PUT', `/api/employees/${profileId}/office`, { body: { officeLocationId: office.id } }),
       'the office assignment',
@@ -115,6 +124,16 @@ async function seedLeaveScenario(testServer, adminClient, departmentId) {
       note: 'Balance for the browser tests',
     }),
     'the leave balance',
+  );
+  await expectCreated(
+    adminClient.post('/api/leave/adjustments', {
+      employeeId: briefingEmployee.profileId,
+      leaveTypeId: leaveTypes.find((type) => type.code === 'CL').id,
+      reasonCode: 'ENTITLEMENT_GRANT',
+      days: BRIEFING_EMPLOYEE_CASUAL_DAYS,
+      note: 'Balance for the daily briefing test',
+    }),
+    'the briefing leave balance',
   );
   // Earned Leave of any length needs HR's approval after the manager's.
   const earnedLeave = leaveTypes.find((type) => type.code === 'EL');

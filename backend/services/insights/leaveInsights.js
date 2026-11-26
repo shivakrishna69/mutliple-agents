@@ -13,7 +13,8 @@
  *   waiting          a request waiting longer than INSIGHT_SETTINGS.LEAVE_URGENT_AFTER_HOURS is urgent
  *
  * Actions: Approve and Decline (the step the request waits on travels with them), and Ask NSK.
- * Every figure is read from the database; nothing is estimated.
+ * Every figure is read from the database; nothing is estimated. The LEAVE_DECISIONS queue counts every
+ * request and leave change waiting for the viewer, beyond the cards shown.
  */
 
 import { INSIGHT_MESSAGES } from '../../constants/messages.js';
@@ -24,7 +25,7 @@ import User from '../../models/User.js';
 import { getEmployeeBalances } from '../leaveBalances.js';
 import { listApprovalQueue } from '../leaveRequests.js';
 import { findOwnEmployeeProfileId, isWorkforceAdmin } from '../workforceAccess.js';
-import { INSIGHT_ACTIONS, INSIGHT_KINDS, INSIGHT_SEVERITIES, dateRange } from './insightFormat.js';
+import { INSIGHT_ACTIONS, INSIGHT_KINDS, INSIGHT_QUEUES, INSIGHT_SEVERITIES, dateRange } from './insightFormat.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const OVERLAPPING_STATUSES = Object.freeze([LEAVE_REQUEST_STATUSES.APPROVED, LEAVE_REQUEST_STATUSES.PENDING]);
@@ -110,17 +111,20 @@ function overlapLine({ entries, more }) {
 /**
  * @param {{ id: string, role: string }} viewer
  * @param {{ now: Date }} options
- * @returns {Promise<object[]>} cards
+ * @returns {Promise<{ cards: object[], queues: object }>}
  */
-export async function buildLeaveCards(viewer, { now }) {
+export async function buildLeaveInsights(viewer, { now }) {
   const employeeId = await findOwnEmployeeProfileId(viewer.id);
-  if (!employeeId && !isWorkforceAdmin(viewer.role)) return [];
-  const queue = await listApprovalQueue({
-    actor: { role: viewer.role, employeeId },
-    queue: APPROVAL_QUEUES.REQUESTS,
-  });
+  if (!employeeId && !isWorkforceAdmin(viewer.role)) {
+    return { cards: [], queues: { [INSIGHT_QUEUES.LEAVE_DECISIONS]: 0 } };
+  }
+  const actor = { role: viewer.role, employeeId };
+  const [queue, changes] = await Promise.all([
+    listApprovalQueue({ actor, queue: APPROVAL_QUEUES.REQUESTS }),
+    listApprovalQueue({ actor, queue: APPROVAL_QUEUES.CHANGES }),
+  ]);
   const requests = queue.slice(0, INSIGHT_SETTINGS.LEAVE_CARDS_MAX);
-  return Promise.all(
+  const cards = await Promise.all(
     requests.map(async (request) => {
       const [balanceLine, overlaps] = await Promise.all([balanceLineOf(request, now), overlapsOf(request)]);
       const range = dateRange(request.startDate, request.endDate);
@@ -155,4 +159,5 @@ export async function buildLeaveCards(viewer, { now }) {
       };
     }),
   );
+  return { cards, queues: { [INSIGHT_QUEUES.LEAVE_DECISIONS]: queue.length + changes.length } };
 }

@@ -18,6 +18,10 @@
  * The top bar and the page (.glass-content) turn the pages' white surfaces into glass. Ask NSK is a
  * page of its own (/ask-nsk), opened from the top bar, the sidebar and the launcher.
  *
+ * The daily briefing (components/insights/) is loaded once here and shared through InsightsProvider:
+ * the ✦ pill beside Ask NSK, the briefing bars on My Access and Overview, the slide-over panel and the
+ * My Access badges. The notifications' socket also carries INSIGHTS_CHANGED, so it reloads live.
+ *
  * The content column is exactly one viewport tall and the <main> element scrolls, so full-height
  * pages (the chat and the console) can fill it with `h-full` while ordinary pages scroll inside it.
  *
@@ -44,6 +48,9 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { hasCapability } from '../auth/capabilities.js';
 import { NAVIGATION_SECTIONS, isItemVisible, itemOfPath } from './appNavigation.js';
 import NskLaunchButton from './nskBot/NskLaunchButton.jsx';
+import { InsightsProvider, useInsightsState } from './insights/InsightsContext.jsx';
+import InsightsPanel from './insights/InsightsPanel.jsx';
+import InsightsPill from './insights/InsightsPill.jsx';
 import BrandMark from './BrandMark.jsx';
 import NotificationCenter from './NotificationCenter.jsx';
 import ErrorBanner from './ErrorBanner.jsx';
@@ -221,6 +228,7 @@ function TopBar({ companyName, pageLabel, currentUser, health, switcher, notific
       <div className="flex shrink-0 items-center gap-3">
         {switcher}
         <SystemsPill health={health} />
+        <InsightsPill />
         <NskLaunchButton variant="topbar" />
         <NotificationCenter notificationState={notificationState} />
         <span
@@ -246,8 +254,14 @@ export default function AppShell() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(null);
   const { canSwitch, view, setView } = usePortalView(currentUser);
-  // One connection for the bells and the My Access announcement (each call opens its own socket).
-  const notificationState = useNotifications();
+  // The daily briefing, shared by the pill, the bars, the panel and the launcher badges.
+  const insights = useInsightsState();
+  // One connection for the bells, the My Access announcement and the briefing's live reloads (each
+  // call opens its own socket).
+  const notificationState = useNotifications({
+    onInsightsChanged: insights.scheduleReload,
+    onReconnected: insights.scheduleReload,
+  });
   // The My Access launcher is shown without the sidebar; every other page has it.
   const isLauncher = pathname === ROUTE_PATHS.MY_ACCESS;
   const canLaunch = hasCapability(currentUser, CAPABILITIES.USE_EMPLOYEE_WORKSPACE);
@@ -308,105 +322,109 @@ export default function AppShell() {
   const closeMobileNav = () => setIsMobileNavOpen(false);
 
   return (
-    <div className="app-canvas h-dvh">
-      {/* Desktop sidebar: the frame's left rail, joined to the top bar by one hairline (not on the launcher) */}
-      {!isLauncher && (
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
-          <SidebarContents
-            className="hairline-r"
-            currentUser={currentUser}
-            companyName={companyName}
-            visibility={visibility}
-            isSigningOut={isSigningOut}
-            onSignOut={handleSignOut}
-          />
-        </aside>
-      )}
-
-      {/* Mobile drawer */}
-      {isMobileNavOpen && !isLauncher && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
-            aria-label="Close navigation"
-            onClick={closeMobileNav}
-          />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
+    <InsightsProvider value={insights}>
+      <div className="app-canvas h-dvh">
+        {/* Desktop sidebar: the frame's left rail, joined to the top bar by one hairline (not on the launcher) */}
+        {!isLauncher && (
+          <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 lg:block">
             <SidebarContents
-              className="bg-white/90"
+              className="hairline-r"
               currentUser={currentUser}
               companyName={companyName}
               visibility={visibility}
               isSigningOut={isSigningOut}
               onSignOut={handleSignOut}
-              onNavigate={closeMobileNav}
-              switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} className="w-full" />}
-              closeButton={
-                <button
-                  type="button"
-                  onClick={closeMobileNav}
-                  aria-label="Close navigation"
-                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-900/[0.05] hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
-                >
-                  <CloseIcon className="h-5 w-5" />
-                </button>
-              }
             />
           </aside>
-        </div>
-      )}
+        )}
 
-      <div className={`glass-content flex h-dvh flex-col ${isLauncher ? '' : 'lg:pl-64'}`}>
-        <TopBar
-          companyName={companyName}
-          pageLabel={pageLabelOf(pathname)}
-          currentUser={currentUser}
-          health={health.data}
-          switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} />}
-          notificationState={notificationState}
-          isLauncher={isLauncher}
-          canLaunch={canLaunch}
-        />
-
-        {/* Mobile top bar */}
-        <header className="glass-frame hairline-b relative z-20 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden">
-          {isLauncher ? (
-            <span className="w-9" aria-hidden="true" />
-          ) : (
+        {/* Mobile drawer */}
+        {isMobileNavOpen && !isLauncher && (
+          <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
             <button
               type="button"
-              onClick={() => setIsMobileNavOpen(true)}
-              aria-label="Open navigation"
-              aria-expanded={isMobileNavOpen}
-              className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-            >
-              <MenuIcon className="h-6 w-6" />
-            </button>
-          )}
-          <BrandMark />
-          <div className="flex items-center gap-1">
-            {canLaunch && !isLauncher && <LauncherButton testId="app-launcher-mobile" className="mr-1" />}
-            <NskLaunchButton variant="icon" />
-            <NotificationCenter notificationState={notificationState} />
-          </div>
-        </header>
-
-        {signOutError && (
-          <div className="glass-frame hairline-b shrink-0 px-4 py-3 sm:px-8">
-            <ErrorBanner
-              title={BANNER_TITLES.SIGN_OUT_FAILED}
-              message={signOutError.message}
-              requestId={signOutError.requestId}
-              onDismiss={() => setSignOutError(null)}
+              className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
+              aria-label="Close navigation"
+              onClick={closeMobileNav}
             />
+            <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl">
+              <SidebarContents
+                className="bg-white/90"
+                currentUser={currentUser}
+                companyName={companyName}
+                visibility={visibility}
+                isSigningOut={isSigningOut}
+                onSignOut={handleSignOut}
+                onNavigate={closeMobileNav}
+                switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} className="w-full" />}
+                closeButton={
+                  <button
+                    type="button"
+                    onClick={closeMobileNav}
+                    aria-label="Close navigation"
+                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-900/[0.05] hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none"
+                  >
+                    <CloseIcon className="h-5 w-5" />
+                  </button>
+                }
+              />
+            </aside>
           </div>
         )}
 
-        <main className="min-h-0 flex-1 overflow-y-auto scroll-thin">
-          <Outlet context={{ visibility, notificationState }} />
-        </main>
+        <div className={`glass-content flex h-dvh flex-col ${isLauncher ? '' : 'lg:pl-64'}`}>
+          <TopBar
+            companyName={companyName}
+            pageLabel={pageLabelOf(pathname)}
+            currentUser={currentUser}
+            health={health.data}
+            switcher={canSwitch && <PortalSwitcher view={view} onChange={changeView} />}
+            notificationState={notificationState}
+            isLauncher={isLauncher}
+            canLaunch={canLaunch}
+          />
+
+          {/* Mobile top bar */}
+          <header className="glass-frame hairline-b relative z-20 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden">
+            {isLauncher ? (
+              <span className="w-9" aria-hidden="true" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsMobileNavOpen(true)}
+                aria-label="Open navigation"
+                aria-expanded={isMobileNavOpen}
+                className="-ml-1.5 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+              >
+                <MenuIcon className="h-6 w-6" />
+              </button>
+            )}
+            <BrandMark />
+            <div className="flex items-center gap-1">
+              {canLaunch && !isLauncher && <LauncherButton testId="app-launcher-mobile" className="mr-1" />}
+              <InsightsPill />
+              <NskLaunchButton variant="icon" />
+              <NotificationCenter notificationState={notificationState} />
+            </div>
+          </header>
+
+          {signOutError && (
+            <div className="glass-frame hairline-b shrink-0 px-4 py-3 sm:px-8">
+              <ErrorBanner
+                title={BANNER_TITLES.SIGN_OUT_FAILED}
+                message={signOutError.message}
+                requestId={signOutError.requestId}
+                onDismiss={() => setSignOutError(null)}
+              />
+            </div>
+          )}
+
+          <main className="min-h-0 flex-1 overflow-y-auto scroll-thin">
+            <Outlet context={{ visibility, notificationState }} />
+          </main>
+        </div>
+        <InsightsPanel />
       </div>
-    </div>
+    </InsightsProvider>
   );
 }

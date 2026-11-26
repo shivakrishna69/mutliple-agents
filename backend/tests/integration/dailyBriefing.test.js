@@ -167,6 +167,13 @@ describe('daily briefing', { skip: mongoReason ?? false }, () => {
     assert.deepEqual(briefing.cards, []);
     assert.deepEqual([briefing.counts.total, briefing.counts.urgent], [0, 0]);
     assert.equal(briefing.today, today);
+    assert.deepEqual(briefing.queues, {
+      LEAVE_DECISIONS: 0,
+      SUPPORT_WAITING: 0,
+      ATTENDANCE_CORRECTIONS: 0,
+      OFFERS_PENDING: 0,
+      FORM16_PENDING: 0,
+    });
   });
 
   it("shows a manager a report's leave with the balance, leave taken and the team's overlap, and clears it once decided", async () => {
@@ -205,13 +212,16 @@ describe('daily briefing', { skip: mongoReason ?? false }, () => {
     assert.equal(card.actions[0].step, 'MANAGER');
     assert.match(card.actions[2].prompt, /Shiva Krishna's Planned Leave/);
     assert.match(briefing.headline, /1 leave request to approve/);
+    assert.equal(briefing.queues.LEAVE_DECISIONS, 1, 'the exact queue, for the Leave badge');
 
     // HR sees it too; the applicant and the teammate do not.
     assert.equal(cardsOf(await briefingOf(hr), 'LEAVE_APPROVAL').length, 1);
     assert.equal(cardsOf(await briefingOf(applicant.client), 'LEAVE_APPROVAL').length, 0);
 
     await expectStatus(manager.client.post(`/api/leave/requests/${request.id}/approve`, {}), 200);
-    assert.equal(cardsOf(await briefingOf(manager.client), 'LEAVE_APPROVAL').length, 0, 'gone at once');
+    const decided = await briefingOf(manager.client);
+    assert.equal(cardsOf(decided, 'LEAVE_APPROVAL').length, 0, 'gone at once');
+    assert.equal(decided.queues.LEAVE_DECISIONS, 0);
   });
 
   let designId;
@@ -340,7 +350,10 @@ describe('daily briefing', { skip: mongoReason ?? false }, () => {
     const [support] = cardsOf(await briefingOf(otherAdmin), 'SUPPORT_WAITING');
     assert.equal(support.title, '1 support chat is waiting for an agent');
     assert.deepEqual(support.actions[0], { kind: 'OPEN_PAGE', label: 'Open', path: '/console' });
-    assert.equal(cardsOf(await briefingOf(developer.client), 'SUPPORT_WAITING').length, 0);
+    assert.equal((await briefingOf(otherAdmin)).queues.SUPPORT_WAITING, 1);
+    const developerBriefing = await briefingOf(developer.client);
+    assert.equal(cardsOf(developerBriefing, 'SUPPORT_WAITING').length, 0);
+    assert.equal(developerBriefing.queues.SUPPORT_WAITING, 0, 'not their queue');
   });
 
   it('tells the people a change touches to fetch their briefing again', async () => {

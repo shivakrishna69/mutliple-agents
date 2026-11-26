@@ -3,7 +3,8 @@
  *   - signing in lands on /my-access, with no sidebar and one tile per page the role may open;
  *   - a tile opens its page, where the sidebar is back; the nine-dot button and "My Access" at the top
  *     of the sidebar both return to the launcher;
- *   - an administrator's tiles include the management tools.
+ *   - an administrator's tiles include the management tools;
+ *   - the launcher, with its briefing bar, fits one screen at 1366×768 and 1920×1080.
  */
 
 import { expect, test } from '@playwright/test';
@@ -84,3 +85,29 @@ test('an administrator’s launcher has the management tools', async ({ page }) 
   await expect(page.getByRole('heading', { level: 1, name: 'Users & roles' })).toBeVisible();
   await expect(mainNavigation(page)).toBeVisible();
 });
+
+// My Access is one screen: the heading, the briefing bar and every tile fit without scrolling, for
+// the role with the most tiles, on a common laptop and a full HD screen.
+for (const viewport of [
+  { width: 1366, height: 768 },
+  { width: 1920, height: 1080 },
+]) {
+  test(`My Access fits one screen at ${viewport.width}×${viewport.height}, with the briefing bar`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ viewport, extraHTTPHeaders: { 'X-Forwarded-For': '203.0.113.23' } });
+    const page = await context.newPage();
+    await signIn(page, ACCOUNTS.admin.email, undefined, { stayOnLauncher: true });
+    await expect(page.getByTestId('briefing-bar').getByTestId('briefing-headline')).toBeVisible();
+    const lastTile = tileLabels(page).last();
+    await expect(lastTile).toBeVisible();
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector('main');
+      return { main: main.scrollHeight - main.clientHeight, page: document.documentElement.scrollHeight - innerHeight };
+    });
+    expect(overflow.main, 'the launcher scrolls').toBeLessThanOrEqual(0);
+    expect(overflow.page, 'the page scrolls').toBeLessThanOrEqual(0);
+    await expect(lastTile).toBeInViewport({ ratio: 1 });
+    await context.close();
+  });
+}
