@@ -1059,6 +1059,11 @@ export const NOTIFICATION_MESSAGES = Object.freeze({
   QUESTION_ANSWERED_BODY: (leadName) => `${leadName} replied to the question you asked the department's agent`,
   TASK_ASSIGNED_TITLE: (taskKey) => `${taskKey} was assigned to you`,
   TASK_ASSIGNED_BODY: (assignerName, taskTitle) => `${assignerName} assigned you "${taskTitle}"`,
+  TASK_REVIEW_REQUESTED_TITLE: (taskKey) => `${taskKey} is ready for review`,
+  TASK_REVIEW_REQUESTED_BODY: (submitterName, taskTitle) => `${submitterName} submitted "${taskTitle}" for review`,
+  TASK_CHANGES_REQUESTED_TITLE: (taskKey) => `Changes requested on ${taskKey}`,
+  TASK_CHANGES_REQUESTED_BODY: (leadName, taskTitle, note) =>
+    `${leadName} asked for changes to "${taskTitle}": ${note}`.slice(0, 500),
 });
 
 /** Department task boards: sprints, tasks, comments and team leads. */
@@ -1095,6 +1100,11 @@ export const TASK_MESSAGES = Object.freeze({
     'Only the task leads plan sprints; you can bring a backlog task assigned to you into the active sprint',
   TASK_DONE_NEEDS_REVIEW: 'A task is marked done from In review. Move it to In review first',
   TASK_DONE_NOT_ALLOWED: 'Only the task leads or the person who reported a task can mark it done',
+  TASK_REVIEWED_APPROVED: 'Task approved and marked done',
+  TASK_REVIEWED_CHANGES: 'Changes requested; the task is back in progress',
+  TASK_NOT_IN_REVIEW: 'Only a task in review can be approved or sent back for changes',
+  TASK_DEPENDENCY_NOT_FOUND: 'The task it follows must be on this board',
+  TASK_DEPENDENCY_LOOP: 'This would make the tasks follow each other in a loop',
 });
 
 export const COMPENSATION_MESSAGES = Object.freeze({

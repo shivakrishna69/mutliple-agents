@@ -17,6 +17,7 @@ import {
   postSprint,
   postTask,
   postTaskComment,
+  postTaskReview,
   putTaskLeads,
 } from '../controllers/taskBoardController.js';
 import { departmentBoardScope } from '../middleware/departmentBoardScope.js';
@@ -37,5 +38,6 @@ departmentBoardRouter.get('/tasks/metrics', departmentBoardScope, getTeamWorkMet
 departmentBoardRouter.get('/tasks/:taskId', departmentBoardScope, getTaskDetail);
 departmentBoardRouter.patch('/tasks/:taskId', taskWriteRateLimitByUser, departmentBoardScope, patchTask);
 departmentBoardRouter.post('/tasks/:taskId/comments', taskWriteRateLimitByUser, departmentBoardScope, postTaskComment);
+departmentBoardRouter.post('/tasks/:taskId/review', taskWriteRateLimitByUser, departmentBoardScope, postTaskReview);
 
 export default departmentBoardRouter;

@@ -7,7 +7,7 @@
 import { TASK_SETTINGS } from '../constants/validation.js';
 import { TASK_STATUSES } from '../models/Task.js';
 import { SPRINT_STATUSES } from '../models/Sprint.js';
-import { ASSIGNEE_FILTERS, BACKLOG } from '../services/tasks/taskService.js';
+import { ASSIGNEE_FILTERS, BACKLOG, TASK_REVIEW_DECISIONS } from '../services/tasks/taskService.js';
 import { isValidObjectIdString } from './conversationValidators.js';
 import { bodyNotObjectResult, checkVersion, isPlainObject, validationResult } from './requestShape.js';
 
@@ -19,7 +19,14 @@ const TASK_FIELDS = Object.freeze([
   'assigneeId',
   'storyPoints',
   'sprintId',
+  'startDate',
+  'dueDate',
+  'dependsOnTaskId',
 ]);
+// References to another document: an id, or null to clear.
+const ID_FIELDS = Object.freeze(['assigneeId', 'sprintId', 'dependsOnTaskId']);
+// Calendar dates on a task: text (the model checks it is a real YYYY-MM-DD date), or null to clear.
+const NULLABLE_DATE_FIELDS = Object.freeze(['startDate', 'dueDate']);
 const TASK_CHANGE_FIELDS = Object.freeze([...TASK_FIELDS, 'status', 'orderIndex']);
 const SPRINT_FIELDS = Object.freeze(['name', 'goal', 'startDate', 'endDate']);
 
@@ -35,10 +42,12 @@ function pickTaskFields(body, fieldNames, validationErrors) {
   for (const field of fieldNames) {
     if (body[field] === undefined) continue;
     const value = body[field];
-    if (field === 'assigneeId' || field === 'sprintId') {
+    if (ID_FIELDS.includes(field)) {
       if (value === null) fields[field] = null;
       else if (isValidObjectIdString(value)) fields[field] = value.toLowerCase();
       else validationErrors.push({ field, message: 'must be an id, or null' });
+    } else if (NULLABLE_DATE_FIELDS.includes(field) && value === null) {
+      fields[field] = null;
     } else if (field === 'storyPoints') {
       if (value === null || Number.isInteger(value)) fields[field] = value;
       else validationErrors.push({ field, message: 'must be a whole number, or null' });
@@ -54,7 +63,10 @@ function pickTaskFields(body, fieldNames, validationErrors) {
   return fields;
 }
 
-/** POST /tasks: { title, description?, taskType?, priority?, assigneeId?, storyPoints?, sprintId? } */
+/**
+ * POST /tasks: { title, description?, taskType?, priority?, assigneeId?, storyPoints?, sprintId?,
+ * startDate?, dueDate?, dependsOnTaskId? }
+ */
 export function validateTaskCreation(body) {
   if (!isPlainObject(body)) return bodyNotObjectResult();
   const validationErrors = [];
@@ -78,6 +90,36 @@ export function validateTaskChanges(body) {
   if (Object.keys(changes).length === 0) validationErrors.push({ field: 'body', message: 'nothing to change' });
   const version = checkVersion(body.version, validationErrors);
   return validationResult(validationErrors, { changes, version });
+}
+
+/**
+ * POST /tasks/:taskId/review: { decision: APPROVE | REQUEST_CHANGES, note?, version }. A note is
+ * required to ask for changes, so the person knows what to change.
+ */
+export function validateTaskReview(body) {
+  if (!isPlainObject(body)) return bodyNotObjectResult();
+  const validationErrors = [];
+  refuseUnknownFields(body, ['decision', 'note', 'version'], validationErrors);
+  const decisions = Object.values(TASK_REVIEW_DECISIONS);
+  if (!decisions.includes(body.decision)) {
+    validationErrors.push({ field: 'decision', message: `must be one of ${decisions.join(', ')}` });
+  }
+  let note = null;
+  if (body.note !== undefined && body.note !== null) {
+    if (typeof body.note !== 'string') validationErrors.push({ field: 'note', message: 'must be text' });
+    else note = body.note.trim() || null;
+  }
+  if (note && note.length > TASK_SETTINGS.REVIEW_NOTE_MAX_LENGTH) {
+    validationErrors.push({
+      field: 'note',
+      message: `must be at most ${TASK_SETTINGS.REVIEW_NOTE_MAX_LENGTH} characters`,
+    });
+  }
+  if (body.decision === TASK_REVIEW_DECISIONS.REQUEST_CHANGES && !note) {
+    validationErrors.push({ field: 'note', message: 'is required when asking for changes' });
+  }
+  const version = checkVersion(body.version, validationErrors);
+  return validationResult(validationErrors, { decision: body.decision, note, version });
 }
 
 /** GET /tasks?sprintId=&assignee=&status= */

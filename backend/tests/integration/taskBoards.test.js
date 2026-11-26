@@ -287,7 +287,12 @@ describe('department task boards', { skip: mongoReason ?? false }, () => {
       [{ field: 'title', from: null, to: null }],
       'text is not copied into the log',
     );
-    assert.deepEqual(activity[3].changes.map((entry) => entry.field).sort(), ['sprintId', 'status']);
+    // Moving it to In review also submits it for review (tests/integration/taskReview.test.js).
+    assert.deepEqual(activity[3].changes.map((entry) => entry.field).sort(), ['review', 'sprintId', 'status']);
+    assert.deepEqual(
+      activity[3].changes.find((entry) => entry.field === 'review'),
+      { field: 'review', from: null, to: 'SUBMITTED' },
+    );
   });
 
   it('reassigns within the department, notifying the new assignee, and reorders a column', async () => {

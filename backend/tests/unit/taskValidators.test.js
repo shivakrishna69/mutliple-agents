@@ -1,6 +1,7 @@
 /**
  * Request shapes for department task boards (validators/taskValidators.js): ids, numbers and text
- * where they belong, unknown fields refused, filters, the version an edit is based on. Field values
+ * where they belong, unknown fields refused, filters, the version an edit is based on, task dates and
+ * the task it follows, and a lead's review. Field values
  * themselves (enums, lengths, dates) are the models' job and are tested end to end.
  */
 
@@ -16,6 +17,7 @@ import {
   validateTaskCreation,
   validateTaskLeads,
   validateTaskQuery,
+  validateTaskReview,
 } from '../../validators/taskValidators.js';
 
 const ID = '65f1a2b3c4d5e6f708192a3b';
@@ -96,5 +98,66 @@ describe('task board requests', () => {
         .isValid,
       false,
     );
+  });
+});
+
+describe('task dates and the task it follows', () => {
+  const ID = '65f1a2b3c4d5e6f708192a3b';
+
+  it('takes dates as text or null, and the followed task as an id or null', () => {
+    const created = validateTaskCreation({
+      title: 'Build',
+      startDate: '2026-11-28',
+      dueDate: null,
+      dependsOnTaskId: ID,
+    });
+    assert.equal(created.isValid, true);
+    assert.deepEqual(
+      [created.sanitizedInput.startDate, created.sanitizedInput.dueDate, created.sanitizedInput.dependsOnTaskId],
+      ['2026-11-28', null, ID],
+    );
+    const cleared = validateTaskChanges({ dueDate: null, dependsOnTaskId: null, version: 2 });
+    assert.deepEqual(cleared.sanitizedInput.changes, { dueDate: null, dependsOnTaskId: null });
+  });
+
+  it('refuses a date that is not text and a followed task that is not an id', () => {
+    const fieldsOf = (result) => result.validationErrors.map((error) => error.field).sort();
+    assert.deepEqual(fieldsOf(validateTaskCreation({ title: 'Build', dueDate: 20261130 })), ['dueDate']);
+    assert.deepEqual(fieldsOf(validateTaskChanges({ dependsOnTaskId: 'ENG-1', version: 1 })), [
+      'body',
+      'dependsOnTaskId',
+    ]);
+  });
+});
+
+describe('a lead’s review', () => {
+  it('approves with or without a note', () => {
+    assert.deepEqual(validateTaskReview({ decision: 'APPROVE', version: 3 }).sanitizedInput, {
+      decision: 'APPROVE',
+      note: null,
+      version: 3,
+    });
+    assert.equal(
+      validateTaskReview({ decision: 'APPROVE', note: '  Looks good  ', version: 3 }).sanitizedInput.note,
+      'Looks good',
+    );
+  });
+
+  it('needs a note to ask for changes, within the limit', () => {
+    const fieldsOf = (result) => result.validationErrors.map((error) => error.field).sort();
+    assert.deepEqual(fieldsOf(validateTaskReview({ decision: 'REQUEST_CHANGES', note: '   ', version: 1 })), ['note']);
+    const tooLong = 'x'.repeat(TASK_SETTINGS.REVIEW_NOTE_MAX_LENGTH + 1);
+    assert.deepEqual(fieldsOf(validateTaskReview({ decision: 'REQUEST_CHANGES', note: tooLong, version: 1 })), [
+      'note',
+    ]);
+    assert.equal(validateTaskReview({ decision: 'REQUEST_CHANGES', note: 'Fix the header', version: 1 }).isValid, true);
+  });
+
+  it('refuses an unknown decision, a missing version and unknown fields', () => {
+    const fieldsOf = (result) => result.validationErrors.map((error) => error.field).sort();
+    assert.deepEqual(fieldsOf(validateTaskReview({ decision: 'MAYBE', version: 1 })), ['decision']);
+    assert.deepEqual(fieldsOf(validateTaskReview({ decision: 'APPROVE' })), ['version']);
+    assert.deepEqual(fieldsOf(validateTaskReview({ decision: 'APPROVE', version: 1, status: 'DONE' })), ['status']);
+    assert.equal(validateTaskReview([]).isValid, false);
   });
 });
